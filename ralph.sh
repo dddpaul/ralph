@@ -46,8 +46,8 @@ echo "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS"
 
 for i in $(seq 1 $MAX_ITERATIONS); do
   # Check if any "To Do" tasks remain
-  REMAINING=$(backlog task list -s "To Do" --plain 2>/dev/null | grep -c "^" || echo "0")
-  if [ "$REMAINING" -eq 0 ]; then
+  TODO_OUTPUT=$(backlog task list -s "To Do" --plain 2>/dev/null)
+  if echo "$TODO_OUTPUT" | grep -q "No tasks found"; then
     echo ""
     echo "All tasks complete!"
     exit 0
@@ -55,6 +55,7 @@ for i in $(seq 1 $MAX_ITERATIONS); do
 
   echo ""
   echo "==============================================================="
+  REMAINING=$(echo "$TODO_OUTPUT" | grep -c "TASK-" || echo "0")
   echo "  Ralph Iteration $i of $MAX_ITERATIONS ($TOOL) - $REMAINING tasks remaining"
   echo "==============================================================="
 
