@@ -4,48 +4,37 @@ You are an autonomous coding agent working on a software project.
 
 ## Your Task
 
-1. Read the PRD at `prd.json` (in the same directory as this file)
-2. Read the progress log at `progress.txt` (check Codebase Patterns section first)
-3. Check you're on the correct branch from PRD `branchName`. If not, check it out or create from main.
-4. Pick the **highest priority** user story where `passes: false`
-5. Implement that single user story
-6. Run quality checks (e.g., typecheck, lint, test - use whatever your project requires)
-7. Update AGENTS.md files if you discover reusable patterns (see below)
-8. If checks pass, commit ALL changes with message: `feat: [Story ID] - [Story Title]`
-9. Update the PRD to set `passes: true` for the completed story
-10. Append your progress to `progress.txt`
+1. List pending tasks: `backlog task list -s "To Do" --plain`
+2. Pick the next task:
+   - Default: lowest task ID
+   - If priorities exist: highest priority first
+3. Read task details: `backlog task <id> --plain`
+4. Create branch: `git checkout -b task-<id> main`
+5. Mark in progress: `backlog task edit <id> -s "In Progress"`
+6. Implement the task
+7. Run quality checks (typecheck, lint, test - use whatever your project requires)
+8. Update AGENTS.md files if you discover reusable patterns (see below)
+9. If checks pass, commit ALL changes with message: `feat: task-<id> - <title>`
+10. Merge to main: `git checkout main && git merge task-<id>`
+11. Mark done: `backlog task edit <id> -s "Done"`
+12. Add implementation notes: `backlog task edit <id> --notes "..."`
 
-## Progress Report Format
+## Implementation Notes Format
 
-APPEND to progress.txt (never replace, always append):
+Add notes to the completed task (via `--notes` flag):
 ```
-## [Date/Time] - [Story ID]
 Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
 - What was implemented
 - Files changed
-- **Learnings for future iterations:**
+- Learnings for future iterations:
   - Patterns discovered (e.g., "this codebase uses X for Y")
   - Gotchas encountered (e.g., "don't forget to update Z when changing W")
   - Useful context (e.g., "the evaluation panel is in component X")
----
 ```
 
 Include the thread URL so future iterations can use the `read_thread` tool to reference previous work if needed.
 
 The learnings section is critical - it helps future iterations avoid repeating mistakes and understand the codebase better.
-
-## Consolidate Patterns
-
-If you discover a **reusable pattern** that future iterations should know, add it to the `## Codebase Patterns` section at the TOP of progress.txt (create it if it doesn't exist). This section should consolidate the most important learnings:
-
-```
-## Codebase Patterns
-- Example: Use `sql<number>` template for aggregations
-- Example: Always use `IF NOT EXISTS` for migrations
-- Example: Export types from actions.ts for UI components
-```
-
-Only add patterns that are **general and reusable**, not story-specific details.
 
 ## Update AGENTS.md Files
 
@@ -67,9 +56,9 @@ Before committing, check if any edited files have learnings worth preserving in 
 - "Field names must match the template exactly"
 
 **Do NOT add:**
-- Story-specific implementation details
+- Task-specific implementation details
 - Temporary debugging notes
-- Information already in progress.txt
+- Information already in task notes
 
 Only update AGENTS.md if you have **genuinely reusable knowledge** that would help future work in that directory.
 
@@ -80,29 +69,29 @@ Only update AGENTS.md if you have **genuinely reusable knowledge** that would he
 - Keep changes focused and minimal
 - Follow existing code patterns
 
-## Browser Testing (Required for Frontend Stories)
+## Browser Testing (Required for Frontend Tasks)
 
-For any story that changes UI, you MUST verify it works in the browser:
+For any task that changes UI, you MUST verify it works in the browser:
 
 1. Load the `dev-browser` skill
 2. Navigate to the relevant page
 3. Verify the UI changes work as expected
-4. Take a screenshot if helpful for the progress log
+4. Take a screenshot if helpful for the task notes
 
-A frontend story is NOT complete until browser verification passes.
+A frontend task is NOT complete until browser verification passes.
 
 ## Stop Condition
 
-After completing a user story, check if ALL stories have `passes: true`.
-
-If ALL stories are complete and passing, reply with:
-<promise>COMPLETE</promise>
-
-If there are still stories with `passes: false`, end your response normally (another iteration will pick up the next story).
+After completing a task:
+1. Run: `backlog task list -s "To Do" --plain`
+2. If NO tasks remain with status "To Do": reply with <promise>COMPLETE</promise>
+3. If tasks remain: end normally (next iteration picks up)
 
 ## Important
 
-- Work on ONE story per iteration
+- Work on ONE task per iteration
+- Each task gets its own branch: `task-<id>`
+- Always merge to main before finishing
+- Use `--plain` flag for all backlog CLI output
 - Commit frequently
 - Keep CI green
-- Read the Codebase Patterns section in progress.txt before starting

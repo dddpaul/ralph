@@ -238,3 +238,11 @@ Before saving the PRD:
 - [ ] Functional requirements are numbered and unambiguous
 - [ ] Non-goals section defines clear boundaries
 - [ ] Saved to `tasks/prd-[feature-name].md`
+
+## Next Step
+
+After creating the PRD, use the Ralph skill to convert it to backlog tasks:
+
+```
+Load the ralph skill and convert tasks/prd-[feature-name].md to backlog tasks
+```
