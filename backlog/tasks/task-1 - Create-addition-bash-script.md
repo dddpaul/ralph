@@ -1,10 +1,10 @@
 ---
 id: TASK-1
 title: Create addition bash script
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-01-29 18:20'
-updated_date: '2026-01-29 18:21'
+updated_date: '2026-01-29 18:22'
 labels: []
 dependencies: []
 ---
@@ -19,3 +19,9 @@ Create a bash script calc_add.sh that takes two numbers as arguments and prints 
 <!-- AC:BEGIN -->
 - [ ] #1 Script calc_add.sh exists,Takes two arguments,Prints the sum of the two numbers,Script is executable,Handles missing arguments with usage message
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Created calc_add.sh - takes two args, prints sum, handles missing args
+<!-- SECTION:NOTES:END -->

@@ -1,9 +1,10 @@
 ---
 id: TASK-2
 title: Create subtraction bash script
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-01-29 18:20'
+updated_date: '2026-01-29 18:23'
 labels: []
 dependencies: []
 ---
