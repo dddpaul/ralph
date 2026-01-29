@@ -1,24 +1,41 @@
-Here is Claude's plan:
-╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
- Plan: Migrate Ralph from prd.json to Backlog.md CLI
+Plan: Migrate Ralph from prd.json to Backlog.md CLI
 
  Overview
 
  Replace Ralph's single prd.json file with the
- backlog.md CLI tool for task management. Tasks become
- individual markdown files in backlog/tasks/ managed
- via backlog CLI commands.
+ backlog.md CLI tool. Each task becomes its own branch
+ (task-<id>), gets merged to main after completion, and
+  Ralph loops through all tasks.
 
  User Decisions
 
- - Branch name: Derive from task labels (e.g., label
- ralph/feature-name)
+ - Branch name: task-<id> per task (e.g., task-5)
  - Progress tracking: Fully migrate to task notes
  (eliminate progress.txt)
  - Coexistence: Fully replace prd.json (no backward
  compatibility)
  - Task ordering: Default to task ID order; use
  priority if specified
+ - Merge strategy: Merge each task branch directly to
+ main
+ - Loop behavior: Ralph loops through all tasks in one
+ run
+
+ New Workflow
+
+ 1. backlog task list -s "To Do" --plain → pick next
+ task (lowest ID or highest priority)
+ 2. git checkout -b task-<id> main
+ 3. backlog task edit <id> -s "In Progress"
+ 4. View task details: backlog task <id> --plain
+ 5. Implement the task
+ 6. Run quality checks
+ 7. Commit: feat: task-<id> - <title>
+ 8. git checkout main && git merge task-<id>
+ 9. backlog task edit <id> -s "Done" --notes
+ "Implementation notes..."
+ 10. Check remaining tasks → loop or output
+ <promise>COMPLETE</promise>
 
  ---
  Key Mappings
@@ -32,231 +49,255 @@ Here is Claude's plan:
  backlog.md: Task ID order (or --priority flag)
  ────────────────────────────────────────
  prd.json: branchName
- backlog.md: Label on tasks (e.g., ralph/feature-name)
+ backlog.md: Derived: task-<id>
  ────────────────────────────────────────
  prd.json: acceptanceCriteria[]
- backlog.md: ## Acceptance Criteria in task file
+ backlog.md: --ac flag / ## Acceptance Criteria
  ────────────────────────────────────────
  prd.json: progress.txt learnings
- backlog.md: --notes field in task file
+ backlog.md: --notes on the task
  ---
  Files to Modify
 
- 1. /Users/paul/Private/Projects/ralph/ralph.sh
+ 1. ralph.sh — Core loop rewrite
 
- - Replace jq parsing of prd.json with backlog CLI
- calls
- - Change branch detection: extract from task labels
- - Update archive logic: archive backlog/ directory
- - Remove progress.txt initialization
+ Remove:
+ - PRD_FILE / jq parsing
+ - PROGRESS_FILE initialization
+ - .last-branch tracking
+ - Archive logic (no longer needed — each task is its
+ own branch)
 
- 2. /Users/paul/Private/Projects/ralph/CLAUDE.md
-
- - Replace all prd.json references with backlog CLI
- commands
- - Update task selection: backlog task list -s "To Do"
+ Add:
+ - Task discovery via backlog task list -s "To Do"
  --plain
- - Update completion: backlog task edit <id> -s "Done"
- - Replace progress.txt append with backlog task edit
- <id> --notes "..."
- - Update stop condition logic
+ - Per-task branching: git checkout -b task-<id> main
+ - Per-task merging: git checkout main && git merge
+ task-<id>
+ - Completion check: no "To Do" tasks remaining
 
- 3. /Users/paul/Private/Projects/ralph/prompt.md
+ New script structure:
+ #!/bin/bash
+ set -e
 
- - Same changes as CLAUDE.md (for Amp CLI)
+ TOOL="amp"
+ MAX_ITERATIONS=10
+ # parse args...
 
- 4. /Users/paul/Private/Projects/ralph/skills/ralph/SKI
- LL.md
+ echo "Starting Ralph - Tool: $TOOL - Max iterations:
+ $MAX_ITERATIONS"
 
- - Change output from prd.json to backlog tasks
- - Use backlog task create commands
- - Update examples and checklists
+ for i in $(seq 1 $MAX_ITERATIONS); do
+   # Check if any "To Do" tasks remain
+   REMAINING=$(backlog task list -s "To Do" --plain
+ 2>/dev/null | grep -c "^" || echo "0")
+   if [ "$REMAINING" -eq 0 ]; then
+     echo "All tasks complete!"
+     exit 0
+   fi
 
- 5.
- /Users/paul/Private/Projects/ralph/skills/prd/SKILL.md
+   echo "=== Ralph Iteration $i of $MAX_ITERATIONS
+ ($TOOL) ==="
 
- - Update to mention backlog.md as output target
- - Add note about ralph skill converting to backlog
- tasks
+   # Spawn AI instance with prompt
+   if [[ "$TOOL" == "amp" ]]; then
+     OUTPUT=$(cat prompt.md | amp
+ --dangerously-allow-all 2>&1 | tee /dev/stderr) ||
+ true
+   else
+     OUTPUT=$(claude --dangerously-skip-permissions
+ --print < CLAUDE.md 2>&1 | tee /dev/stderr) || true
+   fi
 
- 6. /Users/paul/Private/Projects/ralph/README.md
+   # Check for completion signal
+   if echo "$OUTPUT" | grep -q
+ "<promise>COMPLETE</promise>"; then
+     echo "Ralph completed all tasks!"
+     exit 0
+   fi
 
- - Update workflow documentation
- - Change file descriptions
- - Update debugging commands
+   sleep 2
+ done
 
- 7. /Users/paul/Private/Projects/ralph/AGENTS.md
+ echo "Reached max iterations ($MAX_ITERATIONS)."
+ exit 1
 
- - Update key files section
- - Update patterns section
+ 2. CLAUDE.md — Full rewrite for backlog workflow
 
- ---
- Implementation Details
+ New content structure:
 
- Phase 1: ralph.sh Script
+ # Ralph Agent Instructions
 
- Current flow:
- CURRENT_BRANCH=$(jq -r '.branchName' "$PRD_FILE")
+ ## Your Task
 
- New flow:
- # Get branch from first task's ralph/* label
- CURRENT_BRANCH=$(backlog task list --plain 2>/dev/null
-  | head -1 | grep -oE 'ralph/[^ ]+' || echo "")
-
- Task selection logic:
- # Check if any tasks remain (for completion detection
- in script)
- REMAINING=$(backlog task list -s "To Do" --plain
- 2>/dev/null | wc -l)
-
- Archive logic:
- # Archive backlog/ directory instead of prd.json
- [ -d "$BACKLOG_DIR" ] && cp -r "$BACKLOG_DIR"
- "$ARCHIVE_FOLDER/"
-
- Phase 2: Agent Prompts (CLAUDE.md / prompt.md)
-
- Task Discovery:
  1. List pending tasks: `backlog task list -s "To Do"
  --plain`
- 2. Pick the task with lowest ID (or highest priority
- if priorities exist)
- 3. View task details: `backlog task <id> --plain`
+ 2. Pick the next task:
+    - Default: lowest task ID
+    - If priorities exist: highest priority first
+ 3. Read task details: `backlog task <id> --plain`
+ 4. Create branch: `git checkout -b task-<id> main`
+ 5. Mark in progress: `backlog task edit <id> -s "In
+ Progress"`
+ 6. Implement the task
+ 7. Run quality checks (typecheck, lint, test)
+ 8. Update CLAUDE.md files if you discover reusable
+ patterns
+ 9. If checks pass, commit: `feat: task-<id> - <title>`
+ 10. Merge to main: `git checkout main && git merge
+ task-<id>`
+ 11. Mark done: `backlog task edit <id> -s "Done"`
+ 12. Add implementation notes: `backlog task edit <id>
+ --notes "..."`
 
- Task Selection Order:
- - Default: Pick lowest task ID where status is "To Do"
- - If tasks have `--priority` set: Pick highest
- priority first
- - Check for blockers: Skip tasks with unresolved
- `--dep` dependencies
+ ## Implementation Notes Format
 
- Branch Detection:
- - Read task labels to find branch name (e.g., label
- `ralph/feature-name`)
- - Extract: `backlog task list --plain | grep -oE
- 'ralph/[^ ]+' | head -1`
- - If no ralph/* label found, use `main` or prompt user
+ Add notes to the completed task (via --notes flag):
+ - What was implemented
+ - Files changed
+ - Learnings for future iterations
 
- Marking Complete:
- - Update status: `backlog task edit <id> -s "Done"`
- - Add implementation notes: `backlog task edit <id>
- --notes "What was done, learnings..."`
+ ## Codebase Patterns
 
- Stop Condition:
- - Check: `backlog task list -s "To Do" --plain`
- - If empty (no "To Do" tasks remain): output
- `<promise>COMPLETE</promise>`
+ If you discover reusable patterns, update nearby
+ CLAUDE.md files.
+ (Same section as current — no changes needed)
 
- Progress/Learnings:
- - Instead of appending to progress.txt, add notes to
- task:
-   `backlog task edit <id> --notes "## Implementation
- Notes\n- What was done\n- Learnings..."`
- - For cross-task patterns, update CLAUDE.md files as
- before
+ ## Quality Requirements
+ (Same as current — no changes)
 
- Phase 3: Skills Updates
+ ## Browser Testing
+ (Same as current — no changes)
 
- skills/ralph/SKILL.md - New workflow:
+ ## Stop Condition
+
+ After completing a task:
+ 1. Run: `backlog task list -s "To Do" --plain`
+ 2. If NO tasks remain with status "To Do": reply with
+ <promise>COMPLETE</promise>
+ 3. If tasks remain: end normally (next iteration picks
+  up)
+
+ ## Important
+
+ - Work on ONE task per iteration
+ - Each task gets its own branch: `task-<id>`
+ - Always merge to main before finishing
+ - Use `--plain` flag for all backlog CLI output
+
+ 3. prompt.md — Same changes as CLAUDE.md (for Amp)
+
+ Mirror all CLAUDE.md changes, keeping Amp-specific
+ differences (thread URL format).
+
+ 4. skills/ralph/SKILL.md — Output backlog tasks
+ instead of JSON
+
+ Replace the JSON output format section with:
+
  ## Output Format
 
- For each user story, run:
+ For each user story in the PRD, create a backlog task:
+
  backlog task create "<title>" \
    -d "<description>" \
    --ac "<criterion1>,<criterion2>,Typecheck passes" \
-   -l ralph/<feature-name> \
    --priority <number>
 
+ ## Story Ordering
+ Create tasks in dependency order. Task IDs are
+ auto-assigned sequentially,
+ so create foundational tasks first (schema → backend →
+  UI).
+
+ For tasks with dependencies:
+ backlog task create "<title>" --dep task-<id>
+
  ## Example
+
+ Input PRD: "Task Priority System"
+
  backlog task create "Add priority field to database" \
    -d "As a developer, I need to store task priority so
   it persists across sessions." \
    --ac "Add priority column to tasks table,Generate
  and run migration,Typecheck passes" \
-   -l ralph/task-priority \
    --priority 1
 
- Dependency ordering:
- # For tasks that depend on earlier tasks:
- backlog task create "Display UI component" \
-   -d "..." \
+ backlog task create "Display priority indicator on
+ task cards" \
+   -d "As a user, I want to see task priority at a
+ glance." \
+   --ac "Each task card shows colored priority
+ badge,Priority visible without hovering,Typecheck
+ passes,Verify in browser" \
    --dep task-1 \
    --priority 2
+
+ 5. skills/prd/SKILL.md — Minor update
+
+ Add a note at the end:
+ ## Next Step
+ After creating the PRD, use the Ralph skill to convert
+  it to backlog tasks:
+ "Load the ralph skill and convert
+ tasks/prd-[feature-name].md to backlog tasks"
+
+ 6. README.md — Update documentation
+
+ Key changes:
+ - Replace prd.json references with backlog.md CLI
+ - Update workflow section (backlog init → task create
+ → ralph.sh)
+ - Update key files table (remove prd.json, add
+ backlog/)
+ - Update debugging section (backlog task list --plain
+ instead of jq)
+ - Remove archiving section (no longer applicable with
+ per-task branches)
+
+ 7. AGENTS.md — Update key files and patterns
+
+ - Replace prd.json references with backlog/tasks/
+ - Update "Memory persists via" to include backlog task
+  notes
+ - Remove progress.txt references
+
+ 8. Update PROMPT-BACKLOG.md — Write the full proposal
+
+ Replace current content with the complete migration
+ proposal documenting:
+ - The new workflow (backlog CLI replaces prd.json)
+ - Per-task branching strategy (task-<id>)
+ - Merge-to-main after each task
+ - Task ordering (ID order, priority override)
+ - Progress via task notes (no progress.txt)
+ - All affected files and their changes
+
+ 9. Delete prd.json.example
+
+ No longer needed — backlog.md format replaces it.
 
  ---
  Verification Plan
 
- 1. Create test backlog tasks:
+ 1. Ensure backlog CLI is available:
+ which backlog && backlog --version
+ 2. Create test tasks:
  backlog init  # if needed
- backlog task create "Test task 1" -d "Test" --ac "Test
-  criterion" -l ralph/test-feature
- backlog task create "Test task 2" -d "Test" --ac "Test
-  criterion" -l ralph/test-feature
- 2. Run ralph.sh and verify:
-   - Script detects branch from labels
-   - Script spawns AI instance
-   - AI picks lowest ID task
-   - AI implements (or simulates)
-   - AI marks task Done via CLI
-   - AI adds notes to task
-   - Loop continues or completes
- 3. Test completion detection:
-   - Mark all tasks Done
-   - Verify <promise>COMPLETE</promise> is output
-   - Verify ralph.sh exits successfully
- 4. Test archiving:
-   - Change branch label on new tasks
-   - Run ralph.sh
-   - Verify old backlog/ is archived to
- archive/YYYY-MM-DD-feature/
-
- ---
- Files Summary
- File: ralph.sh
- Action: Modify
- Key Changes: Replace jq with backlog CLI, update
-   archive logic
- ────────────────────────────────────────
- File: CLAUDE.md
- Action: Modify
- Key Changes: Full rewrite of task workflow
- instructions
- ────────────────────────────────────────
- File: prompt.md
- Action: Modify
- Key Changes: Same as CLAUDE.md for Amp
- ────────────────────────────────────────
- File: skills/ralph/SKILL.md
- Action: Modify
- Key Changes: Output backlog tasks instead of JSON
- ────────────────────────────────────────
- File: skills/prd/SKILL.md
- Action: Modify
- Key Changes: Minor updates to reference backlog
- ────────────────────────────────────────
- File: README.md
- Action: Modify
- Key Changes: Update workflow docs, file descriptions
- ────────────────────────────────────────
- File: AGENTS.md
- Action: Modify
- Key Changes: Update key files and patterns
- ────────────────────────────────────────
- File: prd.json.example
- Action: Delete
- Key Changes: No longer needed
- ────────────────────────────────────────
- File: progress.txt
- Action: Delete concept
- Key Changes: Learnings go to task notes
- ---
- Commit Strategy
-
- 1. feat: Replace prd.json with backlog.md CLI in
- ralph.sh
- 2. feat: Update CLAUDE.md for backlog workflow
- 3. feat: Update prompt.md for backlog workflow
- 4. feat: Update ralph skill for backlog task creation
- 5. docs: Update README and AGENTS.md for backlog
- workflow
- 6. chore: Remove prd.json.example
+ backlog task create "Test task 1" -d "First test" --ac
+  "Criterion A,Criterion B"
+ backlog task create "Test task 2" -d "Second test"
+ --ac "Criterion C" --dep task-1
+ 3. Verify ralph.sh flow:
+   - Run ./ralph.sh --tool claude 1 (single iteration)
+   - Verify branch task-1 is created
+   - Verify task is marked "In Progress" then "Done"
+   - Verify merge to main
+ 4. Test completion:
+   - Mark all tasks Done manually
+   - Verify ralph.sh detects no remaining tasks and
+ exits 0
+ 5. Test task ordering:
+   - Create tasks with explicit --priority values
+   - Verify Ralph picks highest priority first
