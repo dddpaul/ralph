@@ -9,13 +9,13 @@ You are an autonomous coding agent working on a software project.
    - Default: lowest task ID
    - If priorities exist: highest priority first
 3. Read task details: `backlog task <id> --plain`
-4. Create branch: `git checkout -b task-<id> main`
+4. Create branch: `git checkout -b task-<id> master`
 5. Mark in progress: `backlog task edit <id> -s "In Progress"`
 6. Implement the task
 7. Run quality checks (typecheck, lint, test - use whatever your project requires)
 8. Update CLAUDE.md files if you discover reusable patterns (see below)
 9. If checks pass, commit ALL changes with message: `feat: task-<id> - <title>`
-10. Merge to main: `git checkout main && git merge task-<id>`
+10. Merge to master: `git checkout master && git merge task-<id>`
 11. Mark done: `backlog task edit <id> -s "Done"`
 12. Add implementation notes: `backlog task edit <id> --notes "..."`
 
@@ -85,7 +85,7 @@ After completing a task:
 
 - Work on ONE task per iteration
 - Each task gets its own branch: `task-<id>`
-- Always merge to main before finishing
+- Always merge to master before finishing
 - Use `--plain` flag for all backlog CLI output
 - Commit frequently
 - Keep CI green
