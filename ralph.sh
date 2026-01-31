@@ -76,7 +76,7 @@ for i in $(seq 1 $MAX_ITERATIONS); do
     fi
   else
     if [[ "$STREAM" == true ]]; then
-      claude --dangerously-skip-permissions --print --output-format stream-json < "$SCRIPT_DIR/CLAUDE.md" 2>&1 | tee "$OUTFILE" || true
+      claude --dangerously-skip-permissions --print --output-format stream-json --verbose < "$SCRIPT_DIR/CLAUDE.md" 2>&1 | tee "$OUTFILE" || true
     else
       claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/CLAUDE.md" > "$OUTFILE" 2>&1 || true
     fi
