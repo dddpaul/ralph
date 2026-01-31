@@ -9,22 +9,7 @@ You are an autonomous coding agent working on a software project.
    - Default: lowest task ID
    - If priorities exist: highest priority first
 3. Read task details: `backlog task <id> --plain`
-4. Create branch: `git checkout -b task-<id>-<short-description> master`
-5. Mark in progress: `backlog task edit <id> -s "In Progress" -a @claude`
-6. Implement the task
-7. Run quality checks (build, typecheck, lint, test - use whatever your project requires)
-8. Update CLAUDE.md files if you discover reusable patterns (see below)
-9. Check off acceptance criteria as you complete them: `backlog task edit <id> --check-ac <number>`
-10. If checks pass, commit: `task-<id>: <description>`
-11. Include the backlog task file in a follow-up commit:
-    ```bash
-    git add backlog/tasks/task-<id>*.md
-    git commit -m "task-<id>: Add task file"
-    ```
-12. Run mandatory code review (see below)
-13. Merge to master: `git checkout master && git merge task-<id>-<short-description> && git branch -d task-<id>-<short-description>`
-14. Mark done: `backlog task edit <id> -s "Done"`
-15. Add implementation notes: `backlog task edit <id> --notes "..."`
+4. Follow the Full Task Workflow below to implement, review, and merge
 
 ## Important Workflow Notes
 - **MANDATORY: Make sure there is backlog task BEFORE writing any code.** When asked to implement a feature or fix, first create a task with `backlog task create`, set it in progress, assign to @claude, and create a task branch. Only then start coding. No exceptions.
@@ -43,14 +28,18 @@ You are an autonomous coding agent working on a software project.
 
 ## Git Flow with Backlog Hooks
 
-The post-commit hook automatically appends commit hash to task files when on a `task-XXX-*` branch. The task file stays uncommitted to preserve the exact hash. Workflow:
-```bash
-git commit -m "task-XXX: message"  # hook appends hash to task file
-git add backlog/tasks/task-XXX*.md # include task file
-git commit -m "task-XXX: Add task file"
-# Run code review before merge (see below)
-git checkout master && git merge <branch> && git branch -d <branch>
-```
+The post-commit hook automatically appends commit hash to task files when on a `task-XXX-*` branch. The task file stays uncommitted to preserve the exact hash. On amends, it updates the hash.
+
+### Full Task Workflow
+1. **Create task:** `backlog task create "Title" -d "Description" --ac "Criterion"`
+2. **Start work:** `backlog task edit <id> -s "In Progress" -a @claude`
+3. **Create branch:** `git checkout -b task-XXX-description master`
+4. **Implement:** write code, run linter, run tests
+5. **Commit code:** `git commit -m "task-XXX: message"` (hook appends hash to task file)
+6. **Code review:** spawn Explore agent to review changes (see below). If changes requested, loop back to step 4.
+7. **Mark done:** `backlog task edit <id> -s "Done"`
+8. **Commit task file:** `git add backlog/tasks/task-XXX*.md && git commit -m "Update task file"`
+9. **Merge and clean up:** `git checkout master && git merge <branch> && git branch -d <branch>`
 
 ## Mandatory Code Review Before Merge
 
