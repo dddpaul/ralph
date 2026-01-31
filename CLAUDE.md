@@ -27,13 +27,14 @@ You are an autonomous coding agent working on a software project.
 - Delete task branch after merge
 
 ## Git Flow with Backlog Hooks
-
 The post-commit hook automatically appends commit hash to task files when on a `task-XXX-*` branch. The task file stays uncommitted to preserve the exact hash. On amends, it updates the hash.
+
+**Never use `--notes` flag** — it overwrites the entire Notes section, destroying commit hashes appended by the hook. Always use `--append-notes` instead.
 
 ### Full Task Workflow
 1. **Create task:** `backlog task create "Title" -d "Description" --ac "Criterion"`
 2. **Start work:** `backlog task edit <id> -s "In Progress" -a @claude`
-3. **Create branch:** `git checkout -b task-XXX-description master`
+3. **Create branch:** `git checkout -b task-XXX-description`
 4. **Implement:** write code, run linter, run tests
 5. **Commit code:** `git commit -m "task-XXX: message"` (hook appends hash to task file)
 6. **Code review:** spawn Explore agent to review changes (see below). If changes requested, loop back to step 4.
