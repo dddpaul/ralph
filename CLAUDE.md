@@ -26,6 +26,21 @@ You are an autonomous coding agent working on a software project.
 14. Mark done: `backlog task edit <id> -s "Done"`
 15. Add implementation notes: `backlog task edit <id> --notes "..."`
 
+## Important Workflow Notes
+- **MANDATORY: Make sure there is backlog task BEFORE writing any code.** When asked to implement a feature or fix, first create a task with `backlog task create`, set it in progress, assign to @claude, and create a task branch. Only then start coding. No exceptions.
+- Do not execute any tasks that not being asked to do
+- Always run build, tests, linter before committing
+- Do NOT commit broken code
+- Run tests and linter after making significant changes to verify functionality
+- Don't add "Generated with Claude Code" or "Co-Authored-By: Claude" to commit messages or PRs
+- Do not include "Test plan" sections in PR descriptions
+- Do not add comments that describe changes, progress, or historical modifications. Avoid comments like "new function," "added test," "now we changed this," or "previously used X, now using Y." Comments should only describe the current state and purpose of the code, not its history or evolution.
+- After important functionality added, update README.md accordingly
+- Work on ONE task per iteration
+- Each task gets its own branch: `task-<id>-<short-description>`
+- Always merge to master before finishing
+- Delete task branch after merge
+
 ## Git Flow with Backlog Hooks
 
 The post-commit hook automatically appends commit hash to task files when on a `task-XXX-*` branch. The task file stays uncommitted to preserve the exact hash. Workflow:
@@ -114,16 +129,6 @@ Before committing, check if any edited files have learnings worth preserving in 
 
 Only update CLAUDE.md if you have **genuinely reusable knowledge** that would help future work in that directory.
 
-## Quality Requirements
-
-- Always run build, tests, and linter before committing
-- Run tests and linter after making significant changes to verify functionality
-- Do NOT commit broken code
-- Keep changes focused and minimal
-- Follow existing code patterns
-- Do not add comments that describe changes, progress, or historical modifications. Comments should only describe the current state and purpose of the code.
-- Do not execute any tasks that are not being asked to do
-
 ## Browser Testing (If Available)
 
 For any task that changes UI, verify it works in the browser if you have browser testing tools configured (e.g., via MCP):
@@ -141,12 +146,3 @@ After completing a task:
 2. If NO tasks remain with status "To Do": reply with <promise>COMPLETE</promise>
 3. If tasks remain: end normally (next iteration picks up)
 
-## Important
-
-- Work on ONE task per iteration
-- Each task gets its own branch: `task-<id>-<short-description>`
-- Always merge to master before finishing
-- Delete task branch after merge
-- Use `--plain` flag for all backlog CLI output
-- Commit frequently
-- Keep CI green
