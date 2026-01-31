@@ -1,12 +1,13 @@
 #!/bin/bash
 # Ralph Wiggum - Long-running AI agent loop
-# Usage: ./ralph.sh [--tool amp|claude] [max_iterations]
+# Usage: ./ralph.sh [--tool amp|claude] [--stream] [max_iterations]
 
 set -e
 
 # Parse arguments
 TOOL="amp"  # Default to amp for backwards compatibility
 MAX_ITERATIONS=10
+STREAM=false
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -16,6 +17,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --tool=*)
       TOOL="${1#*=}"
+      shift
+      ;;
+    --stream)
+      STREAM=true
       shift
       ;;
     *)
@@ -42,7 +47,7 @@ if ! command -v backlog &> /dev/null; then
   exit 1
 fi
 
-echo "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS"
+echo "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS - Stream: $STREAM"
 
 for i in $(seq 1 $MAX_ITERATIONS); do
   # Check if any "To Do" tasks remain
@@ -59,15 +64,22 @@ for i in $(seq 1 $MAX_ITERATIONS); do
   echo "  Ralph Iteration $i of $MAX_ITERATIONS ($TOOL) - $REMAINING tasks remaining"
   echo "==============================================================="
 
-  # Run the selected tool, streaming output to terminal via temp file
+  # Run the selected tool, saving output to temp file
   OUTFILE=$(mktemp)
   trap "rm -f $OUTFILE" EXIT
 
   if [[ "$TOOL" == "amp" ]]; then
-    cat "$SCRIPT_DIR/prompt.md" | amp --dangerously-allow-all 2>&1 | tee "$OUTFILE" || true
+    if [[ "$STREAM" == true ]]; then
+      cat "$SCRIPT_DIR/prompt.md" | amp --dangerously-allow-all 2>&1 | tee "$OUTFILE" || true
+    else
+      cat "$SCRIPT_DIR/prompt.md" | amp --dangerously-allow-all > "$OUTFILE" 2>&1 || true
+    fi
   else
-    # Claude Code: use --dangerously-skip-permissions for autonomous operation, --print for output
-    claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/CLAUDE.md" 2>&1 | tee "$OUTFILE" || true
+    if [[ "$STREAM" == true ]]; then
+      claude --dangerously-skip-permissions --print --output-format stream-json < "$SCRIPT_DIR/CLAUDE.md" 2>&1 | tee "$OUTFILE" || true
+    else
+      claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/CLAUDE.md" > "$OUTFILE" 2>&1 || true
+    fi
   fi
 
   # Check for completion signal
