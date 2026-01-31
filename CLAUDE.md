@@ -9,15 +9,72 @@ You are an autonomous coding agent working on a software project.
    - Default: lowest task ID
    - If priorities exist: highest priority first
 3. Read task details: `backlog task <id> --plain`
-4. Create branch: `git checkout -b task-<id> master`
-5. Mark in progress: `backlog task edit <id> -s "In Progress"`
+4. Create branch: `git checkout -b task-<id>-<short-description> master`
+5. Mark in progress: `backlog task edit <id> -s "In Progress" -a @claude`
 6. Implement the task
-7. Run quality checks (typecheck, lint, test - use whatever your project requires)
+7. Run quality checks (build, typecheck, lint, test - use whatever your project requires)
 8. Update CLAUDE.md files if you discover reusable patterns (see below)
-9. If checks pass, commit ALL changes with message: `feat: task-<id> - <title>`
-10. Merge to master: `git checkout master && git merge task-<id>`
-11. Mark done: `backlog task edit <id> -s "Done"`
-12. Add implementation notes: `backlog task edit <id> --notes "..."`
+9. Check off acceptance criteria as you complete them: `backlog task edit <id> --check-ac <number>`
+10. If checks pass, commit: `task-<id>: <description>`
+11. Include the backlog task file in a follow-up commit:
+    ```bash
+    git add backlog/tasks/task-<id>*.md
+    git commit -m "task-<id>: Add task file"
+    ```
+12. Run mandatory code review (see below)
+13. Merge to master: `git checkout master && git merge task-<id>-<short-description> && git branch -d task-<id>-<short-description>`
+14. Mark done: `backlog task edit <id> -s "Done"`
+15. Add implementation notes: `backlog task edit <id> --notes "..."`
+
+## Git Flow with Backlog Hooks
+
+The post-commit hook automatically appends commit hash to task files when on a `task-XXX-*` branch. The task file stays uncommitted to preserve the exact hash. Workflow:
+```bash
+git commit -m "task-XXX: message"  # hook appends hash to task file
+git add backlog/tasks/task-XXX*.md # include task file
+git commit -m "task-XXX: Add task file"
+# Run code review before merge (see below)
+git checkout master && git merge <branch> && git branch -d <branch>
+```
+
+## Mandatory Code Review Before Merge
+
+**Every task branch MUST be reviewed before merging to master.** No exceptions.
+
+After implementation is complete and tests pass, spawn an Explore agent to review the changes:
+
+```
+Review the changes in branch task-XXX for merge to master.
+Run: git diff master..HEAD
+Check the task requirements: backlog task XXX --plain
+```
+
+**Review Checklist:**
+1. **Acceptance Criteria** - All AC items are implemented and verified
+2. **Functionality** - Code does what it's supposed to do, edge cases handled
+3. **Bugs** - No obvious bugs, null checks, error handling present
+4. **Security** - No SQL injection, XSS, command injection, secrets in code
+5. **Code Style** - Consistent with project conventions, readable
+6. **Tests** - New functionality has appropriate test coverage
+7. **No Debug Code** - No console.log, print statements, commented code left behind
+8. **Unintended Changes** - No accidental modifications to unrelated files
+
+**Review Outcomes:**
+- Approved - Proceed with merge
+- Changes Requested - Fix issues and re-review
+- Rejected - Significant problems, needs rework
+
+Only merge after receiving explicit approval from the reviewer.
+
+## Task Management with Backlog CLI
+
+Use `backlog` CLI for all task operations. **Never edit task files directly.**
+
+Key commands:
+- `backlog task create "Title" -d "Description" --ac "Criterion"`
+- `backlog task edit <id> -s "In Progress" -a @claude`
+- `backlog task edit <id> --check-ac 1`
+- `backlog task list --plain` / `backlog task <id> --plain`
 
 ## Implementation Notes Format
 
@@ -59,10 +116,13 @@ Only update CLAUDE.md if you have **genuinely reusable knowledge** that would he
 
 ## Quality Requirements
 
-- ALL commits must pass your project's quality checks (typecheck, lint, test)
+- Always run build, tests, and linter before committing
+- Run tests and linter after making significant changes to verify functionality
 - Do NOT commit broken code
 - Keep changes focused and minimal
 - Follow existing code patterns
+- Do not add comments that describe changes, progress, or historical modifications. Comments should only describe the current state and purpose of the code.
+- Do not execute any tasks that are not being asked to do
 
 ## Browser Testing (If Available)
 
@@ -84,8 +144,9 @@ After completing a task:
 ## Important
 
 - Work on ONE task per iteration
-- Each task gets its own branch: `task-<id>`
+- Each task gets its own branch: `task-<id>-<short-description>`
 - Always merge to master before finishing
+- Delete task branch after merge
 - Use `--plain` flag for all backlog CLI output
 - Commit frequently
 - Keep CI green
