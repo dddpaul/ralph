@@ -4,11 +4,10 @@
 
 If the prompt starts with `MODE: autonomous`: you MUST complete exactly **ONE** task, then **STOP**. Do NOT pick up another task. The Ralph loop will spawn a fresh instance for the next task.
 
-After completing the single task, output a summary and stop:
-1. Print what was done: task ID, title, files changed, key decisions
-2. Run: `backlog task list -s "To Do" --plain`
-3. If no "To Do" tasks remain: reply with `<promise>COMPLETE</promise>`
-4. If tasks remain: end your response (do NOT start another task)
+After completing the single task:
+- Run: `backlog task list -s "To Do" --plain`
+- If no "To Do" tasks remain: reply with `<promise>COMPLETE</promise>`
+- If tasks remain: end your response (do NOT start another task)
 
 ## Workflow
 
@@ -23,6 +22,7 @@ After completing the single task, output a summary and stop:
 8. **Mark done with notes:** `backlog task edit <id> -s "Done" --append-notes "What was implemented, files changed, learnings"`
 9. **Commit task file:** `git add backlog/tasks/task-<id>*.md && git commit -m "Update task file"`
 10. **Merge and clean up:** `git checkout master && git merge <branch> && git branch -d <branch>`
+11. **Output summary:** Print a recap — task ID, title, what was implemented, files changed, and any key decisions made
 
 ### Git Hooks
 The post-commit hook appends commit hash to task files on `task-*` branches. The task file stays uncommitted to preserve the exact hash. On amends, it updates the hash.
