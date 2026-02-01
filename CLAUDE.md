@@ -20,7 +20,7 @@ After completing the single task:
 6. **Commit code:** `git commit -m "task-<id>: message"` (post-commit hook appends hash to task file)
 7. **Code review:** spawn Explore agent to review (see below). If changes requested, loop to step 4.
 8. **Mark done with notes:** `backlog task edit <id> -s "Done" --append-notes "What was implemented, files changed, learnings"`
-9. **Commit task file:** `git add backlog/tasks/task-<id>*.md && git commit -m "Update task file"`
+9. **Commit task file:** `git add backlog/tasks/task-<id>*.md && git commit -m "task-<id>: Update task file"`
 10. **Merge and clean up:** `git checkout master && git merge <branch> && git branch -d <branch>`
 11. **Output summary:** Print a recap — task ID, title, what was implemented, files changed, and any key decisions made
 
