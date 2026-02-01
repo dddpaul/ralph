@@ -1,13 +1,12 @@
 #!/bin/bash
 # Ralph Wiggum - Long-running AI agent loop
-# Usage: ./ralph.sh [--tool amp|claude] [--stream] [max_iterations]
+# Usage: ./ralph.sh [--tool amp|claude] [max_iterations]
 
 set -e
 
 # Parse arguments
 TOOL="amp"  # Default to amp for backwards compatibility
 MAX_ITERATIONS=10
-STREAM=false
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -17,10 +16,6 @@ while [[ $# -gt 0 ]]; do
       ;;
     --tool=*)
       TOOL="${1#*=}"
-      shift
-      ;;
-    --stream)
-      STREAM=true
       shift
       ;;
     *)
@@ -47,7 +42,7 @@ if ! command -v backlog &> /dev/null; then
   exit 1
 fi
 
-echo "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS - Stream: $STREAM"
+echo "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS"
 
 for i in $(seq 1 $MAX_ITERATIONS); do
   # Check if any "To Do" tasks remain
@@ -73,18 +68,10 @@ for i in $(seq 1 $MAX_ITERATIONS); do
 
   if [[ "$TOOL" == "amp" ]]; then
     PROMPT=$(printf "%s\n\n%s" "$MODE_PREFIX" "$(cat "$SCRIPT_DIR/prompt.md")")
-    if [[ "$STREAM" == true ]]; then
-      echo "$PROMPT" | amp --dangerously-allow-all 2>&1 | tee "$OUTFILE" || true
-    else
-      echo "$PROMPT" | amp --dangerously-allow-all > "$OUTFILE" 2>&1 || true
-    fi
+    echo "$PROMPT" | amp --dangerously-allow-all > "$OUTFILE" 2>&1 || true
   else
     PROMPT=$(printf "%s\n\n%s" "$MODE_PREFIX" "$(cat "$SCRIPT_DIR/CLAUDE.md")")
-    if [[ "$STREAM" == true ]]; then
-      echo "$PROMPT" | claude --dangerously-skip-permissions --print --output-format stream-json --verbose 2>&1 | tee "$OUTFILE" || true
-    else
-      echo "$PROMPT" | claude --dangerously-skip-permissions --print > "$OUTFILE" 2>&1 || true
-    fi
+    echo "$PROMPT" | claude --dangerously-skip-permissions --print > "$OUTFILE" 2>&1 || true
   fi
 
   # Check for completion signal
