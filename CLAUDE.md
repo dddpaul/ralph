@@ -36,6 +36,8 @@ Use `backlog` CLI for all task operations. **Never edit task files directly.**
 - `backlog task edit <id> -s "In Progress" -a @claude`
 - `backlog task edit <id> --check-ac 1`
 
+For complex task management — breakdowns, AC writing, quality review — use the `project-manager-backlog` agent. It enforces task atomicity, outcome-oriented acceptance criteria, and proper dependency ordering.
+
 ## Rules
 
 ### Code Quality
