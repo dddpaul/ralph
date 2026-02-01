@@ -68,10 +68,10 @@ for i in $(seq 1 $MAX_ITERATIONS); do
 
   if [[ "$TOOL" == "amp" ]]; then
     PROMPT=$(printf "%s\n\n%s" "$MODE_PREFIX" "$(cat "$SCRIPT_DIR/prompt.md")")
-    echo "$PROMPT" | amp --dangerously-allow-all > "$OUTFILE" 2>&1 || true
+    echo "$PROMPT" | amp --dangerously-allow-all 2>&1 | tee "$OUTFILE" || true
   else
     PROMPT=$(printf "%s\n\n%s" "$MODE_PREFIX" "$(cat "$SCRIPT_DIR/CLAUDE.md")")
-    echo "$PROMPT" | claude --dangerously-skip-permissions --print > "$OUTFILE" 2>&1 || true
+    echo "$PROMPT" | claude --dangerously-skip-permissions --print 2>&1 | tee "$OUTFILE" || true
   fi
 
   # Check for completion signal
