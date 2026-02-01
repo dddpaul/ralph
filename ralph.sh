@@ -71,7 +71,7 @@ for i in $(seq 1 $MAX_ITERATIONS); do
     echo "$PROMPT" | amp --dangerously-allow-all 2>&1 | tee "$OUTFILE" || true
   else
     PROMPT=$(printf "%s\n\n%s" "$MODE_PREFIX" "$(cat "$SCRIPT_DIR/CLAUDE.md")")
-    echo "$PROMPT" | claude --dangerously-skip-permissions --print --verbose 2>&1 | tee "$OUTFILE" || true
+    echo "$PROMPT" | claude --dangerously-skip-permissions --print 2>&1 | tee "$OUTFILE" || true
   fi
 
   # Check for completion signal
