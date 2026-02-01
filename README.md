@@ -100,12 +100,24 @@ Default is 10 iterations. Use `--tool amp` or `--tool claude` to select your AI 
 Ralph will:
 1. Check for remaining "To Do" tasks via `backlog task list`
 2. Pick the next task (lowest ID or highest priority)
-3. Create a branch (`task-<id>`) from main
+3. Create a branch (`task-<id>-description`) from master
 4. Implement the task
-5. Run quality checks (typecheck, tests)
-6. Commit and merge to main
-7. Mark the task as "Done" with implementation notes
-8. Repeat until all tasks are done or max iterations reached
+5. Run quality checks (build, lint, tests)
+6. Commit code, then run mandatory code review
+7. Mark task as "Done", commit task file
+8. Merge to master and delete the task branch
+9. Repeat until all tasks are done or max iterations reached
+
+Each iteration gets a `MODE: autonomous` prefix so the agent knows it's running in the Ralph loop vs interactive mode.
+
+## Dual Mode: Autonomous + Interactive
+
+CLAUDE.md serves both autonomous (Ralph loop) and interactive (human-driven) development:
+
+- **Autonomous mode**: Ralph loop prepends `MODE: autonomous` to the prompt. The agent picks tasks from the backlog and works through them.
+- **Interactive mode**: No mode prefix. The agent creates a backlog task for every code change request before implementing.
+
+The same workflow (branch, implement, review, merge) applies in both modes.
 
 ## Key Files
 
@@ -113,7 +125,7 @@ Ralph will:
 |------|---------|
 | `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool amp` or `--tool claude`) |
 | `prompt.md` | Prompt template for Amp |
-| `CLAUDE.md` | Prompt template for Claude Code |
+| `CLAUDE.md` | Agent instructions for Claude Code (autonomous + interactive) |
 | `backlog/` | Task files managed by backlog.md CLI |
 | `skills/prd/` | Skill for generating PRDs |
 | `skills/ralph/` | Skill for converting PRDs to backlog tasks |
@@ -159,27 +171,28 @@ Too big (split these):
 
 ### Per-Task Branching
 
-Each task gets its own branch (`task-<id>`) created from main. After the task is complete and quality checks pass, the branch is merged back to main. This keeps main always up-to-date and avoids long-lived feature branches.
+Each task gets its own branch (`task-<id>-description`) created from master. After the task is complete, code review passes, and quality checks pass, the branch is merged back to master and deleted. This keeps master always up-to-date and avoids long-lived feature branches.
 
-### AGENTS.md / CLAUDE.md Updates Are Critical
+### Mandatory Code Review
+
+Every task branch is reviewed before merging. The agent spawns an Explore agent to check acceptance criteria, functionality, security, code style, and test coverage. Only approved branches get merged.
+
+### Git Hooks
+
+The post-commit hook appends commit hashes to task files on `task-*` branches. This creates an audit trail linking commits to tasks. Use `--append-notes` (never `--notes`) to avoid overwriting hook-generated content.
+
+### AGENTS.md / CLAUDE.md Updates
 
 After each iteration, Ralph updates the relevant AGENTS.md or CLAUDE.md files with learnings. This is key because AI coding tools automatically read these files, so future iterations (and future human developers) benefit from discovered patterns, gotchas, and conventions.
-
-Examples of what to add:
-- Patterns discovered ("this codebase uses X for Y")
-- Gotchas ("do not forget to update Z when changing W")
-- Useful context ("the settings panel is in component X")
 
 ### Feedback Loops
 
 Ralph only works if there are feedback loops:
-- Typecheck catches type errors
+- Build/typecheck catches compilation errors
+- Linter enforces code style
 - Tests verify behavior
+- Code review catches issues before merge
 - CI must stay green (broken code compounds across iterations)
-
-### Browser Verification for UI Tasks
-
-Frontend tasks must include "Verify in browser using dev-browser skill" in acceptance criteria. Ralph will use the dev-browser skill to navigate to the page, interact with the UI, and confirm changes work.
 
 ### Stop Condition
 
@@ -200,12 +213,12 @@ backlog task <id> --plain
 git log --oneline -10
 ```
 
-## Customizing the Prompt
+## Customizing
 
-After copying `prompt.md` (for Amp) or `CLAUDE.md` (for Claude Code) to your project, customize it for your project:
+After copying `prompt.md` (for Amp) or `CLAUDE.md` (for Claude Code) to your project, customize it:
 - Add project-specific quality check commands
-- Include codebase conventions
-- Add common gotchas for your stack
+- Include codebase conventions and common gotchas
+- Add language/framework instructions to the `## Project-Specific` section at the bottom of CLAUDE.md
 
 ## References
 
