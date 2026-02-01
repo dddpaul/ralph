@@ -10,7 +10,7 @@
 5. **Check off AC:** `backlog task edit <id> --check-ac <number>`
 6. **Commit code:** `git commit -m "task-<id>: message"` (post-commit hook appends hash to task file)
 7. **Code review:** spawn Explore agent to review (see below). If changes requested, loop to step 4.
-8. **Mark done:** `backlog task edit <id> -s "Done"`
+8. **Mark done with notes:** `backlog task edit <id> -s "Done" --append-notes "What was implemented, files changed, learnings"`
 9. **Commit task file:** `git add backlog/tasks/task-<id>*.md && git commit -m "Update task file"`
 10. **Merge and clean up:** `git checkout master && git merge <branch> && git branch -d <branch>`
 
