@@ -1,5 +1,14 @@
 # Agent Instructions
 
+## CRITICAL: One Task Per Iteration (Autonomous Mode)
+
+If the prompt starts with `MODE: autonomous`: you MUST complete exactly **ONE** task, then **STOP**. Do NOT pick up another task. The Ralph loop will spawn a fresh instance for the next task.
+
+After completing the single task:
+- Run: `backlog task list -s "To Do" --plain`
+- If no "To Do" tasks remain: reply with `<promise>COMPLETE</promise>`
+- If tasks remain: **STOP immediately** and end your response
+
 ## Workflow
 
 ### Task Lifecycle
@@ -76,17 +85,12 @@ Only merge after reviewer approval. If changes requested, fix and re-review.
 
 ## Ralph Loop (Autonomous Mode)
 
-Activated when the prompt starts with `MODE: autonomous`. When in this mode:
+Activated when the prompt starts with `MODE: autonomous`. Task picking:
 
-1. Pick next task: `backlog task list -s "To Do" --plain` (lowest ID, or highest priority)
+1. Run: `backlog task list -s "To Do" --plain` (pick lowest ID, or highest priority)
 2. Read details: `backlog task <id> --plain`
-3. Execute the Task Lifecycle above for **ONE task only**
-4. After completing the task, check remaining work:
-   - Run: `backlog task list -s "To Do" --plain`
-   - If NO "To Do" tasks remain: reply with `<promise>COMPLETE</promise>`
-   - If tasks remain: **STOP immediately** — do not pick up another task. The next Ralph loop iteration will handle it.
-
-**Important:** Each iteration handles exactly ONE task. Do not continue to the next task within the same iteration.
+3. Execute the Task Lifecycle above for that single task
+4. Then STOP (see top of file)
 
 ## Browser Testing
 
