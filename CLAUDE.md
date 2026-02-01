@@ -1,138 +1,92 @@
-# Ralph Agent Instructions
+# Agent Instructions
 
-You are an autonomous coding agent working on a software project.
+## Workflow
 
-## Your Task
-
-1. List pending tasks: `backlog task list -s "To Do" --plain`
-2. Pick the next task:
-   - Default: lowest task ID
-   - If priorities exist: highest priority first
-3. Read task details: `backlog task <id> --plain`
-4. Follow the Full Task Workflow below to implement, review, and merge
-
-## Important Workflow Notes
-- **MANDATORY: Make sure there is backlog task BEFORE writing any code.** When asked to implement a feature or fix, first create a task with `backlog task create`, set it in progress, assign to @claude, and create a task branch. Only then start coding. No exceptions.
-- Do not execute any tasks that not being asked to do
-- Always run build, tests, linter before committing
-- Do NOT commit broken code
-- Run tests and linter after making significant changes to verify functionality
-- Don't add "Generated with Claude Code" or "Co-Authored-By: Claude" to commit messages or PRs
-- Do not include "Test plan" sections in PR descriptions
-- Do not add comments that describe changes, progress, or historical modifications. Avoid comments like "new function," "added test," "now we changed this," or "previously used X, now using Y." Comments should only describe the current state and purpose of the code, not its history or evolution.
-- After important functionality added, update README.md accordingly
-- Work on ONE task per iteration
-- Each task gets its own branch: `task-<id>-<short-description>`
-- Always merge to master before finishing
-- Delete task branch after merge
-
-## Git Flow with Backlog Hooks
-The post-commit hook automatically appends commit hash to task files when on a `task-XXX-*` branch. The task file stays uncommitted to preserve the exact hash. On amends, it updates the hash.
-
-**Never use `--notes` flag** — it overwrites the entire Notes section, destroying commit hashes appended by the hook. Always use `--append-notes` instead.
-
-### Full Task Workflow
-1. **Create task:** `backlog task create "Title" -d "Description" --ac "Criterion"`
+### Task Lifecycle
+1. **Create task (if needed):** `backlog task create "Title" -d "Description" --ac "Criterion"` — skip if task already exists
 2. **Start work:** `backlog task edit <id> -s "In Progress" -a @claude`
-3. **Create branch:** `git checkout -b task-XXX-description`
-4. **Implement:** write code, run linter, run tests
-5. **Commit code:** `git commit -m "task-XXX: message"` (hook appends hash to task file)
-6. **Code review:** spawn Explore agent to review changes (see below). If changes requested, loop back to step 4.
-7. **Mark done:** `backlog task edit <id> -s "Done"`
-8. **Commit task file:** `git add backlog/tasks/task-XXX*.md && git commit -m "Update task file"`
-9. **Merge and clean up:** `git checkout master && git merge <branch> && git branch -d <branch>`
+3. **Create branch:** `git checkout -b task-<id>-description master`
+4. **Implement:** write code, run build/linter/tests
+5. **Check off AC:** `backlog task edit <id> --check-ac <number>`
+6. **Commit code:** `git commit -m "task-<id>: message"` (post-commit hook appends hash to task file)
+7. **Code review:** spawn Explore agent to review (see below). If changes requested, loop to step 4.
+8. **Mark done:** `backlog task edit <id> -s "Done"`
+9. **Commit task file:** `git add backlog/tasks/task-<id>*.md && git commit -m "Update task file"`
+10. **Merge and clean up:** `git checkout master && git merge <branch> && git branch -d <branch>`
 
-## Mandatory Code Review Before Merge
+### Git Hooks
+The post-commit hook appends commit hash to task files on `task-*` branches. The task file stays uncommitted to preserve the exact hash. On amends, it updates the hash.
 
-**Every task branch MUST be reviewed before merging to master.** No exceptions.
+**Never use `--notes`** — it overwrites the Notes section, destroying commit hashes. Use `--append-notes` instead.
 
-After implementation is complete and tests pass, spawn an Explore agent to review the changes:
-
-```
-Review the changes in branch task-XXX for merge to master.
-Run: git diff master..HEAD
-Check the task requirements: backlog task XXX --plain
-```
-
-**Review Checklist:**
-1. **Acceptance Criteria** - All AC items are implemented and verified
-2. **Functionality** - Code does what it's supposed to do, edge cases handled
-3. **Bugs** - No obvious bugs, null checks, error handling present
-4. **Security** - No SQL injection, XSS, command injection, secrets in code
-5. **Code Style** - Consistent with project conventions, readable
-6. **Tests** - New functionality has appropriate test coverage
-7. **No Debug Code** - No console.log, print statements, commented code left behind
-8. **Unintended Changes** - No accidental modifications to unrelated files
-
-**Review Outcomes:**
-- Approved - Proceed with merge
-- Changes Requested - Fix issues and re-review
-- Rejected - Significant problems, needs rework
-
-Only merge after receiving explicit approval from the reviewer.
-
-## Task Management with Backlog CLI
-
+### Backlog CLI Reference
 Use `backlog` CLI for all task operations. **Never edit task files directly.**
-
-Key commands:
+- `backlog task list --plain` / `backlog task <id> --plain`
 - `backlog task create "Title" -d "Description" --ac "Criterion"`
 - `backlog task edit <id> -s "In Progress" -a @claude`
 - `backlog task edit <id> --check-ac 1`
-- `backlog task list --plain` / `backlog task <id> --plain`
 
-## Implementation Notes Format
+## Rules
 
-Add notes to the completed task (via `--notes` flag):
-- What was implemented
-- Files changed
-- **Learnings for future iterations:**
-  - Patterns discovered (e.g., "this codebase uses X for Y")
-  - Gotchas encountered (e.g., "don't forget to update Z when changing W")
-  - Useful context (e.g., "the evaluation panel is in component X")
+### Code Quality
+- Always run build, linter, and tests before committing
+- Run tests after significant changes to verify functionality
+- Do NOT commit broken code
+- Follow existing code patterns
 
-The learnings section is critical - it helps future iterations avoid repeating mistakes and understand the codebase better.
+### Commit Hygiene
+- No "Generated with Claude Code" or "Co-Authored-By" in commits or PRs
+- No "Test plan" sections in PR descriptions
+- No historical comments ("added X", "changed Y to Z") — comments describe current state only
 
-## Update CLAUDE.md Files
+### Scope
+- **MANDATORY: A backlog task MUST exist BEFORE writing any code.** When asked to implement a feature or fix in interactive mode, first create a task with `backlog task create`, then follow the Task Lifecycle. No exceptions.
+- Do not execute tasks you were not asked to do
+- One task per iteration, one branch per task
+- Keep changes focused and minimal
+- Always merge to master and delete task branch when done
 
-Before committing, check if any edited files have learnings worth preserving in nearby CLAUDE.md files:
+### Knowledge Sharing
+- Update README.md after adding important functionality
+- Update nearby CLAUDE.md files with reusable patterns (API conventions, gotchas, dependencies — not task-specific details)
+- Add implementation notes to completed tasks via `--append-notes`
 
-1. **Identify directories with edited files** - Look at which directories you modified
-2. **Check for existing CLAUDE.md** - Look for CLAUDE.md in those directories or parent directories
-3. **Add valuable learnings** - If you discovered something future developers/agents should know:
-   - API patterns or conventions specific to that module
-   - Gotchas or non-obvious requirements
-   - Dependencies between files
-   - Testing approaches for that area
-   - Configuration or environment requirements
+## Code Review
 
-**Examples of good CLAUDE.md additions:**
-- "When modifying X, also update Y to keep them in sync"
-- "This module uses pattern Z for all API calls"
-- "Tests require the dev server running on PORT 3000"
-- "Field names must match the template exactly"
+**Every task branch MUST be reviewed before merging.** No exceptions.
 
-**Do NOT add:**
-- Task-specific implementation details
-- Temporary debugging notes
-- Information already in task notes
+After tests pass, spawn an Explore agent:
+```
+Review changes in branch task-<id> for merge to master.
+Run: git diff master..HEAD
+Check requirements: backlog task <id> --plain
+```
 
-Only update CLAUDE.md if you have **genuinely reusable knowledge** that would help future work in that directory.
+**Checklist:**
+1. Acceptance criteria met
+2. Functionality correct, edge cases handled
+3. No bugs, proper error handling
+4. No security issues (injection, XSS, secrets)
+5. Consistent code style
+6. Test coverage for new functionality
+7. No debug code or commented-out code
+8. No unintended changes to other files
 
-## Browser Testing (If Available)
+Only merge after reviewer approval. If changes requested, fix and re-review.
 
-For any task that changes UI, verify it works in the browser if you have browser testing tools configured (e.g., via MCP):
+## Ralph Loop (Autonomous Mode)
 
-1. Navigate to the relevant page
-2. Verify the UI changes work as expected
-3. Take a screenshot if helpful for the task notes
+Activated when the prompt starts with `MODE: autonomous`. When in this mode:
 
-If no browser tools are available, note in the task notes that manual browser verification is needed.
+1. Pick next task: `backlog task list -s "To Do" --plain` (lowest ID, or highest priority)
+2. Read details: `backlog task <id> --plain`
+3. Execute the Task Lifecycle above
+4. After completing: if no "To Do" tasks remain, reply with `<promise>COMPLETE</promise>`. Otherwise end normally.
 
-## Stop Condition
+## Browser Testing
 
-After completing a task:
-1. Run: `backlog task list -s "To Do" --plain`
-2. If NO tasks remain with status "To Do": reply with <promise>COMPLETE</promise>
-3. If tasks remain: end normally (next iteration picks up)
+For UI tasks, verify in browser if tools are available (e.g., MCP). Note in task if manual verification is needed.
 
+## Project-Specific
+
+<!-- Add language, framework, and tech stack instructions below -->

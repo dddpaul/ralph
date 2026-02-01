@@ -68,17 +68,22 @@ for i in $(seq 1 $MAX_ITERATIONS); do
   OUTFILE=$(mktemp)
   trap "rm -f $OUTFILE" EXIT
 
+  # Build prompt with autonomous mode prefix
+  MODE_PREFIX="MODE: autonomous (Ralph loop iteration $i of $MAX_ITERATIONS)"
+
   if [[ "$TOOL" == "amp" ]]; then
+    PROMPT=$(printf "%s\n\n%s" "$MODE_PREFIX" "$(cat "$SCRIPT_DIR/prompt.md")")
     if [[ "$STREAM" == true ]]; then
-      cat "$SCRIPT_DIR/prompt.md" | amp --dangerously-allow-all 2>&1 | tee "$OUTFILE" || true
+      echo "$PROMPT" | amp --dangerously-allow-all 2>&1 | tee "$OUTFILE" || true
     else
-      cat "$SCRIPT_DIR/prompt.md" | amp --dangerously-allow-all > "$OUTFILE" 2>&1 || true
+      echo "$PROMPT" | amp --dangerously-allow-all > "$OUTFILE" 2>&1 || true
     fi
   else
+    PROMPT=$(printf "%s\n\n%s" "$MODE_PREFIX" "$(cat "$SCRIPT_DIR/CLAUDE.md")")
     if [[ "$STREAM" == true ]]; then
-      claude --dangerously-skip-permissions --print --output-format stream-json --verbose < "$SCRIPT_DIR/CLAUDE.md" 2>&1 | tee "$OUTFILE" || true
+      echo "$PROMPT" | claude --dangerously-skip-permissions --print --output-format stream-json --verbose 2>&1 | tee "$OUTFILE" || true
     else
-      claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/CLAUDE.md" > "$OUTFILE" 2>&1 || true
+      echo "$PROMPT" | claude --dangerously-skip-permissions --print > "$OUTFILE" 2>&1 || true
     fi
   fi
 
