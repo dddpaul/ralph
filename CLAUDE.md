@@ -80,8 +80,13 @@ Activated when the prompt starts with `MODE: autonomous`. When in this mode:
 
 1. Pick next task: `backlog task list -s "To Do" --plain` (lowest ID, or highest priority)
 2. Read details: `backlog task <id> --plain`
-3. Execute the Task Lifecycle above
-4. After completing: if no "To Do" tasks remain, reply with `<promise>COMPLETE</promise>`. Otherwise end normally.
+3. Execute the Task Lifecycle above for **ONE task only**
+4. After completing the task, check remaining work:
+   - Run: `backlog task list -s "To Do" --plain`
+   - If NO "To Do" tasks remain: reply with `<promise>COMPLETE</promise>`
+   - If tasks remain: **STOP immediately** — do not pick up another task. The next Ralph loop iteration will handle it.
+
+**Important:** Each iteration handles exactly ONE task. Do not continue to the next task within the same iteration.
 
 ## Browser Testing
 
