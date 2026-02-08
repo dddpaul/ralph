@@ -46,12 +46,12 @@ For complex task management — breakdowns, AC writing, quality review — use t
 - Do NOT commit broken code
 - Follow existing code patterns
 
-### Commit Brevity
-- Do not add comments that describe changes, progress, or historical modifications
-- Avoid comments like “new function,” “added test,” “now we changed this,” or “previously used X, now using Y."
-- Do not add "Generated with Claude Code" or "Co-Authored-By" in commits or PRs
+### Commit & PR Brevity
+- Commit messages must not describe changes, progress, or historical modifications
+- Avoid commit messages like "new function," "added test," "now we changed this," or "previously used X, now using Y"
+- Do not add "Generated with Claude Code" or "Co-Authored-By" trailers to commits or PRs
 - Do not add "Test plan" sections in PR descriptions
-- Comments should only describe the current state and purpose of the code, not its history or evolution
+- Commit messages should describe what the code does, not its history or evolution
 
 ### Scope
 - **MANDATORY: A backlog task MUST exist BEFORE writing any code.** When asked to implement a feature or fix in interactive mode, first create a task with `backlog task create`, then follow the Task Lifecycle. No exceptions.
