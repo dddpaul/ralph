@@ -57,6 +57,8 @@ cp -r skills/ralph ~/.claude/skills/
 
 The repository includes a DevContainer with firewall restrictions for sandboxed autonomous agent execution. Network access is limited to approved domains only (GitHub, npm, Anthropic API, etc.).
 
+**Runtime:** The default Dockerfile includes Go 1.25, but you can replace Stage 1 with any language runtime (Python, Ruby, Java, etc.) by modifying `.devcontainer/Dockerfile`.
+
 To run Ralph in the devcontainer:
 
 ```bash

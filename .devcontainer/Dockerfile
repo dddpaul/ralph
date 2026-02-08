@@ -1,5 +1,8 @@
 ###
-### Stage 1: Go
+### Stage 1: Language Runtime
+###
+### Replace this stage with your project's language runtime (python:3.x, ruby:3.x, openjdk:21, etc.)
+### Then update the COPY command in Stage 2 to copy the appropriate binaries/libraries
 ###
 FROM golang:1.25 AS golang
 
@@ -37,7 +40,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   ca-certificates \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# ---- Go (from multi-stage) ----
+# ---- Language Runtime (from multi-stage) ----
+# If using a different language, update this section:
+# Python: COPY --from=python /usr/local /usr/local
+# Ruby: COPY --from=ruby /usr/local /usr/local
+# Java: COPY --from=openjdk /usr/local/openjdk-* /usr/local/jdk
 COPY --from=golang /usr/local/go /usr/local/go
 ENV PATH="/usr/local/go/bin:${PATH}"
 
