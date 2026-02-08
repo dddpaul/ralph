@@ -53,6 +53,18 @@ cp -r skills/prd ~/.claude/skills/
 cp -r skills/ralph ~/.claude/skills/
 ```
 
+### Option 3: Run in DevContainer (sandboxed)
+
+The repository includes a DevContainer with firewall restrictions for sandboxed autonomous agent execution. Network access is limited to approved domains only (GitHub, npm, Anthropic API, etc.).
+
+To run Ralph in the devcontainer:
+
+```bash
+./ralph.sh --devcontainer [max_iterations]
+```
+
+This starts the container automatically and executes Ralph inside the isolated environment. The firewall (`init-firewall.sh`) restricts outbound network access using iptables and validates restrictions on startup.
+
 ### Configure Amp auto-handoff (recommended)
 
 Add to `~/.config/amp/settings.json`:
@@ -95,9 +107,12 @@ This creates individual backlog tasks with acceptance criteria, priorities, and 
 
 # Using Claude Code
 ./scripts/ralph/ralph.sh --tool claude [max_iterations]
+
+# Run in sandboxed devcontainer
+./scripts/ralph/ralph.sh --devcontainer [max_iterations]
 ```
 
-Default is 10 iterations. Use `--tool amp` or `--tool claude` to select your AI coding tool.
+Default is 10 iterations. Use `--tool amp` or `--tool claude` to select your AI coding tool. Add `--devcontainer` to run in an isolated container with network restrictions.
 
 Ralph will:
 1. Check for remaining "To Do" tasks via `backlog task list`
@@ -125,10 +140,11 @@ The same workflow (branch, implement, review, merge) applies in both modes.
 
 | File | Purpose |
 |------|---------|
-| `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool amp` or `--tool claude`) |
+| `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool amp\|claude` and `--devcontainer`) |
 | `prompt.md` | Prompt template for Amp |
 | `CLAUDE.md` | Agent instructions for Claude Code (autonomous + interactive) |
 | `backlog/` | Task files managed by backlog.md CLI |
+| `.devcontainer/` | DevContainer configuration with firewall for sandboxed execution |
 | `skills/prd/` | Skill for generating PRDs |
 | `skills/ralph/` | Skill for converting PRDs to backlog tasks |
 | `flowchart/` | Interactive visualization of how Ralph works |
