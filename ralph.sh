@@ -1,12 +1,13 @@
 #!/bin/bash
 # Ralph Wiggum - Long-running AI agent loop
-# Usage: ./ralph.sh [--tool amp|claude] [max_iterations]
+# Usage: ./ralph.sh [--tool amp|claude] [--devcontainer] [max_iterations]
 
 set -e
 
 # Parse arguments
 TOOL="amp"  # Default to amp for backwards compatibility
 MAX_ITERATIONS=10
+USE_DEVCONTAINER=false
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -16,6 +17,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --tool=*)
       TOOL="${1#*=}"
+      shift
+      ;;
+    --devcontainer)
+      USE_DEVCONTAINER=true
       shift
       ;;
     *)
@@ -42,7 +47,18 @@ if ! command -v backlog &> /dev/null; then
   exit 1
 fi
 
-echo "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS"
+# Start devcontainer if requested
+if [[ "$USE_DEVCONTAINER" == true ]]; then
+  if ! command -v devcontainer &> /dev/null; then
+    echo "Error: 'devcontainer' CLI not found. Install with: npm install -g @devcontainers/cli"
+    exit 1
+  fi
+  echo "Starting devcontainer..."
+  devcontainer up --workspace-folder "$SCRIPT_DIR"
+  echo "Devcontainer is ready."
+fi
+
+echo "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS${USE_DEVCONTAINER:+ (devcontainer)}"
 
 for i in $(seq 1 $MAX_ITERATIONS); do
   # Check if any "To Do" tasks remain
@@ -66,12 +82,18 @@ for i in $(seq 1 $MAX_ITERATIONS); do
   # Build prompt with autonomous mode prefix
   MODE_PREFIX="MODE: autonomous (Ralph loop iteration $i of $MAX_ITERATIONS)"
 
+  # Build the exec prefix for devcontainer mode
+  EXEC_PREFIX=""
+  if [[ "$USE_DEVCONTAINER" == true ]]; then
+    EXEC_PREFIX="devcontainer exec --workspace-folder $SCRIPT_DIR"
+  fi
+
   if [[ "$TOOL" == "amp" ]]; then
     PROMPT=$(printf "%s\n\n%s" "$MODE_PREFIX" "$(cat "$SCRIPT_DIR/prompt.md")")
-    echo "$PROMPT" | amp --dangerously-allow-all 2>&1 | tee "$OUTFILE" || true
+    echo "$PROMPT" | $EXEC_PREFIX amp --dangerously-allow-all 2>&1 | tee "$OUTFILE" || true
   else
     PROMPT=$(printf "%s\n\n%s" "$MODE_PREFIX" "$(cat "$SCRIPT_DIR/CLAUDE.md")")
-    echo "$PROMPT" | claude --dangerously-skip-permissions --print 2>&1 | tee "$OUTFILE" || true
+    echo "$PROMPT" | $EXEC_PREFIX claude --dangerously-skip-permissions --print 2>&1 | tee "$OUTFILE" || true
   fi
 
   # Check for completion signal
