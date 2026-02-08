@@ -11,7 +11,29 @@ Converts existing PRDs to backlog tasks that Ralph uses for autonomous execution
 
 ## The Job
 
-Take a PRD (markdown file or text) and create backlog tasks using the `backlog` CLI.
+Take a PRD (markdown file or text) and create:
+1. A **project overview document** via `backlog doc create` — captures goals, tech stack, architecture, and scope from the PRD
+2. **Backlog tasks** via `backlog task create` — one per user story, ordered by dependency
+
+---
+
+## Project Overview Document
+
+Before creating tasks, generate a project overview document that gives Ralph context about the project. This document persists in the backlog and can be referenced by any task iteration.
+
+```bash
+backlog doc create "Project Overview" -t "overview"
+```
+
+Then edit the generated file to include:
+
+- **Goal** — what the project/feature achieves (1-2 sentences from PRD)
+- **Tech Stack** — languages, frameworks, databases, key libraries
+- **Architecture** — high-level structure (e.g., "Next.js app with server actions and SQLite")
+- **Scope** — what's in and out of scope
+- **Task Dependency Graph** — ordered list showing task flow (schema -> backend -> UI)
+
+Keep it concise — this is a reference sheet, not a copy of the PRD.
 
 ---
 
@@ -22,7 +44,9 @@ For each user story in the PRD, create a backlog task:
 ```bash
 backlog task create "<title>" \
   -d "<description>" \
-  --ac "<criterion1>,<criterion2>,Typecheck passes" \
+  --ac "<criterion1>" \
+  --ac "<criterion2>" \
+  --ac "Typecheck passes" \
   --priority <number>
 ```
 
@@ -31,7 +55,9 @@ For tasks with dependencies on earlier tasks:
 ```bash
 backlog task create "<title>" \
   -d "<description>" \
-  --ac "<criterion1>,<criterion2>,Typecheck passes" \
+  --ac "<criterion1>" \
+  --ac "<criterion2>" \
+  --ac "Typecheck passes" \
   --dep task-<id> \
   --priority <number>
 ```
@@ -148,36 +174,51 @@ Each is one focused change that can be completed and verified independently.
 ```bash
 backlog task create "Add priority field to database" \
   -d "As a developer, I need to store task priority so it persists across sessions." \
-  --ac "Add priority column to tasks table,Generate and run migration,Typecheck passes" \
+  --ac "Add priority column to tasks table" \
+  --ac "Generate and run migration" \
+  --ac "Typecheck passes" \
   --priority 1
 
 backlog task create "Display priority indicator on task cards" \
   -d "As a user, I want to see task priority at a glance." \
-  --ac "Each task card shows colored priority badge,Priority visible without hovering,Typecheck passes,Verify in browser using dev-browser skill" \
+  --ac "Each task card shows colored priority badge" \
+  --ac "Priority visible without hovering" \
+  --ac "Typecheck passes" \
+  --ac "Verify in browser using dev-browser skill" \
   --dep task-1 \
   --priority 2
 
 backlog task create "Add priority selector to task edit" \
   -d "As a user, I want to change a task's priority when editing it." \
-  --ac "Priority dropdown in task edit modal,Shows current priority as selected,Saves immediately on selection change,Typecheck passes,Verify in browser using dev-browser skill" \
+  --ac "Priority dropdown in task edit modal" \
+  --ac "Shows current priority as selected" \
+  --ac "Saves immediately on selection change" \
+  --ac "Typecheck passes" \
+  --ac "Verify in browser using dev-browser skill" \
   --dep task-2 \
   --priority 3
 
 backlog task create "Filter tasks by priority" \
   -d "As a user, I want to filter the task list to see only high-priority items when I'm focused." \
-  --ac "Filter dropdown with options: All | High | Medium | Low,Filter persists in URL params,Empty state message when no tasks match filter,Typecheck passes,Verify in browser using dev-browser skill" \
+  --ac "Filter dropdown with options: All | High | Medium | Low" \
+  --ac "Filter persists in URL params" \
+  --ac "Empty state message when no tasks match filter" \
+  --ac "Typecheck passes" \
+  --ac "Verify in browser using dev-browser skill" \
   --dep task-3 \
   --priority 4
 ```
 
 ---
 
-## Checklist Before Creating Tasks
+## Checklist Before Creating
 
-Before running the backlog task create commands, verify:
+Before running the commands, verify:
 
+- [ ] Project overview doc is created with goals, tech stack, and architecture
 - [ ] Each task is completable in one iteration (small enough)
 - [ ] Tasks are ordered by dependency (schema -> backend -> UI)
+- [ ] Each `--ac` flag contains exactly one criterion (no comma-separated lists)
 - [ ] Every task has "Typecheck passes" as criterion
 - [ ] UI tasks have "Verify in browser using dev-browser skill" as criterion
 - [ ] Acceptance criteria are verifiable (not vague)
