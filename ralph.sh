@@ -1,11 +1,12 @@
 #!/bin/bash
 # Ralph Wiggum - Long-running AI agent loop
-# Usage: ./ralph.sh [--tool amp|claude] [--devcontainer] [max_iterations]
+# Usage: ./ralph.sh [--tool amp|claude] [--model model_id] [--devcontainer] [max_iterations]
 
 set -e
 
 # Parse arguments
 TOOL="amp"  # Default to amp for backwards compatibility
+MODEL="claude-opus-4-6"  # Default model for claude tool
 MAX_ITERATIONS=10
 USE_DEVCONTAINER=false
 
@@ -17,6 +18,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --tool=*)
       TOOL="${1#*=}"
+      shift
+      ;;
+    --model)
+      MODEL="$2"
+      shift 2
+      ;;
+    --model=*)
+      MODEL="${1#*=}"
       shift
       ;;
     --devcontainer)
@@ -58,7 +67,11 @@ if [[ "$USE_DEVCONTAINER" == true ]]; then
   echo "Devcontainer is ready."
 fi
 
-echo "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS${USE_DEVCONTAINER:+ (devcontainer)}"
+MODEL_INFO=""
+if [[ "$TOOL" == "claude" ]]; then
+  MODEL_INFO=" ($MODEL)"
+fi
+echo "Starting Ralph - Tool: $TOOL$MODEL_INFO - Max iterations: $MAX_ITERATIONS${USE_DEVCONTAINER:+ (devcontainer)}"
 
 for i in $(seq 1 $MAX_ITERATIONS); do
   # Check if any "To Do" tasks remain
@@ -92,8 +105,14 @@ for i in $(seq 1 $MAX_ITERATIONS); do
     PROMPT=$(printf "%s\n\n%s" "$MODE_PREFIX" "$(cat "$SCRIPT_DIR/prompt.md")")
     echo "$PROMPT" | $EXEC_PREFIX amp --dangerously-allow-all 2>&1 | tee "$OUTFILE" || true
   else
-    PROMPT=$(printf "%s\n\n%s" "$MODE_PREFIX" "$(cat "$SCRIPT_DIR/CLAUDE.md")")
-    echo "$PROMPT" | $EXEC_PREFIX claude --dangerously-skip-permissions --print 2>&1 | tee "$OUTFILE" || true
+    # Claude reads CLAUDE.md automatically as project instructions.
+    # Send only a short, focused prompt — not the full CLAUDE.md — to avoid
+    # drowning the key instructions in a wall of duplicated text.
+    PROMPT="$MODE_PREFIX
+
+Pick the next To Do task and execute the full Task Lifecycle from CLAUDE.md.
+Your response MUST end with the ## Task Summary block. This is not optional."
+    echo "$PROMPT" | $EXEC_PREFIX claude --model "$MODEL" --dangerously-skip-permissions --print 2>&1 | tee "$OUTFILE" || true
   fi
 
   # Check for completion signal

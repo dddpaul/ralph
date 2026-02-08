@@ -4,10 +4,20 @@
 
 If the prompt starts with `MODE: autonomous`: you MUST complete exactly **ONE** task, then **STOP**. Do NOT pick up another task. The Ralph loop will spawn a fresh instance for the next task.
 
-After completing the single task:
-- Run: `backlog task list -s "To Do" --plain`
-- If no "To Do" tasks remain: reply with `<promise>COMPLETE</promise>`
-- If tasks remain: end your response (do NOT start another task)
+After completing the single task, your final output MUST use this exact format:
+
+```
+## Task Summary
+
+- **Task:** TASK-<id> — <title>
+- **What was implemented:** <description of what was done>
+- **Files changed:** <list of files>
+- **Key decisions:** <any notable decisions or trade-offs>
+```
+
+Then run `backlog task list -s "To Do" --plain`:
+- If no "To Do" tasks remain → reply with `<promise>COMPLETE</promise>`
+- If tasks remain → end your response (do NOT start another task)
 
 ## Workflow
 
@@ -19,10 +29,11 @@ After completing the single task:
 5. **Check off AC:** `backlog task edit <id> --check-ac <number>`
 6. **Commit code:** `git commit -m "task-<id>: message"` (post-commit hook appends hash to task file)
 7. **Code review:** spawn Explore agent to review (see below). If changes requested, loop to step 4.
-8. **Mark done with notes:** `backlog task edit <id> -s "Done" --append-notes "What was implemented, files changed, learnings"`
-9. **Commit task file:** `git add backlog/tasks/task-<id>*.md && git commit -m "task-<id>: Update task file"`
-10. **Merge and clean up:** `git checkout master && git merge <branch> && git branch -d <branch>`
-11. **Output summary:** Print a recap — task ID, title, what was implemented, files changed, and any key decisions made
+8. **GATE — verify before marking done:** Run build, linter, and tests one final time. ALL must pass. If any fails, loop to step 4. **Never mark a task "Done" with a broken build, failing tests, or linter errors.**
+9. **Mark done with notes:** `backlog task edit <id> -s "Done" --append-notes "What was implemented, files changed, learnings"`
+10. **Commit task file:** `git add backlog/tasks/task-<id>*.md && git commit -m "task-<id>: Update task file"`
+11. **Merge and clean up:** `git checkout master && git merge <branch> && git branch -d <branch>`
+12. **Output summary:** Print the `## Task Summary` block defined at the top of this file with all fields filled in.
 
 ### Git Hooks
 The post-commit hook appends commit hash to task files on `task-*` branches. The task file stays uncommitted to preserve the exact hash. On amends, it updates the hash.
@@ -45,6 +56,7 @@ For complex task management — breakdowns, AC writing, quality review — use t
 - Run tests after significant changes to verify functionality
 - Do NOT commit broken code
 - Follow existing code patterns
+- **CRITICAL: A task may ONLY be marked "Done" if ALL of the following pass: (1) build succeeds, (2) all tests pass, (3) linter reports zero errors, (4) code review is approved.** If any of these fail, the task MUST remain "In Progress" until all issues are resolved. No exceptions.
 
 ### Commit & PR Brevity
 - Commit messages must not describe changes, progress, or historical modifications
