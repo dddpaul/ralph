@@ -1,0 +1,39 @@
+#!/bin/bash
+
+# Skip if only backlog files changed (avoid noise on task-only commits)
+CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r HEAD)
+if echo "$CHANGED_FILES" | grep -qE '^backlog/'; then
+    if ! echo "$CHANGED_FILES" | grep -qvE '^backlog/'; then
+        exit 0
+    fi
+fi
+
+BRANCH_NAME=$(git symbolic-ref --short HEAD 2>/dev/null)
+TASK_ID=$(echo "$BRANCH_NAME" | grep -oE 'task-[0-9]+' | head -1)
+
+if [ -n "$TASK_ID" ]; then
+    NUMERIC_ID="${TASK_ID#task-}"
+
+    # Check if this is an amend
+    IS_AMEND=false
+    if git reflog -1 --format=%gs | grep -q "amend"; then
+        IS_AMEND=true
+    fi
+
+    COMMIT_HASH=$(git rev-parse --short HEAD)
+    COMMIT_MSG=$(git log -1 --format=%s)
+    TASK_FILE=$(ls "$(git rev-parse --show-toplevel)"/backlog/tasks/task-"${NUMERIC_ID}"*.md 2>/dev/null | head -1)
+
+    if [ "$IS_AMEND" = true ] && [ -n "$TASK_FILE" ]; then
+        # On amend: find and replace previous commit entry
+        PREV_HASH=$(git reflog -2 --format=%h | tail -1)
+        if grep -q "Commit: \`$PREV_HASH\`" "$TASK_FILE" 2>/dev/null; then
+            sed -i '' "s/Commit: \`$PREV_HASH\` - .*/Commit: \`$COMMIT_HASH\` - $COMMIT_MSG/" "$TASK_FILE"
+        else
+            backlog task edit "$NUMERIC_ID" --append-notes "Commit: \`$COMMIT_HASH\` - $COMMIT_MSG" 2>/dev/null || true
+        fi
+    else
+        # Regular commit: append new entry
+        backlog task edit "$NUMERIC_ID" --append-notes "Commit: \`$COMMIT_HASH\` - $COMMIT_MSG" 2>/dev/null || true
+    fi
+fi
