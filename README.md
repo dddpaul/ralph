@@ -43,14 +43,16 @@ Copy the skills to your Amp or Claude config for use across all projects:
 
 For AMP
 ```bash
-cp -r skills/prd ~/.config/amp/skills/
-cp -r skills/ralph ~/.config/amp/skills/
+cp -r skills/ralph-init ~/.config/amp/skills/
+cp -r skills/ralph-prd ~/.config/amp/skills/
+cp -r skills/ralph-backlog ~/.config/amp/skills/
 ```
 
 For Claude Code
 ```bash
-cp -r skills/prd ~/.claude/skills/
-cp -r skills/ralph ~/.claude/skills/
+cp -r skills/ralph-init ~/.claude/skills/
+cp -r skills/ralph-prd ~/.claude/skills/
+cp -r skills/ralph-backlog ~/.claude/skills/
 ```
 
 ### Option 3: Run in DevContainer (sandboxed)
@@ -86,17 +88,17 @@ This enables automatic handoff when context fills up, allowing Ralph to handle l
 Use the PRD skill to generate a detailed requirements document:
 
 ```
-Load the prd skill and create a PRD for [your feature description]
+Load the ralph-prd skill and create a PRD for [your feature description]
 ```
 
 Answer the clarifying questions. The skill saves output to `tasks/prd-[feature-name].md`.
 
 ### 2. Convert PRD to backlog tasks
 
-Use the Ralph skill to convert the markdown PRD to backlog tasks:
+Use the Ralph backlog skill to convert the markdown PRD to backlog tasks:
 
 ```
-Load the ralph skill and convert tasks/prd-[feature-name].md to backlog tasks
+Load the ralph-backlog skill and convert tasks/prd-[feature-name].md to backlog tasks
 ```
 
 This creates individual backlog tasks with acceptance criteria, priorities, and dependencies.
@@ -147,8 +149,9 @@ The same workflow (branch, implement, review, merge) applies in both modes.
 | `CLAUDE.md` | Agent instructions for Claude Code (autonomous + interactive) |
 | `backlog/` | Task files managed by backlog.md CLI |
 | `.devcontainer/` | DevContainer configuration with firewall for sandboxed execution |
-| `skills/prd/` | Skill for generating PRDs |
-| `skills/ralph/` | Skill for converting PRDs to backlog tasks |
+| `skills/ralph-init/` | Skill for bootstrapping Ralph in a new project |
+| `skills/ralph-prd/` | Skill for generating PRDs |
+| `skills/ralph-backlog/` | Skill for converting PRDs to backlog tasks |
 | `flowchart/` | Interactive visualization of how Ralph works |
 
 ## Flowchart

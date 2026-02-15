@@ -29,8 +29,9 @@ backlog task list --plain
 - `prompt.md` - Instructions given to each AMP instance
 - `CLAUDE.md` - Instructions given to each Claude Code instance
 - `backlog/` - Task files managed by backlog.md CLI
-- `skills/prd/` - Skill for generating PRDs
-- `skills/ralph/` - Skill for converting PRDs to backlog tasks
+- `skills/ralph-init/` - Skill for bootstrapping Ralph in a new project
+- `skills/ralph-prd/` - Skill for generating PRDs
+- `skills/ralph-backlog/` - Skill for converting PRDs to backlog tasks
 - `flowchart/` - Interactive React Flow diagram explaining how Ralph works
 
 ## Flowchart

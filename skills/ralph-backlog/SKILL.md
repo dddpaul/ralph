@@ -1,5 +1,5 @@
 ---
-name: ralph
+name: ralph-backlog
 description: "Convert PRDs to backlog tasks for the Ralph autonomous agent system. Use when you have an existing PRD and need to create backlog tasks from it. Triggers on: convert this prd, turn this into ralph format, create backlog tasks from this, ralph tasks."
 ---
 

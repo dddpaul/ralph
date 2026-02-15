@@ -1,5 +1,5 @@
 ---
-name: prd
+name: ralph-prd
 description: "Generate a Product Requirements Document (PRD) for a new feature. Use when planning a feature, starting a new project, or when asked to create a PRD. Triggers on: create a prd, write prd for, plan this feature, requirements for, spec out."
 ---
 
@@ -244,5 +244,5 @@ Before saving the PRD:
 After creating the PRD, use the Ralph skill to convert it to backlog tasks:
 
 ```
-Load the ralph skill and convert tasks/prd-[feature-name].md to backlog tasks
+Load the ralph-backlog skill and convert tasks/prd-[feature-name].md to backlog tasks
 ```
