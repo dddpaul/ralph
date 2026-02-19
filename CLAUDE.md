@@ -49,6 +49,12 @@ Use `backlog` CLI for all task operations. **Never edit task files directly.**
 
 For complex task management — breakdowns, AC writing, quality review — use the `project-manager-backlog` agent. It enforces task atomicity, outcome-oriented acceptance criteria, and proper dependency ordering.
 
+### Project Knowledge Sources
+When exploring or researching this codebase, check available documentation:
+- `README.md` and `*.md` files in repo root and subdirectories
+- Run `backlog doc list --plain` to check for backlog docs (may not exist). If present, read relevant ones with `backlog doc view <id>`
+- `CLAUDE.md` / `AGENTS.md` files for agent-specific conventions
+
 ## Rules
 
 ### Code Quality
