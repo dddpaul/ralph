@@ -2,7 +2,7 @@
 
 ## CRITICAL: One Task Per Iteration (Autonomous Mode)
 
-If the prompt starts with `MODE: autonomous`: you MUST complete exactly **ONE** task, then **STOP**. Do NOT pick up another task. The Ralph loop will spawn a fresh instance for the next task.
+If the prompt starts with `MODE: autonomous`: you MUST complete exactly **ONE** task, then **STOP**. Do NOT pick up another task. The Ralph loop will spawn a fresh instance for the next task. Pick the lowest-ID "To Do" task (or highest priority if set).
 
 After completing the single task, your final output MUST use this exact format:
 
@@ -105,15 +105,6 @@ Check requirements: backlog task <id> --plain
 8. No unintended changes to other files
 
 Only merge after reviewer approval. If changes requested, fix and re-review.
-
-## Ralph Loop (Autonomous Mode)
-
-Activated when the prompt starts with `MODE: autonomous`. Task picking:
-
-1. Run: `backlog task list -s "To Do" --plain` (pick lowest ID, or highest priority)
-2. Read details: `backlog task <id> --plain`
-3. Execute the Task Lifecycle above for that single task
-4. Then STOP (see top of file)
 
 ## Browser Testing
 
