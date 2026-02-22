@@ -72,7 +72,7 @@ When exploring or researching this codebase, check available documentation:
 - Commit messages should describe what the code does, not its history or evolution
 
 ### Scope
-- **MANDATORY: A backlog task MUST exist BEFORE writing any code.** When asked to implement a feature or fix in interactive mode, first create a task with `backlog task create`, then follow the Task Lifecycle. No exceptions.
+- **MANDATORY: A backlog task MUST exist BEFORE writing any code.** When asked to implement a feature or fix in interactive mode, first create a task with `backlog task create`, then **ask the user for confirmation before starting implementation**. No exceptions.
 - Do not execute tasks you were not asked to do
 - One task per iteration, one branch per task
 - Keep changes focused and minimal
