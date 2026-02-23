@@ -1,12 +1,13 @@
 #!/bin/bash
 # Ralph Wiggum - Long-running AI agent loop
-# Usage: ./ralph.sh [--tool amp|claude] [--model model_id] [--devcontainer] [max_iterations]
+# Usage: ./ralph.sh [--tool amp|claude] [--model model_id] [--timeout minutes] [--devcontainer] [max_iterations]
 
-set -e
+set -eo pipefail
 
 # Parse arguments
 TOOL="amp"  # Default to amp for backwards compatibility
 MODEL="claude-opus-4-6"  # Default model for claude tool
+TIMEOUT=15  # Per-iteration timeout in minutes
 MAX_ITERATIONS=10
 USE_DEVCONTAINER=false
 
@@ -26,6 +27,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --model=*)
       MODEL="${1#*=}"
+      shift
+      ;;
+    --timeout)
+      TIMEOUT="$2"
+      shift 2
+      ;;
+    --timeout=*)
+      TIMEOUT="${1#*=}"
       shift
       ;;
     --devcontainer)
@@ -71,7 +80,7 @@ MODEL_INFO=""
 if [[ "$TOOL" == "claude" ]]; then
   MODEL_INFO=" ($MODEL)"
 fi
-echo "Starting Ralph - Tool: $TOOL$MODEL_INFO - Max iterations: $MAX_ITERATIONS${USE_DEVCONTAINER:+ (devcontainer)}"
+echo "Starting Ralph - Tool: $TOOL$MODEL_INFO - Max iterations: $MAX_ITERATIONS - Timeout: ${TIMEOUT}m${USE_DEVCONTAINER:+ (devcontainer)}"
 
 for i in $(seq 1 $MAX_ITERATIONS); do
   # Check if any "To Do" tasks remain
@@ -101,9 +110,12 @@ for i in $(seq 1 $MAX_ITERATIONS); do
     EXEC_PREFIX="devcontainer exec --workspace-folder $SCRIPT_DIR"
   fi
 
+  TIMEOUT_SEC=$((TIMEOUT * 60))
+
   if [[ "$TOOL" == "amp" ]]; then
     PROMPT=$(printf "%s\n\n%s" "$MODE_PREFIX" "$(cat "$SCRIPT_DIR/prompt.md")")
-    echo "$PROMPT" | $EXEC_PREFIX amp --dangerously-allow-all 2>&1 | tee "$OUTFILE" || true
+    echo "$PROMPT" | timeout "$TIMEOUT_SEC" $EXEC_PREFIX amp --dangerously-allow-all 2>&1 | tee "$OUTFILE"
+    EXIT_CODE=$?
   else
     # Claude reads CLAUDE.md automatically as project instructions.
     # Send only a short, focused prompt — not the full CLAUDE.md — to avoid
@@ -112,7 +124,16 @@ for i in $(seq 1 $MAX_ITERATIONS); do
 
 Pick the next To Do task and execute the full Task Lifecycle from CLAUDE.md.
 Your response MUST end with the ## Task Summary block. This is not optional."
-    echo "$PROMPT" | $EXEC_PREFIX claude --model "$MODEL" --dangerously-skip-permissions --print 2>&1 | tee "$OUTFILE" || true
+    echo "$PROMPT" | timeout "$TIMEOUT_SEC" $EXEC_PREFIX claude --model "$MODEL" --dangerously-skip-permissions --print 2>&1 | tee "$OUTFILE"
+    EXIT_CODE=$?
+  fi
+
+  # Check if iteration timed out (exit code 124 = timeout)
+  if [[ $EXIT_CODE -eq 124 ]]; then
+    echo ""
+    echo "WARNING: Iteration $i timed out after ${TIMEOUT}m. Continuing to next iteration..."
+    sleep 2
+    continue
   fi
 
   # Check for completion signal
