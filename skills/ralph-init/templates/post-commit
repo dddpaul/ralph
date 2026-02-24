@@ -28,7 +28,8 @@ if [ -n "$TASK_ID" ]; then
         # On amend: find and replace previous commit entry
         PREV_HASH=$(git reflog -2 --format=%h | tail -1)
         if grep -q "Commit: \`$PREV_HASH\`" "$TASK_FILE" 2>/dev/null; then
-            sed -i '' "s/Commit: \`$PREV_HASH\` - .*/Commit: \`$COMMIT_HASH\` - $COMMIT_MSG/" "$TASK_FILE"
+            ESCAPED_MSG=$(printf '%s' "$COMMIT_MSG" | sed 's/[&/\]/\\&/g')
+            sed -i '' "s/Commit: \`$PREV_HASH\` - .*/Commit: \`$COMMIT_HASH\` - $ESCAPED_MSG/" "$TASK_FILE"
         else
             backlog task edit "$NUMERIC_ID" --append-notes "Commit: \`$COMMIT_HASH\` - $COMMIT_MSG" 2>/dev/null || true
         fi
