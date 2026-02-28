@@ -83,6 +83,11 @@ When exploring or researching this codebase, check available documentation:
 - Keep changes focused and minimal
 - Always merge to master and delete task branch when done
 
+### Naming Convention — English Filenames
+- Task titles (passed to `backlog task create`) must always be in **English** — the CLI derives filenames and slugs from the title
+- Git branch names (`task-<id>-description`) must always be in **English**
+- Task descriptions (`-d`), acceptance criteria (`--ac`), and notes can be in any language
+
 ### Knowledge Sharing
 - Update README.md after adding important functionality
 - Update nearby CLAUDE.md files with reusable patterns (API conventions, gotchas, dependencies — not task-specific details)

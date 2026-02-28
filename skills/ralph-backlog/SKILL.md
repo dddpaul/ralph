@@ -142,9 +142,10 @@ Frontend tasks are NOT complete until visually verified. Ralph will use the dev-
 ## Conversion Rules
 
 1. **Each user story becomes one backlog task**
-2. **Priority**: Based on dependency order, then document order
-3. **Dependencies**: Use `--dep task-<id>` for tasks that depend on earlier ones
-4. **Always add**: "Typecheck passes" to every task's acceptance criteria
+2. **English titles only**: Task titles passed to `backlog task create` must always be in **English** — the CLI derives filenames from the title. Descriptions (`-d`) and acceptance criteria (`--ac`) can be in any language.
+3. **Priority**: Based on dependency order, then document order
+4. **Dependencies**: Use `--dep task-<id>` for tasks that depend on earlier ones
+5. **Always add**: "Typecheck passes" to every task's acceptance criteria
 
 ---
 
