@@ -74,13 +74,11 @@ When exploring or researching this codebase, check available documentation:
 - Commit messages should describe what the code does, not its history or evolution
 
 ### Scope — Task-Before-Code Gate
-Exploring the codebase to understand scope is allowed without a task. But before entering plan mode, planning implementation, or writing any code:
-
-**MANDATORY — verify BOTH conditions:**
+**MANDATORY: Before writing, editing, or deleting ANY code, verify BOTH conditions:**
 1. A backlog task exists for this work — if not, run `backlog task create` and ask user to confirm
 2. That task is in "In Progress" status — if not (including "Done" tasks that need reopening), update status first
 
-**Only then plan or touch code.** This applies to new features, bug fixes, and even "small" one-line edits. No exceptions. Violating this rule wastes user trust.
+**Only then touch code.** This applies to new features, bug fixes, and even "small" one-line edits. No exceptions. Violating this rule wastes user trust.
 
 - Do not execute tasks you were not asked to do
 - One task per iteration, one branch per task
