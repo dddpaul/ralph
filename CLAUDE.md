@@ -25,15 +25,17 @@ Then run `backlog task list -s "To Do" --plain`:
 1. **Create task (if needed):** `backlog task create "Title" -d "Description" --ac "Criterion"` — skip if task already exists
 2. **Start work:** `backlog task edit <id> -s "In Progress" -a @claude`
 3. **Create branch:** `git checkout -b task-<id>-description master`
-4. **Implement:** write code, run build/linter/tests
-5. **Check off AC:** `backlog task edit <id> --check-ac <number>`
-6. **Commit code:** `git commit -m "task-<id>: message"` (post-commit hook appends hash to task file)
-7. **Code review:** spawn Explore agent to review (see below). If changes requested, loop to step 4.
-8. **GATE — verify before marking done:** Run build, linter, and tests one final time. ALL must pass. If any fails, loop to step 4. **Never mark a task "Done" with a broken build, failing tests, or linter errors.**
-9. **Mark done with notes:** `backlog task edit <id> -s "Done" --append-notes "What was implemented, files changed, learnings"`
-10. **Commit task file:** `git add backlog/tasks/task-<id>*.md && git commit -m "task-<id>: Update task file"`
-11. **Merge and clean up:** `git checkout master && git merge <branch> && git branch -d <branch>`
-12. **Output summary:** Print the `## Task Summary` block defined at the top of this file with all fields filled in.
+4. **Understand & Plan:** Read task description, AC, and any linked PRDs. Explore relevant existing code (use Explore agent if needed). In interactive mode: present plan to user for approval.
+5. **GATE — document plan:** `backlog task edit <id> --append-notes "Plan: ..."` — summarize the chosen approach in the task notes. Do NOT proceed to implementation until the plan is recorded. No exceptions.
+6. **Implement:** write code, run build/linter/tests
+7. **Check off AC:** `backlog task edit <id> --check-ac <number>`
+8. **Commit code:** `git commit -m "task-<id>: message"` (post-commit hook appends hash to task file)
+9. **Code review:** spawn Explore agent to review (see below). If changes requested, loop to step 6.
+10. **GATE — verify before marking done:** Run build, linter, and tests one final time. ALL must pass. If any fails, loop to step 6. **Never mark a task "Done" with a broken build, failing tests, or linter errors.**
+11. **Mark done with notes:** `backlog task edit <id> -s "Done" --append-notes "What was implemented, files changed, learnings"`
+12. **Commit task file:** `git add backlog/tasks/task-<id>*.md && git commit -m "task-<id>: Update task file"`
+13. **Merge and clean up:** `git checkout master && git merge <branch> && git branch -d <branch>`
+14. **Output summary:** Print the `## Task Summary` block defined at the top of this file with all fields filled in.
 
 ### Git Hooks
 The post-commit hook appends commit hash to task files on `task-*` branches. The task file stays uncommitted to preserve the exact hash. On amends, it updates the hash.
@@ -72,11 +74,13 @@ When exploring or researching this codebase, check available documentation:
 - Commit messages should describe what the code does, not its history or evolution
 
 ### Scope — Task-Before-Code Gate
-**MANDATORY: Before writing, editing, or deleting ANY code, verify BOTH conditions:**
+Exploring the codebase to understand scope is allowed without a task. But before entering plan mode, planning implementation, or writing any code:
+
+**MANDATORY — verify BOTH conditions:**
 1. A backlog task exists for this work — if not, run `backlog task create` and ask user to confirm
 2. That task is in "In Progress" status — if not (including "Done" tasks that need reopening), update status first
 
-**Only then touch code.** This applies to new features, bug fixes, and even "small" one-line edits. No exceptions. Violating this rule wastes user trust.
+**Only then plan or touch code.** This applies to new features, bug fixes, and even "small" one-line edits. No exceptions. Violating this rule wastes user trust.
 
 - Do not execute tasks you were not asked to do
 - One task per iteration, one branch per task
