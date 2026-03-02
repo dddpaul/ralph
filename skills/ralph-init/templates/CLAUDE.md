@@ -22,7 +22,7 @@ Then run `backlog task list -s "To Do" --plain`:
 ## Workflow
 
 ### Task Lifecycle
-1. **Create task (if needed):** `backlog task create "Title" -d "Description" --ac "Criterion"` — skip if task already exists
+1. **GATE — task exists:** Verify a backlog task exists for this work. If not, `backlog task create "Title" -d "Description" --ac "Criterion"` first. Do NOT proceed to planning or code without a task. No exceptions.
 2. **Start work:** `backlog task edit <id> -s "In Progress" -a @claude`
 3. **Create branch:** `git checkout -b task-<id>-description master`
 4. **Understand & Plan:** Read task description, AC, and any linked PRDs. Explore relevant existing code (use Explore agent if needed). In interactive mode: present plan to user for approval.
@@ -73,12 +73,12 @@ When exploring or researching this codebase, check available documentation:
 - Do not add "Test plan" sections in PR descriptions
 - Commit messages should describe what the code does, not its history or evolution
 
-### Scope — Task-Before-Code Gate
-**MANDATORY: Before writing, editing, or deleting ANY code, verify BOTH conditions:**
+### Scope — Task-Before-Work Gate
+**MANDATORY: Before planning, designing, or writing ANY code, verify BOTH conditions:**
 1. A backlog task exists for this work — if not, run `backlog task create` and ask user to confirm
 2. That task is in "In Progress" status — if not (including "Done" tasks that need reopening), update status first
 
-**Only then touch code.** This applies to new features, bug fixes, and even "small" one-line edits. No exceptions. Violating this rule wastes user trust.
+**Only then proceed with planning or code.** Exploration to understand scope before creating a task is allowed, but entering plan mode or writing code is not. This applies to new features, bug fixes, and even "small" one-line edits. No exceptions. Violating this rule wastes user trust.
 
 - Do not execute tasks you were not asked to do
 - One task per iteration, one branch per task
