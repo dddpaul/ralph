@@ -21,7 +21,7 @@ command -v backlog          # Must have backlog CLI
 ```
 
 If `backlog` is missing: `npm install -g backlog.md`
-If not a git repo: `git init`
+If not a git repo: `git init -b master`
 
 ---
 
