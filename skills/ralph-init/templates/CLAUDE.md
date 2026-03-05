@@ -74,7 +74,7 @@ When exploring or researching this codebase, check available documentation:
 - Commit messages should describe what the code does, not its history or evolution
 
 ### Scope — Task-Before-Work Gate
-**MANDATORY: Before planning, designing, or writing ANY code, verify BOTH conditions:**
+**MANDATORY: Your FIRST action on any user request for change (before planning, designing, or writing ANY code) must be verify BOTH conditions:**
 1. A backlog task exists for this work — if not, run `backlog task create` and ask user to confirm
 2. That task is in "In Progress" status — if not (including "Done" tasks that need reopening), update status first
 
