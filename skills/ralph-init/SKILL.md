@@ -47,9 +47,10 @@ Ask with lettered options for quick answers (e.g. "1A, 2C, 3B, 4A"):
    B. No — I'll run Ralph directly on my machine
 
 4. Which AI tool will you use with Ralph?
-   A. Claude Code only
-   B. Amp only
+   A. Claude Code
+   B. Amp
    C. Both Claude Code and Amp
+   D. opencode
 ```
 
 ---
@@ -107,7 +108,7 @@ Read `templates/settings.local.json` → write to `.claude/settings.local.json`.
 Ralph initialized successfully!
 
 Files created:
-  ralph.sh              - Main autonomous loop script
+  ralph.sh              - Main autonomous loop script (supports amp, claude, opencode)
   CLAUDE.md             - Agent instructions for Claude Code
   .git/hooks/post-commit - Commit hash tracking for tasks
   .gitignore            - Updated with Ralph entries
@@ -115,9 +116,20 @@ Files created:
   .claude/settings.local.json - Claude Code permissions
   .devcontainer/        - (if applicable) Sandboxed execution environment
 
+Usage:
+  ./ralph.sh --tool amp          # Run with Amp
+  ./ralph.sh --tool claude       # Run with Claude Code
+  ./ralph.sh --tool opencode     # Run with opencode
+
+Error handling options:
+  --on-error stop|continue|retry  # Error behavior (default: stop)
+  --retry-count N                 # Retries for --on-error=retry (default: 2)
+  --log-file path                 # Log errors to file
+
 Next steps:
   1. Review and customize CLAUDE.md (especially ## Project-Specific)
   2. Create a PRD:  /ralph-prd
   3. Convert to tasks:  /ralph-backlog
   4. Run Ralph:  ./ralph.sh --tool claude
+                 ./ralph.sh --tool opencode
 ```
