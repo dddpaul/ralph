@@ -1,14 +1,15 @@
 #!/bin/bash
 # Ralph Wiggum - Long-running AI agent loop
-# Usage: ./ralph.sh [--tool amp|claude|opencode] [--model model_id] [--timeout minutes]
-#                    [--on-error stop|continue|retry] [--retry-count N] [--log-file path]
-#                    [--devcontainer] [max_iterations]
+# Usage: ./ralph.sh [--tool amp|claude|opencode] [--model model_id] [--effort low|medium|high]
+#                    [--timeout minutes] [--on-error stop|continue|retry] [--retry-count N]
+#                    [--log-file path] [--devcontainer] [max_iterations]
 
 set -eo pipefail
 
 # Parse arguments
 TOOL="amp"  # Default to amp for backwards compatibility
 MODEL="claude-opus-4-6"  # Default model for claude tool
+EFFORT="medium"  # Default effort level for claude tool (low|medium|high)
 TIMEOUT=15  # Per-iteration timeout in minutes
 MAX_ITERATIONS=10
 USE_DEVCONTAINER=false
@@ -32,6 +33,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --model=*)
       MODEL="${1#*=}"
+      shift
+      ;;
+    --effort)
+      EFFORT="$2"
+      shift 2
+      ;;
+    --effort=*)
+      EFFORT="${1#*=}"
       shift
       ;;
     --timeout)
@@ -91,6 +100,12 @@ if [[ ! "$TIMEOUT" =~ ^[0-9]+$ ]] || [[ "$TIMEOUT" -lt 1 ]]; then
   exit 1
 fi
 
+# Validate effort level
+if [[ "$EFFORT" != "low" && "$EFFORT" != "medium" && "$EFFORT" != "high" ]]; then
+  echo "Error: Invalid effort level '$EFFORT'. Must be 'low', 'medium', or 'high'."
+  exit 1
+fi
+
 # Validate on-error strategy
 if [[ "$ON_ERROR" != "stop" && "$ON_ERROR" != "continue" && "$ON_ERROR" != "retry" ]]; then
   echo "Error: Invalid on-error strategy '$ON_ERROR'. Must be 'stop', 'continue', or 'retry'."
@@ -127,7 +142,7 @@ log_error() {
   local message="$1"
   local timestamp
   timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-  
+
   if [[ -n "$LOG_FILE" ]]; then
     echo "[$timestamp] ERROR: $message" >> "$LOG_FILE"
   fi
@@ -139,9 +154,9 @@ handle_error() {
   local exit_code="$1"
   local iteration="$2"
   local retry_attempt="$3"
-  
+
   log_error "Iteration $iteration failed with exit code $exit_code (tool: $TOOL, retry: $retry_attempt)"
-  
+
   case "$ON_ERROR" in
     stop)
       echo "ERROR: AI tool failed with exit code $exit_code. Stopping."
@@ -165,7 +180,7 @@ handle_error() {
 
 MODEL_INFO=""
 if [[ "$TOOL" == "claude" ]]; then
-  MODEL_INFO=" ($MODEL)"
+  MODEL_INFO=" ($MODEL, effort: $EFFORT)"
 fi
 
 CONFIG_INFO="on-error: $ON_ERROR"
@@ -224,7 +239,7 @@ Your response MUST end with the ## Task Summary block. This is not optional."
 
 Pick the next To Do task and execute the full Task Lifecycle from CLAUDE.md.
 Your response MUST end with the ## Task Summary block. This is not optional."
-      echo "$PROMPT" | timeout "$TIMEOUT_SEC" ${EXEC_PREFIX:+$EXEC_PREFIX} claude --model "$MODEL" --dangerously-skip-permissions --print 2>&1 | tee "$OUTFILE"
+      echo "$PROMPT" | timeout "$TIMEOUT_SEC" ${EXEC_PREFIX:+$EXEC_PREFIX} claude --model "$MODEL" --effort "$EFFORT" --dangerously-skip-permissions --print 2>&1 | tee "$OUTFILE"
       EXIT_CODE=${PIPESTATUS[0]}
     fi
 
@@ -240,7 +255,7 @@ Your response MUST end with the ## Task Summary block. This is not optional."
     if [[ $EXIT_CODE -ne 0 ]]; then
       handle_error "$EXIT_CODE" "$i" "$retry_attempt"
       handler_result=$?
-      
+
       if [[ $handler_result -eq 1 ]]; then
         # continue strategy - go to next iteration
         break

@@ -121,6 +121,9 @@ This creates individual backlog tasks with acceptance criteria, priorities, and 
 # Using Claude Code
 ./scripts/ralph/ralph.sh --tool claude [max_iterations]
 
+# Using Claude Code with low effort (faster, cheaper)
+./scripts/ralph/ralph.sh --tool claude --effort low [max_iterations]
+
 # Using opencode
 ./scripts/ralph/ralph.sh --tool opencode [max_iterations]
 
@@ -139,6 +142,7 @@ Ralph supports configurable error handling for AI tool failures:
 
 | Option | Description | Default |
 |--------|-------------|---------|
+| `--effort <level>` | Thinking effort for Claude Code: `low`, `medium`, or `high` | `medium` |
 | `--on-error <strategy>` | How to handle AI tool errors: `stop`, `continue`, or `retry` | `stop` |
 | `--retry-count <n>` | Number of retries when `--on-error=retry` | `2` |
 | `--log-file <path>` | Log errors to file for later analysis | (none) |

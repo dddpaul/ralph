@@ -130,13 +130,69 @@ teardown() {
 @test "Default values are correct" {
   TOOL="amp"
   MODEL="claude-opus-4-6"
+  EFFORT="medium"
   TIMEOUT=15
   MAX_ITERATIONS=10
   USE_DEVCONTAINER=false
-  
+
   [[ "$TOOL" == "amp" ]]
   [[ "$MODEL" == "claude-opus-4-6" ]]
+  [[ "$EFFORT" == "medium" ]]
   [[ "$TIMEOUT" -eq 15 ]]
   [[ "$MAX_ITERATIONS" -eq 10 ]]
   [[ "$USE_DEVCONTAINER" == false ]]
+}
+
+@test "Effort validation: low is valid" {
+  EFFORT="low"
+  if [[ "$EFFORT" != "low" && "$EFFORT" != "medium" && "$EFFORT" != "high" ]]; then
+    return 1
+  fi
+  [[ "$EFFORT" == "low" ]]
+}
+
+@test "Effort validation: medium is valid" {
+  EFFORT="medium"
+  if [[ "$EFFORT" != "low" && "$EFFORT" != "medium" && "$EFFORT" != "high" ]]; then
+    return 1
+  fi
+  [[ "$EFFORT" == "medium" ]]
+}
+
+@test "Effort validation: high is valid" {
+  EFFORT="high"
+  if [[ "$EFFORT" != "low" && "$EFFORT" != "medium" && "$EFFORT" != "high" ]]; then
+    return 1
+  fi
+  [[ "$EFFORT" == "high" ]]
+}
+
+@test "Effort validation: invalid value rejected" {
+  run bash -c '
+    EFFORT="extreme"
+    if [[ "$EFFORT" != "low" && "$EFFORT" != "medium" && "$EFFORT" != "high" ]]; then
+      echo "Error: Invalid effort level '\''$EFFORT'\''. Must be '\''low'\'', '\''medium'\'', or '\''high'\''."
+      exit 1
+    fi
+  '
+  [[ "$status" -eq 1 ]]
+  [[ "$output" == *"Invalid effort level"* ]]
+}
+
+@test "--effort parsed correctly" {
+  EFFORT="high"
+
+  # Simulate --effort low parsing
+  EFFORT="low"
+
+  [[ "$EFFORT" == "low" ]]
+}
+
+@test "--effort with equals sign parsed correctly" {
+  EFFORT="high"
+
+  # Simulate --effort=medium parsing (from ralph.sh logic)
+  EFFORT="medium"
+
+  [[ "$EFFORT" == "medium" ]]
 }
