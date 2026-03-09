@@ -122,10 +122,11 @@ Only merge after reviewer approval. If changes requested, fix and re-review.
 
 Activated when the prompt starts with `MODE: autonomous`. Task picking:
 
-1. Run: `backlog task list -s "To Do" --plain` (pick lowest ID, or highest priority)
-2. Read details: `backlog task <id> --plain`
-3. Execute the Task Lifecycle above for that single task
-4. Then STOP (see top of file)
+1. Run: `backlog task list -s "To Do" --plain`
+2. Pick the task with the lowest ID **whose dependencies are all "Done"**. If the lowest-ID task has unmet dependencies, skip it and check the next one.
+3. Read details: `backlog task <id> --plain`
+4. Execute the Task Lifecycle above for that single task
+5. Then STOP (see top of file)
 
 ## Browser Testing
 
