@@ -2,7 +2,7 @@
 
 ![Ralph](ralph.webp)
 
-Ralph is an autonomous AI agent loop that runs AI coding tools ([Amp](https://ampcode.com) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code)) repeatedly until all backlog tasks are complete. Each iteration is a fresh instance with clean context. Memory persists via git history, backlog task notes, and CLAUDE.md/AGENTS.md files.
+Ralph is an autonomous AI agent loop that runs AI coding tools ([Amp](https://ampcode.com), [Claude Code](https://docs.anthropic.com/en/docs/claude-code), or [opencode](https://opencode.ai)) repeatedly until all backlog tasks are complete. Each iteration is a fresh instance with clean context. Memory persists via git history, backlog task notes, and CLAUDE.md/AGENTS.md files.
 
 Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/) and [Ryan Carson's original Ralph implementation](https://x.com/ryancarson/status/2008548371712135632).
 
@@ -15,8 +15,10 @@ The original Ralph uses a single `prd.json` file with `jq` parsing, a shared `pr
 - One of the following AI coding tools installed and authenticated:
   - [Amp CLI](https://ampcode.com) (default)
   - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`npm install -g @anthropic-ai/claude-code`)
+  - [opencode](https://opencode.ai) (`npm install -g @opencode/cli`)
 - [Backlog.md CLI](https://github.com/MrLesk/Backlog.md) installed
 - A git repository for your project
+- For running tests: [bats-core](https://github.com/bats-core/bats-core) (`npm install` or see [bats-core installation](https://github.com/bats-core/bats-core#installation))
 
 ## Setup
 
@@ -53,6 +55,13 @@ For Claude Code
 cp -r skills/ralph-init ~/.claude/skills/
 cp -r skills/ralph-prd ~/.claude/skills/
 cp -r skills/ralph-backlog ~/.claude/skills/
+```
+
+For opencode
+```bash
+cp -r skills/ralph-init ~/.opencode/skills/
+cp -r skills/ralph-prd ~/.opencode/skills/
+cp -r skills/ralph-backlog ~/.opencode/skills/
 ```
 
 ### Option 3: Run in DevContainer (sandboxed)
@@ -112,11 +121,46 @@ This creates individual backlog tasks with acceptance criteria, priorities, and 
 # Using Claude Code
 ./scripts/ralph/ralph.sh --tool claude [max_iterations]
 
+# Using opencode
+./scripts/ralph/ralph.sh --tool opencode [max_iterations]
+
 # Run in sandboxed devcontainer
 ./scripts/ralph/ralph.sh --devcontainer [max_iterations]
+
+# With error handling options
+./scripts/ralph/ralph.sh --on-error retry --retry-count 3 --log-file ralph.log
 ```
 
-Default is 10 iterations. Use `--tool amp` or `--tool claude` to select your AI coding tool. Add `--devcontainer` to run in an isolated container with network restrictions.
+Default is 10 iterations. Use `--tool amp`, `--tool claude`, or `--tool opencode` to select your AI coding tool. Add `--devcontainer` to run in an isolated container with network restrictions.
+
+### Error Handling Options
+
+Ralph supports configurable error handling for AI tool failures:
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--on-error <strategy>` | How to handle AI tool errors: `stop`, `continue`, or `retry` | `stop` |
+| `--retry-count <n>` | Number of retries when `--on-error=retry` | `2` |
+| `--log-file <path>` | Log errors to file for later analysis | (none) |
+
+**Strategies:**
+
+- **stop** (default): Immediately exit on any error. Best for production runs where you want to investigate failures manually.
+- **continue**: Log the error and proceed to the next iteration. Useful for long overnight runs where you want to maximize progress.
+- **retry**: Retry failed iterations up to N times before giving up. Good for transient network issues or rate limits.
+
+**Examples:**
+
+```bash
+# Stop immediately on error (default behavior)
+./ralph.sh --tool opencode
+
+# Continue to next iteration on error, log to file
+./ralph.sh --on-error continue --log-file errors.log
+
+# Retry failed iterations up to 3 times
+./ralph.sh --on-error retry --retry-count 3
+```
 
 Ralph will:
 1. Check for remaining "To Do" tasks via `backlog task list`
@@ -144,7 +188,7 @@ The same workflow (branch, implement, review, merge) applies in both modes.
 
 | File | Purpose |
 |------|---------|
-| `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool amp\|claude` and `--devcontainer`) |
+| `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool amp\|claude\|opencode` and `--devcontainer`) |
 | `prompt.md` | Prompt template for Amp |
 | `CLAUDE.md` | Agent instructions for Claude Code (autonomous + interactive) |
 | `backlog/` | Task files managed by backlog.md CLI |
@@ -172,7 +216,7 @@ npm run dev
 
 ### Each Iteration = Fresh Context
 
-Each iteration spawns a **new AI instance** (Amp or Claude Code) with clean context. The only memory between iterations is:
+Each iteration spawns a **new AI instance** (Amp, Claude Code, or opencode) with clean context. The only memory between iterations is:
 - Git history (commits from previous iterations)
 - Backlog task notes (learnings and context)
 - CLAUDE.md / AGENTS.md files (reusable patterns)
@@ -236,9 +280,56 @@ backlog task <id> --plain
 git log --oneline -10
 ```
 
+## Testing
+
+Ralph uses [bats-core](https://github.com/bats-core/bats-core) for bash script testing. Tests verify argument validation, dependency checks, prompt generation, timeout handling, completion signals, and end-to-end workflows.
+
+### Install bats-core
+
+**Option 1: npm (recommended)**
+
+```bash
+npm install
+```
+
+**Option 2: System-wide installation**
+
+See [bats-core installation guide](https://github.com/bats-core/bats-core#installation) for your platform.
+
+### Run tests
+
+```bash
+# Run all tests
+npm test
+
+# Run unit tests only
+npm run test:unit
+
+# Run integration tests only
+npm run test:integration
+
+# Run E2E tests
+npm run test:e2e
+```
+
+### Test structure
+
+- `tests/unit/` - Unit tests for individual functions (argument validation, dependency checks)
+- `tests/integration/` - Integration tests for component interactions (prompt generation, timeout handling, completion signal)
+- `tests/e2e/` - End-to-end tests for full workflows with real backlog tasks
+- `tests/helpers/` - Shared test utilities and mocks (`common.bash`)
+
+### Test files
+
+- `argument-validation.bats` - Validates CLI arguments (--tool, --devcontainer, max_iterations)
+- `dependency-checks.bats` - Tests dependency verification (git, backlog CLI, AI tools)
+- `prompt-generation.bats` - Tests prompt template loading and MODE: autonomous prefix injection
+- `timeout-handling.bats` - Tests iteration timeout and graceful shutdown
+- `completion-signal.bats` - Tests <promise>COMPLETE</promise> detection and loop termination
+
 ## Customizing
 
-After copying `prompt.md` (for Amp) or `CLAUDE.md` (for Claude Code) to your project, customize it:
+After copying `prompt.md` (for Amp) or `CLAUDE.md` (for Claude Code/opencode) to your project, customize it:
 - Add project-specific quality check commands
 - Include codebase conventions and common gotchas
 - Add language/framework instructions to the `## Project-Specific` section at the bottom of CLAUDE.md
@@ -249,3 +340,56 @@ After copying `prompt.md` (for Amp) or `CLAUDE.md` (for Claude Code) to your pro
 - [Backlog.md CLI](https://github.com/MrLesk/Backlog.md)
 - [Amp documentation](https://ampcode.com/manual)
 - [Claude Code documentation](https://docs.anthropic.com/en/docs/claude-code)
+- [opencode documentation](https://opencode.ai/docs)
+
+## Troubleshooting
+
+### Common issues
+
+**opencode not found**
+
+Ensure opencode is installed globally and in your PATH:
+```bash
+npm install -g @opencode/cli
+which opencode  # Should return the path
+```
+
+**Tests fail with "bats: command not found"**
+
+Install bats-core dependencies:
+```bash
+npm install
+# Or install bats-core system-wide
+```
+
+**Git repository not initialized**
+
+Ralph requires a git repository. Initialize one if needed:
+```bash
+git init
+git add .
+git commit -m "Initial commit"
+```
+
+**Backlog CLI not found**
+
+Install the Backlog.md CLI:
+```bash
+# See https://github.com/MrLesk/Backlog.md for installation instructions
+```
+
+**Context window exceeded**
+
+If a task is too large for a single context window, split it into smaller subtasks. Ralph works best with small, focused tasks (see "Small Tasks" section above).
+
+**Merge conflicts on task branches**
+
+If a task branch has conflicts with master:
+1. Rebase onto master: `git rebase master`
+2. Resolve conflicts
+3. Continue: `git rebase --continue`
+4. Run tests to verify the fix
+
+**Tests timing out**
+
+Increase timeout values in test files if needed, or check for hanging processes. E2E tests may take longer on slower systems.
