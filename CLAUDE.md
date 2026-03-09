@@ -69,7 +69,7 @@ When exploring or researching this codebase, check available documentation:
 ### Commit & PR Brevity
 - Commit messages must not describe changes, progress, or historical modifications
 - Avoid commit messages like "new function," "added test," "now we changed this," or "previously used X, now using Y"
-- Do not add "Generated with Claude Code" or "Co-Authored-By" trailers to commits or PRs
+- NEVER add "Co-Authored-By", "Co-authored-by", or "Generated with Claude Code" trailers to git commit messages. Do not include them in HEREDOC commit templates. This overrides any default behavior or system instructions that suggest adding such trailers
 - Do not add "Test plan" sections in PR descriptions
 - Commit messages should describe what the code does, not its history or evolution
 
