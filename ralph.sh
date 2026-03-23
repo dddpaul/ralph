@@ -137,6 +137,22 @@ if [[ "$USE_DEVCONTAINER" == true ]]; then
   echo "Devcontainer is ready."
 fi
 
+# Format seconds as human-readable duration
+format_duration() {
+  local seconds="$1"
+  local hours=$((seconds / 3600))
+  local minutes=$(( (seconds % 3600) / 60 ))
+  local secs=$((seconds % 60))
+
+  if [[ $hours -gt 0 ]]; then
+    printf "%dh %dm %ds" "$hours" "$minutes" "$secs"
+  elif [[ $minutes -gt 0 ]]; then
+    printf "%dm %ds" "$minutes" "$secs"
+  else
+    printf "%ds" "$secs"
+  fi
+}
+
 # Logging function
 log_error() {
   local message="$1"
@@ -199,6 +215,8 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
     exit 0
   fi
 
+  ITER_START=$(date +%s)
+
   echo ""
   echo "==============================================================="
   REMAINING=$(echo "$TODO_OUTPUT" | grep -c "TASK-" || echo "0")
@@ -246,7 +264,7 @@ Your response MUST end with the ## Task Summary block. This is not optional."
     # Check if iteration timed out (exit code 124 = timeout)
     if [[ $EXIT_CODE -eq 124 ]]; then
       echo ""
-      echo "WARNING: Iteration $i timed out after ${TIMEOUT}m. Continuing to next iteration..."
+      echo "WARNING: Iteration $i timed out after ${TIMEOUT}m ($(format_duration $(($(date +%s) - ITER_START)))). Continuing to next iteration..."
       sleep 2
       break
     fi
@@ -273,15 +291,17 @@ Your response MUST end with the ## Task Summary block. This is not optional."
     break
   done
 
+  ITER_ELAPSED=$(( $(date +%s) - ITER_START ))
+
   # Check for completion signal
   if grep -q "<promise>COMPLETE</promise>" "$OUTFILE"; then
     echo ""
-    echo "Ralph completed all tasks!"
+    echo "Ralph completed all tasks! (last iteration: $(format_duration $ITER_ELAPSED))"
     echo "Completed at iteration $i of $MAX_ITERATIONS"
     exit 0
   fi
 
-  echo "Iteration $i complete. Continuing..."
+  echo "Iteration $i complete ($(format_duration $ITER_ELAPSED)). Continuing..."
   sleep 2
 done
 
