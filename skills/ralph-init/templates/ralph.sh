@@ -1,6 +1,6 @@
 #!/bin/bash
 # Ralph Wiggum - Long-running AI agent loop
-# Usage: ./ralph.sh [--tool amp|claude|opencode] [--model model_id] [--effort low|medium|high]
+# Usage: ./ralph.sh [--tool amp|claude|opencode] [--model model_id] [--effort low|medium|high|max]
 #                    [--timeout minutes] [--on-error stop|continue|retry] [--retry-count N]
 #                    [--log-file path] [--devcontainer] [max_iterations]
 
@@ -9,7 +9,7 @@ set -eo pipefail
 # Parse arguments
 TOOL="amp"  # Default to amp for backwards compatibility
 MODEL="claude-opus-4-6"  # Default model for claude tool
-EFFORT="medium"  # Default effort level for claude tool (low|medium|high)
+EFFORT="medium"  # Default effort level for claude tool (low|medium|high|max)
 TIMEOUT=15  # Per-iteration timeout in minutes
 MAX_ITERATIONS=10
 USE_DEVCONTAINER=false
@@ -101,8 +101,8 @@ if [[ ! "$TIMEOUT" =~ ^[0-9]+$ ]] || [[ "$TIMEOUT" -lt 1 ]]; then
 fi
 
 # Validate effort level
-if [[ "$EFFORT" != "low" && "$EFFORT" != "medium" && "$EFFORT" != "high" ]]; then
-  echo "Error: Invalid effort level '$EFFORT'. Must be 'low', 'medium', or 'high'."
+if [[ "$EFFORT" != "low" && "$EFFORT" != "medium" && "$EFFORT" != "high" && "$EFFORT" != "max" ]]; then
+  echo "Error: Invalid effort level '$EFFORT'. Must be 'low', 'medium', 'high', or 'max'."
   exit 1
 fi
 

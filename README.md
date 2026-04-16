@@ -142,7 +142,7 @@ Ralph supports configurable error handling for AI tool failures:
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--effort <level>` | Thinking effort for Claude Code: `low`, `medium`, or `high` | `medium` |
+| `--effort <level>` | Thinking effort for Claude Code: `low`, `medium`, `high`, or `max` | `medium` |
 | `--on-error <strategy>` | How to handle AI tool errors: `stop`, `continue`, or `retry` | `stop` |
 | `--retry-count <n>` | Number of retries when `--on-error=retry` | `2` |
 | `--log-file <path>` | Log errors to file for later analysis | (none) |
