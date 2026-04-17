@@ -50,7 +50,7 @@
     "HTTP_PROXY": "http://host.docker.internal:3128",
     "HTTPS_PROXY": "http://host.docker.internal:3128",
     "NO_PROXY": "localhost,127.0.0.1,.local",
-    "TZ": "Europe/Moscow"
+    "TZ": "${localEnv:TZ:America/Los_Angeles}"
   },
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
   "workspaceFolder": "/workspace",
