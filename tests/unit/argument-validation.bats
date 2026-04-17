@@ -145,7 +145,7 @@ teardown() {
 
 @test "Effort validation: low is valid" {
   EFFORT="low"
-  if [[ "$EFFORT" != "low" && "$EFFORT" != "medium" && "$EFFORT" != "high" ]]; then
+  if [[ "$EFFORT" != "low" && "$EFFORT" != "medium" && "$EFFORT" != "high" && "$EFFORT" != "max" ]]; then
     return 1
   fi
   [[ "$EFFORT" == "low" ]]
@@ -153,7 +153,7 @@ teardown() {
 
 @test "Effort validation: medium is valid" {
   EFFORT="medium"
-  if [[ "$EFFORT" != "low" && "$EFFORT" != "medium" && "$EFFORT" != "high" ]]; then
+  if [[ "$EFFORT" != "low" && "$EFFORT" != "medium" && "$EFFORT" != "high" && "$EFFORT" != "max" ]]; then
     return 1
   fi
   [[ "$EFFORT" == "medium" ]]
@@ -161,17 +161,25 @@ teardown() {
 
 @test "Effort validation: high is valid" {
   EFFORT="high"
-  if [[ "$EFFORT" != "low" && "$EFFORT" != "medium" && "$EFFORT" != "high" ]]; then
+  if [[ "$EFFORT" != "low" && "$EFFORT" != "medium" && "$EFFORT" != "high" && "$EFFORT" != "max" ]]; then
     return 1
   fi
   [[ "$EFFORT" == "high" ]]
 }
 
+@test "Effort validation: max is valid" {
+  EFFORT="max"
+  if [[ "$EFFORT" != "low" && "$EFFORT" != "medium" && "$EFFORT" != "high" && "$EFFORT" != "max" ]]; then
+    return 1
+  fi
+  [[ "$EFFORT" == "max" ]]
+}
+
 @test "Effort validation: invalid value rejected" {
   run bash -c '
     EFFORT="extreme"
-    if [[ "$EFFORT" != "low" && "$EFFORT" != "medium" && "$EFFORT" != "high" ]]; then
-      echo "Error: Invalid effort level '\''$EFFORT'\''. Must be '\''low'\'', '\''medium'\'', or '\''high'\''."
+    if [[ "$EFFORT" != "low" && "$EFFORT" != "medium" && "$EFFORT" != "high" && "$EFFORT" != "max" ]]; then
+      echo "Error: Invalid effort level '\''$EFFORT'\''. Must be '\''low'\'', '\''medium'\'', '\''high'\'', or '\''max'\''."
       exit 1
     fi
   '
@@ -188,6 +196,14 @@ teardown() {
   [[ "$EFFORT" == "low" ]]
 }
 
+@test "--effort max parsed correctly" {
+  EFFORT="medium"
+
+  EFFORT="max"
+
+  [[ "$EFFORT" == "max" ]]
+}
+
 @test "--effort with equals sign parsed correctly" {
   EFFORT="high"
 
@@ -195,4 +211,12 @@ teardown() {
   EFFORT="medium"
 
   [[ "$EFFORT" == "medium" ]]
+}
+
+@test "--effort=max with equals sign parsed correctly" {
+  EFFORT="medium"
+
+  EFFORT="max"
+
+  [[ "$EFFORT" == "max" ]]
 }
