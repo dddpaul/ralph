@@ -24,7 +24,7 @@ Then run `backlog task list -s "To Do" --plain`:
 ### Task Lifecycle
 1. **GATE — task exists:** Verify a backlog task exists for this work. If not, `backlog task create "Title" -d "Description" --ac "Criterion"` first. Do NOT proceed to planning or code without a task. No exceptions.
 2. **Start work:** `backlog task edit <id> -s "In Progress" -a @claude`
-3. **Create branch:** `git checkout -b task-<id>-description master`
+3. **Create branch:** `git checkout -b task-<id>-description main`
 4. **Understand & Plan:** Read task description, AC, and any linked PRDs. Explore relevant existing code (use Explore agent if needed). In interactive mode: present plan to user for approval.
 5. **GATE — document plan:** `backlog task edit <id> --append-notes "Plan: ..."` — summarize the chosen approach in the task notes. Do NOT proceed to implementation until the plan is recorded. No exceptions.
 6. **Implement:** write code, run build/linter/tests
@@ -34,7 +34,7 @@ Then run `backlog task list -s "To Do" --plain`:
 10. **GATE — verify before marking done:** Run build, linter, and tests one final time. ALL must pass. If any fails, loop to step 6. **Never mark a task "Done" with a broken build, failing tests, or linter errors.**
 11. **Mark done with notes:** `backlog task edit <id> -s "Done" --append-notes "What was implemented, files changed, learnings"`
 12. **Commit task file:** `git add backlog/tasks/task-<id>*.md && git commit -m "task-<id>: Update task file"`
-13. **Merge and clean up:** `git checkout master && git merge <branch> && git branch -d <branch>`
+13. **Merge and clean up:** `git checkout main && git merge <branch> && git branch -d <branch>`
 14. **Output summary:** Print the `## Task Summary` block defined at the top of this file with all fields filled in.
 
 ### Git Hooks
@@ -83,7 +83,7 @@ When exploring or researching this codebase, check available documentation:
 - Do not execute tasks you were not asked to do
 - One task per iteration, one branch per task
 - Keep changes focused and minimal
-- Always merge to master and delete task branch when done
+- Always merge to main and delete task branch when done
 
 ### Naming Convention — English Filenames
 - Task titles (passed to `backlog task create`) must always be in **English** — the CLI derives filenames and slugs from the title
@@ -101,8 +101,8 @@ When exploring or researching this codebase, check available documentation:
 
 After tests pass, spawn an Explore agent:
 ```
-Review changes in branch task-<id> for merge to master.
-Run: git diff master..HEAD
+Review changes in branch task-<id> for merge to main.
+Run: git diff main..HEAD
 Check requirements: backlog task <id> --plain
 ```
 

@@ -8,7 +8,7 @@ Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/) and [Ry
 
 ### How this fork differs from the original
 
-The original Ralph uses a single `prd.json` file with `jq` parsing, a shared `progress.txt` for learnings, and one long-lived feature branch per run. This fork replaces all of that with the [Backlog.md CLI](https://github.com/MrLesk/Backlog.md) — each task is a separate file with built-in status, acceptance criteria, and notes. Tasks get per-task branches (`task-<id>-description`) merged to master individually, mandatory code review before every merge, and a `MODE: autonomous` prefix so the same CLAUDE.md works for both the Ralph loop and interactive development.
+The original Ralph uses a single `prd.json` file with `jq` parsing, a shared `progress.txt` for learnings, and one long-lived feature branch per run. This fork replaces all of that with the [Backlog.md CLI](https://github.com/MrLesk/Backlog.md) — each task is a separate file with built-in status, acceptance criteria, and notes. Tasks get per-task branches (`task-<id>-description`) merged to main individually, mandatory code review before every merge, and a `MODE: autonomous` prefix so the same CLAUDE.md works for both the Ralph loop and interactive development.
 
 ## Prerequisites
 
@@ -169,12 +169,12 @@ Ralph supports configurable error handling for AI tool failures:
 Ralph will:
 1. Check for remaining "To Do" tasks via `backlog task list`
 2. Pick the next task (lowest ID or highest priority)
-3. Create a branch (`task-<id>-description`) from master
+3. Create a branch (`task-<id>-description`) from main
 4. Implement the task
 5. Run quality checks (build, lint, tests)
 6. Commit code, then run mandatory code review
 7. Mark task as "Done", commit task file
-8. Merge to master and delete the task branch
+8. Merge to main and delete the task branch
 9. Repeat until all tasks are done or max iterations reached
 
 Each iteration gets a `MODE: autonomous` prefix so the agent knows it's running in the Ralph loop vs interactive mode.
@@ -242,7 +242,7 @@ Too big (split these):
 
 ### Per-Task Branching
 
-Each task gets its own branch (`task-<id>-description`) created from master. After the task is complete, code review passes, and quality checks pass, the branch is merged back to master and deleted. This keeps master always up-to-date and avoids long-lived feature branches.
+Each task gets its own branch (`task-<id>-description`) created from main. After the task is complete, code review passes, and quality checks pass, the branch is merged back to main and deleted. This keeps main always up-to-date and avoids long-lived feature branches.
 
 ### Mandatory Code Review
 
@@ -388,8 +388,8 @@ If a task is too large for a single context window, split it into smaller subtas
 
 **Merge conflicts on task branches**
 
-If a task branch has conflicts with master:
-1. Rebase onto master: `git rebase master`
+If a task branch has conflicts with main:
+1. Rebase onto main: `git rebase main`
 2. Resolve conflicts
 3. Continue: `git rebase --continue`
 4. Run tests to verify the fix
