@@ -243,7 +243,7 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
   while true; do
     if [[ "$TOOL" == "amp" ]]; then
       PROMPT=$(printf "%s\n\n%s" "$MODE_PREFIX" "$(cat "$SCRIPT_DIR/prompt.md")")
-      echo "$PROMPT" | timeout "$TIMEOUT_SEC" ${EXEC_PREFIX:+$EXEC_PREFIX} amp --dangerously-allow-all 2>&1 | tee "$OUTFILE"
+      timeout "$TIMEOUT_SEC" ${EXEC_PREFIX:+$EXEC_PREFIX} amp --dangerously-allow-all <<< "$PROMPT" 2>&1 | tee "$OUTFILE"
       EXIT_CODE=${PIPESTATUS[0]}
     elif [[ "$TOOL" == "opencode" ]]; then
       PROMPT="$MODE_PREFIX
@@ -257,7 +257,7 @@ Your response MUST end with the ## Task Summary block. This is not optional."
 
 Pick the next To Do task and execute the full Task Lifecycle from CLAUDE.md.
 Your response MUST end with the ## Task Summary block. This is not optional."
-      echo "$PROMPT" | timeout "$TIMEOUT_SEC" ${EXEC_PREFIX:+$EXEC_PREFIX} claude --model "$MODEL" --effort "$EFFORT" --dangerously-skip-permissions --print 2>&1 | tee "$OUTFILE"
+      timeout "$TIMEOUT_SEC" ${EXEC_PREFIX:+$EXEC_PREFIX} claude --model "$MODEL" --effort "$EFFORT" --dangerously-skip-permissions --print <<< "$PROMPT" 2>&1 | tee "$OUTFILE"
       EXIT_CODE=${PIPESTATUS[0]}
     fi
 
