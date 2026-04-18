@@ -72,7 +72,7 @@ TASK_FILE=$(find backlog/tasks -name "*.md" -exec grep -l "status: To Do" {} \; 
 
 if [[ -n "$TASK_FILE" ]]; then
   # Update status to Done
-  sed -i 's/status: To Do/status: Done/' "$TASK_FILE"
+  sed -i '' 's/status: To Do/status: Done/' "$TASK_FILE"
   
   # Add some notes
   echo "" >> "$TASK_FILE"
@@ -99,8 +99,8 @@ mock_opencode_completes_all() {
 
 for TASK_FILE in backlog/tasks/*.md; do
   if [[ -f "$TASK_FILE" ]]; then
-    sed -i 's/status: To Do/status: Done/' "$TASK_FILE"
-    sed -i 's/status: In Progress/status: Done/' "$TASK_FILE"
+    sed -i '' 's/status: To Do/status: Done/' "$TASK_FILE"
+    sed -i '' 's/status: In Progress/status: Done/' "$TASK_FILE"
   fi
 done
 
@@ -161,7 +161,7 @@ SCRIPT
   RALPH_SCRIPT="$PROJECT_ROOT/ralph.sh"
   run timeout 30 bash "$RALPH_SCRIPT" --tool opencode --timeout 0.05 5
   
-  [[ "$output" == *"Ralph completed all tasks!"* ]] || [[ "$output" == *"All tasks complete"* ]]
+  [[ "$output" == *"all tasks done"* ]]
 }
 
 @test "E2E: Verify tasks marked as Done after run" {
