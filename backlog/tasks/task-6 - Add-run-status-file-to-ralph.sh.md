@@ -1,10 +1,11 @@
 ---
 id: TASK-6
 title: Add run status file to ralph.sh
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-18 11:56'
-updated_date: '2026-04-18 12:59'
+updated_date: '2026-04-18 14:07'
 labels: []
 dependencies:
   - TASK-5
@@ -18,11 +19,21 @@ ralph.sh should always write a JSON status file (backlog/.ralph-status.json) tha
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Status file written at loop start (state=running), each iteration start (current_task updated), each iteration end (tasks_done updated, last_iteration_duration), loop exit on completion (state=completed), loop exit on failure (state=failed), loop exit on max-iterations (state=failed)
-- [ ] #2 backlog/.ralph-status.json and backlog/.ralph-run.log added to .gitignore
-- [ ] #3 No new CLI flags - status writing is always on
-- [ ] #4 All existing tests still pass
-- [ ] #5 write_status() function writes JSON with: pid, started_at, state (running/completed/failed), iteration, max_iterations, tool, tasks_done (task IDs that transitioned to Done during this run, determined by diffing backlog status before and after each iteration), tasks_remaining count, current_task (determined by running backlog task list -s "In Progress" --plain at iteration start), last_iteration_duration, elapsed, errors array, completed_at, exit_code
-- [ ] #6 Full stdout/stderr is always tee'd to backlog/.ralph-run.log. The existing --log-file flag for error-only logging remains unchanged and independent
-- [ ] #7 Tests: write_status() must be sourceable and testable directly. Unit tests call write_status() with arguments and assert valid JSON output, correct fields, and state values. Integration tests use instant-exit tool mocks to verify status file is created and updated through the lifecycle. No sleeps or real timeouts. Total new test time under 10 seconds
+- [x] #1 Status file written at loop start (state=running), each iteration start (current_task updated), each iteration end (tasks_done updated, last_iteration_duration), loop exit on completion (state=completed), loop exit on failure (state=failed), loop exit on max-iterations (state=failed)
+- [x] #2 backlog/.ralph-status.json and backlog/.ralph-run.log added to .gitignore
+- [x] #3 No new CLI flags - status writing is always on
+- [x] #4 All existing tests still pass
+- [x] #5 write_status() function writes JSON with: pid, started_at, state (running/completed/failed), iteration, max_iterations, tool, tasks_done (task IDs that transitioned to Done during this run, determined by diffing backlog status before and after each iteration), tasks_remaining count, current_task (determined by running backlog task list -s "In Progress" --plain at iteration start), last_iteration_duration, elapsed, errors array, completed_at, exit_code
+- [x] #6 Full stdout/stderr is always tee'd to backlog/.ralph-run.log. The existing --log-file flag for error-only logging remains unchanged and independent
+- [x] #7 Tests: write_status() must be sourceable and testable directly. Unit tests call write_status() with arguments and assert valid JSON output, correct fields, and state values. Integration tests use instant-exit tool mocks to verify status file is created and updated through the lifecycle. No sleeps or real timeouts. Total new test time under 10 seconds
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan: Create lib/status.sh with write_status() that writes JSON to backlog/.ralph-status.json. Integrate into ralph.sh at all lifecycle points (loop start, iteration start/end, completion, failure, max-iterations). Use exec > >(tee) for run log. Track tasks_done by diffing Done tasks before/after iterations. Add unit tests for write_status() JSON output and integration tests for lifecycle status updates. Add both files to .gitignore.
+
+Commit: `eadc708` - task-6: Add run status file and log to ralph.sh
+
+Implemented lib/status.sh with write_status() function that writes JSON status to backlog/.ralph-status.json. Integrated into ralph.sh at all lifecycle points. Added exec tee to backlog/.ralph-run.log. 17 unit tests + 15 integration tests. Pre-existing e2e test 89 fails on main (unrelated).
+<!-- SECTION:NOTES:END -->
