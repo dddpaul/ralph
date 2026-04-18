@@ -1,13 +1,13 @@
 #!/bin/bash
 # Ralph Wiggum - Long-running AI agent loop
-# Usage: ./ralph.sh [--tool amp|claude|opencode] [--model model_id] [--effort low|medium|high|max]
+# Usage: ./ralph.sh [--tool claude|opencode] [--model model_id] [--effort low|medium|high|max]
 #                    [--timeout minutes] [--on-error stop|continue|retry] [--retry-count N]
 #                    [--log-file path] [--devcontainer] [max_iterations]
 
 set -eo pipefail
 
 # Parse arguments
-TOOL="amp"  # Default to amp for backwards compatibility
+TOOL="claude"
 MODEL="claude-opus-4-6"  # Default model for claude tool
 EFFORT="medium"  # Default effort level for claude tool (low|medium|high|max)
 TIMEOUT=15  # Per-iteration timeout in minutes
@@ -89,8 +89,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Validate tool choice
-if [[ "$TOOL" != "amp" && "$TOOL" != "claude" && "$TOOL" != "opencode" ]]; then
-  echo "Error: Invalid tool '$TOOL'. Must be 'amp', 'claude', or 'opencode'."
+if [[ "$TOOL" != "claude" && "$TOOL" != "opencode" ]]; then
+  echo "Error: Invalid tool '$TOOL'. Must be 'claude' or 'opencode'."
   exit 1
 fi
 
@@ -241,11 +241,7 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
   # Retry loop for --on-error=retry
   retry_attempt=0
   while true; do
-    if [[ "$TOOL" == "amp" ]]; then
-      PROMPT=$(printf "%s\n\n%s" "$MODE_PREFIX" "$(cat "$SCRIPT_DIR/prompt.md")")
-      echo "$PROMPT" | timeout "$TIMEOUT_SEC" ${EXEC_PREFIX:+$EXEC_PREFIX} amp --dangerously-allow-all 2>&1 | tee "$OUTFILE"
-      EXIT_CODE=${PIPESTATUS[0]}
-    elif [[ "$TOOL" == "opencode" ]]; then
+    if [[ "$TOOL" == "opencode" ]]; then
       PROMPT="$MODE_PREFIX
 
 Pick the next To Do task and execute the full Task Lifecycle from CLAUDE.md.

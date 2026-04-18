@@ -2,7 +2,7 @@
 
 ## Overview
 
-Ralph is an autonomous AI agent loop that runs AI coding tools (Amp, Claude Code, or opencode) repeatedly until all backlog tasks are complete. Each iteration is a fresh instance with clean context.
+Ralph is an autonomous AI agent loop that runs AI coding tools (Claude Code or opencode) repeatedly until all backlog tasks are complete. Each iteration is a fresh instance with clean context.
 
 ## Commands
 
@@ -13,11 +13,8 @@ cd flowchart && npm run dev
 # Build the flowchart
 cd flowchart && npm run build
 
-# Run Ralph with Amp (default)
+# Run Ralph with Claude Code (default)
 ./ralph.sh [max_iterations]
-
-# Run Ralph with Claude Code
-./ralph.sh --tool claude [max_iterations]
 
 # Run Ralph with opencode
 ./ralph.sh --tool opencode [max_iterations]
@@ -28,8 +25,7 @@ backlog task list --plain
 
 ## Key Files
 
-- `ralph.sh` - The bash loop that spawns fresh AI instances (supports `--tool amp`, `--tool claude`, or `--tool opencode`)
-- `prompt.md` - Instructions given to each AMP instance
+- `ralph.sh` - The bash loop that spawns fresh AI instances (supports `--tool claude` or `--tool opencode`)
 - `CLAUDE.md` - Instructions given to each Claude Code instance
 - `backlog/` - Task files managed by backlog.md CLI
 - `skills/ralph-init/` - Skill for bootstrapping Ralph in a new project
@@ -50,7 +46,7 @@ npm run dev
 
 ## Patterns
 
-- Each iteration spawns a fresh AI instance (Amp, Claude Code, or opencode) with clean context
+- Each iteration spawns a fresh AI instance (Claude Code or opencode) with clean context
 - Memory persists via git history, backlog task notes, and CLAUDE.md/AGENTS.md files
 - Tasks should be small enough to complete in one context window
 - Each task gets its own branch (`task-<id>`) merged to main after completion

@@ -13,38 +13,37 @@ teardown() {
 }
 
 @test "AC1: --tool opencode accepted as valid" {
-  # Extract just the argument parsing logic from ralph.sh
-  TOOL="amp"
+  TOOL="claude"
   TIMEOUT=15
   MAX_ITERATIONS=10
   USE_DEVCONTAINER=false
-  
+
   # Simulate parsing --tool opencode
   TOOL="opencode"
-  
+
   # Validate tool choice (same logic as ralph.sh)
-  if [[ "$TOOL" != "amp" && "$TOOL" != "claude" && "$TOOL" != "opencode" ]]; then
+  if [[ "$TOOL" != "claude" && "$TOOL" != "opencode" ]]; then
     return 1
   fi
-  
+
   [[ "$TOOL" == "opencode" ]]
 }
 
 @test "AC2: Invalid tool rejected with exit code 1" {
-  TOOL="amp"
-  
+  TOOL="claude"
+
   # Simulate invalid tool
   TOOL="invalid-tool"
-  
+
   # Validate tool choice - should fail
   run bash -c '
     TOOL="invalid-tool"
-    if [[ "$TOOL" != "amp" && "$TOOL" != "claude" && "$TOOL" != "opencode" ]]; then
-      echo "Error: Invalid tool '\''$TOOL'\''. Must be '\''amp'\'', '\''claude'\'', or '\''opencode'\''."
+    if [[ "$TOOL" != "claude" && "$TOOL" != "opencode" ]]; then
+      echo "Error: Invalid tool '\''$TOOL'\''. Must be '\''claude'\'' or '\''opencode'\''."
       exit 1
     fi
   '
-  
+
   [[ "$status" -eq 1 ]]
   [[ "$output" == *"Invalid tool"* ]]
 }
@@ -100,17 +99,9 @@ teardown() {
   [[ "$status" -eq 0 ]]
 }
 
-@test "Tool validation: amp is valid" {
-  TOOL="amp"
-  if [[ "$TOOL" != "amp" && "$TOOL" != "claude" && "$TOOL" != "opencode" ]]; then
-    return 1
-  fi
-  [[ "$TOOL" == "amp" ]]
-}
-
 @test "Tool validation: claude is valid" {
   TOOL="claude"
-  if [[ "$TOOL" != "amp" && "$TOOL" != "claude" && "$TOOL" != "opencode" ]]; then
+  if [[ "$TOOL" != "claude" && "$TOOL" != "opencode" ]]; then
     return 1
   fi
   [[ "$TOOL" == "claude" ]]
@@ -120,7 +111,7 @@ teardown() {
   TOOL=""
   run bash -c '
     TOOL=""
-    if [[ "$TOOL" != "amp" && "$TOOL" != "claude" && "$TOOL" != "opencode" ]]; then
+    if [[ "$TOOL" != "claude" && "$TOOL" != "opencode" ]]; then
       exit 1
     fi
   '
@@ -128,14 +119,14 @@ teardown() {
 }
 
 @test "Default values are correct" {
-  TOOL="amp"
+  TOOL="claude"
   MODEL="claude-opus-4-6"
   EFFORT="medium"
   TIMEOUT=15
   MAX_ITERATIONS=10
   USE_DEVCONTAINER=false
 
-  [[ "$TOOL" == "amp" ]]
+  [[ "$TOOL" == "claude" ]]
   [[ "$MODEL" == "claude-opus-4-6" ]]
   [[ "$EFFORT" == "medium" ]]
   [[ "$TIMEOUT" -eq 15 ]]

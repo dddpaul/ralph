@@ -25,7 +25,7 @@ The user may pass overrides as skill arguments. Parse them as space-separated ke
 
 **Example invocations:**
 - `/ralph-run` — all defaults
-- `/ralph-run tool=amp timeout=30 max_iterations=5`
+- `/ralph-run tool=opencode timeout=30 max_iterations=5`
 - `/ralph-run devcontainer=false effort=high`
 
 ---

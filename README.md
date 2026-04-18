@@ -2,7 +2,7 @@
 
 ![Ralph](ralph.webp)
 
-Ralph is an autonomous AI agent loop that runs AI coding tools ([Amp](https://ampcode.com), [Claude Code](https://docs.anthropic.com/en/docs/claude-code), or [opencode](https://opencode.ai)) repeatedly until all backlog tasks are complete. Each iteration is a fresh instance with clean context. Memory persists via git history, backlog task notes, and CLAUDE.md/AGENTS.md files.
+Ralph is an autonomous AI agent loop that runs AI coding tools ([Claude Code](https://docs.anthropic.com/en/docs/claude-code) or [opencode](https://opencode.ai)) repeatedly until all backlog tasks are complete. Each iteration is a fresh instance with clean context. Memory persists via git history, backlog task notes, and CLAUDE.md/AGENTS.md files.
 
 Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/) and [Ryan Carson's original Ralph implementation](https://x.com/ryancarson/status/2008548371712135632).
 
@@ -13,8 +13,7 @@ The original Ralph uses a single `prd.json` file with `jq` parsing, a shared `pr
 ## Prerequisites
 
 - One of the following AI coding tools installed and authenticated:
-  - [Amp CLI](https://ampcode.com) (default)
-  - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`npm install -g @anthropic-ai/claude-code`)
+  - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`npm install -g @anthropic-ai/claude-code`) (default)
   - [opencode](https://opencode.ai) (`npm install -g @opencode/cli`)
 - [Backlog.md CLI](https://github.com/MrLesk/Backlog.md) installed
 - A git repository for your project
@@ -30,25 +29,13 @@ Copy the ralph files into your project:
 # From your project root
 mkdir -p scripts/ralph
 cp /path/to/ralph/ralph.sh scripts/ralph/
-
-# Copy the prompt template for your AI tool of choice:
-cp /path/to/ralph/prompt.md scripts/ralph/prompt.md    # For Amp
-# OR
-cp /path/to/ralph/CLAUDE.md scripts/ralph/CLAUDE.md    # For Claude Code
-
+cp /path/to/ralph/CLAUDE.md scripts/ralph/CLAUDE.md
 chmod +x scripts/ralph/ralph.sh
 ```
 
 ### Option 2: Install skills globally
 
-Copy the skills to your Amp or Claude config for use across all projects:
-
-For AMP
-```bash
-cp -r skills/ralph-init ~/.config/amp/skills/
-cp -r skills/ralph-prd ~/.config/amp/skills/
-cp -r skills/ralph-backlog ~/.config/amp/skills/
-```
+Copy the skills to your AI tool's config for use across all projects:
 
 For Claude Code
 ```bash
@@ -78,18 +65,6 @@ To run Ralph in the devcontainer:
 
 This starts the container automatically and executes Ralph inside the isolated environment. The firewall (`init-firewall.sh`) restricts outbound network access using iptables and validates restrictions on startup.
 
-### Configure Amp auto-handoff (recommended)
-
-Add to `~/.config/amp/settings.json`:
-
-```json
-{
-  "amp.experimental.autoHandoff": { "context": 90 }
-}
-```
-
-This enables automatic handoff when context fills up, allowing Ralph to handle large tasks that exceed a single context window.
-
 ## Workflow
 
 ### 1. Create a PRD
@@ -115,11 +90,8 @@ This creates individual backlog tasks with acceptance criteria, priorities, and 
 ### 3. Run Ralph
 
 ```bash
-# Using Amp (default)
+# Using Claude Code (default)
 ./scripts/ralph/ralph.sh [max_iterations]
-
-# Using Claude Code
-./scripts/ralph/ralph.sh --tool claude [max_iterations]
 
 # Using Claude Code with low effort (faster, cheaper)
 ./scripts/ralph/ralph.sh --tool claude --effort low [max_iterations]
@@ -134,7 +106,7 @@ This creates individual backlog tasks with acceptance criteria, priorities, and 
 ./scripts/ralph/ralph.sh --on-error retry --retry-count 3 --log-file ralph.log
 ```
 
-Default is 10 iterations. Use `--tool amp`, `--tool claude`, or `--tool opencode` to select your AI coding tool. Add `--devcontainer` to run in an isolated container with network restrictions.
+Default is 10 iterations. Use `--tool claude` (default) or `--tool opencode` to select your AI coding tool. Add `--devcontainer` to run in an isolated container with network restrictions.
 
 ### Error Handling Options
 
@@ -192,8 +164,7 @@ The same workflow (branch, implement, review, merge) applies in both modes.
 
 | File | Purpose |
 |------|---------|
-| `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool amp\|claude\|opencode` and `--devcontainer`) |
-| `prompt.md` | Prompt template for Amp |
+| `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool claude\|opencode` and `--devcontainer`) |
 | `CLAUDE.md` | Agent instructions for Claude Code (autonomous + interactive) |
 | `backlog/` | Task files managed by backlog.md CLI |
 | `.devcontainer/` | DevContainer configuration with firewall for sandboxed execution |
@@ -220,7 +191,7 @@ npm run dev
 
 ### Each Iteration = Fresh Context
 
-Each iteration spawns a **new AI instance** (Amp, Claude Code, or opencode) with clean context. The only memory between iterations is:
+Each iteration spawns a **new AI instance** (Claude Code or opencode) with clean context. The only memory between iterations is:
 - Git history (commits from previous iterations)
 - Backlog task notes (learnings and context)
 - CLAUDE.md / AGENTS.md files (reusable patterns)
@@ -333,7 +304,7 @@ npm run test:e2e
 
 ## Customizing
 
-After copying `prompt.md` (for Amp) or `CLAUDE.md` (for Claude Code/opencode) to your project, customize it:
+After copying `CLAUDE.md` to your project, customize it:
 - Add project-specific quality check commands
 - Include codebase conventions and common gotchas
 - Add language/framework instructions to the `## Project-Specific` section at the bottom of CLAUDE.md
@@ -342,7 +313,6 @@ After copying `prompt.md` (for Amp) or `CLAUDE.md` (for Claude Code/opencode) to
 
 - [Geoffrey Huntley's Ralph article](https://ghuntley.com/ralph/)
 - [Backlog.md CLI](https://github.com/MrLesk/Backlog.md)
-- [Amp documentation](https://ampcode.com/manual)
 - [Claude Code documentation](https://docs.anthropic.com/en/docs/claude-code)
 - [opencode documentation](https://opencode.ai/docs)
 

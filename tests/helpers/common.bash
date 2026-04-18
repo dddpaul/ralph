@@ -43,7 +43,7 @@ EOF
   export PATH="$TEST_DIR/bin:$PATH"
 }
 
-# Mock AI tools (amp, claude, opencode)
+# Mock AI tools (claude, opencode)
 mock_tool() {
   local tool="$1"
   local output="${2:-AI tool mocked}"
