@@ -102,7 +102,7 @@ MOCK
   cat > "$TEST_DIR/bin/opencode" <<MOCK
 #!/bin/bash
 touch "$marker"
-sleep 30
+sleep 3
 MOCK
   chmod +x "$TEST_DIR/bin/opencode"
   export PATH="$TEST_DIR/bin:$PATH"

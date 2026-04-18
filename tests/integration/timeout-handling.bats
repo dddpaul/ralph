@@ -34,7 +34,7 @@ mock_opencode_normal() {
   cat > "$TEST_DIR/bin/opencode" <<'EOF'
 #!/bin/bash
 echo "Opencode running..."
-sleep 0.5
+sleep 0.1
 echo "## Task Summary"
 echo "- Task: TASK-1 - Test task"
 echo "- What was implemented: Test"
@@ -74,20 +74,20 @@ SCRIPT
 
 @test "Timeout warning message printed when iteration times out" {
   mock_backlog_with_counter
-  mock_opencode_with_timeout 3
+  mock_opencode_with_timeout 1
 
   cd "$PROJECT_ROOT"
-  run timeout 30 bash ralph.sh --tool opencode --timeout 0.02 2
+  run timeout 10 bash ralph.sh --tool opencode --timeout 0.02 2
 
   [[ "$output" == *"WARNING:"*"timed out"* ]]
 }
 
 @test "Script continues to next iteration after timeout" {
   mock_backlog_with_counter
-  mock_opencode_with_timeout 3
+  mock_opencode_with_timeout 1
 
   cd "$PROJECT_ROOT"
-  run timeout 30 bash ralph.sh --tool opencode --timeout 0.02 2
+  run timeout 10 bash ralph.sh --tool opencode --timeout 0.02 2
 
   [[ "$output" == *"Iteration 1 of 2"* ]]
   [[ "$output" == *"Iteration 2 of 2"* ]]
@@ -95,10 +95,10 @@ SCRIPT
 
 @test "Exit code 124 handled correctly" {
   mock_backlog "TASK-1 - Test task"
-  mock_opencode_with_timeout 3
+  mock_opencode_with_timeout 1
 
   cd "$PROJECT_ROOT"
-  run timeout 30 bash ralph.sh --tool opencode --timeout 0.02 1
+  run timeout 10 bash ralph.sh --tool opencode --timeout 0.02 1
 
   [[ "$output" == *"WARNING:"*"timed out"* ]]
 }
@@ -108,7 +108,7 @@ SCRIPT
   mock_opencode_normal
 
   cd "$PROJECT_ROOT"
-  run timeout 30 bash ralph.sh --tool opencode --timeout 0.02 1
+  run timeout 10 bash ralph.sh --tool opencode --timeout 0.02 1
 
   [[ "$output" != *"WARNING:"*"timed out"* ]]
   [[ "$output" == *"Iteration 1 of 1"* ]]
@@ -128,7 +128,7 @@ EOF
   mock_backlog "TASK-1 - Test task"
 
   cd "$PROJECT_ROOT"
-  run timeout 30 bash ralph.sh --tool opencode --timeout 0.02 1
+  run timeout 10 bash ralph.sh --tool opencode --timeout 0.02 1
 
   [ "$status" -eq 0 ]
   [[ "$output" == *"Ralph Run Summary"* ]]
@@ -159,10 +159,10 @@ SCRIPT
   chmod +x "$TEST_DIR/bin/backlog"
   export PATH="$TEST_DIR/bin:$PATH"
   
-  mock_opencode_with_timeout 3
+  mock_opencode_with_timeout 1
 
   cd "$PROJECT_ROOT"
-  run timeout 30 bash ralph.sh --tool opencode --timeout 0.02 3
+  run timeout 15 bash ralph.sh --tool opencode --timeout 0.02 3
 
   [[ "$output" == *"Iteration 1 of 3"* ]]
   [[ "$output" == *"Iteration 2 of 3"* ]]
@@ -183,7 +183,7 @@ SCRIPT
   mock_opencode_normal
 
   cd "$PROJECT_ROOT"
-  run timeout 30 bash ralph.sh --tool opencode --timeout 0.5 1
+  run timeout 10 bash ralph.sh --tool opencode --timeout 0.5 1
 
   [[ "$output" == *"Timeout: 0.5m"* ]]
   [[ "$output" != *"Timeout must be"* ]]
@@ -197,7 +197,7 @@ SCRIPT
   export TMPDIR="$TEST_DIR/tmpfiles"
 
   cd "$PROJECT_ROOT"
-  run timeout 30 bash ralph.sh --tool opencode --timeout 0.02 1
+  run timeout 10 bash ralph.sh --tool opencode --timeout 0.02 1
 
   local tmp_count
   tmp_count=$(find "$TEST_DIR/tmpfiles" -type f 2>/dev/null | wc -l)
@@ -206,13 +206,13 @@ SCRIPT
 
 @test "Temp file cleaned up on timeout" {
   mock_backlog_with_counter
-  mock_opencode_with_timeout 3
+  mock_opencode_with_timeout 1
 
   mkdir -p "$TEST_DIR/tmpfiles"
   export TMPDIR="$TEST_DIR/tmpfiles"
 
   cd "$PROJECT_ROOT"
-  run timeout 30 bash ralph.sh --tool opencode --timeout 0.02 2
+  run timeout 10 bash ralph.sh --tool opencode --timeout 0.02 2
 
   local tmp_count
   tmp_count=$(find "$TEST_DIR/tmpfiles" -type f 2>/dev/null | wc -l)
@@ -239,7 +239,7 @@ SCRIPT
   export TMPDIR="$TEST_DIR/tmpfiles"
   
   cd "$PROJECT_ROOT"
-  run timeout 30 bash ralph.sh --tool opencode --timeout 0.02 1 --on-error stop
+  run timeout 10 bash ralph.sh --tool opencode --timeout 0.02 1 --on-error stop
   
   [ "$status" -eq 1 ]
   local tmp_count
