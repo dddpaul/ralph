@@ -4,7 +4,7 @@ title: Add run summary on ralph.sh exit
 status: To Do
 assignee: []
 created_date: '2026-04-18 10:18'
-updated_date: '2026-04-18 12:10'
+updated_date: '2026-04-18 12:58'
 labels: []
 dependencies: []
 ---
@@ -22,6 +22,6 @@ Print a plain-text run summary to stdout on every exit path (clean exit, max ite
 - [ ] #3 Exit reason is one of: 'all tasks done', 'max iterations reached', 'error', 'interrupted'
 - [ ] #4 Output format is plain text (not markdown, not JSON)
 - [ ] #5 Signal traps (SIGINT/SIGTERM) trigger the summary before the script exits
-- [ ] #6 Existing tests continue to pass; new tests verify summary appears on each exit path
-- [ ] #7 Summary includes: per-iteration durations (accumulated in an array during the run, each printed) and count of failed/timed-out iterations
+- [ ] #6 Summary includes: per-iteration durations (accumulated in an array during the run, each printed) and count of failed/timed-out iterations
+- [ ] #7 Tests: extract print_summary() as a sourceable function. Unit tests call it directly with arguments and assert output format (no ralph.sh execution needed). Integration tests use instant-exit tool mocks (no sleep). Only the SIGINT test may use a brief sleep (1-2s max via background launch, sleep 1, kill -SIGINT, wait). Total test suite must complete in under 10 seconds
 <!-- AC:END -->
