@@ -75,3 +75,32 @@ EOF
   chmod +x "$TEST_DIR/bin/opencode"
   export PATH="$TEST_DIR/bin:$PATH"
 }
+
+# Mock backlog with per-status responses
+# Usage: mock_backlog_multi "todo response" "done response" "in progress response"
+mock_backlog_multi() {
+  local todo_resp="$1"
+  local done_resp="${2:-No tasks found}"
+  local inprog_resp="${3:-No tasks found}"
+  mkdir -p "$TEST_DIR/bin"
+  cat > "$TEST_DIR/bin/backlog" <<'OUTEREOF'
+#!/bin/bash
+prev=""
+status=""
+for arg in "$@"; do
+  if [[ "$prev" == "-s" ]]; then
+    status="$arg"
+  fi
+  prev="$arg"
+done
+OUTEREOF
+  cat >> "$TEST_DIR/bin/backlog" <<EOF
+case "\$status" in
+  "Done") echo "$done_resp" ;;
+  "In Progress") echo "$inprog_resp" ;;
+  *) echo "$todo_resp" ;;
+esac
+EOF
+  chmod +x "$TEST_DIR/bin/backlog"
+  export PATH="$TEST_DIR/bin:$PATH"
+}

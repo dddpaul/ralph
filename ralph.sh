@@ -120,8 +120,9 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Source summary library
+# Source libraries
 source "$SCRIPT_DIR/lib/summary.sh"
+source "$SCRIPT_DIR/lib/status.sh"
 
 # Run tracking state
 RUN_START_TIME=$(date +%s)
@@ -130,6 +131,16 @@ FAILED_ITERATIONS=0
 ITER_DURATIONS=()
 EXIT_REASON=""
 
+# Status file tracking
+STATUS_FILE="$SCRIPT_DIR/backlog/.ralph-status.json"
+RUN_LOG="$SCRIPT_DIR/backlog/.ralph-run.log"
+RUN_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+TASKS_DONE_IDS=""
+STATUS_ERRORS=""
+CURRENT_TASK=""
+LAST_ITER_DURATION=""
+CURRENT_ITERATION=0
+
 count_remaining_tasks() {
   local output
   output=$(backlog task list -s "To Do" --plain 2>/dev/null)
@@ -137,6 +148,35 @@ count_remaining_tasks() {
     echo "0"
   else
     echo "$output" | grep -c "TASK-" || echo "0"
+  fi
+}
+
+_get_done_task_ids() {
+  backlog task list -s "Done" --plain 2>/dev/null | grep -o "TASK-[0-9]*" | sort || true
+}
+
+_get_current_task() {
+  backlog task list -s "In Progress" --plain 2>/dev/null | grep -o "TASK-[0-9]*" | head -1 || true
+}
+
+_update_status() {
+  local state="$1"
+  local completed_at="${2:-}"
+  local exit_code="${3:-}"
+  local elapsed=$(( $(date +%s) - RUN_START_TIME ))
+  local remaining
+  remaining=$(count_remaining_tasks)
+  write_status "$STATUS_FILE" "$$" "$RUN_STARTED_AT" "$state" \
+    "$CURRENT_ITERATION" "$MAX_ITERATIONS" "$TOOL" "$remaining" \
+    "$CURRENT_TASK" "$LAST_ITER_DURATION" "$elapsed" "$completed_at" \
+    "$exit_code" "$TASKS_DONE_IDS" "$STATUS_ERRORS"
+}
+
+_append_status_error() {
+  if [[ -n "$STATUS_ERRORS" ]]; then
+    STATUS_ERRORS="$STATUS_ERRORS"$'\n'"$1"
+  else
+    STATUS_ERRORS="$1"
   fi
 }
 
@@ -150,6 +190,9 @@ show_summary() {
 
 cleanup_and_exit() {
   local code="$1"
+  local final_state="completed"
+  [[ "$code" -ne 0 ]] && final_state="failed"
+  _update_status "$final_state" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$code"
   show_summary
   exit "$code"
 }
@@ -157,7 +200,13 @@ cleanup_and_exit() {
 _ralph_cleanup_files=()
 _ralph_cleanup() { rm -f "${_ralph_cleanup_files[@]}"; }
 trap '_ralph_cleanup' EXIT
-trap 'EXIT_REASON="interrupted"; show_summary "interrupted"; exit 130' INT TERM
+_ralph_interrupt() {
+  EXIT_REASON="interrupted"
+  _update_status "failed" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "130"
+  show_summary "interrupted"
+  exit 130
+}
+trap '_ralph_interrupt' INT TERM
 
 # Verify backlog CLI is available
 if ! command -v backlog &> /dev/null; then
@@ -211,13 +260,15 @@ handle_error() {
   local retry_attempt="$3"
   
   log_error "Iteration $iteration failed with exit code $exit_code (tool: $TOOL, retry: $retry_attempt)"
-  
+  _append_status_error "Iteration $iteration failed with exit code $exit_code"
+
   case "$ON_ERROR" in
     stop)
       echo "ERROR: AI tool failed with exit code $exit_code. Stopping."
       EXIT_REASON="error"
+      LAST_ITER_DURATION=$(( $(date +%s) - ITER_START ))
       FAILED_ITERATIONS=$((FAILED_ITERATIONS + 1))
-      ITER_DURATIONS+=("$(( $(date +%s) - ITER_START ))")
+      ITER_DURATIONS+=("$LAST_ITER_DURATION")
       cleanup_and_exit "$exit_code"
       ;;
     continue)
@@ -232,8 +283,9 @@ handle_error() {
       else
         echo "ERROR: AI tool failed after $RETRY_COUNT retries. Stopping."
         EXIT_REASON="error"
+        LAST_ITER_DURATION=$(( $(date +%s) - ITER_START ))
         FAILED_ITERATIONS=$((FAILED_ITERATIONS + 1))
-        ITER_DURATIONS+=("$(( $(date +%s) - ITER_START ))")
+        ITER_DURATIONS+=("$LAST_ITER_DURATION")
         cleanup_and_exit "$exit_code"
       fi
       ;;
@@ -249,6 +301,13 @@ CONFIG_INFO="on-error: $ON_ERROR"
 [[ "$ON_ERROR" == "retry" ]] && CONFIG_INFO="$CONFIG_INFO (retries: $RETRY_COUNT)"
 [[ -n "$LOG_FILE" ]] && CONFIG_INFO="$CONFIG_INFO, log: $LOG_FILE"
 
+# Set up run logging
+mkdir -p "$SCRIPT_DIR/backlog"
+: > "$RUN_LOG"
+exec > >(tee -a "$RUN_LOG") 2>&1
+
+_update_status "running"
+
 echo "Starting Ralph - Tool: $TOOL$MODEL_INFO - Max iterations: $MAX_ITERATIONS - Timeout: ${TIMEOUT}m${USE_DEVCONTAINER:+ (devcontainer)}"
 echo "Config: $CONFIG_INFO"
 
@@ -261,6 +320,10 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
   fi
 
   ITER_START=$(date +%s)
+  CURRENT_ITERATION=$i
+  DONE_BEFORE=$(_get_done_task_ids)
+  CURRENT_TASK=$(_get_current_task)
+  _update_status "running"
 
   echo ""
   echo "==============================================================="
@@ -313,6 +376,7 @@ Your response MUST end with the ## Task Summary block. This is not optional."
       echo "WARNING: Iteration $i timed out after ${TIMEOUT}m ($(format_duration $(($(date +%s) - ITER_START)))). Continuing to next iteration..."
       FAILED_ITERATIONS=$((FAILED_ITERATIONS + 1))
       ITER_FAILED=true
+      _append_status_error "Iteration $i timed out after ${TIMEOUT}m"
       sleep 2
       break
     fi
@@ -340,14 +404,35 @@ Your response MUST end with the ## Task Summary block. This is not optional."
 
   ITER_ELAPSED=$(( $(date +%s) - ITER_START ))
   ITER_DURATIONS+=("$ITER_ELAPSED")
+  LAST_ITER_DURATION="$ITER_ELAPSED"
+
+  # Track tasks that transitioned to Done during this iteration
+  DONE_AFTER=$(_get_done_task_ids)
+  if [[ -n "$DONE_AFTER" ]]; then
+    NEW_DONE=""
+    if [[ -n "$DONE_BEFORE" ]]; then
+      NEW_DONE=$(comm -13 <(echo "$DONE_BEFORE") <(echo "$DONE_AFTER"))
+    else
+      NEW_DONE="$DONE_AFTER"
+    fi
+    if [[ -n "$NEW_DONE" ]]; then
+      if [[ -n "$TASKS_DONE_IDS" ]]; then
+        TASKS_DONE_IDS="$TASKS_DONE_IDS"$'\n'"$NEW_DONE"
+      else
+        TASKS_DONE_IDS="$NEW_DONE"
+      fi
+    fi
+  fi
 
   if [[ "$ITER_FAILED" == true ]]; then
+    _update_status "running"
     echo "Iteration $i failed ($(format_duration $ITER_ELAPSED)). Continuing..."
     sleep 2
     continue
   fi
 
   TASKS_COMPLETED=$((TASKS_COMPLETED + 1))
+  _update_status "running"
 
   # Check for completion signal
   if grep -q "<promise>COMPLETE</promise>" "$OUTFILE"; then

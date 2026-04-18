@@ -2,6 +2,8 @@
 prd.json
 progress.txt
 .last-branch
+backlog/.ralph-status.json
+backlog/.ralph-run.log
 
 # Archive is optional to commit
 # archive/
