@@ -94,9 +94,9 @@ if [[ "$TOOL" != "claude" && "$TOOL" != "opencode" ]]; then
   exit 1
 fi
 
-# Validate timeout (minimum 1 minute)
-if [[ ! "$TIMEOUT" =~ ^[0-9]+$ ]] || [[ "$TIMEOUT" -lt 1 ]]; then
-  echo "Error: Timeout must be an integer >= 1 minute."
+# Validate timeout (any positive number of minutes)
+if ! echo "$TIMEOUT" | grep -qE '^[0-9]*\.?[0-9]+$' || awk "BEGIN{exit(!($TIMEOUT <= 0))}"; then
+  echo "Error: Timeout must be a positive number of minutes."
   exit 1
 fi
 
@@ -344,7 +344,7 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
     EXEC_PREFIX="devcontainer exec --workspace-folder $SCRIPT_DIR"
   fi
 
-  TIMEOUT_SEC=$((TIMEOUT * 60))
+  TIMEOUT_SEC=$(awk "BEGIN{printf \"%d\", $TIMEOUT * 60}")
 
   # Retry loop for --on-error=retry
   retry_attempt=0

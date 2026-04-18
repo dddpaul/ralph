@@ -159,7 +159,7 @@ SCRIPT
   
   # Run ralph with mock
   RALPH_SCRIPT="$PROJECT_ROOT/ralph.sh"
-  run timeout 30 bash "$RALPH_SCRIPT" --tool opencode --timeout 1 5
+  run timeout 30 bash "$RALPH_SCRIPT" --tool opencode --timeout 0.05 5
   
   [[ "$output" == *"Ralph completed all tasks!"* ]] || [[ "$output" == *"All tasks complete"* ]]
 }
@@ -172,7 +172,7 @@ SCRIPT
   cd "$TEST_REPO"
   
   RALPH_SCRIPT="$PROJECT_ROOT/ralph.sh"
-  run timeout 30 bash "$RALPH_SCRIPT" --tool opencode --timeout 1 5
+  run timeout 30 bash "$RALPH_SCRIPT" --tool opencode --timeout 0.05 5
   
   # Check all tasks are Done
   TODO_COUNT=$(find backlog/tasks -name "*.md" -exec grep -l "status: To Do" {} \; 2>/dev/null | wc -l || echo "0")
@@ -203,7 +203,7 @@ SCRIPT
   
   # Run ralph
   RALPH_SCRIPT="$PROJECT_ROOT/ralph.sh"
-  run timeout 30 bash "$RALPH_SCRIPT" --tool opencode --timeout 1 5
+  run timeout 30 bash "$RALPH_SCRIPT" --tool opencode --timeout 0.05 5
   
   # Verify completion
   [[ "$status" -eq 0 ]]
