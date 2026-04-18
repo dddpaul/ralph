@@ -44,25 +44,25 @@ EOF
   [ "$status" -eq 0 ]
 }
 
-@test "Ralph completed all tasks message printed" {
+@test "Ralph run summary printed on completion" {
   mock_backlog "TASK-1 - Test task"
   mock_opencode_with_completion
-  
+
   cd "$PROJECT_ROOT"
   run timeout 10 bash ralph.sh --tool opencode 5
-  
-  [[ "$output" == *"Ralph completed all tasks!"* ]]
+
+  [[ "$output" == *"Ralph Run Summary"* ]]
+  [[ "$output" == *"Exit reason:        all tasks done"* ]]
 }
 
-@test "Iteration count shown in completion message" {
+@test "Iteration count shown in completion summary" {
   mock_backlog "TASK-1 - Test task"
   mock_opencode_with_completion
-  
+
   cd "$PROJECT_ROOT"
   run timeout 10 bash ralph.sh --tool opencode 5
-  
-  [[ "$output" == *"Completed at iteration"* ]]
-  [[ "$output" == *"of 5"* ]]
+
+  [[ "$output" == *"Iterations used:    1 of 5"* ]]
 }
 
 @test "No completion signal when not present" {
@@ -84,5 +84,5 @@ TASK-2 - Another task"
   run timeout 10 bash ralph.sh --tool opencode 3
   
   [ "$status" -eq 0 ]
-  [[ "$output" == *"Ralph completed all tasks!"* ]]
+  [[ "$output" == *"Ralph Run Summary"* ]]
 }

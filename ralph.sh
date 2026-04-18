@@ -4,7 +4,7 @@
 #                    [--timeout minutes] [--on-error stop|continue|retry] [--retry-count N]
 #                    [--log-file path] [--devcontainer] [max_iterations]
 
-set -eo pipefail
+set -o pipefail
 
 # Parse arguments
 TOOL="amp"  # Default to amp for backwards compatibility
@@ -120,6 +120,45 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Source summary library
+source "$SCRIPT_DIR/lib/summary.sh"
+
+# Run tracking state
+RUN_START_TIME=$(date +%s)
+TASKS_COMPLETED=0
+FAILED_ITERATIONS=0
+ITER_DURATIONS=()
+EXIT_REASON=""
+
+count_remaining_tasks() {
+  local output
+  output=$(backlog task list -s "To Do" --plain 2>/dev/null)
+  if echo "$output" | grep -q "No tasks found"; then
+    echo "0"
+  else
+    echo "$output" | grep -c "TASK-" || echo "0"
+  fi
+}
+
+show_summary() {
+  local reason="${1:-$EXIT_REASON}"
+  local wall_time=$(( $(date +%s) - RUN_START_TIME ))
+  local remaining
+  remaining=$(count_remaining_tasks)
+  print_summary "$TASKS_COMPLETED" "$wall_time" "${#ITER_DURATIONS[@]}" "$MAX_ITERATIONS" "$reason" "$remaining" "$FAILED_ITERATIONS" "${ITER_DURATIONS[@]}"
+}
+
+cleanup_and_exit() {
+  local code="$1"
+  show_summary
+  exit "$code"
+}
+
+_ralph_cleanup_files=()
+_ralph_cleanup() { rm -f "${_ralph_cleanup_files[@]}"; }
+trap '_ralph_cleanup' EXIT
+trap 'EXIT_REASON="interrupted"; show_summary "interrupted"; exit 130' INT TERM
+
 # Verify backlog CLI is available
 if ! command -v backlog &> /dev/null; then
   echo "Error: 'backlog' CLI not found. Install from https://github.com/MrLesk/Backlog.md"
@@ -176,10 +215,14 @@ handle_error() {
   case "$ON_ERROR" in
     stop)
       echo "ERROR: AI tool failed with exit code $exit_code. Stopping."
-      exit "$exit_code"
+      EXIT_REASON="error"
+      FAILED_ITERATIONS=$((FAILED_ITERATIONS + 1))
+      ITER_DURATIONS+=("$(( $(date +%s) - ITER_START ))")
+      cleanup_and_exit "$exit_code"
       ;;
     continue)
       echo "WARNING: AI tool failed with exit code $exit_code. Continuing to next iteration..."
+      FAILED_ITERATIONS=$((FAILED_ITERATIONS + 1))
       return 1  # Signal to continue loop
       ;;
     retry)
@@ -188,7 +231,10 @@ handle_error() {
         return 2  # Signal to retry
       else
         echo "ERROR: AI tool failed after $RETRY_COUNT retries. Stopping."
-        exit "$exit_code"
+        EXIT_REASON="error"
+        FAILED_ITERATIONS=$((FAILED_ITERATIONS + 1))
+        ITER_DURATIONS+=("$(( $(date +%s) - ITER_START ))")
+        cleanup_and_exit "$exit_code"
       fi
       ;;
   esac
@@ -210,9 +256,8 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
   # Check if any "To Do" tasks remain
   TODO_OUTPUT=$(backlog task list -s "To Do" --plain 2>/dev/null)
   if echo "$TODO_OUTPUT" | grep -q "No tasks found"; then
-    echo ""
-    echo "All tasks complete!"
-    exit 0
+    EXIT_REASON="all tasks done"
+    cleanup_and_exit 0
   fi
 
   ITER_START=$(date +%s)
@@ -225,7 +270,7 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
 
   # Run the selected tool, saving output to temp file
   OUTFILE=$(mktemp)
-  trap 'rm -f "$OUTFILE"' EXIT
+  _ralph_cleanup_files+=("$OUTFILE")
 
   # Build prompt with autonomous mode prefix
   MODE_PREFIX="MODE: autonomous (Ralph loop iteration $i of $MAX_ITERATIONS)"
@@ -262,9 +307,12 @@ Your response MUST end with the ## Task Summary block. This is not optional."
     fi
 
     # Check if iteration timed out (exit code 124 = timeout)
+    ITER_FAILED=false
     if [[ $EXIT_CODE -eq 124 ]]; then
       echo ""
       echo "WARNING: Iteration $i timed out after ${TIMEOUT}m ($(format_duration $(($(date +%s) - ITER_START)))). Continuing to next iteration..."
+      FAILED_ITERATIONS=$((FAILED_ITERATIONS + 1))
+      ITER_FAILED=true
       sleep 2
       break
     fi
@@ -273,9 +321,10 @@ Your response MUST end with the ## Task Summary block. This is not optional."
     if [[ $EXIT_CODE -ne 0 ]]; then
       handle_error "$EXIT_CODE" "$i" "$retry_attempt"
       handler_result=$?
-      
+
       if [[ $handler_result -eq 1 ]]; then
         # continue strategy - go to next iteration
+        ITER_FAILED=true
         break
       elif [[ $handler_result -eq 2 ]]; then
         # retry strategy - increment counter and retry
@@ -283,8 +332,6 @@ Your response MUST end with the ## Task Summary block. This is not optional."
         sleep 2
         continue
       fi
-      # handler_result would be from exit(), but bash functions can't return that
-      # The exit is handled inside handle_error for stop strategy
     fi
 
     # Success - break out of retry loop
@@ -292,20 +339,25 @@ Your response MUST end with the ## Task Summary block. This is not optional."
   done
 
   ITER_ELAPSED=$(( $(date +%s) - ITER_START ))
+  ITER_DURATIONS+=("$ITER_ELAPSED")
+
+  if [[ "$ITER_FAILED" == true ]]; then
+    echo "Iteration $i failed ($(format_duration $ITER_ELAPSED)). Continuing..."
+    sleep 2
+    continue
+  fi
+
+  TASKS_COMPLETED=$((TASKS_COMPLETED + 1))
 
   # Check for completion signal
   if grep -q "<promise>COMPLETE</promise>" "$OUTFILE"; then
-    echo ""
-    echo "Ralph completed all tasks! (last iteration: $(format_duration $ITER_ELAPSED))"
-    echo "Completed at iteration $i of $MAX_ITERATIONS"
-    exit 0
+    EXIT_REASON="all tasks done"
+    cleanup_and_exit 0
   fi
 
   echo "Iteration $i complete ($(format_duration $ITER_ELAPSED)). Continuing..."
   sleep 2
 done
 
-echo ""
-echo "Ralph reached max iterations ($MAX_ITERATIONS) without completing all tasks."
-echo "Check remaining tasks with: backlog task list --plain"
-exit 1
+EXIT_REASON="max iterations reached"
+cleanup_and_exit 1

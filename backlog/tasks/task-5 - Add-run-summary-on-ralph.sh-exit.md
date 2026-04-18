@@ -1,10 +1,11 @@
 ---
 id: TASK-5
 title: Add run summary on ralph.sh exit
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-04-18 10:18'
-updated_date: '2026-04-18 12:58'
+updated_date: '2026-04-18 13:00'
 labels: []
 dependencies: []
 ---

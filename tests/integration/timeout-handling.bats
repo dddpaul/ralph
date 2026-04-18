@@ -131,7 +131,7 @@ EOF
   run timeout 30 bash ralph.sh --tool opencode --timeout 1 1
   
   [ "$status" -eq 0 ]
-  [[ "$output" == *"Ralph completed all tasks!"* ]]
+  [[ "$output" == *"Ralph Run Summary"* ]]
 }
 
 @test "Multiple timeouts handled gracefully" {
