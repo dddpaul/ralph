@@ -1,10 +1,11 @@
 ---
 id: TASK-22
 title: Consolidate failure tracking between timeout and error paths
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-19 10:20'
-updated_date: '2026-04-19 15:17'
+updated_date: '2026-04-19 16:26'
 labels: []
 dependencies: []
 ---
@@ -23,9 +24,9 @@ Fix: extract a single _record_iteration_failure() function that takes a reason s
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Single _record_iteration_failure() function exists and is called from both timeout and error paths
-- [ ] #2 FAILED_ITERATIONS count matches the number of error entries in the status file
-- [ ] #3 Existing tests in run-summary-integration.bats and timeout-handling.bats still pass
+- [x] #1 Single _record_iteration_failure() function exists and is called from both timeout and error paths
+- [x] #2 FAILED_ITERATIONS count matches the number of error entries in the status file
+- [x] #3 Existing tests in run-summary-integration.bats and timeout-handling.bats still pass
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -212,4 +213,10 @@ fi
 - AC5: End-of-loop exit uses TASKS_COMPLETED + FAILED_ITERATIONS to decide exit code (0 for productive, 1 for failures or no progress)
 - AC6: max_iterations=1 with successful agent produces state='completed' and exit code 0
 - AC7: Mixed-outcome runs (any FAILED_ITERATIONS > 0) produce state='failed' regardless of TASKS_COMPLETED
+
+Plan: 1) Add _record_iteration_failure() helper after _append_status_error(). 2) Refactor timeout path to call helper. 3) Refactor handle_error() - remove unconditional _append_status_error, add _record_iteration_failure in terminal branches only. 4) Remove redundant ITER_FAILED=true at line 383. 5) Update max-iterations exit to use TASKS_COMPLETED/FAILED_ITERATIONS for exit code. 6) Update existing tests and add new tests for retry-succeeds and max-iterations-success scenarios.
+
+Commit: `db592b5` - task-22: Consolidate failure tracking into _record_iteration_failure helper
+
+Implemented _record_iteration_failure() helper consolidating FAILED_ITERATIONS++, _append_status_error(), and ITER_FAILED=true. Fixed pre-existing bug where retry-that-succeeds logged spurious status errors. Updated max-iterations exit to return 0 for productive runs (tasks completed, no failures). Added 5 new test cases, updated 2 existing tests.
 <!-- SECTION:NOTES:END -->
