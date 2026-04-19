@@ -68,6 +68,23 @@ Second task done
   [[ "$output" != *"WARNING"*"Task Summary"* ]]
 }
 
+@test "Warning when agent times out with 0 Task Summary blocks" {
+  mock_backlog "TASK-1 - Test task"
+  mkdir -p "$TEST_DIR/bin"
+  cat > "$TEST_DIR/bin/opencode" <<'EOF'
+#!/bin/bash
+echo "Working on task but timed out before finishing"
+exit 124
+EOF
+  chmod +x "$TEST_DIR/bin/opencode"
+  export PATH="$TEST_DIR/bin:$PATH"
+
+  cd "$PROJECT_ROOT"
+  run timeout 10 bash ralph.sh --tool opencode 1
+
+  [[ "$output" == *"WARNING: Iteration 1 produced 0 '## Task Summary' blocks (expected 1)"* ]]
+}
+
 @test "No warning when COMPLETE signal present with 0 blocks" {
   mock_backlog "TASK-1 - Test task"
   mock_opencode_output "All tasks are done.
