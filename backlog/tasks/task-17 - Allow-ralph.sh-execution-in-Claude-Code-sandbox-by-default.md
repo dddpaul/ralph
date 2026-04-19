@@ -1,10 +1,11 @@
 ---
 id: TASK-17
 title: Allow ralph.sh execution in Claude Code sandbox by default
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-19 08:30'
-updated_date: '2026-04-19 09:17'
+updated_date: '2026-04-19 09:21'
 labels: []
 dependencies: []
 ---
@@ -17,9 +18,9 @@ When Claude Code with sandbox enabled invokes ralph-run skill on the host, ralph
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 .claude/settings.local.json permissions.allow includes 'Bash(./ralph.sh:*)' and 'Bash(nohup ./ralph.sh:*)'
-- [ ] #2 skills/ralph-init/templates/settings.local.json permissions.allow includes the same two entries
-- [ ] #3 Running ralph-run skill from Claude Code with sandbox enabled launches ralph.sh without permission errors
+- [x] #1 .claude/settings.local.json permissions.allow includes 'Bash(./ralph.sh:*)' and 'Bash(nohup ./ralph.sh:*)'
+- [x] #2 skills/ralph-init/templates/settings.local.json permissions.allow includes the same two entries
+- [x] #3 Running ralph-run skill from Claude Code with sandbox enabled launches ralph.sh without permission errors
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -35,4 +36,10 @@ ralph.sh fails inside bwrap because:
 - Writes to backlog/.ralph-status.json and .ralph-run.log (restricted)
 
 Fix: Add Bash(./ralph.sh:*) to permissions.allow so Claude Code skips bwrap for this specific trusted command. This is the most targeted approach vs disabling sandbox entirely.
+
+Plan: Add 'Bash(./ralph.sh:*)' and 'Bash(nohup ./ralph.sh:*)' to permissions.allow in both (1) .claude/settings.local.json and (2) skills/ralph-init/templates/settings.local.json
+
+Commit: `9f7bb7c` - task-17: Allow ralph.sh execution in Claude Code sandbox
+
+Implemented: Added Bash(./ralph.sh:*) and Bash(nohup ./ralph.sh:*) to both .claude/settings.local.json and skills/ralph-init/templates/settings.local.json. Files changed: .claude/settings.local.json (local only, gitignored), skills/ralph-init/templates/settings.local.json (committed).
 <!-- SECTION:NOTES:END -->
