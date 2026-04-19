@@ -12,7 +12,9 @@
       "Bash(backlog overview)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git config:*)"
+      "Bash(git config:*)",
+      "Bash(./ralph.sh:*)",
+      "Bash(nohup ./ralph.sh:*)"
     ]
   }
 }
