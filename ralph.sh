@@ -422,6 +422,7 @@ Your response MUST end with the ## Task Summary block. This is not optional."
   ITER_ELAPSED=$(( $(date +%s) - ITER_START ))
   ITER_DURATIONS+=("$ITER_ELAPSED")
   LAST_ITER_DURATION="$ITER_ELAPSED"
+  CURRENT_TASK=$(backlog task list -s 'In Progress' --plain 2>/dev/null | grep -o 'TASK-[0-9]*' | head -1)
 
   # Track tasks that transitioned to Done during this iteration
   DONE_AFTER=$(_get_done_task_ids)

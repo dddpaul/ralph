@@ -169,7 +169,7 @@ print(len(d['errors']))
 
 @test "status file current_task populated from To Do list" {
   mock_tool opencode '<promise>COMPLETE</promise>'
-  mock_backlog_multi "TASK-2 - Test task" "TASK-1 - Done task"
+  mock_backlog_multi "TASK-2 - Test task" "TASK-1 - Done task" "TASK-2 - Test task"
 
   cd "$PROJECT_ROOT"
   run timeout 10 bash ralph.sh --tool opencode 3
@@ -290,4 +290,25 @@ MOCK
   [ -f "$error_log" ]
   [[ "$(cat "$error_log")" == *"ERROR"* ]]
   [ -f "$RUN_LOG" ]
+}
+
+@test "status file current_task is null after iteration if no In Progress task remains" {
+  mock_backlog_multi "TASK-5 - Test task" "No tasks found" "No tasks found"
+  mock_tool opencode '<promise>COMPLETE</promise>'
+
+  cd "$PROJECT_ROOT"
+  run timeout 10 bash ralph.sh --tool opencode 1
+  [ "$status" -eq 0 ]
+  python3 -c "import json,sys; d=json.load(open(sys.argv[1])); assert d['current_task'] in (None, ''), f'expected null, got {d[\"current_task\"]}'" "$STATUS_FILE"
+}
+
+@test "status file current_task reflects In Progress task after iteration" {
+  mock_backlog_multi "TASK-5 - Test task" "No tasks found" "TASK-5 - In progress"
+  mock_tool opencode '## Task Summary'
+
+  cd "$PROJECT_ROOT"
+  run timeout 10 bash ralph.sh --tool opencode 1
+  local ct
+  ct=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['current_task'])" "$STATUS_FILE")
+  [[ "$ct" == "TASK-5" ]]
 }
