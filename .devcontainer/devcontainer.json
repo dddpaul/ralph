@@ -55,7 +55,7 @@
   },
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
   "workspaceFolder": "/workspace",
-  "postCreateCommand": "cp -a /workspace-host-claude/. /workspace/.claude/ && jq '.sandbox.enabled = false' /workspace/.claude/settings.local.json > /tmp/s.json && mv /tmp/s.json /workspace/.claude/settings.local.json",
+  "postCreateCommand": "sudo chown node:node /workspace/.claude && cp /workspace-host-claude/* /workspace/.claude/ && jq '.sandbox.enabled = false' /workspace/.claude/settings.local.json > /tmp/s.json && mv /tmp/s.json /workspace/.claude/settings.local.json",
   "postStartCommand": "sudo /usr/local/bin/init-firewall.sh",
   "forwardPorts": [3000],
   "portsAttributes": {
