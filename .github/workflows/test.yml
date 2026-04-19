@@ -1,0 +1,30 @@
+name: tests
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install bats
+        run: sudo apt-get update && sudo apt-get install -y bats
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install backlog CLI
+        run: npm install -g backlog.md
+
+      - name: Run unit tests
+        run: bats tests/unit/
+
+      - name: Run integration tests
+        run: bats tests/integration/
+
+      - name: Run e2e tests
+        run: bats tests/e2e/

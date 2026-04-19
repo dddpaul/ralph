@@ -72,8 +72,8 @@ TASK_FILE=$(find backlog/tasks -name "*.md" -exec grep -l "status: To Do" {} \; 
 
 if [[ -n "$TASK_FILE" ]]; then
   # Update status to Done
-  sed -i '' 's/status: To Do/status: Done/' "$TASK_FILE"
-  
+  perl -i -pe 's/status: To Do/status: Done/' "$TASK_FILE"
+
   # Add some notes
   echo "" >> "$TASK_FILE"
   echo "## Notes" >> "$TASK_FILE"
@@ -99,8 +99,8 @@ mock_opencode_completes_all() {
 
 for TASK_FILE in backlog/tasks/*.md; do
   if [[ -f "$TASK_FILE" ]]; then
-    sed -i '' 's/status: To Do/status: Done/' "$TASK_FILE"
-    sed -i '' 's/status: In Progress/status: Done/' "$TASK_FILE"
+    perl -i -pe 's/status: To Do/status: Done/' "$TASK_FILE"
+    perl -i -pe 's/status: In Progress/status: Done/' "$TASK_FILE"
   fi
 done
 
