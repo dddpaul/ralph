@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-19 10:19'
-updated_date: '2026-04-19 15:11'
+updated_date: '2026-04-19 16:55'
 labels: []
 dependencies: []
 ---
@@ -72,4 +72,26 @@ Plan: Insert a summary-block count check between line 395 (end of retry loop) an
 Commit: `a7c787d` - task-18: Enforce one task per iteration in ralph.sh
 
 Implemented: Added summary-block count check after retry loop in ralph.sh. Warns to stderr when count != 1, skips check when COMPLETE signal present. Added 4 integration tests in tests/integration/one-task-enforcement.bats. Files: ralph.sh, tests/integration/one-task-enforcement.bats.
+
+## Reopened 2026-04-19 — missing test case
+
+Audit on 2026-04-19 found the implementation delivered 4 of 5 planned test cases in tests/integration/one-task-enforcement.bats. Missing:
+
+**Test 5: Mock agent times out (EXIT_CODE=124) with 0 blocks → warning still emitted**
+
+Per the brainstorm design (see earlier notes), this scenario was explicitly chosen — 'Skip only on COMPLETE signal; still warn on timeout/error (those already log separately, so the warning adds context).'
+
+## Additional AC
+
+- AC4: tests/integration/one-task-enforcement.bats includes a test case where the agent mock times out (exit code 124) producing 0 '## Task Summary' blocks, and asserts the warning is still emitted
+
+## Scope of reopen
+
+Single test addition. No code changes to ralph.sh — the check already runs on all iteration completions (only COMPLETE suppresses it). This is purely regression coverage for a design decision that's already implemented correctly.
+
+Plan: Add test case 5 (timeout with exit code 124, 0 summary blocks → warning emitted). Create mock that exits 124 with no summary output. Assert warning is present.
+
+Commit: `01c7586` - task-18: Add timeout test for one-task-per-iteration enforcement
+
+Added test case 5: timeout with exit code 124, 0 summary blocks → warning emitted. Single file changed: tests/integration/one-task-enforcement.bats.
 <!-- SECTION:NOTES:END -->
