@@ -146,13 +146,17 @@ print(len(d['errors']))
   [[ "$pid" -gt 0 ]]
 }
 
-@test "status file current_task populated from In Progress tasks" {
+@test "status file current_task populated from To Do list" {
   mock_tool opencode '<promise>COMPLETE</promise>'
-  mock_backlog_multi "TASK-2 - Test task" "TASK-1 - Done task" "TASK-2 - In progress"
+  mock_backlog_multi "TASK-2 - Test task" "TASK-1 - Done task"
 
   cd "$PROJECT_ROOT"
   run timeout 10 bash ralph.sh --tool opencode 3
   [ "$status" -eq 0 ]
+
+  local current_task
+  current_task=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['current_task'])" "$STATUS_FILE")
+  [[ "$current_task" == "TASK-2" ]]
 }
 
 @test "run log file created with output" {

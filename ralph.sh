@@ -155,10 +155,6 @@ _get_done_task_ids() {
   backlog task list -s "Done" --plain 2>/dev/null | grep -o "TASK-[0-9]*" | sort || true
 }
 
-_get_current_task() {
-  backlog task list -s "In Progress" --plain 2>/dev/null | grep -o "TASK-[0-9]*" | head -1 || true
-}
-
 _update_status() {
   local state="$1"
   local completed_at="${2:-}"
@@ -322,7 +318,7 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
   ITER_START=$(date +%s)
   CURRENT_ITERATION=$i
   DONE_BEFORE=$(_get_done_task_ids)
-  CURRENT_TASK=$(_get_current_task)
+  CURRENT_TASK=$(echo "$TODO_OUTPUT" | grep -o "TASK-[0-9]*" | head -1)
   _update_status "running"
 
   echo ""
