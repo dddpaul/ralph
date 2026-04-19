@@ -205,9 +205,23 @@ _ralph_cleanup() { rm -f "${_ralph_cleanup_files[@]}"; }
 trap '_ralph_cleanup' EXIT
 _ralph_interrupt() {
   EXIT_REASON="interrupted"
+  _kill_children
   _update_status "failed" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "130"
   show_summary "interrupted"
   exit 130
+}
+
+_kill_children() {
+  for pid in $(pgrep -P $$ 2>/dev/null); do
+    [[ "$pid" == "${RUN_LOG_TEE_PID:-}" ]] && continue
+    local pgid
+    pgid=$(ps -o pgid= -p "$pid" 2>/dev/null | tr -d ' ')
+    if [[ -n "$pgid" && "$pgid" != "$$" ]]; then
+      kill -TERM -- -"$pgid" 2>/dev/null || true
+    else
+      kill -TERM "$pid" 2>/dev/null || true
+    fi
+  done
 }
 trap '_ralph_interrupt' INT TERM
 
@@ -307,6 +321,7 @@ CONFIG_INFO="on-error: $ON_ERROR"
 mkdir -p "$SCRIPT_DIR/backlog"
 : > "$RUN_LOG"
 exec > >(tee -a "$RUN_LOG") 2>&1
+RUN_LOG_TEE_PID=$!
 
 _update_status "running"
 
