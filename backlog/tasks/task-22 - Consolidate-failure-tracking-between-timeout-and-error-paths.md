@@ -4,7 +4,7 @@ title: Consolidate failure tracking between timeout and error paths
 status: To Do
 assignee: []
 created_date: '2026-04-19 10:20'
-updated_date: '2026-04-19 14:51'
+updated_date: '2026-04-19 15:17'
 labels: []
 dependencies: []
 ---
@@ -159,4 +159,57 @@ Add to tests/integration/run-summary-integration.bats:
 
 Existing ACs still valid. Add:
 - AC4: A retry-that-succeeds scenario leaves STATUS_ERRORS count equal to FAILED_ITERATIONS count (both 0)
+
+## Additional scope: max-iterations exit semantics (2026-04-19)
+
+Related brainstorm while running Ralph with max_iterations=1 showed the current 'max iterations reached' behavior conflates successful productive runs with failures.
+
+**Problem:** ralph.sh lines 447-448 always exit 1 when max_iterations is reached, producing state='failed' even when the agent completed tasks successfully. For single-iteration runs this is especially misleading.
+
+## Behavior matrix (new)
+
+| TASKS_COMPLETED | FAILED_ITERATIONS | Exit code | State |
+|---|---|---|---|
+| 0 | 0 | 1 | failed (no progress) |
+| 0 | >0 | 1 | failed (all failed) |
+| >0 | 0 | **0** | **completed** (productive run, iterations exhausted) |
+| >0 | >0 | 1 | failed (strict — any failure taints the run) |
+
+Success criterion: TASKS_COMPLETED > 0 AND FAILED_ITERATIONS == 0.
+
+## Change to ralph.sh (lines 447-448)
+
+Replace:
+```bash
+EXIT_REASON="max iterations reached"
+cleanup_and_exit 1
+```
+
+With:
+```bash
+if [[ "$TASKS_COMPLETED" -gt 0 && "$FAILED_ITERATIONS" -eq 0 ]]; then
+  EXIT_REASON="max iterations reached ($TASKS_COMPLETED task(s) completed)"
+  cleanup_and_exit 0
+else
+  EXIT_REASON="max iterations reached"
+  cleanup_and_exit 1
+fi
+```
+
+`cleanup_and_exit` itself is unchanged — state still derives from exit code via its existing logic (line 190).
+
+## Test updates
+
+- **Update existing:** tests/integration/run-summary-integration.bats test 'summary on max iterations reached' currently asserts exit 1; split into two tests or update to match new matrix
+- **New cases to add:**
+  1. max_iterations=1, agent succeeds (TASKS_COMPLETED=1, no failures) → exit 0, state='completed'
+  2. max_iterations=1, agent times out → exit 1, state='failed'
+  3. max_iterations=3, all succeed → exit 0, state='completed'
+  4. max_iterations=3, mixed 2 success + 1 failure (strict criterion) → exit 1, state='failed'
+
+## Additional acceptance criteria
+
+- AC5: End-of-loop exit uses TASKS_COMPLETED + FAILED_ITERATIONS to decide exit code (0 for productive, 1 for failures or no progress)
+- AC6: max_iterations=1 with successful agent produces state='completed' and exit code 0
+- AC7: Mixed-outcome runs (any FAILED_ITERATIONS > 0) produce state='failed' regardless of TASKS_COMPLETED
 <!-- SECTION:NOTES:END -->
