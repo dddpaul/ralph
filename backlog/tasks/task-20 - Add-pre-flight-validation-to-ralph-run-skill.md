@@ -1,10 +1,11 @@
 ---
 id: TASK-20
 title: Add pre-flight validation to ralph-run skill
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-19 10:19'
-updated_date: '2026-04-19 13:17'
+updated_date: '2026-04-19 15:27'
 labels: []
 dependencies: []
 ---
@@ -22,9 +23,9 @@ On failure, report which check failed with the actual error output.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Skill validates ralph.sh is executable before launching
-- [ ] #2 Skill runs 'bash -n ./ralph.sh' syntax check before launching
-- [ ] #3 Failed validation reports the specific check that failed and its error output
+- [x] #1 Skill validates ralph.sh is executable before launching
+- [x] #2 Skill runs 'bash -n ./ralph.sh' syntax check before launching
+- [x] #3 Failed validation reports the specific check that failed and its error output
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -104,4 +105,10 @@ For full output, inspect both files.
 
 - Do NOT add RALPH_PATH resolution logic change — still uses existing Step 2 logic (./ralph.sh or scripts/ralph/ralph.sh)
 - Do NOT modify ralph.sh itself — all changes confined to skills/ralph-run/SKILL.md and .gitignore
+
+Plan: In SKILL.md, add Step 3.4 for ralph.sh integrity checks (executable + syntax). Modify Step 4 to capture launch output to backlog/.ralph-launch.log. Modify Step 5 to show diagnostic output from both logs on failure. Add backlog/.ralph-launch.log to .gitignore.
+
+Commit: `dd4960a` - task-20: Add pre-flight validation to ralph-run skill
+
+Implemented pre-flight validation in skills/ralph-run/SKILL.md: Step 3.4 checks executable permission and bash syntax before launch. Step 4 captures early output to backlog/.ralph-launch.log (cleaned up on success). Step 5 shows diagnostic tails from both logs on failure. Added backlog/.ralph-launch.log to .gitignore.
 <!-- SECTION:NOTES:END -->
