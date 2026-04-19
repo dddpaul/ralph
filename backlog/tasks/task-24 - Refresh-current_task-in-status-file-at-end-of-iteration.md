@@ -1,10 +1,11 @@
 ---
 id: TASK-24
 title: Refresh current_task in status file at end of iteration
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-19 10:20'
-updated_date: '2026-04-19 14:58'
+updated_date: '2026-04-19 19:17'
 labels: []
 dependencies:
   - TASK-13
@@ -22,8 +23,8 @@ This is a follow-up to TASK-13, depends on it being merged.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 After each iteration completes, status file current_task reflects In Progress task (or null if none)
-- [ ] #2 Test added in tests/integration/status-file-integration.bats verifying current_task updates after iteration
+- [x] #1 After each iteration completes, status file current_task reflects In Progress task (or null if none)
+- [x] #2 Test added in tests/integration/status-file-integration.bats verifying current_task updates after iteration
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -90,4 +91,10 @@ Kept inline — the query is used in exactly one place and extracting a helper a
 - Modifies: ralph.sh (+1 line), tests/integration/status-file-integration.bats (+2 tests)
 - Does NOT modify: existing current_task logic at line 321 (kept — it's still correct for pre-iteration state)
 - No helper function, no new test fixtures, no changes to mock_backlog_multi
+
+Plan: Add CURRENT_TASK refresh after LAST_ITER_DURATION at line 424. Add 2 integration tests verifying current_task after iteration.
+
+Commit: `3a8d5b7` - task-24: Refresh current_task in status file after each iteration
+
+Implemented: single-line refresh of CURRENT_TASK after iteration via backlog In Progress query. Updated test 11 to provide In Progress mock response. Added 2 new tests. All 18 status-file tests pass.
 <!-- SECTION:NOTES:END -->
