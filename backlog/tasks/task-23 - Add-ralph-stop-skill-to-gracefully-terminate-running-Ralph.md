@@ -1,10 +1,11 @@
 ---
 id: TASK-23
 title: Add ralph-stop skill to gracefully terminate running Ralph
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-19 10:20'
-updated_date: '2026-04-19 14:56'
+updated_date: '2026-04-19 19:08'
 labels: []
 dependencies: []
 ---
@@ -27,11 +28,11 @@ Trigger phrases: 'stop ralph', 'kill ralph', 'ralph stop'.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 skills/ralph-stop/SKILL.md exists with proper frontmatter (name, description, triggers)
-- [ ] #2 Skill reads PID from backlog/.ralph-status.json and validates process is alive
-- [ ] #3 Skill confirms with user before killing (showing current iteration/task)
-- [ ] #4 Skill sends SIGTERM first, falls back to SIGKILL after 10s
-- [ ] #5 If no Ralph is running, skill reports cleanly without error
+- [x] #1 skills/ralph-stop/SKILL.md exists with proper frontmatter (name, description, triggers)
+- [x] #2 Skill reads PID from backlog/.ralph-status.json and validates process is alive
+- [x] #3 Skill confirms with user before killing (showing current iteration/task)
+- [x] #4 Skill sends SIGTERM first, falls back to SIGKILL after 10s
+- [x] #5 If no Ralph is running, skill reports cleanly without error
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -127,4 +128,10 @@ New file: tests/integration/interrupt-trap.bats
 - AC4: SIGTERM first, SIGKILL fallback after 10s
 - AC5: If no Ralph running (missing file, state \!= running, or PID dead), skill reports cleanly without error
 - AC6: New interrupt-trap.bats test verifies children are killed on SIGTERM and RUN_LOG retains content
+
+Plan: Implement per the brainstorm design. Part 1: fix ralph.sh trap to propagate SIGTERM to children (capture tee PID, update _ralph_interrupt). Part 2: create skills/ralph-stop/SKILL.md. Part 3: add interrupt-trap.bats tests.
+
+Commit: `704df99` - task-23: Add ralph-stop skill and SIGTERM child propagation
+
+Implemented ralph-stop skill (skills/ralph-stop/SKILL.md) with 7-step shutdown flow. Added _kill_children helper in ralph.sh trap handler for SIGTERM propagation to child process groups. Added RUN_LOG_TEE_PID capture to preserve log output during interrupts. 3 integration tests in tests/integration/interrupt-trap.bats.
 <!-- SECTION:NOTES:END -->
