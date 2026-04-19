@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-19 06:14'
-updated_date: '2026-04-19 06:14'
+updated_date: '2026-04-19 07:00'
 labels: []
 dependencies: []
 ---
@@ -13,7 +13,7 @@ dependencies: []
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Claude Code sandbox breaks inside devcontainer because host ~/.claude is bind-mounted with host-specific paths that don't exist at /workspace. Fix: add CLAUDE_SANDBOX_ENABLED=false to containerEnv in devcontainer.json. The container already has iptables firewall for network isolation.
+Claude Code sandbox breaks inside devcontainer because bubblewrap (bwrap) can't create mount namespaces — Docker Desktop macOS restricts this even with SYS_ADMIN + seccomp=unconfined. Fix: remove bubblewrap from Dockerfile so Claude Code skips sandboxing (falls back gracefully with a warning), and add CLAUDE_SANDBOX_ENABLED=false to containerEnv to suppress the warning. The container already has iptables firewall for network isolation.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
@@ -30,4 +30,8 @@ Plan: Add CLAUDE_SANDBOX_ENABLED=false to containerEnv in .devcontainer/devconta
 Commit: `10bb550` - task-15: Disable Claude Code sandbox inside devcontainer
 
 Added CLAUDE_SANDBOX_ENABLED=false to containerEnv. AC2 requires manual verification in devcontainer.
+
+History: (1) Tried CLAUDE_SANDBOX_ENABLED env var — didn't work with bwrap present. (2) Tried mount --bind overlay — failed on Docker Desktop macOS. (3) Tried seccomp=unconfined + SYS_ADMIN — bwrap still can't create mount namespaces. (4) Final approach: remove bwrap from Dockerfile + env var to suppress warning.
+
+Final approach: volume mount overlays /workspace/.claude, postCreateCommand copies host files and patches sandbox.enabled=false via jq. No bwrap needed, no warnings, host file untouched.
 <!-- SECTION:NOTES:END -->
