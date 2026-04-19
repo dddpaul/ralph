@@ -18,7 +18,6 @@ ARG CLAUDE_CODE_VERSION=latest
 
 # Install basic development tools and networking utilities
 RUN apt-get update && apt-get install -y --no-install-recommends \
-  bubblewrap \
   less \
   git \
   procps \
