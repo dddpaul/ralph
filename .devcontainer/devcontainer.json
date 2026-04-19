@@ -9,7 +9,7 @@
       "ZSH_IN_DOCKER_VERSION": "1.2.0"
     }
   },
-  "runArgs": ["--cap-add=NET_ADMIN", "--cap-add=NET_RAW", "--security-opt", "seccomp=unconfined"],
+  "runArgs": ["--cap-add=NET_ADMIN", "--cap-add=NET_RAW", "--cap-add=SYS_ADMIN", "--security-opt", "seccomp=unconfined"],
   "customizations": {
     "vscode": {
       "extensions": [
