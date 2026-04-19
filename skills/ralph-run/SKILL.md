@@ -82,6 +82,29 @@ If missing and devcontainer=true, report and stop:
 Error: devcontainer CLI not found but --devcontainer is enabled. Install it or run with devcontainer=false.
 ```
 
+### 3.4 ralph.sh integrity
+
+Check that the script is executable:
+
+```bash
+if [[ ! -x "$RALPH_PATH" ]]; then
+  echo 'Error: ralph.sh is not executable. Run: chmod +x ./ralph.sh'
+  exit 1
+fi
+```
+
+Check that the script has valid bash syntax:
+
+```bash
+if ! bash -n "$RALPH_PATH" 2>/tmp/ralph-syntax-err; then
+  echo 'Error: ralph.sh has syntax errors:'
+  cat /tmp/ralph-syntax-err
+  exit 1
+fi
+```
+
+If either check fails, report the specific check that failed with its error output and stop.
+
 ---
 
 ## Step 4: Launch
@@ -94,10 +117,11 @@ RALPH_CMD="<path-to-ralph.sh> --tool <tool> --effort <effort> --timeout <timeout
 
 Add `--devcontainer` flag only if devcontainer=true.
 
-Launch fully detached so Ralph survives the session ending:
+Launch fully detached, capturing early output to a launch log:
 
 ```bash
-nohup bash -c "$RALPH_CMD" > /dev/null 2>&1 & disown
+LAUNCH_LOG='backlog/.ralph-launch.log'
+nohup bash -c "$RALPH_CMD" > "$LAUNCH_LOG" 2>&1 & disown
 RALPH_PID=$!
 ```
 
@@ -106,6 +130,12 @@ Wait briefly and verify the process started:
 ```bash
 sleep 1
 kill -0 $RALPH_PID 2>/dev/null
+```
+
+On successful launch, remove the launch log (it only has diagnostic value on failure):
+
+```bash
+rm -f "$LAUNCH_LOG"
 ```
 
 ---
@@ -128,8 +158,16 @@ Ralph is running in the background. Use /ralph-status to check progress.
 To stop: kill <pid>
 ```
 
-On failure (process died immediately), output:
+On failure (process died immediately), output diagnostics from both logs:
 
 ```
-Error: Ralph process exited immediately. Check backlog/.ralph-run.log for details.
+Error: Ralph process exited immediately.
+
+--- Last 20 lines of launch output (backlog/.ralph-launch.log) ---
+<tail -20 backlog/.ralph-launch.log>
+
+--- Last 20 lines of run log (backlog/.ralph-run.log, if exists) ---
+<tail -20 backlog/.ralph-run.log, or 'not created' if file does not exist>
+
+For full output, inspect both files.
 ```
