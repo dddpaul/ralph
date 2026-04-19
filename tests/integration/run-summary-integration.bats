@@ -35,16 +35,63 @@ teardown() {
   [[ "$output" == *"Iterations used:    1 of 3"* ]]
 }
 
-@test "summary on max iterations reached" {
+@test "summary on max iterations reached with successful tasks exits 0" {
   mock_tool opencode "iteration done"
   mock_backlog "TASK-1 - Test task"
 
   cd "$PROJECT_ROOT"
   run timeout 10 bash ralph.sh --tool opencode 2
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Ralph Run Summary"* ]]
+  [[ "$output" == *"Exit reason:        max iterations reached (2 task(s) completed)"* ]]
+  [[ "$output" == *"Iterations used:    2 of 2"* ]]
+}
+
+@test "summary on max iterations reached with no progress exits 1" {
+  mock_backlog "TASK-1 - Test task"
+  mkdir -p "$TEST_DIR/bin"
+  cat > "$TEST_DIR/bin/opencode" <<'MOCK'
+#!/bin/bash
+exit 1
+MOCK
+  chmod +x "$TEST_DIR/bin/opencode"
+  export PATH="$TEST_DIR/bin:$PATH"
+
+  cd "$PROJECT_ROOT"
+  run timeout 10 bash ralph.sh --tool opencode --on-error continue 2
   [ "$status" -eq 1 ]
   [[ "$output" == *"Ralph Run Summary"* ]]
   [[ "$output" == *"Exit reason:        max iterations reached"* ]]
-  [[ "$output" == *"Iterations used:    2 of 2"* ]]
+  [[ "$output" == *"Failed iterations:  2"* ]]
+}
+
+@test "summary on max iterations with mixed outcomes exits 1" {
+  mock_backlog "TASK-1 - Test task"
+  mkdir -p "$TEST_DIR/bin"
+  local call_count="$TEST_DIR/opencode_calls"
+  echo "0" > "$call_count"
+  cat > "$TEST_DIR/bin/opencode" <<MOCK
+#!/bin/bash
+count=\$(cat "$call_count")
+count=\$((count + 1))
+echo "\$count" > "$call_count"
+if [ "\$count" -eq 1 ]; then
+  echo "iteration done"
+  exit 0
+else
+  exit 1
+fi
+MOCK
+  chmod +x "$TEST_DIR/bin/opencode"
+  export PATH="$TEST_DIR/bin:$PATH"
+
+  cd "$PROJECT_ROOT"
+  run timeout 10 bash ralph.sh --tool opencode --on-error continue 2
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"Ralph Run Summary"* ]]
+  [[ "$output" == *"Exit reason:        max iterations reached"* ]]
+  [[ "$output" == *"Tasks completed:    1"* ]]
+  [[ "$output" == *"Failed iterations:  1"* ]]
 }
 
 @test "summary on error with on-error=stop" {
@@ -93,6 +140,36 @@ MOCK
   [ "$status" -eq 0 ]
   [[ "$output" == *"Per-iteration durations:"* ]]
   [[ "$output" == *"Iteration 1:"* ]]
+}
+
+@test "retry that succeeds produces zero failed iterations and zero status errors" {
+  mock_backlog "TASK-1 - Test task"
+  mkdir -p "$TEST_DIR/bin"
+  local call_count="$TEST_DIR/retry_calls"
+  echo "0" > "$call_count"
+  cat > "$TEST_DIR/bin/opencode" <<MOCK
+#!/bin/bash
+count=\$(cat "$call_count")
+count=\$((count + 1))
+echo "\$count" > "$call_count"
+if [ "\$count" -le 1 ]; then
+  exit 1
+fi
+echo "<promise>COMPLETE</promise>"
+exit 0
+MOCK
+  chmod +x "$TEST_DIR/bin/opencode"
+  export PATH="$TEST_DIR/bin:$PATH"
+
+  cd "$PROJECT_ROOT"
+  run timeout 10 bash ralph.sh --tool opencode --on-error retry --retry-count 2 3
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Tasks completed:    1"* ]]
+  [[ "$output" == *"Failed iterations:  0"* ]]
+
+  local status_content
+  status_content=$(cat "$RALPH_STATUS_FILE")
+  [[ "$status_content" == *'"errors":[]'* ]]
 }
 
 @test "summary on signal shows interrupted" {

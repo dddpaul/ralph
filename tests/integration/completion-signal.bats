@@ -69,11 +69,12 @@ EOF
   mock_backlog "TASK-1 - Test task
 TASK-2 - Another task"
   mock_opencode_without_completion
-  
+
   cd "$PROJECT_ROOT"
   run timeout 10 bash ralph.sh --tool opencode 1
-  
-  [ "$status" -eq 1 ]
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"max iterations reached"* ]]
 }
 
 @test "Detects completion signal with surrounding text" {

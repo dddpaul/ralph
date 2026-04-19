@@ -176,6 +176,13 @@ _append_status_error() {
   fi
 }
 
+_record_iteration_failure() {
+  local reason="$1"
+  FAILED_ITERATIONS=$((FAILED_ITERATIONS + 1))
+  _append_status_error "$reason"
+  ITER_FAILED=true
+}
+
 show_summary() {
   local reason="${1:-$EXIT_REASON}"
   local wall_time=$(( $(date +%s) - RUN_START_TIME ))
@@ -254,33 +261,32 @@ handle_error() {
   local exit_code="$1"
   local iteration="$2"
   local retry_attempt="$3"
-  
+
   log_error "Iteration $iteration failed with exit code $exit_code (tool: $TOOL, retry: $retry_attempt)"
-  _append_status_error "Iteration $iteration failed with exit code $exit_code"
 
   case "$ON_ERROR" in
     stop)
       echo "ERROR: AI tool failed with exit code $exit_code. Stopping."
       EXIT_REASON="error"
+      _record_iteration_failure "Iteration $iteration failed with exit code $exit_code"
       LAST_ITER_DURATION=$(( $(date +%s) - ITER_START ))
-      FAILED_ITERATIONS=$((FAILED_ITERATIONS + 1))
       ITER_DURATIONS+=("$LAST_ITER_DURATION")
       cleanup_and_exit "$exit_code"
       ;;
     continue)
       echo "WARNING: AI tool failed with exit code $exit_code. Continuing to next iteration..."
-      FAILED_ITERATIONS=$((FAILED_ITERATIONS + 1))
-      return 1  # Signal to continue loop
+      _record_iteration_failure "Iteration $iteration failed with exit code $exit_code"
+      return 1
       ;;
     retry)
       if [[ $retry_attempt -lt $RETRY_COUNT ]]; then
         echo "WARNING: AI tool failed with exit code $exit_code. Retrying (attempt $((retry_attempt + 1)) of $RETRY_COUNT)..."
-        return 2  # Signal to retry
+        return 2
       else
         echo "ERROR: AI tool failed after $RETRY_COUNT retries. Stopping."
         EXIT_REASON="error"
+        _record_iteration_failure "Iteration $iteration failed with exit code $exit_code"
         LAST_ITER_DURATION=$(( $(date +%s) - ITER_START ))
-        FAILED_ITERATIONS=$((FAILED_ITERATIONS + 1))
         ITER_DURATIONS+=("$LAST_ITER_DURATION")
         cleanup_and_exit "$exit_code"
       fi
@@ -366,9 +372,7 @@ Your response MUST end with the ## Task Summary block. This is not optional."
     if [[ $EXIT_CODE -eq 124 ]]; then
       echo ""
       echo "WARNING: Iteration $i timed out after ${TIMEOUT}m ($(format_duration $(($(date +%s) - ITER_START)))). Continuing to next iteration..."
-      FAILED_ITERATIONS=$((FAILED_ITERATIONS + 1))
-      ITER_FAILED=true
-      _append_status_error "Iteration $i timed out after ${TIMEOUT}m"
+      _record_iteration_failure "Iteration $i timed out after ${TIMEOUT}m"
       sleep 2
       break
     fi
@@ -379,8 +383,6 @@ Your response MUST end with the ## Task Summary block. This is not optional."
       handler_result=$?
 
       if [[ $handler_result -eq 1 ]]; then
-        # continue strategy - go to next iteration
-        ITER_FAILED=true
         break
       elif [[ $handler_result -eq 2 ]]; then
         # retry strategy - increment counter and retry
@@ -444,5 +446,10 @@ Your response MUST end with the ## Task Summary block. This is not optional."
   sleep 2
 done
 
-EXIT_REASON="max iterations reached"
-cleanup_and_exit 1
+if [[ "$TASKS_COMPLETED" -gt 0 && "$FAILED_ITERATIONS" -eq 0 ]]; then
+  EXIT_REASON="max iterations reached ($TASKS_COMPLETED task(s) completed)"
+  cleanup_and_exit 0
+else
+  EXIT_REASON="max iterations reached"
+  cleanup_and_exit 1
+fi

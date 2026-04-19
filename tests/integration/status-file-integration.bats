@@ -57,12 +57,36 @@ print(d['completed_at'] is not None)
   [[ "$state" == "completed" ]]
 }
 
-@test "status file state=failed on max iterations" {
+@test "status file state=completed on max iterations with successful tasks" {
   mock_tool opencode "iteration done"
   mock_backlog_multi "TASK-1 - Test task" "No tasks found" "TASK-1 - Test task"
 
   cd "$PROJECT_ROOT"
   run timeout 10 bash ralph.sh --tool opencode 2
+  [ "$status" -eq 0 ]
+  local j
+  j=$(python3 -c "
+import json,sys
+d=json.load(open(sys.argv[1]))
+print(d['state'])
+print(d['exit_code'])
+" "$STATUS_FILE")
+  [[ "$(echo "$j" | sed -n '1p')" == "completed" ]]
+  [[ "$(echo "$j" | sed -n '2p')" == "0" ]]
+}
+
+@test "status file state=failed on max iterations with all failures" {
+  mock_backlog_multi "TASK-1 - Test task" "No tasks found" "TASK-1 - Test task"
+  mkdir -p "$TEST_DIR/bin"
+  cat > "$TEST_DIR/bin/opencode" <<'MOCK'
+#!/bin/bash
+exit 1
+MOCK
+  chmod +x "$TEST_DIR/bin/opencode"
+  export PATH="$TEST_DIR/bin:$PATH"
+
+  cd "$PROJECT_ROOT"
+  run timeout 10 bash ralph.sh --tool opencode --on-error continue 2
   [ "$status" -eq 1 ]
   local j
   j=$(python3 -c "
