@@ -132,8 +132,8 @@ ITER_DURATIONS=()
 EXIT_REASON=""
 
 # Status file tracking
-STATUS_FILE="$SCRIPT_DIR/backlog/.ralph-status.json"
-RUN_LOG="$SCRIPT_DIR/backlog/.ralph-run.log"
+STATUS_FILE="${RALPH_STATUS_FILE:-$SCRIPT_DIR/backlog/.ralph-status.json}"
+RUN_LOG="${RALPH_RUN_LOG:-$SCRIPT_DIR/backlog/.ralph-run.log}"
 RUN_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 TASKS_DONE_IDS=""
 STATUS_ERRORS=""

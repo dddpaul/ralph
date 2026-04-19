@@ -2,17 +2,14 @@
 
 load '../helpers/common'
 
-STATUS_FILE="$PROJECT_ROOT/backlog/.ralph-status.json"
-RUN_LOG="$PROJECT_ROOT/backlog/.ralph-run.log"
-
 setup() {
   setup_test_dir
-  rm -f "$STATUS_FILE" "$RUN_LOG"
+  STATUS_FILE="$RALPH_STATUS_FILE"
+  RUN_LOG="$RALPH_RUN_LOG"
 }
 
 teardown() {
   cleanup_test_dir
-  rm -f "$STATUS_FILE" "$RUN_LOG"
 }
 
 @test "status file created on loop start with state=running" {
