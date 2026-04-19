@@ -394,6 +394,14 @@ Your response MUST end with the ## Task Summary block. This is not optional."
     break
   done
 
+  # Verify agent produced exactly one Task Summary block
+  if ! grep -q '<promise>COMPLETE</promise>' "$OUTFILE"; then
+    SUMMARY_COUNT=$(grep -c '^## Task Summary$' "$OUTFILE" || true)
+    if [[ "$SUMMARY_COUNT" -ne 1 ]]; then
+      echo "WARNING: Iteration $i produced $SUMMARY_COUNT '## Task Summary' blocks (expected 1). This may indicate the agent processed multiple tasks or none." >&2
+    fi
+  fi
+
   ITER_ELAPSED=$(( $(date +%s) - ITER_START ))
   ITER_DURATIONS+=("$ITER_ELAPSED")
   LAST_ITER_DURATION="$ITER_ELAPSED"
