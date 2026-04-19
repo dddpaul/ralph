@@ -40,14 +40,14 @@
   "remoteUser": "node",
   "mounts": [
     "source=claude-code-bashhistory-${devcontainerId},target=/commandhistory,type=volume",
-    // "source=claude-code-config-${devcontainerId},target=/home/node/.claude,type=volume",
-    "source=${localEnv:HOME}/.claude,target=/home/node/.claude,type=bind"
+    "source=${localEnv:HOME}/.claude,target=/home/node/.claude,type=bind",
+    "source=claude-code-project-config-${devcontainerId},target=/workspace/.claude,type=volume",
+    "source=${localWorkspaceFolder}/.claude,target=/workspace-host-claude,type=bind,ro"
   ],
   "containerEnv": {
     "NODE_OPTIONS": "--max-old-space-size=4096",
     "CLAUDE_CONFIG_DIR": "/home/node/.claude",
     "POWERLEVEL9K_DISABLE_GITSTATUS": "true",
-    "CLAUDE_SANDBOX_ENABLED": "false",
     "HTTP_PROXY": "http://host.docker.internal:3128",
     "HTTPS_PROXY": "http://host.docker.internal:3128",
     "NO_PROXY": "localhost,127.0.0.1,.local",
@@ -55,6 +55,7 @@
   },
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
   "workspaceFolder": "/workspace",
+  "postCreateCommand": "cp -a /workspace-host-claude/. /workspace/.claude/ && jq '.sandbox.enabled = false' /workspace/.claude/settings.local.json > /tmp/s.json && mv /tmp/s.json /workspace/.claude/settings.local.json",
   "postStartCommand": "sudo /usr/local/bin/init-firewall.sh",
   "forwardPorts": [3000],
   "portsAttributes": {
