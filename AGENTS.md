@@ -49,7 +49,7 @@ npm run dev
 - Each iteration spawns a fresh AI instance (Claude Code or opencode) with clean context
 - Memory persists via git history, backlog task notes, and CLAUDE.md/AGENTS.md files
 - Tasks should be small enough to complete in one context window
-- Each task gets its own branch (`task-<id>`) merged to main after completion
+- Each task gets its own branch (`task-<id>-description`) merged to main after completion
 - Always update AGENTS.md with discovered patterns for future iterations
 
 ## Testing
