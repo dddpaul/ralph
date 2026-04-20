@@ -447,7 +447,8 @@ RUN_LOG_TEE_PID=$!
 
 _update_status "running"
 
-echo "Starting Ralph - Tool: $TOOL$MODEL_INFO - Max iterations: $MAX_ITERATIONS - Timeout: ${TIMEOUT}m${USE_DEVCONTAINER:+ (devcontainer)}"
+DEVCONTAINER_LABEL=""; [[ "$USE_DEVCONTAINER" == true ]] && DEVCONTAINER_LABEL=" (devcontainer)"
+echo "Starting Ralph - Tool: $TOOL$MODEL_INFO - Max iterations: $MAX_ITERATIONS - Timeout: ${TIMEOUT}m${DEVCONTAINER_LABEL}"
 echo "Config: $CONFIG_INFO"
 
 for i in $(seq 1 "$MAX_ITERATIONS"); do
