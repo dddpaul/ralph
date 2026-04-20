@@ -121,7 +121,7 @@ Launch fully detached, capturing early output to a launch log:
 
 ```bash
 LAUNCH_LOG='backlog/.ralph-launch.log'
-nohup bash -c "$RALPH_CMD" > "$LAUNCH_LOG" 2>&1 & disown
+nohup $RALPH_CMD > "$LAUNCH_LOG" 2>&1 & disown
 RALPH_PID=$!
 ```
 
