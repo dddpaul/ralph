@@ -1,9 +1,11 @@
 ---
 id: TASK-34
 title: Add sandbox bypass instructions to ralph-run and ralph-stop skills
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-04-20 15:59'
+updated_date: '2026-04-20 16:04'
 labels: []
 dependencies: []
 ---
@@ -16,9 +18,15 @@ Several Bash commands in ralph-run and ralph-stop are blocked by Claude Code san
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 ralph-run skill has dangerouslyDisableSandbox instruction on Step 3.2 PID check
-- [ ] #2 ralph-run skill has dangerouslyDisableSandbox instruction on Step 3.4 syntax check (or uses $TMPDIR instead of /tmp)
-- [ ] #3 ralph-run skill has dangerouslyDisableSandbox instruction on post-launch kill -0 verify
-- [ ] #4 ralph-stop skill has dangerouslyDisableSandbox instruction on all kill/pkill commands
-- [ ] #5 No functional changes to ralph.sh itself
+- [x] #1 ralph-run skill has dangerouslyDisableSandbox instruction on Step 3.2 PID check
+- [x] #2 ralph-run skill has dangerouslyDisableSandbox instruction on Step 3.4 syntax check (or uses $TMPDIR instead of /tmp)
+- [x] #3 ralph-run skill has dangerouslyDisableSandbox instruction on post-launch kill -0 verify
+- [x] #4 ralph-stop skill has dangerouslyDisableSandbox instruction on all kill/pkill commands
+- [x] #5 No functional changes to ralph.sh itself
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan: Add 'Use dangerouslyDisableSandbox: true for this Bash call' instructions to ralph-run (Step 3.2 kill -0 PID check, Step 3.4 bash -n /tmp write, Step 4 kill -0 post-launch verify) and ralph-stop (Steps 3, 5, 6 — all kill/pkill commands). No changes to ralph.sh itself.
+<!-- SECTION:NOTES:END -->
