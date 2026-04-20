@@ -40,137 +40,138 @@ RETRY_COUNT=2  # Number of retries for --on-error=retry
 LOG_FILE=""  # Optional log file for errors
 PROMPT_FILE=""  # Optional file to load prompt template from
 
-if [[ "${RALPH_SOURCE_ONLY:-}" != "1" ]]; then
-while [[ $# -gt 0 ]]; do
-  case $1 in
-    --tool)
-      TOOL="$2"
-      shift 2
-      ;;
-    --tool=*)
-      TOOL="${1#*=}"
-      shift
-      ;;
-    --model)
-      MODEL="$2"
-      shift 2
-      ;;
-    --model=*)
-      MODEL="${1#*=}"
-      shift
-      ;;
-    --effort)
-      EFFORT="$2"
-      shift 2
-      ;;
-    --effort=*)
-      EFFORT="${1#*=}"
-      shift
-      ;;
-    --timeout)
-      TIMEOUT="$2"
-      shift 2
-      ;;
-    --timeout=*)
-      TIMEOUT="${1#*=}"
-      shift
-      ;;
-    --devcontainer)
-      USE_DEVCONTAINER=true
-      shift
-      ;;
-    --on-error)
-      ON_ERROR="$2"
-      shift 2
-      ;;
-    --on-error=*)
-      ON_ERROR="${1#*=}"
-      shift
-      ;;
-    --retry-count)
-      RETRY_COUNT="$2"
-      shift 2
-      ;;
-    --retry-count=*)
-      RETRY_COUNT="${1#*=}"
-      shift
-      ;;
-    --log-file)
-      LOG_FILE="$2"
-      shift 2
-      ;;
-    --log-file=*)
-      LOG_FILE="${1#*=}"
-      shift
-      ;;
-    --prompt-file)
-      PROMPT_FILE="$2"
-      shift 2
-      ;;
-    --prompt-file=*)
-      PROMPT_FILE="${1#*=}"
-      shift
-      ;;
-    --help)
-      show_help
-      exit 0
-      ;;
-    --version)
-      echo "ralph.sh $RALPH_VERSION"
-      exit 0
-      ;;
-    --*)
-      echo "Error: Unknown flag '$1'. Use --help for usage."
-      exit 1
-      ;;
-    *)
-      if [[ "$1" =~ ^[0-9]+$ ]]; then
-        MAX_ITERATIONS="$1"
-      else
-        echo "Error: Unexpected argument '$1'. Use --help for usage."
+parse_args() {
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      --tool)
+        TOOL="$2"
+        shift 2
+        ;;
+      --tool=*)
+        TOOL="${1#*=}"
+        shift
+        ;;
+      --model)
+        MODEL="$2"
+        shift 2
+        ;;
+      --model=*)
+        MODEL="${1#*=}"
+        shift
+        ;;
+      --effort)
+        EFFORT="$2"
+        shift 2
+        ;;
+      --effort=*)
+        EFFORT="${1#*=}"
+        shift
+        ;;
+      --timeout)
+        TIMEOUT="$2"
+        shift 2
+        ;;
+      --timeout=*)
+        TIMEOUT="${1#*=}"
+        shift
+        ;;
+      --devcontainer)
+        USE_DEVCONTAINER=true
+        shift
+        ;;
+      --on-error)
+        ON_ERROR="$2"
+        shift 2
+        ;;
+      --on-error=*)
+        ON_ERROR="${1#*=}"
+        shift
+        ;;
+      --retry-count)
+        RETRY_COUNT="$2"
+        shift 2
+        ;;
+      --retry-count=*)
+        RETRY_COUNT="${1#*=}"
+        shift
+        ;;
+      --log-file)
+        LOG_FILE="$2"
+        shift 2
+        ;;
+      --log-file=*)
+        LOG_FILE="${1#*=}"
+        shift
+        ;;
+      --prompt-file)
+        PROMPT_FILE="$2"
+        shift 2
+        ;;
+      --prompt-file=*)
+        PROMPT_FILE="${1#*=}"
+        shift
+        ;;
+      --help)
+        show_help
+        exit 0
+        ;;
+      --version)
+        echo "ralph.sh $RALPH_VERSION"
+        exit 0
+        ;;
+      --*)
+        echo "Error: Unknown flag '$1'. Use --help for usage."
         exit 1
-      fi
-      shift
-      ;;
-  esac
-done
+        ;;
+      *)
+        if [[ "$1" =~ ^[0-9]+$ ]]; then
+          MAX_ITERATIONS="$1"
+        else
+          echo "Error: Unexpected argument '$1'. Use --help for usage."
+          exit 1
+        fi
+        shift
+        ;;
+    esac
+  done
+}
 
-# Validate tool choice
-if [[ "$TOOL" != "claude" && "$TOOL" != "opencode" ]]; then
-  echo "Error: Invalid tool '$TOOL'. Must be 'claude' or 'opencode'."
-  exit 1
-fi
+validate_args() {
+  if [[ "$TOOL" != "claude" && "$TOOL" != "opencode" ]]; then
+    echo "Error: Invalid tool '$TOOL'. Must be 'claude' or 'opencode'."
+    exit 1
+  fi
 
-# Validate timeout (any positive number of minutes)
-if ! [[ "$TIMEOUT" =~ ^[0-9]*\.?[0-9]+$ ]] || [[ -z "${TIMEOUT//[0.]}" ]]; then
-  echo "Error: Timeout must be a positive number of minutes."
-  exit 1
-fi
+  if ! [[ "$TIMEOUT" =~ ^[0-9]*\.?[0-9]+$ ]] || [[ -z "${TIMEOUT//[0.]}" ]]; then
+    echo "Error: Timeout must be a positive number of minutes."
+    exit 1
+  fi
 
-# Validate effort level
-if [[ "$EFFORT" != "low" && "$EFFORT" != "medium" && "$EFFORT" != "high" && "$EFFORT" != "max" ]]; then
-  echo "Error: Invalid effort level '$EFFORT'. Must be 'low', 'medium', 'high', or 'max'."
-  exit 1
-fi
+  if [[ "$EFFORT" != "low" && "$EFFORT" != "medium" && "$EFFORT" != "high" && "$EFFORT" != "max" ]]; then
+    echo "Error: Invalid effort level '$EFFORT'. Must be 'low', 'medium', 'high', or 'max'."
+    exit 1
+  fi
 
-# Validate on-error strategy
-if [[ "$ON_ERROR" != "stop" && "$ON_ERROR" != "continue" && "$ON_ERROR" != "retry" ]]; then
-  echo "Error: Invalid on-error strategy '$ON_ERROR'. Must be 'stop', 'continue', or 'retry'."
-  exit 1
-fi
+  if [[ "$ON_ERROR" != "stop" && "$ON_ERROR" != "continue" && "$ON_ERROR" != "retry" ]]; then
+    echo "Error: Invalid on-error strategy '$ON_ERROR'. Must be 'stop', 'continue', or 'retry'."
+    exit 1
+  fi
 
-# Validate retry-count
-if [[ ! "$RETRY_COUNT" =~ ^[0-9]+$ ]] || [[ "$RETRY_COUNT" -lt 0 ]]; then
-  echo "Error: Retry count must be a non-negative integer."
-  exit 1
-fi
+  if [[ ! "$RETRY_COUNT" =~ ^[0-9]+$ ]] || [[ "$RETRY_COUNT" -lt 0 ]]; then
+    echo "Error: Retry count must be a non-negative integer."
+    exit 1
+  fi
 
-# Validate prompt-file if provided
-if [[ -n "$PROMPT_FILE" ]] && [[ ! -r "$PROMPT_FILE" ]]; then
-  echo "Error: Prompt file '$PROMPT_FILE' does not exist or is not readable."
-  exit 1
+  if [[ -n "$PROMPT_FILE" ]] && [[ ! -r "$PROMPT_FILE" ]]; then
+    echo "Error: Prompt file '$PROMPT_FILE' does not exist or is not readable."
+    exit 1
+  fi
+}
+
+if [[ "${RALPH_SOURCE_ONLY:-}" != "1" ]]; then
+  parse_args "$@"
+  validate_args
 fi
-fi  # RALPH_SOURCE_ONLY guard
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 

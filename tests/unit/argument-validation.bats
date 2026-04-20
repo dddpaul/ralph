@@ -1,259 +1,184 @@
 #!/usr/bin/env bats
-# Unit tests for argument validation in ralph.sh
 
 load '../helpers/common'
 
 setup() {
   setup_test_dir
   mock_backlog "No tasks found"
+  RALPH_SOURCE_ONLY=1 source "$RALPH_SCRIPT"
 }
 
 teardown() {
   cleanup_test_dir
 }
 
-@test "AC1: --tool opencode accepted as valid" {
-  TOOL="claude"
-  TIMEOUT=15
-  MAX_ITERATIONS=10
-  USE_DEVCONTAINER=false
-
-  # Simulate parsing --tool opencode
-  TOOL="opencode"
-
-  # Validate tool choice (same logic as ralph.sh)
-  if [[ "$TOOL" != "claude" && "$TOOL" != "opencode" ]]; then
-    return 1
-  fi
-
-  [[ "$TOOL" == "opencode" ]]
-}
-
-@test "AC2: Invalid tool rejected with exit code 1" {
-  TOOL="claude"
-
-  # Simulate invalid tool
-  TOOL="invalid-tool"
-
-  # Validate tool choice - should fail
-  run bash -c '
-    TOOL="invalid-tool"
-    if [[ "$TOOL" != "claude" && "$TOOL" != "opencode" ]]; then
-      echo "Error: Invalid tool '\''$TOOL'\''. Must be '\''claude'\'' or '\''opencode'\''."
-      exit 1
-    fi
-  '
-
-  [[ "$status" -eq 1 ]]
-  [[ "$output" == *"Invalid tool"* ]]
-}
-
-@test "AC3: --timeout parsed correctly" {
-  TIMEOUT=15
-  
-  # Simulate --timeout 30 parsing
-  TIMEOUT=30
-  
-  [[ "$TIMEOUT" -eq 30 ]]
-}
-
-@test "AC3: --timeout with equals sign parsed correctly" {
-  TIMEOUT=15
-  
-  # Simulate --timeout=45 parsing (from ralph.sh logic)
-  TIMEOUT="45"
-  
-  [[ "$TIMEOUT" -eq 45 ]]
-}
-
-@test "AC4: max_iterations parsed from positional argument" {
-  MAX_ITERATIONS=10
-  
-  # Simulate parsing numeric positional argument
-  arg="5"
-  if [[ "$arg" =~ ^[0-9]+$ ]]; then
-    MAX_ITERATIONS="$arg"
-  fi
-  
-  [[ "$MAX_ITERATIONS" -eq 5 ]]
-}
-
-@test "AC4: Non-numeric positional argument ignored for max_iterations" {
-  MAX_ITERATIONS=10
-  
-  # Simulate parsing non-numeric positional argument
-  arg="invalid"
-  if [[ "$arg" =~ ^[0-9]+$ ]]; then
-    MAX_ITERATIONS="$arg"
-  fi
-  
-  [[ "$MAX_ITERATIONS" -eq 10 ]]
-}
-
-@test "AC5: Help text shows opencode in usage" {
-  # Check that ralph.sh contains opencode in usage line
-  grep -q "opencode" "$RALPH_SCRIPT"
-  
-  # Check usage comment specifically
-  run grep "Usage.*opencode" "$RALPH_SCRIPT"
-  [[ "$status" -eq 0 ]]
-}
-
-@test "Tool validation: claude is valid" {
-  TOOL="claude"
-  if [[ "$TOOL" != "claude" && "$TOOL" != "opencode" ]]; then
-    return 1
-  fi
-  [[ "$TOOL" == "claude" ]]
-}
-
-@test "Tool validation: empty tool is invalid" {
-  TOOL=""
-  run bash -c '
-    TOOL=""
-    if [[ "$TOOL" != "claude" && "$TOOL" != "opencode" ]]; then
-      exit 1
-    fi
-  '
-  [[ "$status" -eq 1 ]]
-}
-
-@test "Default values are correct" {
+reset_defaults() {
   TOOL="claude"
   MODEL="claude-opus-4-6"
   EFFORT="medium"
   TIMEOUT=15
   MAX_ITERATIONS=10
   USE_DEVCONTAINER=false
+  ON_ERROR="stop"
+  RETRY_COUNT=2
+  LOG_FILE=""
+  PROMPT_FILE=""
+}
 
+@test "AC1: --tool opencode accepted as valid" {
+  reset_defaults
+  parse_args --tool opencode
+  validate_args
+  [[ "$TOOL" == "opencode" ]]
+}
+
+@test "AC2: Invalid tool rejected with exit code 1" {
+  reset_defaults
+  parse_args --tool invalid-tool
+  run validate_args
+  [[ "$status" -eq 1 ]]
+  [[ "$output" == *"Invalid tool"* ]]
+}
+
+@test "AC3: --timeout parsed correctly" {
+  reset_defaults
+  parse_args --timeout 30
+  [[ "$TIMEOUT" == "30" ]]
+}
+
+@test "AC3: --timeout with equals sign parsed correctly" {
+  reset_defaults
+  parse_args --timeout=45
+  [[ "$TIMEOUT" == "45" ]]
+}
+
+@test "AC4: max_iterations parsed from positional argument" {
+  reset_defaults
+  parse_args 5
+  [[ "$MAX_ITERATIONS" == "5" ]]
+}
+
+@test "AC4: Non-numeric positional argument rejected" {
+  reset_defaults
+  run parse_args invalid
+  [[ "$status" -eq 1 ]]
+  [[ "$output" == *"Unexpected argument"* ]]
+}
+
+@test "AC5: Help text shows opencode in usage" {
+  grep -q "opencode" "$RALPH_SCRIPT"
+  run grep "Usage.*opencode" "$RALPH_SCRIPT"
+  [[ "$status" -eq 0 ]]
+}
+
+@test "Tool validation: claude is valid" {
+  reset_defaults
+  parse_args --tool claude
+  validate_args
+  [[ "$TOOL" == "claude" ]]
+}
+
+@test "Tool validation: empty tool is invalid" {
+  reset_defaults
+  parse_args --tool ""
+  run validate_args
+  [[ "$status" -eq 1 ]]
+}
+
+@test "Default values are correct" {
+  reset_defaults
   [[ "$TOOL" == "claude" ]]
   [[ "$MODEL" == "claude-opus-4-6" ]]
   [[ "$EFFORT" == "medium" ]]
-  [[ "$TIMEOUT" -eq 15 ]]
-  [[ "$MAX_ITERATIONS" -eq 10 ]]
-  [[ "$USE_DEVCONTAINER" == false ]]
+  [[ "$TIMEOUT" == "15" ]]
+  [[ "$MAX_ITERATIONS" == "10" ]]
+  [[ "$USE_DEVCONTAINER" == "false" ]]
 }
 
 @test "Effort validation: low is valid" {
-  EFFORT="low"
-  if [[ "$EFFORT" != "low" && "$EFFORT" != "medium" && "$EFFORT" != "high" && "$EFFORT" != "max" ]]; then
-    return 1
-  fi
+  reset_defaults
+  parse_args --effort low
+  validate_args
   [[ "$EFFORT" == "low" ]]
 }
 
 @test "Effort validation: medium is valid" {
-  EFFORT="medium"
-  if [[ "$EFFORT" != "low" && "$EFFORT" != "medium" && "$EFFORT" != "high" && "$EFFORT" != "max" ]]; then
-    return 1
-  fi
+  reset_defaults
+  parse_args --effort medium
+  validate_args
   [[ "$EFFORT" == "medium" ]]
 }
 
 @test "Effort validation: high is valid" {
-  EFFORT="high"
-  if [[ "$EFFORT" != "low" && "$EFFORT" != "medium" && "$EFFORT" != "high" && "$EFFORT" != "max" ]]; then
-    return 1
-  fi
+  reset_defaults
+  parse_args --effort high
+  validate_args
   [[ "$EFFORT" == "high" ]]
 }
 
 @test "Effort validation: max is valid" {
-  EFFORT="max"
-  if [[ "$EFFORT" != "low" && "$EFFORT" != "medium" && "$EFFORT" != "high" && "$EFFORT" != "max" ]]; then
-    return 1
-  fi
+  reset_defaults
+  parse_args --effort max
+  validate_args
   [[ "$EFFORT" == "max" ]]
 }
 
 @test "Effort validation: invalid value rejected" {
-  run bash -c '
-    EFFORT="extreme"
-    if [[ "$EFFORT" != "low" && "$EFFORT" != "medium" && "$EFFORT" != "high" && "$EFFORT" != "max" ]]; then
-      echo "Error: Invalid effort level '\''$EFFORT'\''. Must be '\''low'\'', '\''medium'\'', '\''high'\'', or '\''max'\''."
-      exit 1
-    fi
-  '
+  reset_defaults
+  parse_args --effort extreme
+  run validate_args
   [[ "$status" -eq 1 ]]
   [[ "$output" == *"Invalid effort level"* ]]
 }
 
-@test "--effort parsed correctly" {
-  EFFORT="high"
-
-  # Simulate --effort low parsing
-  EFFORT="low"
-
-  [[ "$EFFORT" == "low" ]]
-}
-
-@test "--effort max parsed correctly" {
-  EFFORT="medium"
-
-  EFFORT="max"
-
-  [[ "$EFFORT" == "max" ]]
-}
-
 @test "--effort with equals sign parsed correctly" {
-  EFFORT="high"
-
-  # Simulate --effort=medium parsing (from ralph.sh logic)
-  EFFORT="medium"
-
+  reset_defaults
+  parse_args --effort=medium
+  validate_args
   [[ "$EFFORT" == "medium" ]]
 }
 
 @test "--effort=max with equals sign parsed correctly" {
-  EFFORT="medium"
-
-  EFFORT="max"
-
+  reset_defaults
+  parse_args --effort=max
+  validate_args
   [[ "$EFFORT" == "max" ]]
 }
 
 @test "--prompt-file parsed correctly" {
-  PROMPT_FILE=""
-
-  PROMPT_FILE="/tmp/my-prompt.txt"
-
-  [[ "$PROMPT_FILE" == "/tmp/my-prompt.txt" ]]
+  echo "test prompt" > "$TEST_DIR/prompt.txt"
+  reset_defaults
+  parse_args --prompt-file "$TEST_DIR/prompt.txt"
+  validate_args
+  [[ "$PROMPT_FILE" == "$TEST_DIR/prompt.txt" ]]
 }
 
 @test "--prompt-file with equals sign parsed correctly" {
-  PROMPT_FILE=""
-
-  PROMPT_FILE="/tmp/my-prompt.txt"
-
-  [[ "$PROMPT_FILE" == "/tmp/my-prompt.txt" ]]
+  echo "test prompt" > "$TEST_DIR/prompt.txt"
+  reset_defaults
+  parse_args "--prompt-file=$TEST_DIR/prompt.txt"
+  validate_args
+  [[ "$PROMPT_FILE" == "$TEST_DIR/prompt.txt" ]]
 }
 
 @test "--prompt-file validation: non-existent file rejected with exit code 1" {
-  run bash -c '
-    PROMPT_FILE="/tmp/nonexistent-ralph-prompt-file-$$"
-    if [[ -n "$PROMPT_FILE" ]] && [[ ! -r "$PROMPT_FILE" ]]; then
-      echo "Error: Prompt file '\''$PROMPT_FILE'\'' does not exist or is not readable."
-      exit 1
-    fi
-  '
+  reset_defaults
+  parse_args --prompt-file "/tmp/nonexistent-ralph-prompt-file-$$"
+  run validate_args
   [[ "$status" -eq 1 ]]
   [[ "$output" == *"does not exist or is not readable"* ]]
 }
 
 @test "--prompt-file validation: empty value skips validation" {
-  PROMPT_FILE=""
-  if [[ -n "$PROMPT_FILE" ]] && [[ ! -r "$PROMPT_FILE" ]]; then
-    return 1
-  fi
+  reset_defaults
+  validate_args
   [[ "$PROMPT_FILE" == "" ]]
 }
 
 @test "--prompt-file validation: readable file accepted" {
-  setup_test_dir
   echo "test prompt" > "$TEST_DIR/prompt.txt"
-  PROMPT_FILE="$TEST_DIR/prompt.txt"
-  if [[ -n "$PROMPT_FILE" ]] && [[ ! -r "$PROMPT_FILE" ]]; then
-    return 1
-  fi
-  [[ -r "$PROMPT_FILE" ]]
+  reset_defaults
+  parse_args --prompt-file "$TEST_DIR/prompt.txt"
+  validate_args
+  [[ "$PROMPT_FILE" == "$TEST_DIR/prompt.txt" ]]
 }
