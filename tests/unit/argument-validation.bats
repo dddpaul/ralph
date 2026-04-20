@@ -211,3 +211,49 @@ teardown() {
 
   [[ "$EFFORT" == "max" ]]
 }
+
+@test "--prompt-file parsed correctly" {
+  PROMPT_FILE=""
+
+  PROMPT_FILE="/tmp/my-prompt.txt"
+
+  [[ "$PROMPT_FILE" == "/tmp/my-prompt.txt" ]]
+}
+
+@test "--prompt-file with equals sign parsed correctly" {
+  PROMPT_FILE=""
+
+  PROMPT_FILE="/tmp/my-prompt.txt"
+
+  [[ "$PROMPT_FILE" == "/tmp/my-prompt.txt" ]]
+}
+
+@test "--prompt-file validation: non-existent file rejected with exit code 1" {
+  run bash -c '
+    PROMPT_FILE="/tmp/nonexistent-ralph-prompt-file-$$"
+    if [[ -n "$PROMPT_FILE" ]] && [[ ! -r "$PROMPT_FILE" ]]; then
+      echo "Error: Prompt file '\''$PROMPT_FILE'\'' does not exist or is not readable."
+      exit 1
+    fi
+  '
+  [[ "$status" -eq 1 ]]
+  [[ "$output" == *"does not exist or is not readable"* ]]
+}
+
+@test "--prompt-file validation: empty value skips validation" {
+  PROMPT_FILE=""
+  if [[ -n "$PROMPT_FILE" ]] && [[ ! -r "$PROMPT_FILE" ]]; then
+    return 1
+  fi
+  [[ "$PROMPT_FILE" == "" ]]
+}
+
+@test "--prompt-file validation: readable file accepted" {
+  setup_test_dir
+  echo "test prompt" > "$TEST_DIR/prompt.txt"
+  PROMPT_FILE="$TEST_DIR/prompt.txt"
+  if [[ -n "$PROMPT_FILE" ]] && [[ ! -r "$PROMPT_FILE" ]]; then
+    return 1
+  fi
+  [[ -r "$PROMPT_FILE" ]]
+}

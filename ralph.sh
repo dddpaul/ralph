@@ -2,7 +2,7 @@
 # Ralph Wiggum - Long-running AI agent loop
 # Usage: ./ralph.sh [--tool claude|opencode] [--model model_id] [--effort low|medium|high|max]
 #                    [--timeout minutes] [--on-error stop|continue|retry] [--retry-count N]
-#                    [--log-file path] [--devcontainer] [max_iterations]
+#                    [--log-file path] [--prompt-file path] [--devcontainer] [max_iterations]
 
 set -o pipefail
 
@@ -16,6 +16,7 @@ USE_DEVCONTAINER=false
 ON_ERROR="stop"  # stop | continue | retry
 RETRY_COUNT=2  # Number of retries for --on-error=retry
 LOG_FILE=""  # Optional log file for errors
+PROMPT_FILE=""  # Optional file to load prompt template from
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -79,6 +80,14 @@ while [[ $# -gt 0 ]]; do
       LOG_FILE="${1#*=}"
       shift
       ;;
+    --prompt-file)
+      PROMPT_FILE="$2"
+      shift 2
+      ;;
+    --prompt-file=*)
+      PROMPT_FILE="${1#*=}"
+      shift
+      ;;
     *)
       if [[ "$1" =~ ^[0-9]+$ ]]; then
         MAX_ITERATIONS="$1"
@@ -115,6 +124,12 @@ fi
 # Validate retry-count
 if [[ ! "$RETRY_COUNT" =~ ^[0-9]+$ ]] || [[ "$RETRY_COUNT" -lt 0 ]]; then
   echo "Error: Retry count must be a non-negative integer."
+  exit 1
+fi
+
+# Validate prompt-file if provided
+if [[ -n "$PROMPT_FILE" ]] && [[ ! -r "$PROMPT_FILE" ]]; then
+  echo "Error: Prompt file '$PROMPT_FILE' does not exist or is not readable."
   exit 1
 fi
 
@@ -486,21 +501,24 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
 
   TIMEOUT_SEC=$(awk "BEGIN{printf \"%d\", $TIMEOUT * 60}")
 
+  # Build prompt: load from file or use default
+  if [[ -n "$PROMPT_FILE" ]]; then
+    PROMPT_BODY=$(<"$PROMPT_FILE")
+  else
+    PROMPT_BODY="Pick the next To Do task and execute the full Task Lifecycle from CLAUDE.md.
+Your response MUST end with the ## Task Summary block. This is not optional."
+  fi
+  PROMPT="$MODE_PREFIX
+
+$PROMPT_BODY"
+
   # Retry loop for --on-error=retry
   retry_attempt=0
   while true; do
     if [[ "$TOOL" == "opencode" ]]; then
-      PROMPT="$MODE_PREFIX
-
-Pick the next To Do task and execute the full Task Lifecycle from CLAUDE.md.
-Your response MUST end with the ## Task Summary block. This is not optional."
       timeout "$TIMEOUT_SEC" ${EXEC_PREFIX:+$EXEC_PREFIX} opencode run "$PROMPT" 2>&1 | tee "$OUTFILE"
       EXIT_CODE=${PIPESTATUS[0]}
     else
-      PROMPT="$MODE_PREFIX
-
-Pick the next To Do task and execute the full Task Lifecycle from CLAUDE.md.
-Your response MUST end with the ## Task Summary block. This is not optional."
       timeout "$TIMEOUT_SEC" ${EXEC_PREFIX:+$EXEC_PREFIX} claude --model "$MODEL" --effort "$EFFORT" --dangerously-skip-permissions --print <<< "$PROMPT" 2>&1 | tee "$OUTFILE"
       EXIT_CODE=${PIPESTATUS[0]}
     fi
