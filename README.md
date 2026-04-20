@@ -108,16 +108,21 @@ This creates individual backlog tasks with acceptance criteria, priorities, and 
 
 Default is 10 iterations. Use `--tool claude` (default) or `--tool opencode` to select your AI coding tool. Add `--devcontainer` to run in an isolated container with network restrictions.
 
-### Error Handling Options
-
-Ralph supports configurable error handling for AI tool failures:
+### CLI Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
+| `--tool <claude\|opencode>` | AI tool to use | `claude` |
+| `--model <model_id>` | Model ID for Claude Code | `claude-opus-4-6` |
 | `--effort <level>` | Thinking effort for Claude Code: `low`, `medium`, `high`, or `max` | `medium` |
+| `--timeout <minutes>` | Per-iteration timeout in minutes | `15` |
 | `--on-error <strategy>` | How to handle AI tool errors: `stop`, `continue`, or `retry` | `stop` |
 | `--retry-count <n>` | Number of retries when `--on-error=retry` | `2` |
 | `--log-file <path>` | Log errors to file for later analysis | (none) |
+| `--prompt-file <path>` | File to load prompt template from | (none) |
+| `--devcontainer` | Run inside a devcontainer | off |
+| `--help` | Show help message and exit | |
+| `--version` | Show version and exit | |
 
 **Strategies:**
 
@@ -171,6 +176,9 @@ The same workflow (branch, implement, review, merge) applies in both modes.
 | `skills/ralph-init/` | Skill for bootstrapping Ralph in a new project |
 | `skills/ralph-prd/` | Skill for generating PRDs |
 | `skills/ralph-backlog/` | Skill for converting PRDs to backlog tasks |
+| `skills/ralph-run/` | Skill for launching Ralph in the background from an interactive session |
+| `skills/ralph-status/` | Skill for checking Ralph agent progress |
+| `skills/ralph-stop/` | Skill for stopping a running Ralph agent |
 | `flowchart/` | Interactive visualization of how Ralph works |
 
 ## Flowchart
@@ -296,11 +304,24 @@ npm run test:e2e
 
 ### Test files
 
+**Unit tests** (`tests/unit/`):
 - `argument-validation.bats` - Validates CLI arguments (--tool, --devcontainer, max_iterations)
 - `dependency-checks.bats` - Tests dependency verification (git, backlog CLI, AI tools)
+- `run-summary.bats` - Tests run summary generation
+- `status-file.bats` - Tests status file creation and updates
+
+**Integration tests** (`tests/integration/`):
+- `completion-signal.bats` - Tests `<promise>COMPLETE</promise>` detection and loop termination
+- `interrupt-trap.bats` - Tests signal handling and graceful shutdown on interrupt
+- `one-task-enforcement.bats` - Tests that each iteration completes exactly one task
 - `prompt-generation.bats` - Tests prompt template loading and MODE: autonomous prefix injection
+- `run-summary-integration.bats` - Tests run summary across multiple iterations
+- `status-file-integration.bats` - Tests status file updates across iterations
+- `tee-buffering.bats` - Tests output buffering with tee
 - `timeout-handling.bats` - Tests iteration timeout and graceful shutdown
-- `completion-signal.bats` - Tests <promise>COMPLETE</promise> detection and loop termination
+
+**E2E tests** (`tests/e2e/`):
+- `backlog_workflow.bats` - End-to-end test of the full backlog task workflow
 
 ## Customizing
 
