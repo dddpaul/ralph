@@ -23,6 +23,13 @@ The user may pass overrides as skill arguments. Parse them as space-separated ke
 | devcontainer | true | --devcontainer |
 | max_iterations | 10 | (positional, last arg) |
 
+> **Note: These defaults intentionally differ from ralph.sh CLI defaults.**
+> The skill targets interactive sessions where a user launches Ralph from Claude Code,
+> so it optimizes for thoroughness and isolation over speed:
+> - **effort** (skill: `max`, CLI: `medium`) — interactive launches are typically fewer iterations on harder tasks; max effort avoids shallow results.
+> - **timeout** (skill: `60`, CLI: `15`) — max-effort iterations take longer; 15 minutes would time out most complex tasks.
+> - **devcontainer** (skill: `true`, CLI: `false`) — interactive users expect sandboxed runs by default; the CLI leaves this opt-in for scripted/CI use.
+
 **Example invocations:**
 - `/ralph-run` — all defaults
 - `/ralph-run tool=opencode timeout=30 max_iterations=5`
