@@ -312,6 +312,17 @@ EXIT_REASON=""
 
 # Status file tracking
 STATUS_FILE="${RALPH_STATUS_FILE:-$SCRIPT_DIR/backlog/.ralph-status.json}"
+
+# Double-run guard: refuse to start if another Ralph instance is alive
+if [[ -f "$STATUS_FILE" ]]; then
+  _existing_pid=$(grep -o '"pid":[0-9]*' "$STATUS_FILE" | grep -o '[0-9]*')
+  if [[ -n "$_existing_pid" ]] && kill -0 "$_existing_pid" 2>/dev/null; then
+    echo "Error: Ralph is already running (PID $_existing_pid). Use /ralph-status to check progress, or kill $_existing_pid to stop it."
+    exit 1
+  fi
+  unset _existing_pid
+fi
+
 RUN_LOG="${RALPH_RUN_LOG:-$SCRIPT_DIR/backlog/.ralph-run.log}"
 RUN_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 TASKS_DONE_IDS=""
