@@ -5,7 +5,7 @@
 #                    [--log-file path] [--prompt-file path] [--devcontainer]
 #                    [--help] [--version] [max_iterations]
 
-set -o pipefail
+set -uo pipefail
 
 RALPH_VERSION="0.5.0"
 
