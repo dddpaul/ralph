@@ -28,7 +28,7 @@ Parse the JSON and extract all fields:
 
 ## Step 2: Verify PID (Running State Only)
 
-If `state` is `"running"`, check whether the process is actually alive:
+If `state` is `"running"`, check whether the process is actually alive. **You MUST set `dangerouslyDisableSandbox: true`** on this Bash tool call — the sandbox blocks `kill -0` from seeing processes launched outside the sandbox.
 
 ```bash
 kill -0 <pid> 2>/dev/null
