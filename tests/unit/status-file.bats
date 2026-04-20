@@ -4,7 +4,7 @@ load '../helpers/common'
 
 setup() {
   setup_test_dir
-  source "$PROJECT_ROOT/lib/status.sh"
+  RALPH_SOURCE_ONLY=1 source "$PROJECT_ROOT/ralph.sh"
 }
 
 teardown() {

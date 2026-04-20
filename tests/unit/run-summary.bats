@@ -3,7 +3,7 @@
 load '../helpers/common'
 
 setup() {
-  source "$PROJECT_ROOT/lib/summary.sh"
+  RALPH_SOURCE_ONLY=1 source "$PROJECT_ROOT/ralph.sh"
 }
 
 @test "print_summary outputs all required fields" {

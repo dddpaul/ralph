@@ -120,9 +120,131 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
-# Source libraries
-source "$SCRIPT_DIR/lib/summary.sh"
-source "$SCRIPT_DIR/lib/status.sh"
+# --- Inlined from lib/status.sh ---
+
+_status_json_escape() {
+  local s="$1"
+  s="${s//\\/\\\\}"
+  s="${s//\"/\\\"}"
+  s="${s//$'\n'/\\n}"
+  s="${s//$'\r'/\\r}"
+  s="${s//$'\t'/\\t}"
+  printf '%s' "$s"
+}
+
+_status_json_array() {
+  local items="$1"
+  if [[ -z "$items" ]]; then
+    printf '[]'
+    return
+  fi
+  local first=true
+  printf '['
+  while IFS= read -r item; do
+    [[ -z "$item" ]] && continue
+    if [[ "$first" == true ]]; then
+      first=false
+    else
+      printf ','
+    fi
+    printf '"%s"' "$(_status_json_escape "$item")"
+  done <<< "$items"
+  printf ']'
+}
+
+write_status() {
+  local status_file="$1"
+  local pid="$2"
+  local started_at="$3"
+  local state="$4"
+  local iteration="$5"
+  local max_iterations="$6"
+  local tool="$7"
+  local tasks_remaining="$8"
+  local current_task="$9"
+  local last_iteration_duration="${10}"
+  local elapsed="${11}"
+  local completed_at="${12}"
+  local exit_code="${13}"
+  local tasks_done="${14}"
+  local errors="${15}"
+
+  local tasks_done_json errors_json
+  tasks_done_json=$(_status_json_array "$tasks_done")
+  errors_json=$(_status_json_array "$errors")
+
+  local current_task_json="null"
+  [[ -n "$current_task" ]] && current_task_json="\"$(_status_json_escape "$current_task")\""
+
+  local last_iter_json="null"
+  [[ -n "$last_iteration_duration" ]] && last_iter_json="$last_iteration_duration"
+
+  local completed_at_json="null"
+  [[ -n "$completed_at" ]] && completed_at_json="\"$(_status_json_escape "$completed_at")\""
+
+  local exit_code_json="null"
+  [[ -n "$exit_code" ]] && exit_code_json="$exit_code"
+
+  cat > "$status_file" <<STATUSEOF
+{"pid":$pid,"started_at":"$(_status_json_escape "$started_at")","state":"$(_status_json_escape "$state")","iteration":$iteration,"max_iterations":$max_iterations,"tool":"$(_status_json_escape "$tool")","tasks_done":$tasks_done_json,"tasks_remaining":${tasks_remaining:-0},"current_task":$current_task_json,"last_iteration_duration":$last_iter_json,"elapsed":$elapsed,"errors":$errors_json,"completed_at":$completed_at_json,"exit_code":$exit_code_json}
+STATUSEOF
+}
+
+# --- Inlined from lib/summary.sh ---
+
+_summary_format_duration() {
+  local seconds="$1"
+  local hours=$((seconds / 3600))
+  local minutes=$(( (seconds % 3600) / 60 ))
+  local secs=$((seconds % 60))
+
+  if [[ $hours -gt 0 ]]; then
+    printf "%dh %dm %ds" "$hours" "$minutes" "$secs"
+  elif [[ $minutes -gt 0 ]]; then
+    printf "%dm %ds" "$minutes" "$secs"
+  else
+    printf "%ds" "$secs"
+  fi
+}
+
+print_summary() {
+  local tasks_completed="$1"
+  local wall_time="$2"
+  local iterations_used="$3"
+  local max_iterations="$4"
+  local exit_reason="$5"
+  local tasks_remaining="$6"
+  local failed_iterations="$7"
+  shift 7
+  local iter_durations=("$@")
+
+  echo ""
+  echo "==============================="
+  echo "  Ralph Run Summary"
+  echo "==============================="
+  echo "Exit reason:        $exit_reason"
+  echo "Tasks completed:    $tasks_completed"
+  echo "Tasks remaining:    $tasks_remaining"
+  echo "Iterations used:    $iterations_used of $max_iterations"
+  echo "Failed iterations:  $failed_iterations"
+  echo "Total wall time:    $(_summary_format_duration "$wall_time")"
+
+  if [[ ${#iter_durations[@]} -gt 0 ]]; then
+    echo ""
+    echo "Per-iteration durations:"
+    for idx in "${!iter_durations[@]}"; do
+      echo "  Iteration $((idx + 1)): $(_summary_format_duration "${iter_durations[$idx]}")"
+    done
+  fi
+  echo "==============================="
+}
+
+# --- End inlined libraries ---
+
+# Return early if sourced for testing
+if [[ "${RALPH_SOURCE_ONLY:-}" == "1" ]]; then
+  return 0 2>/dev/null || exit 0
+fi
 
 # Run tracking state
 RUN_START_TIME=$(date +%s)
