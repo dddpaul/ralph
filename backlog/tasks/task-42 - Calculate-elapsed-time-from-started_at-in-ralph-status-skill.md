@@ -1,9 +1,11 @@
 ---
 id: TASK-42
 title: Calculate elapsed time from started_at in ralph-status skill
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-20 16:19'
+updated_date: '2026-04-20 19:19'
 labels: []
 dependencies: []
 ---
@@ -16,7 +18,15 @@ ralph-status reads the elapsed field from .ralph-status.json, but this field is 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 When state is running, elapsed is calculated as current time minus started_at
-- [ ] #2 When state is completed or failed, elapsed uses the value from the status file
-- [ ] #3 Elapsed displays correctly when checked mid-iteration
+- [x] #1 When state is running, elapsed is calculated as current time minus started_at
+- [x] #2 When state is completed or failed, elapsed uses the value from the status file
+- [x] #3 Elapsed displays correctly when checked mid-iteration
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan: Modify ralph-status skill.md Step 1 to add instruction: when state is 'running', calculate elapsed as (current_epoch - started_at_epoch) instead of using the elapsed field from JSON. For completed/failed states, keep using the file's elapsed value. Add a note in Step 3 referencing this computed value.
+
+Implemented: Added 'Compute live elapsed time' subsection to ralph-status skill (Step 1). When state=running, elapsed is calculated as current_epoch - started_at_epoch. For completed/failed, uses file value as-is. File changed: ~/.claude/skills/ralph-status/skill.md (outside repo).
+<!-- SECTION:NOTES:END -->
