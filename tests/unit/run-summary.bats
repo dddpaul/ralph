@@ -63,17 +63,17 @@ setup() {
 }
 
 @test "format duration: seconds only" {
-  run _summary_format_duration 45
+  run format_duration 45
   [[ "$output" == "45s" ]]
 }
 
 @test "format duration: minutes and seconds" {
-  run _summary_format_duration 125
+  run format_duration 125
   [[ "$output" == "2m 5s" ]]
 }
 
 @test "format duration: hours minutes seconds" {
-  run _summary_format_duration 3661
+  run format_duration 3661
   [[ "$output" == "1h 1m 1s" ]]
 }
 

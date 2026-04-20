@@ -207,7 +207,7 @@ STATUSEOF
 
 # --- Inlined from lib/summary.sh ---
 
-_summary_format_duration() {
+format_duration() {
   local seconds="$1"
   local hours=$((seconds / 3600))
   local minutes=$(( (seconds % 3600) / 60 ))
@@ -242,13 +242,13 @@ print_summary() {
   echo "Tasks remaining:    $tasks_remaining"
   echo "Iterations used:    $iterations_used of $max_iterations"
   echo "Failed iterations:  $failed_iterations"
-  echo "Total wall time:    $(_summary_format_duration "$wall_time")"
+  echo "Total wall time:    $(format_duration "$wall_time")"
 
   if [[ ${#iter_durations[@]} -gt 0 ]]; then
     echo ""
     echo "Per-iteration durations:"
     for idx in "${!iter_durations[@]}"; do
-      echo "  Iteration $((idx + 1)): $(_summary_format_duration "${iter_durations[$idx]}")"
+      echo "  Iteration $((idx + 1)): $(format_duration "${iter_durations[$idx]}")"
     done
   fi
   echo "==============================="
@@ -378,22 +378,6 @@ if [[ "$USE_DEVCONTAINER" == true ]]; then
   devcontainer up --workspace-folder "$SCRIPT_DIR"
   echo "Devcontainer is ready."
 fi
-
-# Format seconds as human-readable duration
-format_duration() {
-  local seconds="$1"
-  local hours=$((seconds / 3600))
-  local minutes=$(( (seconds % 3600) / 60 ))
-  local secs=$((seconds % 60))
-
-  if [[ $hours -gt 0 ]]; then
-    printf "%dh %dm %ds" "$hours" "$minutes" "$secs"
-  elif [[ $minutes -gt 0 ]]; then
-    printf "%dm %ds" "$minutes" "$secs"
-  else
-    printf "%ds" "$secs"
-  fi
-}
 
 # Logging function
 log_error() {
