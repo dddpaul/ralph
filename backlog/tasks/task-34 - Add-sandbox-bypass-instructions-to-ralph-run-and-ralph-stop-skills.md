@@ -1,11 +1,11 @@
 ---
 id: TASK-34
 title: Add sandbox bypass instructions to ralph-run and ralph-stop skills
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-20 15:59'
-updated_date: '2026-04-20 16:04'
+updated_date: '2026-04-20 16:05'
 labels: []
 dependencies: []
 ---
@@ -29,4 +29,6 @@ Several Bash commands in ralph-run and ralph-stop are blocked by Claude Code san
 
 <!-- SECTION:NOTES:BEGIN -->
 Plan: Add 'Use dangerouslyDisableSandbox: true for this Bash call' instructions to ralph-run (Step 3.2 kill -0 PID check, Step 3.4 bash -n /tmp write, Step 4 kill -0 post-launch verify) and ralph-stop (Steps 3, 5, 6 — all kill/pkill commands). No changes to ralph.sh itself.
+
+Added dangerouslyDisableSandbox: true instructions to ralph-run SKILL.md (Steps 3.2, 3.4, 4) and ralph-stop SKILL.md (Steps 3, 5, 6). Files changed: ~/.claude/skills/ralph-run/SKILL.md, ~/.claude/skills/ralph-stop/SKILL.md. No changes to ralph.sh.
 <!-- SECTION:NOTES:END -->
