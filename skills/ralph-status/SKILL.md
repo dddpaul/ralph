@@ -34,7 +34,7 @@ If `state` is `"running"`, check whether the process is actually alive:
 kill -0 <pid> 2>/dev/null
 ```
 
-- If the process is **not alive**, override the displayed state:
+- If the process is **not alive**, re-read `backlog/.ralph-status.json` — ralph may have written a final status between your first read and the PID check. If the re-read shows `"completed"` or `"failed"`, use that state (not "crashed"). Only show "crashed" if the state is still `"running"` after the re-read:
   ```
   State: crashed (PID <pid> not found)
   ```
