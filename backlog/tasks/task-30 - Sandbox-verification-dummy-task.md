@@ -1,11 +1,11 @@
 ---
 id: TASK-30
 title: Sandbox verification dummy task
-status: Done
+status: To Do
 assignee:
   - '@claude'
 created_date: '2026-04-20 13:18'
-updated_date: '2026-04-20 13:19'
+updated_date: '2026-04-20 13:24'
 labels: []
 dependencies: []
 ---
