@@ -2,9 +2,31 @@
 # Ralph Wiggum - Long-running AI agent loop
 # Usage: ./ralph.sh [--tool claude|opencode] [--model model_id] [--effort low|medium|high|max]
 #                    [--timeout minutes] [--on-error stop|continue|retry] [--retry-count N]
-#                    [--log-file path] [--prompt-file path] [--devcontainer] [max_iterations]
+#                    [--log-file path] [--prompt-file path] [--devcontainer]
+#                    [--help] [--version] [max_iterations]
 
 set -o pipefail
+
+RALPH_VERSION="0.5.0"
+
+show_help() {
+  cat <<'HELPEOF'
+Usage: ralph.sh [OPTIONS] [max_iterations]
+
+Options:
+  --tool <claude|opencode>     AI tool to use (default: claude)
+  --model <model_id>           Model ID for claude tool (default: claude-opus-4-6)
+  --effort <low|medium|high|max>  Effort level for claude tool (default: medium)
+  --timeout <minutes>          Per-iteration timeout in minutes (default: 15)
+  --on-error <stop|continue|retry>  Error handling strategy (default: stop)
+  --retry-count <N>            Number of retries for --on-error=retry (default: 2)
+  --log-file <path>            Log file for errors
+  --prompt-file <path>         File to load prompt template from
+  --devcontainer               Run inside a devcontainer
+  --help                       Show this help message and exit
+  --version                    Show version and exit
+HELPEOF
+}
 
 # Parse arguments
 TOOL="claude"
@@ -18,6 +40,7 @@ RETRY_COUNT=2  # Number of retries for --on-error=retry
 LOG_FILE=""  # Optional log file for errors
 PROMPT_FILE=""  # Optional file to load prompt template from
 
+if [[ "${RALPH_SOURCE_ONLY:-}" != "1" ]]; then
 while [[ $# -gt 0 ]]; do
   case $1 in
     --tool)
@@ -88,9 +111,24 @@ while [[ $# -gt 0 ]]; do
       PROMPT_FILE="${1#*=}"
       shift
       ;;
+    --help)
+      show_help
+      exit 0
+      ;;
+    --version)
+      echo "ralph.sh $RALPH_VERSION"
+      exit 0
+      ;;
+    --*)
+      echo "Error: Unknown flag '$1'. Use --help for usage."
+      exit 1
+      ;;
     *)
       if [[ "$1" =~ ^[0-9]+$ ]]; then
         MAX_ITERATIONS="$1"
+      else
+        echo "Error: Unexpected argument '$1'. Use --help for usage."
+        exit 1
       fi
       shift
       ;;
@@ -132,6 +170,7 @@ if [[ -n "$PROMPT_FILE" ]] && [[ ! -r "$PROMPT_FILE" ]]; then
   echo "Error: Prompt file '$PROMPT_FILE' does not exist or is not readable."
   exit 1
 fi
+fi  # RALPH_SOURCE_ONLY guard
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
