@@ -167,43 +167,6 @@ _status_json_array() {
   printf ']'
 }
 
-write_status() {
-  local status_file="$1"
-  local pid="$2"
-  local started_at="$3"
-  local state="$4"
-  local iteration="$5"
-  local max_iterations="$6"
-  local tool="$7"
-  local tasks_remaining="$8"
-  local current_task="$9"
-  local last_iteration_duration="${10}"
-  local elapsed="${11}"
-  local completed_at="${12}"
-  local exit_code="${13}"
-  local tasks_done="${14}"
-  local errors="${15}"
-
-  local tasks_done_json errors_json
-  tasks_done_json=$(_status_json_array "$tasks_done")
-  errors_json=$(_status_json_array "$errors")
-
-  local current_task_json="null"
-  [[ -n "$current_task" ]] && current_task_json="\"$(_status_json_escape "$current_task")\""
-
-  local last_iter_json="null"
-  [[ -n "$last_iteration_duration" ]] && last_iter_json="$last_iteration_duration"
-
-  local completed_at_json="null"
-  [[ -n "$completed_at" ]] && completed_at_json="\"$(_status_json_escape "$completed_at")\""
-
-  local exit_code_json="null"
-  [[ -n "$exit_code" ]] && exit_code_json="$exit_code"
-
-  cat > "$status_file" <<STATUSEOF
-{"pid":$pid,"started_at":"$(_status_json_escape "$started_at")","state":"$(_status_json_escape "$state")","iteration":$iteration,"max_iterations":$max_iterations,"tool":"$(_status_json_escape "$tool")","tasks_done":$tasks_done_json,"tasks_remaining":${tasks_remaining:-0},"current_task":$current_task_json,"last_iteration_duration":$last_iter_json,"elapsed":$elapsed,"errors":$errors_json,"completed_at":$completed_at_json,"exit_code":$exit_code_json}
-STATUSEOF
-}
 
 # --- Inlined from lib/summary.sh ---
 
@@ -254,6 +217,45 @@ print_summary() {
   echo "==============================="
 }
 
+count_remaining_tasks() {
+  local output
+  output=$(backlog task list -s "To Do" --plain 2>/dev/null)
+  if echo "$output" | grep -q "No tasks found"; then
+    echo "0"
+  else
+    echo "$output" | grep -c "TASK-" || echo "0"
+  fi
+}
+
+_update_status() {
+  local state="$1"
+  local completed_at="${2:-}"
+  local exit_code="${3:-}"
+  local elapsed=$(( $(date +%s) - RUN_START_TIME ))
+  local remaining
+  remaining=$(count_remaining_tasks)
+
+  local tasks_done_json errors_json
+  tasks_done_json=$(_status_json_array "$TASKS_DONE_IDS")
+  errors_json=$(_status_json_array "$STATUS_ERRORS")
+
+  local current_task_json="null"
+  [[ -n "$CURRENT_TASK" ]] && current_task_json="\"$(_status_json_escape "$CURRENT_TASK")\""
+
+  local last_iter_json="null"
+  [[ -n "$LAST_ITER_DURATION" ]] && last_iter_json="$LAST_ITER_DURATION"
+
+  local completed_at_json="null"
+  [[ -n "$completed_at" ]] && completed_at_json="\"$(_status_json_escape "$completed_at")\""
+
+  local exit_code_json="null"
+  [[ -n "$exit_code" ]] && exit_code_json="$exit_code"
+
+  cat > "$STATUS_FILE" <<STATUSEOF
+{"pid":$$,"started_at":"$(_status_json_escape "$RUN_STARTED_AT")","state":"$(_status_json_escape "$state")","iteration":$CURRENT_ITERATION,"max_iterations":$MAX_ITERATIONS,"tool":"$(_status_json_escape "$TOOL")","tasks_done":$tasks_done_json,"tasks_remaining":${remaining:-0},"current_task":$current_task_json,"last_iteration_duration":$last_iter_json,"elapsed":$elapsed,"errors":$errors_json,"completed_at":$completed_at_json,"exit_code":$exit_code_json}
+STATUSEOF
+}
+
 # --- End inlined libraries ---
 
 # Return early if sourced for testing
@@ -278,31 +280,8 @@ CURRENT_TASK=""
 LAST_ITER_DURATION=""
 CURRENT_ITERATION=0
 
-count_remaining_tasks() {
-  local output
-  output=$(backlog task list -s "To Do" --plain 2>/dev/null)
-  if echo "$output" | grep -q "No tasks found"; then
-    echo "0"
-  else
-    echo "$output" | grep -c "TASK-" || echo "0"
-  fi
-}
-
 _get_done_task_ids() {
   backlog task list -s "Done" --plain 2>/dev/null | grep -o "TASK-[0-9]*" | sort || true
-}
-
-_update_status() {
-  local state="$1"
-  local completed_at="${2:-}"
-  local exit_code="${3:-}"
-  local elapsed=$(( $(date +%s) - RUN_START_TIME ))
-  local remaining
-  remaining=$(count_remaining_tasks)
-  write_status "$STATUS_FILE" "$$" "$RUN_STARTED_AT" "$state" \
-    "$CURRENT_ITERATION" "$MAX_ITERATIONS" "$TOOL" "$remaining" \
-    "$CURRENT_TASK" "$LAST_ITER_DURATION" "$elapsed" "$completed_at" \
-    "$exit_code" "$TASKS_DONE_IDS" "$STATUS_ERRORS"
 }
 
 _append_status_error() {
