@@ -104,7 +104,7 @@ if [[ "$TOOL" != "claude" && "$TOOL" != "opencode" ]]; then
 fi
 
 # Validate timeout (any positive number of minutes)
-if ! echo "$TIMEOUT" | grep -qE '^[0-9]*\.?[0-9]+$' || awk "BEGIN{exit(!($TIMEOUT <= 0))}"; then
+if ! [[ "$TIMEOUT" =~ ^[0-9]*\.?[0-9]+$ ]] || [[ -z "${TIMEOUT//[0.]}" ]]; then
   echo "Error: Timeout must be a positive number of minutes."
   exit 1
 fi
@@ -499,7 +499,16 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
     EXEC_PREFIX="devcontainer exec --workspace-folder $SCRIPT_DIR"
   fi
 
-  TIMEOUT_SEC=$(awk "BEGIN{printf \"%d\", $TIMEOUT * 60}")
+  if [[ "$TIMEOUT" == *.* ]]; then
+    _t_int="${TIMEOUT%%.*}"
+    _t_frac="${TIMEOUT#*.}"
+    _t_int_sec=$(( ${_t_int:-0} * 60 ))
+    while [[ ${#_t_frac} -lt 3 ]]; do _t_frac="${_t_frac}0"; done
+    _t_frac="${_t_frac:0:3}"
+    TIMEOUT_SEC=$(( _t_int_sec + 10#$_t_frac * 60 / 1000 ))
+  else
+    TIMEOUT_SEC=$(( TIMEOUT * 60 ))
+  fi
 
   # Build prompt: load from file or use default
   if [[ -n "$PROMPT_FILE" ]]; then
