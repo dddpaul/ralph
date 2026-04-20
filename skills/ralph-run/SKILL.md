@@ -58,10 +58,16 @@ Error: No "To Do" tasks in backlog. Create tasks first (e.g. /ralph-backlog).
 
 ### 3.2 Ralph not already running
 
-Read `backlog/.ralph-status.json` if it exists. Extract the `pid` field. Check if that process is still alive:
+Read `backlog/.ralph-status.json` if it exists. Extract the `pid` field using grep:
 
 ```bash
-kill -0 <pid> 2>/dev/null
+PID=$(grep -o '"pid":[0-9]*' backlog/.ralph-status.json | grep -o '[0-9]*')
+```
+
+Check if that process is still alive:
+
+```bash
+kill -0 $PID 2>/dev/null
 ```
 
 If the process is alive, report and stop:

@@ -18,7 +18,26 @@ Ralph has not been run yet (no status file found).
 Run /ralph-run to start Ralph.
 ```
 
-Parse the JSON and extract all fields:
+Extract fields using grep (no jq/python dependency):
+
+```bash
+STATUS_FILE="backlog/.ralph-status.json"
+PID=$(grep -o '"pid":[0-9]*' "$STATUS_FILE" | grep -o '[0-9]*')
+STATE=$(grep -o '"state":"[^"]*"' "$STATUS_FILE" | grep -o '"[^"]*"$' | tr -d '"')
+ITERATION=$(grep -o '"iteration":[0-9]*' "$STATUS_FILE" | grep -o '[0-9]*')
+MAX_ITERATIONS=$(grep -o '"max_iterations":[0-9]*' "$STATUS_FILE" | grep -o '[0-9]*')
+TOOL=$(grep -o '"tool":"[^"]*"' "$STATUS_FILE" | grep -o '"[^"]*"$' | tr -d '"')
+STARTED_AT=$(grep -o '"started_at":"[^"]*"' "$STATUS_FILE" | grep -o '"[^"]*"$' | tr -d '"')
+ELAPSED=$(grep -o '"elapsed":[0-9]*' "$STATUS_FILE" | grep -o '[0-9]*')
+TASKS_REMAINING=$(grep -o '"tasks_remaining":[0-9]*' "$STATUS_FILE" | grep -o '[0-9]*')
+CURRENT_TASK=$(grep -o '"current_task":"[^"]*"' "$STATUS_FILE" | grep -o '"[^"]*"$' | tr -d '"')
+EXIT_CODE=$(grep -o '"exit_code":[0-9]*' "$STATUS_FILE" | grep -o '[0-9]*')
+COMPLETED_AT=$(grep -o '"completed_at":"[^"]*"' "$STATUS_FILE" | grep -o '"[^"]*"$' | tr -d '"')
+```
+
+For array fields (`tasks_done`, `errors`), read the raw JSON arrays from the file content.
+
+Extract all fields:
 - `pid`, `started_at`, `state`, `iteration`, `max_iterations`, `tool`
 - `tasks_done`, `tasks_remaining`, `current_task`
 - `last_iteration_duration`, `elapsed`, `errors`

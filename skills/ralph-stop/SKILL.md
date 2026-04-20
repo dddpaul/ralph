@@ -17,7 +17,16 @@ Read `backlog/.ralph-status.json`. If the file does not exist, output the follow
 No Ralph has been run yet (no status file found).
 ```
 
-Parse the JSON and extract: `pid`, `state`, `iteration`, `max_iterations`, `current_task`.
+Extract fields using grep (no jq/python dependency):
+
+```bash
+STATUS_FILE="backlog/.ralph-status.json"
+PID=$(grep -o '"pid":[0-9]*' "$STATUS_FILE" | grep -o '[0-9]*')
+STATE=$(grep -o '"state":"[^"]*"' "$STATUS_FILE" | grep -o '"[^"]*"$' | tr -d '"')
+ITERATION=$(grep -o '"iteration":[0-9]*' "$STATUS_FILE" | grep -o '[0-9]*')
+MAX_ITERATIONS=$(grep -o '"max_iterations":[0-9]*' "$STATUS_FILE" | grep -o '[0-9]*')
+CURRENT_TASK=$(grep -o '"current_task":"[^"]*"' "$STATUS_FILE" | grep -o '"[^"]*"$' | tr -d '"')
+```
 
 ---
 
