@@ -1,9 +1,11 @@
 ---
 id: TASK-40
 title: Rewrite unit tests to source ralph.sh via RALPH_SOURCE_ONLY
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-20 16:15'
+updated_date: '2026-04-20 18:47'
 labels: []
 dependencies: []
 ---
@@ -16,9 +18,21 @@ Unit tests in argument-validation.bats duplicate validation logic inline instead
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 argument-validation.bats sources ralph.sh with RALPH_SOURCE_ONLY=1
-- [ ] #2 Tests call actual ralph.sh validation logic, not inline copies
-- [ ] #3 status-file.bats sources ralph.sh (not lib/status.sh)
-- [ ] #4 run-summary.bats sources ralph.sh (not lib/summary.sh)
-- [ ] #5 All tests pass
+- [x] #1 argument-validation.bats sources ralph.sh with RALPH_SOURCE_ONLY=1
+- [x] #2 Tests call actual ralph.sh validation logic, not inline copies
+- [x] #3 status-file.bats sources ralph.sh (not lib/status.sh)
+- [x] #4 run-summary.bats sources ralph.sh (not lib/summary.sh)
+- [x] #5 All tests pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Commit: `9de0bc1` - task-40: Rewrite argument-validation.bats to source ralph.sh via RALPH_SOURCE_ONLY
+
+Plan: Extract arg parsing (lines 44-136) into parse_args() function, validation (lines 138-172) into validate_args() function. Both callable after RALPH_SOURCE_ONLY source. Tests call parse_args/validate_args explicitly. The RALPH_SOURCE_ONLY guard still skips execution but the functions are available.
+
+Commit: `a68b0bd` - task-40: Extract parse_args/validate_args, rewrite argument-validation tests
+
+Extracted parse_args() and validate_args() from inline code, tests now call actual functions. Removed duplicate dependency tests (covered by dependency-checks.bats). Files: ralph.sh, tests/unit/argument-validation.bats.
+<!-- SECTION:NOTES:END -->
