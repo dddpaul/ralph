@@ -1,9 +1,10 @@
 ---
 id: TASK-39
 title: Reject unknown flags and add --help to ralph.sh
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-20 16:15'
+updated_date: '2026-04-20 18:28'
 labels: []
 dependencies: []
 ---
@@ -22,3 +23,9 @@ The catch-all case in arg parsing (line 91) silently swallows unknown flags like
 - [ ] #4 --version prints version and exits 0
 - [ ] #5 All existing tests pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented --help (show_help function), --version (RALPH_VERSION=0.5.0), unknown --flag rejection with error+exit 1, non-numeric positional arg rejection. Added RALPH_SOURCE_ONLY guard around arg parsing to keep unit tests working. Files changed: ralph.sh. 129/130 tests pass (1 pre-existing failure unrelated).
+<!-- SECTION:NOTES:END -->
