@@ -1,11 +1,11 @@
 ---
 id: TASK-28
 title: Test task for sandbox verification
-status: Done
+status: To Do
 assignee:
   - '@claude'
 created_date: '2026-04-20 12:34'
-updated_date: '2026-04-20 13:06'
+updated_date: '2026-04-20 13:09'
 labels: []
 dependencies: []
 ---
