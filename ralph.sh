@@ -478,9 +478,9 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
   MODE_PREFIX="MODE: autonomous (Ralph loop iteration $i of $MAX_ITERATIONS)"
 
   # Build the exec prefix for devcontainer mode
-  EXEC_PREFIX=""
+  EXEC_PREFIX=()
   if [[ "$USE_DEVCONTAINER" == true ]]; then
-    EXEC_PREFIX="devcontainer exec --workspace-folder $SCRIPT_DIR"
+    EXEC_PREFIX=(devcontainer exec --workspace-folder "$SCRIPT_DIR")
   fi
 
   if [[ "$TIMEOUT" == *.* ]]; then
@@ -509,10 +509,10 @@ $PROMPT_BODY"
   retry_attempt=0
   while true; do
     if [[ "$TOOL" == "opencode" ]]; then
-      timeout "$TIMEOUT_SEC" ${EXEC_PREFIX:+$EXEC_PREFIX} opencode run "$PROMPT" 2>&1 | tee "$OUTFILE"
+      timeout "$TIMEOUT_SEC" ${EXEC_PREFIX[@]:+"${EXEC_PREFIX[@]}"} opencode run "$PROMPT" 2>&1 | tee "$OUTFILE"
       EXIT_CODE=${PIPESTATUS[0]}
     else
-      timeout "$TIMEOUT_SEC" ${EXEC_PREFIX:+$EXEC_PREFIX} claude --model "$MODEL" --effort "$EFFORT" --dangerously-skip-permissions --print <<< "$PROMPT" 2>&1 | tee "$OUTFILE"
+      timeout "$TIMEOUT_SEC" ${EXEC_PREFIX[@]:+"${EXEC_PREFIX[@]}"} claude --model "$MODEL" --effort "$EFFORT" --dangerously-skip-permissions --print <<< "$PROMPT" 2>&1 | tee "$OUTFILE"
       EXIT_CODE=${PIPESTATUS[0]}
     fi
 
