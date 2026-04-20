@@ -117,7 +117,7 @@ RALPH_CMD="<path-to-ralph.sh> --tool <tool> --effort <effort> --timeout <timeout
 
 Add `--devcontainer` flag only if devcontainer=true.
 
-Launch fully detached, capturing early output to a launch log:
+Launch fully detached, capturing early output to a launch log. **You MUST set `dangerouslyDisableSandbox: true`** on this Bash tool call — ralph.sh needs full OS access (mktemp, /dev/fd, tee, docker) which the sandbox blocks.
 
 ```bash
 LAUNCH_LOG='backlog/.ralph-launch.log'
