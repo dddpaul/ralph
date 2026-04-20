@@ -1,9 +1,10 @@
 ---
 id: TASK-35
 title: Fix awk injection in timeout validation and TIMEOUT_SEC
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-20 16:15'
+updated_date: '2026-04-20 16:58'
 labels: []
 dependencies: []
 ---
@@ -21,3 +22,9 @@ Lines 107 and 502 inject $TIMEOUT directly into awk programs. Replace with pure 
 - [ ] #3 Fractional timeouts (e.g. 0.5) still work
 - [ ] #4 All existing tests pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Replaced awk injection on lines 107 and 502 with pure bash. Validation uses regex + zero-check via parameter substitution. Seconds conversion uses bash arithmetic with fractional handling via string manipulation. All 124 tests pass (1 pre-existing flaky test unrelated to changes).
+<!-- SECTION:NOTES:END -->
