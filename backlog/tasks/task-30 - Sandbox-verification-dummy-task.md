@@ -1,7 +1,7 @@
 ---
 id: TASK-30
 title: Sandbox verification dummy task
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-20 13:18'
@@ -29,4 +29,6 @@ Plan: Dummy verification task. No code changes needed. Mark AC and complete.
 Sandbox bypass verification confirmed working. No code changes needed.
 
 Plan: Dummy task, no code changes. Mark AC checked and complete.
+
+Sandbox verification retest complete. No code changes.
 <!-- SECTION:NOTES:END -->
