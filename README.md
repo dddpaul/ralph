@@ -248,6 +248,28 @@ Ralph only works if there are feedback loops:
 
 When all tasks have status "Done" (no "To Do" tasks remaining), Ralph outputs `<promise>COMPLETE</promise>` and the loop exits.
 
+### Heartbeat Liveness
+
+Ralph writes a heartbeat file (`backlog/.ralph-heartbeat`) every 5 seconds while running. The `ralph-status` and `ralph-run` skills use this file to determine whether Ralph is actually alive — if the heartbeat hasn't been updated within 15 seconds, Ralph is considered dead regardless of what the status file says. This replaces `kill -0` PID checks, which can give false positives when PIDs are reused or the process runs in a container.
+
+### Bundled ralph.sh
+
+The `ralph-run` skill bundles its own copy of `ralph.sh` at `~/.claude/skills/ralph-run/scripts/ralph.sh`. When launching Ralph, the skill searches for the script in priority order:
+
+1. `./ralph.sh` — local override in the project root
+2. `scripts/ralph/ralph.sh` — structured project location
+3. `~/.claude/skills/ralph-run/scripts/ralph.sh` — bundled default
+
+This lets you customize ralph.sh per-project while still having a working default from the skill installation.
+
+### Double-Run Guard
+
+Ralph refuses to start if another instance is already running. On startup, it checks the status file (`backlog/.ralph-status.json`) — if the state is `"running"` and the heartbeat file is fresh (updated within 15 seconds), Ralph exits with an error. This prevents two instances from picking the same task or creating conflicting branches.
+
+### --help and --version
+
+Ralph supports `--help` to show usage information and `--version` to print the current version string (e.g., `ralph.sh 0.5.0`). Both flags exit immediately without starting the loop.
+
 ## Debugging
 
 Check current state:
