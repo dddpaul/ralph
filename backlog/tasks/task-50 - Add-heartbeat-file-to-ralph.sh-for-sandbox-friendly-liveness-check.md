@@ -4,7 +4,7 @@ title: Add heartbeat file to ralph.sh for sandbox-friendly liveness check
 status: To Do
 assignee: []
 created_date: '2026-04-21 15:17'
-updated_date: '2026-04-21 16:27'
+updated_date: '2026-04-21 16:28'
 labels: []
 dependencies: []
 ---
@@ -23,6 +23,8 @@ Add background heartbeat loop to ralph.sh that touches backlog/.ralph-heartbeat 
 - [ ] #4 ralph-status uses find -mmin for liveness, no kill -0 or dangerouslyDisableSandbox
 - [ ] #5 backlog/.ralph-heartbeat in .gitignore
 - [ ] #6 All existing tests pass
+- [ ] #7 ralph-run Step 3.2 uses heartbeat freshness instead of kill -0
+- [ ] #8 ralph-run Step 4 post-launch verify uses heartbeat instead of kill -0
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -45,4 +47,8 @@ ralph-status skill changes (SKILL.md Step 2):
 - If state==completed/failed → skip heartbeat check, trust file
 
 ralph-stop skill: keep dangerouslyDisableSandbox on kill/pkill commands (those still need it)
+
+Also update ralph-run skill:
+- Step 3.2 (already running check): replace kill -0 with heartbeat freshness check: find backlog/.ralph-heartbeat -mmin -0.25. If fresh → ralph is running, refuse to start. Remove dangerouslyDisableSandbox from this step.
+- Step 4 (post-launch verify): replace kill -0 $RALPH_PID with heartbeat check. Wait 3-5s for first heartbeat to appear, then check freshness. Remove dangerouslyDisableSandbox from this step.
 <!-- SECTION:NOTES:END -->
