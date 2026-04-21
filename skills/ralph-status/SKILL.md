@@ -9,54 +9,42 @@ Show a concise progress summary of a Ralph autonomous agent run.
 
 ---
 
-## Step 1: Read Status File
+## Step 1: Read Status File and Gather Data
 
-Read `backlog/.ralph-status.json`. If the file does not exist, output the following and stop:
+Read `backlog/.ralph-status.json` using the Read tool. If the file does not exist, output the following and stop:
 
 ```
 Ralph has not been run yet (no status file found).
 Run /ralph-run to start Ralph.
 ```
 
-Extract fields using grep (no jq/python dependency):
-
-```bash
-STATUS_FILE="backlog/.ralph-status.json"
-PID=$(grep -o '"pid":[0-9]*' "$STATUS_FILE" | grep -o '[0-9]*')
-STATE=$(grep -o '"state":"[^"]*"' "$STATUS_FILE" | grep -o '"[^"]*"$' | tr -d '"')
-ITERATION=$(grep -o '"iteration":[0-9]*' "$STATUS_FILE" | grep -o '[0-9]*')
-MAX_ITERATIONS=$(grep -o '"max_iterations":[0-9]*' "$STATUS_FILE" | grep -o '[0-9]*')
-TOOL=$(grep -o '"tool":"[^"]*"' "$STATUS_FILE" | grep -o '"[^"]*"$' | tr -d '"')
-STARTED_AT=$(grep -o '"started_at":"[^"]*"' "$STATUS_FILE" | grep -o '"[^"]*"$' | tr -d '"')
-ELAPSED=$(grep -o '"elapsed":[0-9]*' "$STATUS_FILE" | grep -o '[0-9]*')
-TASKS_REMAINING=$(grep -o '"tasks_remaining":[0-9]*' "$STATUS_FILE" | grep -o '[0-9]*')
-CURRENT_TASK=$(grep -o '"current_task":"[^"]*"' "$STATUS_FILE" | grep -o '"[^"]*"$' | tr -d '"')
-EXIT_CODE=$(grep -o '"exit_code":[0-9]*' "$STATUS_FILE" | grep -o '[0-9]*')
-COMPLETED_AT=$(grep -o '"completed_at":"[^"]*"' "$STATUS_FILE" | grep -o '"[^"]*"$' | tr -d '"')
-```
-
-For array fields (`tasks_done`, `errors`), read the raw JSON arrays from the file content.
-
-Extract all fields:
+Extract fields using grep from the file content (no jq/python dependency):
 - `pid`, `started_at`, `state`, `iteration`, `max_iterations`, `tool`
 - `tasks_done`, `tasks_remaining`, `current_task`
 - `last_iteration_duration`, `elapsed`, `errors`
 - `completed_at`, `exit_code`
 
----
-
-## Step 2: Verify Liveness (Running State Only)
-
-If `state` is `"running"`, check whether the process is actually alive using the heartbeat file. No special sandbox permissions are needed.
+Then run a **single** Bash call to get heartbeat mtime, current time, and backlog snapshot:
 
 ```bash
-stat -f %m backlog/.ralph-heartbeat 2>/dev/null || stat -c %Y backlog/.ralph-heartbeat 2>/dev/null
+stat -f %m backlog/.ralph-heartbeat 2>/dev/null || stat -c %Y backlog/.ralph-heartbeat 2>/dev/null; echo "---"; date +%s; echo "---"; backlog task list --plain 2>/dev/null
 ```
 
-This returns the heartbeat file's mtime as epoch seconds (or empty if missing). Compare with current time (`date +%s`): if age < 15 seconds, the process is alive.
+Parse the output by splitting on `---`:
+- First section: heartbeat mtime (epoch seconds, or empty if missing)
+- Second section: current epoch time
+- Third section: backlog task list
 
-- If the heartbeat file is **fresh** (modified within the last 15 seconds), display state as `running`.
-- If the heartbeat file is **stale or missing**, re-read `backlog/.ralph-status.json` — ralph may have written a final status between your first read and the heartbeat check. If the re-read shows `"completed"` or `"failed"`, use that state (not "crashed"). Only show "crashed" if the state is still `"running"` after the re-read:
+This gives you everything in **2 tool calls** (1 Read + 1 Bash).
+
+---
+
+## Step 2: Determine Liveness
+
+If `state` is `"running"`, compute heartbeat age: `current_time - heartbeat_mtime`.
+
+- If age < 15 seconds: process is **alive**, display state as `running`.
+- If heartbeat is stale or missing: re-read `backlog/.ralph-status.json`. If it now shows `"completed"` or `"failed"`, use that state. Only show "crashed" if still `"running"`:
   ```
   State: crashed (heartbeat stale, PID <pid>)
   ```
@@ -92,7 +80,10 @@ Completed at: <completed_at>
 
 ### Formatting elapsed time
 
-Convert the `elapsed` seconds value to human-readable format:
+For running state, calculate elapsed as `current_time - started_at` (not the stale elapsed field from the file).
+For completed/failed state, use the elapsed field from the file.
+
+Format as:
 - Under 60s: `<N>s`
 - 60s and over: `<M>m <S>s`
 - 3600s and over: `<H>h <M>m`
@@ -137,18 +128,12 @@ Tip: /ralph-status details — to include recent log output
 
 ---
 
-## Step 6: Current Backlog Snapshot
+## Step 6: Backlog Summary
 
-Run:
-
-```bash
-backlog task list --plain 2>/dev/null
-```
-
-Output a one-line count summary below the status block:
+From the backlog task list output (already retrieved in Step 1), output a one-line count:
 
 ```
 Backlog: <done> done, <in-progress> in progress, <to-do> to do
 ```
 
-Count tasks by scanning the output for status markers: `✔` for done, `▶` for in progress, `○` for to do.
+Count by status section headers (`Done:`, `In Progress:`, `To Do:`) and the number of task lines under each.
