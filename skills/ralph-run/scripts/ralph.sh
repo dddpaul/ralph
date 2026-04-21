@@ -173,7 +173,7 @@ if [[ "${RALPH_SOURCE_ONLY:-}" != "1" ]]; then
   validate_args
 fi
 
-PROJECT_DIR="$(pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
 # --- Inlined from lib/status.sh ---
 
@@ -311,19 +311,24 @@ ITER_DURATIONS=()
 EXIT_REASON=""
 
 # Status file tracking
-STATUS_FILE="${RALPH_STATUS_FILE:-$PROJECT_DIR/backlog/.ralph-status.json}"
+STATUS_FILE="${RALPH_STATUS_FILE:-$SCRIPT_DIR/backlog/.ralph-status.json}"
 
 # Double-run guard: refuse to start if another Ralph instance is alive
 if [[ -f "$STATUS_FILE" ]]; then
-  _existing_pid=$(grep -o '"pid":[0-9]*' "$STATUS_FILE" | grep -o '[0-9]*')
-  if [[ -n "$_existing_pid" ]] && kill -0 "$_existing_pid" 2>/dev/null; then
-    echo "Error: Ralph is already running (PID $_existing_pid). Use /ralph-status to check progress, or kill $_existing_pid to stop it."
-    exit 1
+  _existing_state=$(grep -o '"state":"[^"]*"' "$STATUS_FILE" | grep -o '"[^"]*"$' | tr -d '"')
+  if [[ "$_existing_state" == "running" ]]; then
+    _hb_file="${RALPH_HEARTBEAT_FILE:-$SCRIPT_DIR/backlog/.ralph-heartbeat}"
+    if [[ -f "$_hb_file" ]] && find "$_hb_file" -mmin -0.25 -print 2>/dev/null | grep -q .; then
+      _existing_pid=$(grep -o '"pid":[0-9]*' "$STATUS_FILE" | grep -o '[0-9]*')
+      echo "Error: Ralph is already running (PID ${_existing_pid:-unknown}). Use /ralph-status to check progress, or kill ${_existing_pid:-the process} to stop it."
+      exit 1
+    fi
+    unset _hb_file
   fi
-  unset _existing_pid
+  unset _existing_state
 fi
 
-RUN_LOG="${RALPH_RUN_LOG:-$PROJECT_DIR/backlog/.ralph-run.log}"
+RUN_LOG="${RALPH_RUN_LOG:-$SCRIPT_DIR/backlog/.ralph-run.log}"
 RUN_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 TASKS_DONE_IDS=""
 STATUS_ERRORS=""
@@ -368,7 +373,14 @@ cleanup_and_exit() {
 }
 
 _ralph_cleanup_files=()
-_ralph_cleanup() { rm -f "${_ralph_cleanup_files[@]}"; }
+HEARTBEAT_FILE="${RALPH_HEARTBEAT_FILE:-$SCRIPT_DIR/backlog/.ralph-heartbeat}"
+HB_PID=""
+_ralph_cleanup() {
+  if [[ -n "$HB_PID" ]]; then
+    kill -- -"$HB_PID" 2>/dev/null || kill "$HB_PID" 2>/dev/null
+  fi
+  rm -f "$HEARTBEAT_FILE" "${_ralph_cleanup_files[@]}"
+}
 trap '_ralph_cleanup' EXIT
 _ralph_interrupt() {
   EXIT_REASON="interrupted"
@@ -380,7 +392,7 @@ _ralph_interrupt() {
 
 _kill_children() {
   for pid in $(pgrep -P $$ 2>/dev/null); do
-    [[ "$pid" == "${RUN_LOG_TEE_PID:-}" ]] && continue
+    [[ "$pid" == "${RUN_LOG_TEE_PID:-}" || "$pid" == "${HB_PID:-}" ]] && continue
     local pgid
     pgid=$(ps -o pgid= -p "$pid" 2>/dev/null | tr -d ' ')
     if [[ -n "$pgid" && "$pgid" != "$$" ]]; then
@@ -405,7 +417,7 @@ if [[ "$USE_DEVCONTAINER" == true ]]; then
     exit 1
   fi
   echo "Starting devcontainer..."
-  devcontainer up --workspace-folder "$PROJECT_DIR"
+  devcontainer up --workspace-folder "$SCRIPT_DIR"
   echo "Devcontainer is ready."
 fi
 
@@ -469,10 +481,15 @@ CONFIG_INFO="on-error: $ON_ERROR"
 [[ -n "$LOG_FILE" ]] && CONFIG_INFO="$CONFIG_INFO, log: $LOG_FILE"
 
 # Set up run logging
-mkdir -p "$PROJECT_DIR/backlog"
+mkdir -p "$SCRIPT_DIR/backlog"
 : > "$RUN_LOG"
 exec > >(tee -a "$RUN_LOG") 2>&1
 RUN_LOG_TEE_PID=$!
+
+# Start heartbeat: touch file every 5s, exit when parent dies
+_ralph_pid=$$
+( trap 'exit 0' TERM; while kill -0 "$_ralph_pid" 2>/dev/null; do touch "$HEARTBEAT_FILE"; sleep 5 & wait $!; done ) </dev/null >/dev/null 2>&1 &
+HB_PID=$!
 
 _update_status "running"
 
@@ -510,7 +527,7 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
   # Build the exec prefix for devcontainer mode
   EXEC_PREFIX=()
   if [[ "$USE_DEVCONTAINER" == true ]]; then
-    EXEC_PREFIX=(devcontainer exec --workspace-folder "$PROJECT_DIR")
+    EXEC_PREFIX=(devcontainer exec --workspace-folder "$SCRIPT_DIR")
   fi
 
   if [[ "$TIMEOUT" == *.* ]]; then
