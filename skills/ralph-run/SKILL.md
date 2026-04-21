@@ -76,11 +76,10 @@ PID=$(grep -o '"pid":[0-9]*' backlog/.ralph-status.json | grep -o '[0-9]*')
 If state is `"running"`, check the heartbeat file for freshness (no sandbox override needed):
 
 ```bash
-HEARTBEAT="backlog/.ralph-heartbeat"
-MTIME=$(stat -f %m "$HEARTBEAT" 2>/dev/null || stat -c %Y "$HEARTBEAT" 2>/dev/null)
-NOW=$(date +%s)
-[[ $((NOW - MTIME)) -lt 15 ]]
+stat -f %m backlog/.ralph-heartbeat 2>/dev/null || stat -c %Y backlog/.ralph-heartbeat 2>/dev/null
 ```
+
+This returns the heartbeat mtime as epoch seconds. Compare with `date +%s`: if age < 15s, Ralph is alive.
 
 If the heartbeat is fresh (mtime within 15s), report and stop:
 ```
@@ -145,20 +144,13 @@ RALPH_PID=$!
 
 Wait for the heartbeat file to appear (up to 10 seconds), then verify freshness:
 
+Wait up to 10 seconds for the heartbeat file to appear, then check freshness using `stat`:
+
 ```bash
-HEARTBEAT="backlog/.ralph-heartbeat"
-for i in $(seq 1 10); do
-  if [[ -f "$HEARTBEAT" ]]; then
-    MTIME=$(stat -f %m "$HEARTBEAT" 2>/dev/null || stat -c %Y "$HEARTBEAT" 2>/dev/null)
-    NOW=$(date +%s)
-    [[ $((NOW - MTIME)) -lt 15 ]] && break
-  fi
-  sleep 1
-done
-MTIME=$(stat -f %m "$HEARTBEAT" 2>/dev/null || stat -c %Y "$HEARTBEAT" 2>/dev/null)
-NOW=$(date +%s)
-[[ $((NOW - MTIME)) -lt 15 ]]
+stat -f %m backlog/.ralph-heartbeat 2>/dev/null || stat -c %Y backlog/.ralph-heartbeat 2>/dev/null
 ```
+
+Compare the returned epoch with `date +%s`. If age < 15s, launch succeeded. If no heartbeat after 10s, launch failed.
 
 On successful launch, remove the launch log (it only has diagnostic value on failure):
 
