@@ -45,19 +45,20 @@ Extract all fields:
 
 ---
 
-## Step 2: Verify PID (Running State Only)
+## Step 2: Verify Liveness (Running State Only)
 
-If `state` is `"running"`, check whether the process is actually alive. **You MUST set `dangerouslyDisableSandbox: true`** on this Bash tool call — the sandbox blocks `kill -0` from seeing processes launched outside the sandbox.
+If `state` is `"running"`, check whether the process is actually alive using the heartbeat file. No special sandbox permissions are needed.
 
 ```bash
-kill -0 <pid> 2>/dev/null
+HEARTBEAT="backlog/.ralph-heartbeat"
+find "$HEARTBEAT" -mmin -0.25 -print 2>/dev/null | grep -q .
 ```
 
-- If the process is **not alive**, re-read `backlog/.ralph-status.json` — ralph may have written a final status between your first read and the PID check. If the re-read shows `"completed"` or `"failed"`, use that state (not "crashed"). Only show "crashed" if the state is still `"running"` after the re-read:
+- If the heartbeat file is **fresh** (modified within the last 15 seconds), display state as `running`.
+- If the heartbeat file is **stale or missing**, re-read `backlog/.ralph-status.json` — ralph may have written a final status between your first read and the heartbeat check. If the re-read shows `"completed"` or `"failed"`, use that state (not "crashed"). Only show "crashed" if the state is still `"running"` after the re-read:
   ```
-  State: crashed (PID <pid> not found)
+  State: crashed (heartbeat stale, PID <pid>)
   ```
-- If the process **is alive**, display state as `running`.
 
 Skip this check for `"completed"` and `"failed"` states.
 

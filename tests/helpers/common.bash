@@ -13,6 +13,7 @@ setup_test_dir() {
   export TEST_DIR
   export RALPH_STATUS_FILE="$TEST_DIR/.ralph-status.json"
   export RALPH_RUN_LOG="$TEST_DIR/.ralph-run.log"
+  export RALPH_HEARTBEAT_FILE="$TEST_DIR/.ralph-heartbeat"
 }
 
 # Cleanup temporary test directory

@@ -5,6 +5,7 @@ progress.txt
 backlog/.ralph-status.json
 backlog/.ralph-run.log
 backlog/.ralph-launch.log
+backlog/.ralph-heartbeat
 
 # Archive is optional to commit
 # archive/

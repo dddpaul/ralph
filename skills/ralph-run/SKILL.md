@@ -66,24 +66,26 @@ Error: No "To Do" tasks in backlog. Create tasks first (e.g. /ralph-backlog).
 
 ### 3.2 Ralph not already running
 
-Read `backlog/.ralph-status.json` if it exists. Extract the `pid` field using grep:
+Read `backlog/.ralph-status.json` if it exists. Extract the `state` and `pid` fields using grep:
 
 ```bash
+STATE=$(grep -o '"state":"[^"]*"' backlog/.ralph-status.json | grep -o '"[^"]*"$' | tr -d '"')
 PID=$(grep -o '"pid":[0-9]*' backlog/.ralph-status.json | grep -o '[0-9]*')
 ```
 
-Check if that process is still alive:
+If state is `"running"`, check the heartbeat file for freshness (no sandbox override needed):
 
 ```bash
-kill -0 $PID 2>/dev/null
+HEARTBEAT="backlog/.ralph-heartbeat"
+find "$HEARTBEAT" -mmin -0.25 -print 2>/dev/null | grep -q .
 ```
 
-If the process is alive, report and stop:
+If the heartbeat is fresh, report and stop:
 ```
 Error: Ralph is already running (PID <pid>). Use /ralph-status to check progress, or kill <pid> to stop it.
 ```
 
-If the status file doesn't exist or the PID is not alive, proceed.
+If the status file doesn't exist, state is not `"running"`, or the heartbeat is stale, proceed.
 
 ### 3.3 devcontainer CLI (only when devcontainer=true)
 
@@ -139,11 +141,17 @@ nohup $RALPH_CMD > "$LAUNCH_LOG" 2>&1 & disown
 RALPH_PID=$!
 ```
 
-Wait briefly and verify the process started:
+Wait for the heartbeat file to appear (up to 10 seconds), then verify freshness:
 
 ```bash
-sleep 1
-kill -0 $RALPH_PID 2>/dev/null
+HEARTBEAT="backlog/.ralph-heartbeat"
+for i in $(seq 1 10); do
+  if [[ -f "$HEARTBEAT" ]] && find "$HEARTBEAT" -mmin -0.25 -print 2>/dev/null | grep -q .; then
+    break
+  fi
+  sleep 1
+done
+find "$HEARTBEAT" -mmin -0.25 -print 2>/dev/null | grep -q .
 ```
 
 On successful launch, remove the launch log (it only has diagnostic value on failure):
