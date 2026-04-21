@@ -51,7 +51,9 @@ If `state` is `"running"`, check whether the process is actually alive using the
 
 ```bash
 HEARTBEAT="backlog/.ralph-heartbeat"
-find "$HEARTBEAT" -mmin -0.25 -print 2>/dev/null | grep -q .
+MTIME=$(stat -f %m "$HEARTBEAT" 2>/dev/null || stat -c %Y "$HEARTBEAT" 2>/dev/null)
+NOW=$(date +%s)
+[[ $((NOW - MTIME)) -lt 15 ]]
 ```
 
 - If the heartbeat file is **fresh** (modified within the last 15 seconds), display state as `running`.

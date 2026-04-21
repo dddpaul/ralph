@@ -257,6 +257,16 @@ print_summary() {
   echo "==============================="
 }
 
+# Check if heartbeat file was modified within last 15 seconds
+_is_heartbeat_fresh() {
+  local hb_file="$1"
+  [[ -f "$hb_file" ]] || return 1
+  local _mtime _now
+  _mtime=$(stat -f %m "$hb_file" 2>/dev/null || stat -c %Y "$hb_file" 2>/dev/null)
+  _now=$(date +%s)
+  [[ $((_now - _mtime)) -lt 15 ]]
+}
+
 count_remaining_tasks() {
   local output
   output=$(backlog task list -s "To Do" --plain 2>/dev/null)
@@ -318,7 +328,7 @@ if [[ -f "$STATUS_FILE" ]]; then
   _existing_state=$(grep -o '"state":"[^"]*"' "$STATUS_FILE" | grep -o '"[^"]*"$' | tr -d '"')
   if [[ "$_existing_state" == "running" ]]; then
     _hb_file="${RALPH_HEARTBEAT_FILE:-$SCRIPT_DIR/backlog/.ralph-heartbeat}"
-    if [[ -f "$_hb_file" ]] && find "$_hb_file" -mmin -0.25 -print 2>/dev/null | grep -q .; then
+    if _is_heartbeat_fresh "$_hb_file"; then
       _existing_pid=$(grep -o '"pid":[0-9]*' "$STATUS_FILE" | grep -o '[0-9]*')
       echo "Error: Ralph is already running (PID ${_existing_pid:-unknown}). Use /ralph-status to check progress, or kill ${_existing_pid:-the process} to stop it."
       exit 1

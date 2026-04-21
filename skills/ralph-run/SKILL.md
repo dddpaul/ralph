@@ -77,10 +77,12 @@ If state is `"running"`, check the heartbeat file for freshness (no sandbox over
 
 ```bash
 HEARTBEAT="backlog/.ralph-heartbeat"
-find "$HEARTBEAT" -mmin -0.25 -print 2>/dev/null | grep -q .
+MTIME=$(stat -f %m "$HEARTBEAT" 2>/dev/null || stat -c %Y "$HEARTBEAT" 2>/dev/null)
+NOW=$(date +%s)
+[[ $((NOW - MTIME)) -lt 15 ]]
 ```
 
-If the heartbeat is fresh, report and stop:
+If the heartbeat is fresh (mtime within 15s), report and stop:
 ```
 Error: Ralph is already running (PID <pid>). Use /ralph-status to check progress, or kill <pid> to stop it.
 ```
@@ -146,12 +148,16 @@ Wait for the heartbeat file to appear (up to 10 seconds), then verify freshness:
 ```bash
 HEARTBEAT="backlog/.ralph-heartbeat"
 for i in $(seq 1 10); do
-  if [[ -f "$HEARTBEAT" ]] && find "$HEARTBEAT" -mmin -0.25 -print 2>/dev/null | grep -q .; then
-    break
+  if [[ -f "$HEARTBEAT" ]]; then
+    MTIME=$(stat -f %m "$HEARTBEAT" 2>/dev/null || stat -c %Y "$HEARTBEAT" 2>/dev/null)
+    NOW=$(date +%s)
+    [[ $((NOW - MTIME)) -lt 15 ]] && break
   fi
   sleep 1
 done
-find "$HEARTBEAT" -mmin -0.25 -print 2>/dev/null | grep -q .
+MTIME=$(stat -f %m "$HEARTBEAT" 2>/dev/null || stat -c %Y "$HEARTBEAT" 2>/dev/null)
+NOW=$(date +%s)
+[[ $((NOW - MTIME)) -lt 15 ]]
 ```
 
 On successful launch, remove the launch log (it only has diagnostic value on failure):
