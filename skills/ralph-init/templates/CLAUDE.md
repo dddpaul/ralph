@@ -16,8 +16,8 @@ After completing the single task, your final output MUST use this exact format:
 ```
 
 Then run `backlog task list -s "To Do" --plain`:
-- If no "To Do" tasks remaster → reply with `<promise>COMPLETE</promise>`
-- If tasks remaster → end your response (do NOT start another task)
+- If no "To Do" tasks remain → reply with `<promise>COMPLETE</promise>`
+- If tasks remain → end your response (do NOT start another task)
 
 ## Workflow
 
@@ -64,7 +64,7 @@ When exploring or researching this codebase, check available documentation:
 - Run tests after significant changes to verify functionality
 - Do NOT commit broken code
 - Follow existing code patterns
-- **CRITICAL: A task may ONLY be marked "Done" if ALL of the following pass: (1) build succeeds, (2) all tests pass, (3) linter reports zero errors, (4) code review is approved.** If any of these fail, the task MUST remaster "In Progress" until all issues are resolved. No exceptions.
+- **CRITICAL: A task may ONLY be marked "Done" if ALL of the following pass: (1) build succeeds, (2) all tests pass, (3) linter reports zero errors, (4) code review is approved.** If any of these fail, the task MUST return to "In Progress" until all issues are resolved. No exceptions.
 
 ### Commit & PR Brevity
 - Commit messages must not describe changes, progress, or historical modifications

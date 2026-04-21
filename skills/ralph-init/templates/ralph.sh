@@ -9,6 +9,7 @@ set -uo pipefail
 
 RALPH_VERSION="0.5.0"
 
+# Print usage information and available options
 show_help() {
   cat <<'HELPEOF'
 Usage: ralph.sh [OPTIONS] [max_iterations]
@@ -40,6 +41,7 @@ RETRY_COUNT=2  # Number of retries for --on-error=retry
 LOG_FILE=""  # Optional log file for errors
 PROMPT_FILE=""  # Optional file to load prompt template from
 
+# Parse command-line arguments into global configuration variables
 parse_args() {
   while [[ $# -gt 0 ]]; do
     case $1 in
@@ -136,6 +138,7 @@ parse_args() {
   done
 }
 
+# Validate parsed arguments and exit on invalid values
 validate_args() {
   if [[ "$TOOL" != "claude" && "$TOOL" != "opencode" ]]; then
     echo "Error: Invalid tool '$TOOL'. Must be 'claude' or 'opencode'."
@@ -177,6 +180,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
 # --- Inlined from lib/status.sh ---
 
+# Escape special characters in a string for safe JSON embedding
 _status_json_escape() {
   local s="$1"
   s="${s//\\/\\\\}"
@@ -187,6 +191,7 @@ _status_json_escape() {
   printf '%s' "$s"
 }
 
+# Convert a newline-delimited string into a JSON array of strings
 _status_json_array() {
   local items="$1"
   if [[ -z "$items" ]]; then
@@ -210,6 +215,7 @@ _status_json_array() {
 
 # --- Inlined from lib/summary.sh ---
 
+# Format seconds into a human-readable duration string (e.g. "1h 2m 3s")
 format_duration() {
   local seconds="$1"
   local hours=$((seconds / 3600))
@@ -225,6 +231,7 @@ format_duration() {
   fi
 }
 
+# Print the end-of-run summary with stats and per-iteration durations
 print_summary() {
   local tasks_completed="$1"
   local wall_time="$2"
@@ -257,6 +264,17 @@ print_summary() {
   echo "==============================="
 }
 
+# Check if heartbeat file was modified within last 15 seconds
+_is_heartbeat_fresh() {
+  local hb_file="$1"
+  [[ -f "$hb_file" ]] || return 1
+  local _mtime _now
+  _mtime=$(stat -f %m "$hb_file" 2>/dev/null || stat -c %Y "$hb_file" 2>/dev/null)
+  _now=$(date +%s)
+  [[ $((_now - _mtime)) -lt 15 ]]
+}
+
+# Count the number of backlog tasks still in "To Do" status
 count_remaining_tasks() {
   local output
   output=$(backlog task list -s "To Do" --plain 2>/dev/null)
@@ -267,6 +285,7 @@ count_remaining_tasks() {
   fi
 }
 
+# Write current run state to the JSON status file
 _update_status() {
   local state="$1"
   local completed_at="${2:-}"
@@ -315,12 +334,17 @@ STATUS_FILE="${RALPH_STATUS_FILE:-$SCRIPT_DIR/backlog/.ralph-status.json}"
 
 # Double-run guard: refuse to start if another Ralph instance is alive
 if [[ -f "$STATUS_FILE" ]]; then
-  _existing_pid=$(grep -o '"pid":[0-9]*' "$STATUS_FILE" | grep -o '[0-9]*')
-  if [[ -n "$_existing_pid" ]] && kill -0 "$_existing_pid" 2>/dev/null; then
-    echo "Error: Ralph is already running (PID $_existing_pid). Use /ralph-status to check progress, or kill $_existing_pid to stop it."
-    exit 1
+  _existing_state=$(grep -o '"state":"[^"]*"' "$STATUS_FILE" | grep -o '"[^"]*"$' | tr -d '"')
+  if [[ "$_existing_state" == "running" ]]; then
+    _hb_file="${RALPH_HEARTBEAT_FILE:-$SCRIPT_DIR/backlog/.ralph-heartbeat}"
+    if _is_heartbeat_fresh "$_hb_file"; then
+      _existing_pid=$(grep -o '"pid":[0-9]*' "$STATUS_FILE" | grep -o '[0-9]*')
+      echo "Error: Ralph is already running (PID ${_existing_pid:-unknown}). Use /ralph-status to check progress, or kill ${_existing_pid:-the process} to stop it."
+      exit 1
+    fi
+    unset _hb_file
   fi
-  unset _existing_pid
+  unset _existing_state
 fi
 
 RUN_LOG="${RALPH_RUN_LOG:-$SCRIPT_DIR/backlog/.ralph-run.log}"
@@ -331,10 +355,12 @@ CURRENT_TASK=""
 LAST_ITER_DURATION=""
 CURRENT_ITERATION=0
 
+# List all task IDs currently in "Done" status, sorted
 _get_done_task_ids() {
   backlog task list -s "Done" --plain 2>/dev/null | grep -o "TASK-[0-9]*" | sort || true
 }
 
+# Append an error message to the STATUS_ERRORS accumulator
 _append_status_error() {
   if [[ -n "$STATUS_ERRORS" ]]; then
     STATUS_ERRORS="$STATUS_ERRORS"$'\n'"$1"
@@ -343,6 +369,7 @@ _append_status_error() {
   fi
 }
 
+# Record a failed iteration, incrementing the failure counter and logging the reason
 _record_iteration_failure() {
   local reason="$1"
   FAILED_ITERATIONS=$((FAILED_ITERATIONS + 1))
@@ -350,6 +377,7 @@ _record_iteration_failure() {
   ITER_FAILED=true
 }
 
+# Display the run summary using current state
 show_summary() {
   local reason="${1:-$EXIT_REASON}"
   local wall_time=$(( $(date +%s) - RUN_START_TIME ))
@@ -358,6 +386,7 @@ show_summary() {
   print_summary "$TASKS_COMPLETED" "$wall_time" "${#ITER_DURATIONS[@]}" "$MAX_ITERATIONS" "$reason" "$remaining" "$FAILED_ITERATIONS" "${ITER_DURATIONS[@]}"
 }
 
+# Update status file, print summary, and exit with the given code
 cleanup_and_exit() {
   local code="$1"
   local final_state="completed"
@@ -368,8 +397,17 @@ cleanup_and_exit() {
 }
 
 _ralph_cleanup_files=()
-_ralph_cleanup() { rm -f "${_ralph_cleanup_files[@]}"; }
+HEARTBEAT_FILE="${RALPH_HEARTBEAT_FILE:-$SCRIPT_DIR/backlog/.ralph-heartbeat}"
+HB_PID=""
+# Clean up heartbeat process and temporary files on exit
+_ralph_cleanup() {
+  if [[ -n "$HB_PID" ]]; then
+    kill -- -"$HB_PID" 2>/dev/null || kill "$HB_PID" 2>/dev/null
+  fi
+  rm -f "$HEARTBEAT_FILE" "${_ralph_cleanup_files[@]}"
+}
 trap '_ralph_cleanup' EXIT
+# Handle INT/TERM signals: kill children, update status, and exit
 _ralph_interrupt() {
   EXIT_REASON="interrupted"
   _kill_children
@@ -378,9 +416,10 @@ _ralph_interrupt() {
   exit 130
 }
 
+# Terminate all child processes except the log tee and heartbeat
 _kill_children() {
   for pid in $(pgrep -P $$ 2>/dev/null); do
-    [[ "$pid" == "${RUN_LOG_TEE_PID:-}" ]] && continue
+    [[ "$pid" == "${RUN_LOG_TEE_PID:-}" || "$pid" == "${HB_PID:-}" ]] && continue
     local pgid
     pgid=$(ps -o pgid= -p "$pid" 2>/dev/null | tr -d ' ')
     if [[ -n "$pgid" && "$pgid" != "$$" ]]; then
@@ -409,7 +448,7 @@ if [[ "$USE_DEVCONTAINER" == true ]]; then
   echo "Devcontainer is ready."
 fi
 
-# Logging function
+# Log an error message to stderr and optionally to the log file
 log_error() {
   local message="$1"
   local timestamp
@@ -421,7 +460,7 @@ log_error() {
   echo "[$timestamp] ERROR: $message" >&2
 }
 
-# Error handling function
+# Handle a failed iteration based on the configured on-error strategy
 handle_error() {
   local exit_code="$1"
   local iteration="$2"
@@ -473,6 +512,11 @@ mkdir -p "$SCRIPT_DIR/backlog"
 : > "$RUN_LOG"
 exec > >(tee -a "$RUN_LOG") 2>&1
 RUN_LOG_TEE_PID=$!
+
+# Start heartbeat: touch file every 5s, exit when parent dies
+_ralph_pid=$$
+( trap 'exit 0' TERM; while kill -0 "$_ralph_pid" 2>/dev/null; do touch "$HEARTBEAT_FILE"; sleep 5 & wait $!; done ) </dev/null >/dev/null 2>&1 &
+HB_PID=$!
 
 _update_status "running"
 
