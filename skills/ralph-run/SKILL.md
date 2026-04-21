@@ -42,10 +42,11 @@ The user may pass overrides as skill arguments. Parse them as space-separated ke
 Check in order:
 1. `./ralph.sh`
 2. `scripts/ralph/ralph.sh`
+3. `~/.claude/skills/ralph-run/scripts/ralph.sh`
 
-If neither exists, report error and stop:
+If none exists, report error and stop:
 ```
-Error: ralph.sh not found. Checked ./ralph.sh and scripts/ralph/ralph.sh
+Error: ralph.sh not found. Checked ./ralph.sh, scripts/ralph/ralph.sh, and ~/.claude/skills/ralph-run/scripts/ralph.sh
 ```
 
 ---
