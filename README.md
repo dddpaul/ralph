@@ -39,16 +39,12 @@ Copy the skills to your AI tool's config for use across all projects:
 
 For Claude Code
 ```bash
-cp -r skills/ralph-init ~/.claude/skills/
-cp -r skills/ralph-prd ~/.claude/skills/
-cp -r skills/ralph-backlog ~/.claude/skills/
+cp -r skills/ralph-* ~/.claude/skills/
 ```
 
 For opencode
 ```bash
-cp -r skills/ralph-init ~/.opencode/skills/
-cp -r skills/ralph-prd ~/.opencode/skills/
-cp -r skills/ralph-backlog ~/.opencode/skills/
+cp -r skills/ralph-* ~/.opencode/skills/
 ```
 
 ### Option 3: Run in DevContainer (sandboxed)

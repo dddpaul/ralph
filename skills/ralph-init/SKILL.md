@@ -73,9 +73,17 @@ Read `templates/post-commit` → write to `.git/hooks/post-commit`. Make executa
 ### 3.4 `.gitignore`
 Append missing entries (don't duplicate existing lines):
 ```
-# Ralph / Claude
-.claude/
+# Ralph working files (generated during runs)
+backlog/.ralph-status.json
+backlog/.ralph-run.log
+backlog/.ralph-launch.log
+backlog/.ralph-heartbeat
+
+# OS files
 .DS_Store
+
+# Claude
+.claude/
 ```
 Do NOT add `backlog/` — task files should be committed.
 
