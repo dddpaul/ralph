@@ -1,0 +1,4 @@
+###
+### Stage 1: Language Runtime (Python for pptx generation)
+###
+FROM python:3.14 AS python-runtime

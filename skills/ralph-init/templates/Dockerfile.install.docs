@@ -1,0 +1,12 @@
+# ---- Language Runtime (from multi-stage) ----
+COPY --from=python-runtime /usr/local /usr/local
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+# ---- Documentation Tools ----
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libreoffice-impress-nogui \
+    poppler-utils \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN npm install -g pptxgenjs
