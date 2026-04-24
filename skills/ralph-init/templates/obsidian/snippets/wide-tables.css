@@ -1,0 +1,13 @@
+.markdown-preview-view table {
+  width: 100% !important;
+  display: table;
+}
+
+.markdown-preview-view .table-wrapper {
+  width: 100%;
+}
+
+.markdown-source-view.mod-cm6 .cm-table {
+  width: 100%;
+}
+
