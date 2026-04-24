@@ -18,7 +18,21 @@
       "Bash(git commit:*)",
       "Bash(git config:*)",
       "Bash(./ralph.sh:*)",
-      "Bash(nohup ./ralph.sh:*)"
+      "Bash(nohup ./ralph.sh:*)",
+      "Bash(grep:*)",
+      "Bash(stat:*)",
+      "Bash(command -v:*)",
+      "Bash(bash -n:*)",
+      "Bash(test:*)",
+      "Bash(npm test:*)",
+      "Skill(ralph-run)",
+      "Skill(ralph-status)",
+      "Skill(ralph-stop)",
+      "Skill(brainstorm)"
     ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true
   }
 }
