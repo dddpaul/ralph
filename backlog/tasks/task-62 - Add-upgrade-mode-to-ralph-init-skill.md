@@ -1,10 +1,11 @@
 ---
 id: TASK-62
 title: Add upgrade mode to ralph-init skill
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-25 16:27'
-updated_date: '2026-04-25 17:07'
+updated_date: '2026-04-25 17:34'
 labels: []
 dependencies: []
 ---
@@ -43,10 +44,20 @@ Files to check:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Skill detects --upgrade flag (or 'upgrade ralph' / 'update ralph files') and switches to upgrade flow
-- [ ] #2 Each managed file is compared against its template version (exact match for most, above-Project-Specific for CLAUDE.md)
-- [ ] #3 Outdated files: ralph.sh and post-commit get plain language change summary; settings.local.json gets unified diff
-- [ ] #4 User is presented batch summary and can approve all or name files to skip
-- [ ] #5 CLAUDE.md upgrade preserves everything from ## Project-Specific heading down (including conventions)
-- [ ] #6 Summary shows which files were updated, current, skipped by user, or not applicable
+- [x] #1 Skill detects --upgrade flag (or 'upgrade ralph' / 'update ralph files') and switches to upgrade flow
+- [x] #2 Each managed file is compared against its template version (exact match for most, above-Project-Specific for CLAUDE.md)
+- [x] #3 Outdated files: ralph.sh and post-commit get plain language change summary; settings.local.json gets unified diff
+- [x] #4 User is presented batch summary and can approve all or name files to skip
+- [x] #5 CLAUDE.md upgrade preserves everything from ## Project-Specific heading down (including conventions)
+- [x] #6 Summary shows which files were updated, current, skipped by user, or not applicable
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan: Add an ## Upgrade Mode section after Step 4 in SKILL.md with steps U1-U5. U1: preflight (same as Step 1 + verify ralph was previously initialized). U2: build file status table comparing managed files against templates (exact match for most, above-Project-Specific for CLAUDE.md). U3: present batch summary with plain language summaries for ralph.sh/post-commit and unified diff for settings.local.json. U4: apply updates with CLAUDE.md special merge logic. U5: print summary. Also update skill description/triggers. The upgrade section is self-contained, no changes to the init flow.
+
+Commit: `872c287` - task-62: Upgrade mode for ralph-init skill
+
+Implemented: Added ## Upgrade Mode section to SKILL.md with steps U1-U5 (preflight, file status table, batch summary with details, apply updates with CLAUDE.md merge logic, summary). Updated skill description triggers to include upgrade/update phrases. Files changed: skills/ralph-init/SKILL.md.
+<!-- SECTION:NOTES:END -->
