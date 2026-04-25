@@ -103,20 +103,10 @@ rm -f "$LAUNCH_LOG"
 
 ## Step 5: Report
 
-On success, output:
+On success, output exactly one line:
 
 ```
-Ralph launched successfully!
-
-  PID: <pid>
-  Tool: <tool>
-  Effort: <effort>
-  Timeout: <timeout> minutes
-  Max iterations: <max_iterations>
-  Devcontainer: <true/false>
-
-Ralph is running in the background. Use /ralph-status to check progress.
-To stop: kill <pid>
+Ralph launched (PID <pid>, tool=<tool>, effort=<effort>, timeout=<timeout>m, max=<max_iterations>, devcontainer=<true|false>). /ralph-status to monitor, /ralph-stop to halt.
 ```
 
 On failure (process died immediately), output diagnostics from both logs:
