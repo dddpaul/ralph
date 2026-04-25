@@ -19,7 +19,7 @@
       "Bash(git config:*)",
       "Bash(./ralph.sh:*)",
       "Bash(nohup ./ralph.sh:*)",
-      "Bash(bash skills/ralph-run/scripts/preflight.sh:*)",
+      "Bash(bash */preflight.sh:*)",
       "Bash(grep:*)",
       "Bash(stat:*)",
       "Bash(command -v:*)",

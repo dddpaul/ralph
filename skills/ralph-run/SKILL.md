@@ -54,10 +54,10 @@ Error: ralph.sh not found. Checked ./ralph.sh, scripts/ralph/ralph.sh, and ~/.cl
 
 ## Step 3: Validate Preconditions
 
-Run the preflight script with the ralph path from Step 2 and the devcontainer flag from Step 1:
+Run the preflight script (`scripts/preflight.sh` in the directory next to this SKILL.md) with the ralph path from Step 2 and the devcontainer flag from Step 1:
 
 ```bash
-bash skills/ralph-run/scripts/preflight.sh "$RALPH_PATH" <devcontainer:true|false> [--verbose]
+bash <absolute-path-to-scripts/preflight.sh> "$RALPH_PATH" <devcontainer:true|false> [--verbose]
 ```
 
 When `verbose=true`, append `--verbose` to the preflight command. This prints one `check <name>: <result>` line per check before the final OK/ERROR line.
