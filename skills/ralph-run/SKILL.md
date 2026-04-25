@@ -53,74 +53,15 @@ Error: ralph.sh not found. Checked ./ralph.sh, scripts/ralph/ralph.sh, and ~/.cl
 
 ## Step 3: Validate Preconditions
 
-### 3.1 To Do tasks exist
+Run the preflight script with the ralph path from Step 2 and the devcontainer flag from Step 1:
 
 ```bash
-backlog task list -s "To Do" --plain 2>/dev/null
+bash skills/ralph-run/scripts/preflight.sh "$RALPH_PATH" <devcontainer:true|false>
 ```
 
-If no "To Do" tasks found, report and stop:
-```
-Error: No "To Do" tasks in backlog. Create tasks first (e.g. /ralph-backlog).
-```
+If the output starts with `OK`, parse `RALPH_PATH` from the output (format: `OK RALPH_PATH=<path>`) and proceed to Step 4.
 
-### 3.2 Ralph not already running
-
-Read `backlog/.ralph-status.json` if it exists. Extract the `state` and `pid` fields using grep:
-
-```bash
-STATE=$(grep -o '"state":"[^"]*"' backlog/.ralph-status.json | grep -o '"[^"]*"$' | tr -d '"')
-PID=$(grep -o '"pid":[0-9]*' backlog/.ralph-status.json | grep -o '[0-9]*')
-```
-
-If state is `"running"`, check the heartbeat file for freshness (no sandbox override needed):
-
-```bash
-stat -f %m backlog/.ralph-heartbeat 2>/dev/null || stat -c %Y backlog/.ralph-heartbeat 2>/dev/null
-```
-
-This returns the heartbeat mtime as epoch seconds. Compare with `date +%s`: if age < 15s, Ralph is alive.
-
-If the heartbeat is fresh (mtime within 15s), report and stop:
-```
-Error: Ralph is already running (PID <pid>). Use /ralph-status to check progress, or kill <pid> to stop it.
-```
-
-If the status file doesn't exist, state is not `"running"`, or the heartbeat is stale, proceed.
-
-### 3.3 devcontainer CLI (only when devcontainer=true)
-
-```bash
-command -v devcontainer
-```
-
-If missing and devcontainer=true, report and stop:
-```
-Error: devcontainer CLI not found but --devcontainer is enabled. Install it or run with devcontainer=false.
-```
-
-### 3.4 ralph.sh integrity
-
-Check that the script is executable:
-
-```bash
-if [[ ! -x "$RALPH_PATH" ]]; then
-  echo 'Error: ralph.sh is not executable. Run: chmod +x ./ralph.sh'
-  exit 1
-fi
-```
-
-Check that the script has valid bash syntax:
-
-```bash
-if ! bash -n "$RALPH_PATH" 2>/tmp/ralph-syntax-err; then
-  echo 'Error: ralph.sh has syntax errors:'
-  cat /tmp/ralph-syntax-err
-  exit 1
-fi
-```
-
-If either check fails, report the specific check that failed with its error output and stop.
+If the output starts with `ERROR:`, report the message verbatim to the user and stop.
 
 ---
 
