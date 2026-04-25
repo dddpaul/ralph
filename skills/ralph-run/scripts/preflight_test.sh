@@ -25,7 +25,8 @@ teardown_fixture() {
 
 run_preflight() {
   local dir="$1" path="$2" ralph="$3" devcontainer="$4"
-  cd "$dir" && PATH="$path" bash "$PREFLIGHT" "$ralph" "$devcontainer" 2>/dev/null
+  shift 4
+  cd "$dir" && PATH="$path" bash "$PREFLIGHT" "$ralph" "$devcontainer" "$@" 2>/dev/null
 }
 
 assert_error() {
@@ -189,6 +190,86 @@ test_valid_setup() {
   teardown_fixture
 }
 
+# --- Test 7: --verbose prints per-check lines before OK ---
+test_verbose_ok() {
+  setup_fixture
+  make_mock_backlog "$FIXTURE_DIR" "$TODO_RESPONSE"
+
+  local output exit_code
+  output=$(run_preflight "$FIXTURE_DIR" "$FIXTURE_DIR/backlog-bin:$SYS_PATH" "$RALPH_SH" false --verbose)
+  exit_code=$?
+
+  if [[ $exit_code -ne 0 ]]; then
+    echo "FAIL: verbose OK — expected exit 0, got $exit_code"
+    echo "  output: $output"
+    FAIL=$((FAIL + 1))
+    teardown_fixture
+    return
+  fi
+
+  local last_line
+  last_line=$(echo "$output" | tail -1)
+  if [[ "$last_line" != OK\ RALPH_PATH=* ]]; then
+    echo "FAIL: verbose OK — last line is not 'OK RALPH_PATH=...'"
+    echo "  output: $output"
+    FAIL=$((FAIL + 1))
+    teardown_fixture
+    return
+  fi
+
+  local check_lines
+  check_lines=$(echo "$output" | grep -c "^check ")
+  if [[ $check_lines -lt 4 ]]; then
+    echo "FAIL: verbose OK — expected at least 4 check lines, got $check_lines"
+    echo "  output: $output"
+    FAIL=$((FAIL + 1))
+    teardown_fixture
+    return
+  fi
+
+  echo "PASS: verbose OK"
+  PASS=$((PASS + 1))
+  teardown_fixture
+}
+
+# --- Test 8: --verbose prints per-check lines before ERROR ---
+test_verbose_error() {
+  setup_fixture
+  make_mock_backlog "$FIXTURE_DIR" "$NO_TODO_RESPONSE"
+
+  local output exit_code
+  output=$(run_preflight "$FIXTURE_DIR" "$FIXTURE_DIR/backlog-bin:$SYS_PATH" "$RALPH_SH" false --verbose)
+  exit_code=$?
+
+  if [[ $exit_code -eq 0 ]]; then
+    echo "FAIL: verbose ERROR — expected non-zero exit, got 0"
+    FAIL=$((FAIL + 1))
+    teardown_fixture
+    return
+  fi
+
+  local last_line
+  last_line=$(echo "$output" | tail -1)
+  if [[ "$last_line" != ERROR:* ]]; then
+    echo "FAIL: verbose ERROR — last line does not start with 'ERROR:'"
+    echo "  output: $output"
+    FAIL=$((FAIL + 1))
+    teardown_fixture
+    return
+  fi
+
+  if echo "$output" | grep -q "^check "; then
+    echo "PASS: verbose ERROR (check line before ERROR)"
+    PASS=$((PASS + 1))
+  else
+    echo "FAIL: verbose ERROR — no check lines in output"
+    echo "  output: $output"
+    FAIL=$((FAIL + 1))
+  fi
+
+  teardown_fixture
+}
+
 # Run all tests
 test_no_todo_tasks
 test_ralph_running
@@ -196,6 +277,8 @@ test_devcontainer_missing
 test_not_executable
 test_syntax_error
 test_valid_setup
+test_verbose_ok
+test_verbose_error
 
 echo ""
 echo "Results: $PASS passed, $FAIL failed out of $((PASS + FAIL)) tests"

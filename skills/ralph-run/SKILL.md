@@ -21,6 +21,7 @@ The user may pass overrides as skill arguments. Parse them as space-separated ke
 | effort | max | --effort |
 | timeout | 60 | --timeout |
 | devcontainer | true | --devcontainer |
+| verbose | false | --verbose |
 | max_iterations | 10 | (positional, last arg) |
 
 > **Note: These defaults intentionally differ from ralph.sh CLI defaults.**
@@ -56,8 +57,10 @@ Error: ralph.sh not found. Checked ./ralph.sh, scripts/ralph/ralph.sh, and ~/.cl
 Run the preflight script with the ralph path from Step 2 and the devcontainer flag from Step 1:
 
 ```bash
-bash skills/ralph-run/scripts/preflight.sh "$RALPH_PATH" <devcontainer:true|false>
+bash skills/ralph-run/scripts/preflight.sh "$RALPH_PATH" <devcontainer:true|false> [--verbose]
 ```
+
+When `verbose=true`, append `--verbose` to the preflight command. This prints one `check <name>: <result>` line per check before the final OK/ERROR line.
 
 If the output starts with `OK`, parse `RALPH_PATH` from the output (format: `OK RALPH_PATH=<path>`) and proceed to Step 4.
 
