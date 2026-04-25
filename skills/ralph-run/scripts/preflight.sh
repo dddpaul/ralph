@@ -79,7 +79,7 @@ fi
 verbose "check ralph_executable: ok"
 
 # Check 5: ralph.sh has valid syntax
-SYNTAX_ERR=$(mktemp)
+SYNTAX_ERR=$(mktemp "${TMPDIR:-/tmp}/preflight.XXXXXX")
 if ! bash -n "$RALPH_PATH" 2>"$SYNTAX_ERR"; then
   MSG=$(grep -v 'warning: setlocale' "$SYNTAX_ERR" | head -1)
   rm -f "$SYNTAX_ERR"
