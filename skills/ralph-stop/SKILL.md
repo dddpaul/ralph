@@ -58,13 +58,22 @@ Ralph PID <pid> not found (probably crashed). Status file is stale.
 
 ## Step 4: Confirm with User
 
-Show current iteration and task info, then ask for confirmation:
+Output a one-line status header, then end the response with an `<options>` block on its own lines:
 
 ```
-Stop Ralph (PID <pid>) at iteration <iteration> of <max_iterations>, current task: <current_task>? [y/N]
+Stop Ralph (PID <pid>) at iteration <iteration> of <max_iterations>, current task: <current_task>?
 ```
 
-If the user does not confirm, output `Cancelled.` and stop without action.
+```
+<options>
+<option>Stop Ralph</option>
+<option>Cancel</option>
+</options>
+```
+
+The `<options>` block must be at the very end of the response, not nested inside other text or a codeblock.
+
+On the next turn, if the user chose **Stop Ralph**, proceed to Step 5. For any other reply (including **Cancel**), output `Cancelled.` and stop without sending any signals.
 
 ---
 
