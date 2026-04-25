@@ -1,6 +1,6 @@
 ---
 name: ralph-init
-description: "Bootstrap Ralph autonomous agent infrastructure in a new project. Sets up ralph.sh, CLAUDE.md, git hooks, backlog, .devcontainer, .gitignore, and skills. Triggers on: ralph init, bootstrap ralph, setup ralph, init ralph, initialize ralph."
+description: "Bootstrap Ralph autonomous agent infrastructure in a new project. Sets up ralph.sh, CLAUDE.md, git hooks, backlog, .devcontainer, .gitignore, and skills. Triggers on: ralph init, bootstrap ralph, setup ralph, init ralph, initialize ralph, upgrade ralph, ralph upgrade, update ralph files."
 ---
 
 # Ralph Project Bootstrapper
@@ -168,3 +168,135 @@ Next steps:
   4. Run Ralph:  ./ralph.sh --tool claude
                  ./ralph.sh --tool opencode
 ```
+
+---
+
+## Upgrade Mode
+
+Activated when the user says `upgrade ralph`, `ralph upgrade`, `update ralph files`, or passes `--upgrade`. This flow updates existing Ralph infrastructure files to the latest template versions without losing project-specific customizations.
+
+**This is a separate flow from init.** Do not run init steps. Do not ask clarifying questions (Q0–Q4). The upgrade flow reads existing files, compares them against templates, and offers to update outdated ones.
+
+---
+
+### U1: Preflight
+
+Run the same checks as Step 1:
+
+```bash
+git rev-parse --git-dir    # Must be a git repo
+command -v backlog          # Must have backlog CLI
+```
+
+**Additionally verify** that Ralph was previously initialized — at least one of these must exist:
+- `ralph.sh` in the project root
+- `CLAUDE.md` in the project root
+
+If neither exists, tell the user: "Ralph has not been initialized in this project. Run `/ralph-init` first." and stop.
+
+---
+
+### U2: Build File Status Table
+
+Compare each managed file against its current template. Assign one status per file:
+
+| Status | Meaning |
+|---|---|
+| **current** | File exists and matches the template |
+| **outdated** | File exists but differs from the template |
+| **missing** | File does not exist (would be created) |
+| **skipped** | File is excluded from upgrade checks |
+
+**Files to check:**
+
+1. **`ralph.sh`** — exact content match against `templates/ralph.sh`
+2. **`CLAUDE.md`** — compare only lines **above** the `## Project-Specific` heading against the same region in `templates/CLAUDE.md`. Everything from `## Project-Specific` down (including conventions) is the project block and must never be touched.
+3. **`.git/hooks/post-commit`** — exact content match against `templates/post-commit`
+4. **`.claude/settings.local.json`** — exact content match against `templates/settings.local.json`
+5. **`.devcontainer/devcontainer.json`** — exact content match against `templates/devcontainer.json`. If `.devcontainer/` directory does not exist, status is **skipped**.
+6. **`.devcontainer/init-firewall.sh`** — exact content match against `templates/init-firewall.sh`. If `.devcontainer/` directory does not exist, status is **skipped**.
+7. **`.devcontainer/Dockerfile`** — always **skipped** (assembled from fragments, cannot diff meaningfully)
+8. **`.gitignore`** — always **skipped** (append-only logic in init flow)
+
+---
+
+### U3: Present Batch Summary
+
+Display the status table to the user:
+
+```
+File                              Status
+─────────────────────────────────────────
+ralph.sh                          outdated
+CLAUDE.md (generic section)       current
+.git/hooks/post-commit            outdated
+.claude/settings.local.json       current
+.devcontainer/devcontainer.json   skipped (no .devcontainer/)
+.devcontainer/init-firewall.sh    skipped (no .devcontainer/)
+.devcontainer/Dockerfile          skipped (assembled)
+.gitignore                        skipped (append-only)
+```
+
+**For outdated files, show details:**
+
+- **`ralph.sh`** and **`.git/hooks/post-commit`**: show a plain language summary of what changed (e.g. "Template adds --model flag support and fixes timeout handling"). Read both versions and describe the meaningful differences — do not dump raw diffs for these files.
+- **`.claude/settings.local.json`**: show the unified diff (`diff -u`) because the project may have custom permissions the user wants to preserve.
+- **`CLAUDE.md`**: show a plain language summary of what changed in the generic section (above `## Project-Specific`).
+- **`.devcontainer/devcontainer.json`** and **`.devcontainer/init-firewall.sh`**: show a plain language summary of what changed.
+
+If all files are **current** or **skipped**, print "All Ralph files are up to date." and stop.
+
+**Then ask:**
+```
+Update all outdated files? Or name files to skip.
+  - yes / all — update everything
+  - skip <file> [<file> ...] — update all except named files
+  - none / cancel — do nothing
+```
+
+---
+
+### U4: Apply Updates
+
+For each file the user approved:
+
+- **`ralph.sh`**: overwrite from `templates/ralph.sh`, then `chmod +x`.
+- **`.git/hooks/post-commit`**: overwrite from `templates/post-commit`, then `chmod +x`.
+- **`.claude/settings.local.json`**: overwrite from `templates/settings.local.json`.
+- **`.devcontainer/devcontainer.json`**: overwrite from `templates/devcontainer.json`.
+- **`.devcontainer/init-firewall.sh`**: overwrite from `templates/init-firewall.sh`, then `chmod +x`.
+- **`CLAUDE.md` (special merge)**:
+  1. Read the existing `CLAUDE.md`
+  2. Find the line `## Project-Specific`
+  3. Extract from that line to EOF — this is the **project block**
+  4. Read `templates/CLAUDE.md`
+  5. Take everything **above** `## Project-Specific` from the template — this is the **generic block**
+  6. Write: generic block + project block (concatenated, no extra blank lines between them)
+
+**Missing files**: create from template using the same logic as the init flow (copy template, `chmod +x` where applicable).
+
+---
+
+### U5: Summary
+
+Print which files were updated and their final status:
+
+```
+Ralph upgrade complete!
+
+  ralph.sh                          updated
+  CLAUDE.md (generic section)       current
+  .git/hooks/post-commit            updated
+  .claude/settings.local.json       current
+  .devcontainer/devcontainer.json   skipped (no .devcontainer/)
+  .devcontainer/init-firewall.sh    skipped (no .devcontainer/)
+  .devcontainer/Dockerfile          skipped (assembled)
+  .gitignore                        skipped (append-only)
+```
+
+Use these labels:
+- **updated** — file was overwritten with the latest template
+- **created** — file was missing and has been created
+- **current** — file already matched the template
+- **skipped (reason)** — file was excluded from checks, with reason in parentheses
+- **skipped (user)** — user chose to skip this file
