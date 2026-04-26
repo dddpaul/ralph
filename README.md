@@ -116,6 +116,7 @@ Default is 10 iterations. Use `--tool claude` (default) or `--tool opencode` to 
 | `--retry-count <n>` | Number of retries when `--on-error=retry` | `2` |
 | `--log-file <path>` | Log errors to file for later analysis | (none) |
 | `--prompt-file <path>` | File to load prompt template from | (none) |
+| `--tasks <ids>` | Comma-separated numeric task IDs to run (e.g. `62,64,65`). Mutually exclusive with `--prompt-file` | (none) |
 | `--devcontainer` | Run inside a devcontainer | off |
 | `--help` | Show help message and exit | |
 | `--version` | Show version and exit | |

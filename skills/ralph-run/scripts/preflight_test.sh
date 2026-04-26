@@ -270,6 +270,82 @@ test_verbose_error() {
   teardown_fixture
 }
 
+# --- Test 9: --tasks with valid To Do task → OK ---
+test_tasks_valid() {
+  setup_fixture
+  make_mock_backlog "$FIXTURE_DIR" 'echo "Task TASK-42 - Test"; echo "Status: ○ To Do"'
+
+  local output exit_code
+  output=$(run_preflight "$FIXTURE_DIR" "$FIXTURE_DIR/backlog-bin:$SYS_PATH" "$RALPH_SH" false --tasks 42)
+  exit_code=$?
+  assert_ok "--tasks valid To Do" "$output" "$exit_code"
+  teardown_fixture
+}
+
+# --- Test 10: --tasks with non-existent task → ERROR ---
+test_tasks_missing() {
+  setup_fixture
+  make_mock_backlog "$FIXTURE_DIR" 'echo "not found"'
+
+  local output exit_code
+  output=$(run_preflight "$FIXTURE_DIR" "$FIXTURE_DIR/backlog-bin:$SYS_PATH" "$RALPH_SH" false --tasks 999)
+  exit_code=$?
+  assert_error "--tasks missing task" "TASK-999 not found" "$output" "$exit_code"
+  teardown_fixture
+}
+
+# --- Test 11: --tasks with Done task → ERROR ---
+test_tasks_done() {
+  setup_fixture
+  make_mock_backlog "$FIXTURE_DIR" 'echo "Task TASK-1 - Test"; echo "Status: ✓ Done"'
+
+  local output exit_code
+  output=$(run_preflight "$FIXTURE_DIR" "$FIXTURE_DIR/backlog-bin:$SYS_PATH" "$RALPH_SH" false --tasks 1)
+  exit_code=$?
+  assert_error "--tasks Done task" "TASK-1 is not To Do" "$output" "$exit_code"
+  teardown_fixture
+}
+
+# --- Test 12: --tasks with non-numeric value → ERROR ---
+test_tasks_non_numeric() {
+  setup_fixture
+  make_mock_backlog "$FIXTURE_DIR" "$TODO_RESPONSE"
+
+  local output exit_code
+  output=$(run_preflight "$FIXTURE_DIR" "$FIXTURE_DIR/backlog-bin:$SYS_PATH" "$RALPH_SH" false --tasks abc)
+  exit_code=$?
+  assert_error "--tasks non-numeric" "comma-separated numeric IDs" "$output" "$exit_code"
+  teardown_fixture
+}
+
+# --- Test 13: --tasks verbose shows tasks_whitelist check ---
+test_tasks_verbose() {
+  setup_fixture
+  make_mock_backlog "$FIXTURE_DIR" 'echo "Task TASK-42 - Test"; echo "Status: ○ To Do"'
+
+  local output exit_code
+  output=$(run_preflight "$FIXTURE_DIR" "$FIXTURE_DIR/backlog-bin:$SYS_PATH" "$RALPH_SH" false --verbose --tasks 42)
+  exit_code=$?
+
+  if [[ $exit_code -ne 0 ]]; then
+    echo "FAIL: --tasks verbose — expected exit 0, got $exit_code"
+    echo "  output: $output"
+    FAIL=$((FAIL + 1))
+    teardown_fixture
+    return
+  fi
+
+  if echo "$output" | grep -q "check tasks_whitelist: ok"; then
+    echo "PASS: --tasks verbose"
+    PASS=$((PASS + 1))
+  else
+    echo "FAIL: --tasks verbose — no tasks_whitelist check in output"
+    echo "  output: $output"
+    FAIL=$((FAIL + 1))
+  fi
+  teardown_fixture
+}
+
 # Run all tests
 test_no_todo_tasks
 test_ralph_running
@@ -279,6 +355,11 @@ test_syntax_error
 test_valid_setup
 test_verbose_ok
 test_verbose_error
+test_tasks_valid
+test_tasks_missing
+test_tasks_done
+test_tasks_non_numeric
+test_tasks_verbose
 
 echo ""
 echo "Results: $PASS passed, $FAIL failed out of $((PASS + FAIL)) tests"

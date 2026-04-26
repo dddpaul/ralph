@@ -120,13 +120,13 @@ Only merge after reviewer approval. If changes requested, fix and re-review.
 
 ## Ralph Loop (Autonomous Mode)
 
-Activated when the prompt starts with `MODE: autonomous`. Task picking:
+Activated when the prompt starts with `MODE: autonomous`. Task selection:
 
-1. Run: `backlog task list -s "To Do" --plain`
-2. Pick the task with the lowest ID **whose dependencies are all "Done"**. If the lowest-ID task has unmet dependencies, skip it and check the next one.
-3. Read details: `backlog task <id> --plain`
-4. Execute the Task Lifecycle above for that single task
-5. Then STOP (see top of file)
+1. **If the prompt explicitly names a task** (e.g. "Execute TASK-62"): work on that
+   task only. Do not consult the To Do list for picking.
+2. **Otherwise:** Run `backlog task list -s "To Do" --plain` and pick the task
+   with the lowest ID whose dependencies are all "Done".
+3. Read details, execute the Task Lifecycle, then STOP (see top of file).
 
 ## Browser Testing
 

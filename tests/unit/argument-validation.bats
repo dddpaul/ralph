@@ -182,3 +182,62 @@ reset_defaults() {
   validate_args
   [[ "$PROMPT_FILE" == "$TEST_DIR/prompt.txt" ]]
 }
+
+@test "--tasks single ID parsed correctly" {
+  reset_defaults
+  parse_args --tasks 62
+  [[ "$TASKS_RAW" == "62" ]]
+  validate_args
+}
+
+@test "--tasks multiple IDs parsed correctly" {
+  reset_defaults
+  parse_args --tasks 62,64,65
+  [[ "$TASKS_RAW" == "62,64,65" ]]
+  validate_args
+}
+
+@test "--tasks with equals sign parsed correctly" {
+  reset_defaults
+  parse_args --tasks=62,64
+  [[ "$TASKS_RAW" == "62,64" ]]
+  validate_args
+}
+
+@test "--tasks rejects TASK- prefix" {
+  reset_defaults
+  parse_args --tasks TASK-62
+  run validate_args
+  [[ "$status" -eq 1 ]]
+  [[ "$output" == *"comma-separated numeric IDs"* ]]
+}
+
+@test "--tasks rejects non-numeric values" {
+  reset_defaults
+  parse_args --tasks abc
+  run validate_args
+  [[ "$status" -eq 1 ]]
+  [[ "$output" == *"comma-separated numeric IDs"* ]]
+}
+
+@test "--tasks rejects mixed numeric and non-numeric" {
+  reset_defaults
+  parse_args --tasks 62,abc
+  run validate_args
+  [[ "$status" -eq 1 ]]
+  [[ "$output" == *"comma-separated numeric IDs"* ]]
+}
+
+@test "--tasks and --prompt-file are mutually exclusive" {
+  echo "test prompt" > "$TEST_DIR/prompt.txt"
+  reset_defaults
+  parse_args --tasks 62 --prompt-file "$TEST_DIR/prompt.txt"
+  run validate_args
+  [[ "$status" -eq 1 ]]
+  [[ "$output" == *"mutually exclusive"* ]]
+}
+
+@test "--tasks default is empty" {
+  reset_defaults
+  [[ "$TASKS_RAW" == "" ]]
+}

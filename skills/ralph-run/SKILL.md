@@ -20,6 +20,7 @@ The user may pass overrides as skill arguments. Parse them as space-separated ke
 | tool | claude | --tool |
 | effort | max | --effort |
 | timeout | 60 | --timeout |
+| tasks | (none) | --tasks |
 | devcontainer | true | --devcontainer |
 | verbose | false | --verbose |
 | max_iterations | 10 | (positional, last arg) |
@@ -31,10 +32,14 @@ The user may pass overrides as skill arguments. Parse them as space-separated ke
 > - **timeout** (skill: `60`, CLI: `15`) — max-effort iterations take longer; 15 minutes would time out most complex tasks.
 > - **devcontainer** (skill: `true`, CLI: `false`) — interactive users expect sandboxed runs by default; the CLI leaves this opt-in for scripted/CI use.
 
+The `tasks` parameter accepts comma-separated numeric task IDs only (e.g. `62,64,65`). Reject `TASK-` prefix or non-numeric values. Mutually exclusive with `--prompt-file`.
+
 **Example invocations:**
 - `/ralph-run` — all defaults
 - `/ralph-run tool=opencode timeout=30 max_iterations=5`
 - `/ralph-run devcontainer=false effort=high`
+- `/ralph-run tasks=62` — only TASK-62
+- `/ralph-run tasks=62,64,65 max_iterations=3`
 
 ---
 
@@ -57,10 +62,12 @@ Error: ralph.sh not found. Checked ./ralph.sh, scripts/ralph/ralph.sh, and ~/.cl
 Run the preflight script (`scripts/preflight.sh` in the directory next to this SKILL.md) with the ralph path from Step 2 and the devcontainer flag from Step 1:
 
 ```bash
-bash <absolute-path-to-scripts/preflight.sh> "$RALPH_PATH" <devcontainer:true|false> [--verbose]
+bash <absolute-path-to-scripts/preflight.sh> "$RALPH_PATH" <devcontainer:true|false> [--verbose] [--tasks <ids>]
 ```
 
 When `verbose=true`, append `--verbose` to the preflight command. This prints one `check <name>: <result>` line per check before the final OK/ERROR line.
+
+When `tasks` is set, append `--tasks <ids>` to the preflight command.
 
 If the output starts with `OK`, parse `RALPH_PATH` from the output (format: `OK RALPH_PATH=<path>`) and proceed to Step 4.
 
@@ -77,6 +84,8 @@ RALPH_CMD="<path-to-ralph.sh> --tool <tool> --effort <effort> --timeout <timeout
 ```
 
 Add `--devcontainer` flag only if devcontainer=true.
+
+When `tasks` is set, append `--tasks <ids>` to the command.
 
 Launch fully detached, capturing early output to a launch log. **You MUST set `dangerouslyDisableSandbox: true`** on this Bash tool call — ralph.sh needs full OS access (mktemp, /dev/fd, tee, docker) which the sandbox blocks.
 

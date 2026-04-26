@@ -116,3 +116,34 @@ teardown() {
   [[ -f "$MOCK_LOG" ]]
   grep -q "Equals syntax prompt." "$MOCK_LOG"
 }
+
+@test "--tasks sends targeted prompt with task ID" {
+  mkdir -p "$TEST_DIR/bin"
+  cat > "$TEST_DIR/bin/backlog" <<'MOCKEOF'
+#!/bin/bash
+if [[ "$1" == "task" && "$2" == "42" ]]; then
+  echo "Task TASK-42 - Whitelist test"
+  echo "Status: ○ To Do"
+elif [[ "$1" == "task" && "$2" == "list" ]]; then
+  for arg in "$@"; do
+    if [[ "$prev" == "-s" ]]; then
+      if [[ "$arg" == "Done" ]]; then echo "No tasks found"; exit 0; fi
+      if [[ "$arg" == "In Progress" ]]; then echo "No tasks found"; exit 0; fi
+    fi
+    prev="$arg"
+  done
+  echo "To Do:"
+  echo "  TASK-42 - Whitelist test"
+fi
+MOCKEOF
+  chmod +x "$TEST_DIR/bin/backlog"
+  export PATH="$TEST_DIR/bin:$PATH"
+  mock_opencode_with_log "$MOCK_LOG"
+
+  cd "$PROJECT_ROOT"
+  timeout 5 bash ralph.sh --tool opencode --tasks 42 1 2>&1 || true
+
+  [[ -f "$MOCK_LOG" ]]
+  grep -q "Execute TASK-42" "$MOCK_LOG"
+  grep -q "Do NOT pick any other task" "$MOCK_LOG"
+}

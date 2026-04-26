@@ -2,16 +2,19 @@
 set -uo pipefail
 
 usage() {
-  echo "Usage: preflight.sh <ralph_path> <devcontainer:true|false> [--verbose]"
+  echo "Usage: preflight.sh <ralph_path> <devcontainer:true|false> [--verbose] [--tasks <ids>]"
   exit 1
 }
 
 VERBOSE=false
+TASKS_RAW=""
 POSITIONAL=()
-for arg in "$@"; do
-  case "$arg" in
-    --verbose) VERBOSE=true ;;
-    *) POSITIONAL+=("$arg") ;;
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --verbose) VERBOSE=true; shift ;;
+    --tasks) TASKS_RAW="$2"; shift 2 ;;
+    --tasks=*) TASKS_RAW="${1#*=}"; shift ;;
+    *) POSITIONAL+=("$1"); shift ;;
   esac
 done
 
@@ -28,15 +31,39 @@ verbose() {
   fi
 }
 
-# Check 1: To Do tasks exist
-TODO_OUTPUT=$(backlog task list -s "To Do" --plain 2>/dev/null)
-if echo "$TODO_OUTPUT" | grep -q "No tasks found" || ! echo "$TODO_OUTPUT" | grep -q "TASK-"; then
-  verbose "check todo_tasks: FAIL (no To Do tasks)"
-  echo "ERROR: No To Do tasks in backlog"
-  exit 1
+# Check 1: To Do tasks exist (or validate --tasks whitelist)
+if [[ -n "$TASKS_RAW" ]]; then
+  if ! [[ "$TASKS_RAW" =~ ^[0-9]+(,[0-9]+)*$ ]]; then
+    verbose "check tasks_whitelist: FAIL (non-numeric)"
+    echo "ERROR: --tasks must be comma-separated numeric IDs. Got: '$TASKS_RAW'"
+    exit 1
+  fi
+  IFS=',' read -ra _WL_IDS <<< "$TASKS_RAW"
+  for _wl_id in "${_WL_IDS[@]}"; do
+    _wl_out=$(backlog task "$_wl_id" --plain 2>/dev/null)
+    if [[ -z "$_wl_out" ]] || echo "$_wl_out" | grep -q "not found"; then
+      verbose "check tasks_whitelist: FAIL (TASK-$_wl_id not found)"
+      echo "ERROR: TASK-$_wl_id not found in backlog"
+      exit 1
+    fi
+    _wl_status=$(echo "$_wl_out" | grep -o "Status:.*" | sed 's/Status:[[:space:]]*//' | sed 's/^[^[:alpha:]]*//')
+    if [[ "$_wl_status" != *"To Do"* ]]; then
+      verbose "check tasks_whitelist: FAIL (TASK-$_wl_id status: $_wl_status)"
+      echo "ERROR: TASK-$_wl_id is not To Do (status: $_wl_status)"
+      exit 1
+    fi
+  done
+  verbose "check tasks_whitelist: ok (${#_WL_IDS[@]} tasks)"
+else
+  TODO_OUTPUT=$(backlog task list -s "To Do" --plain 2>/dev/null)
+  if echo "$TODO_OUTPUT" | grep -q "No tasks found" || ! echo "$TODO_OUTPUT" | grep -q "TASK-"; then
+    verbose "check todo_tasks: FAIL (no To Do tasks)"
+    echo "ERROR: No To Do tasks in backlog"
+    exit 1
+  fi
+  TODO_COUNT=$(echo "$TODO_OUTPUT" | grep -c "TASK-")
+  verbose "check todo_tasks: ok ($TODO_COUNT tasks)"
 fi
-TODO_COUNT=$(echo "$TODO_OUTPUT" | grep -c "TASK-")
-verbose "check todo_tasks: ok ($TODO_COUNT tasks)"
 
 # Check 2: Ralph not already running
 STATUS_FILE="backlog/.ralph-status.json"
