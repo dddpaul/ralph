@@ -1,10 +1,11 @@
 ---
 id: TASK-65
 title: Add --tasks whitelist flag to ralph.sh and ralph-run skill
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-26 19:50'
-updated_date: '2026-04-26 19:55'
+updated_date: '2026-04-26 20:15'
 labels: []
 dependencies: []
 ---
@@ -87,18 +88,18 @@ Add `--tasks` row to flags table with one-line description and example.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 ralph.sh accepts --tasks flag with comma-separated numeric IDs (regex ^[0-9]+(,[0-9]+)*$); rejects TASK- prefix and non-numeric values
-- [ ] #2 ralph.sh --tasks fails fast at preflight if any listed ID is missing from backlog or not in To Do status
-- [ ] #3 ralph.sh --tasks and --prompt-file are mutually exclusive (preflight error if both set)
-- [ ] #4 Main loop with --tasks active picks first whitelisted ID still in To Do, exits cleanly with 'all specified tasks done' when whitelist is exhausted
-- [ ] #5 Targeted prompt 'Execute TASK-<id> using the full Task Lifecycle...' is sent each iteration when whitelist active
-- [ ] #6 Status file tasks_remaining reflects remaining whitelist IDs (not total To Do) when whitelist active
-- [ ] #7 preflight.sh accepts --tasks flag and performs strict per-ID validation, replacing the generic Check 1 when active
-- [ ] #8 ralph-run skill accepts tasks=<ids> argument, validates format, forwards to both preflight.sh and ralph.sh
-- [ ] #9 Without --tasks, ralph.sh, preflight.sh, and ralph-run skill behave identically to current implementation (regression test)
-- [ ] #10 ralph.sh --help and README document the new --tasks flag
-- [ ] #11 CLAUDE.md (project root) Ralph Loop section branches on whether the prompt names a task: (1) prompt names task → execute it directly, (2) otherwise → pick lowest-ID To Do
-- [ ] #12 skills/ralph-init/templates/CLAUDE.md gets the same Ralph Loop update so new projects bootstrap with task-aware picking logic
+- [x] #1 ralph.sh accepts --tasks flag with comma-separated numeric IDs (regex ^[0-9]+(,[0-9]+)*$); rejects TASK- prefix and non-numeric values
+- [x] #2 ralph.sh --tasks fails fast at preflight if any listed ID is missing from backlog or not in To Do status
+- [x] #3 ralph.sh --tasks and --prompt-file are mutually exclusive (preflight error if both set)
+- [x] #4 Main loop with --tasks active picks first whitelisted ID still in To Do, exits cleanly with 'all specified tasks done' when whitelist is exhausted
+- [x] #5 Targeted prompt 'Execute TASK-<id> using the full Task Lifecycle...' is sent each iteration when whitelist active
+- [x] #6 Status file tasks_remaining reflects remaining whitelist IDs (not total To Do) when whitelist active
+- [x] #7 preflight.sh accepts --tasks flag and performs strict per-ID validation, replacing the generic Check 1 when active
+- [x] #8 ralph-run skill accepts tasks=<ids> argument, validates format, forwards to both preflight.sh and ralph.sh
+- [x] #9 Without --tasks, ralph.sh, preflight.sh, and ralph-run skill behave identically to current implementation (regression test)
+- [x] #10 ralph.sh --help and README document the new --tasks flag
+- [x] #11 CLAUDE.md (project root) Ralph Loop section branches on whether the prompt names a task: (1) prompt names task → execute it directly, (2) otherwise → pick lowest-ID To Do
+- [x] #12 skills/ralph-init/templates/CLAUDE.md gets the same Ralph Loop update so new projects bootstrap with task-aware picking logic
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -125,4 +126,18 @@ Activated when the prompt starts with `MODE: autonomous`. Task selection:
 Apply the same change to both:
 - CLAUDE.md (project root, used by ralph.sh each iteration)
 - skills/ralph-init/templates/CLAUDE.md (so new projects bootstrap with the right version)
+
+Plan:
+1. ralph.sh: Add --tasks flag parsing, validation, mutual exclusion with --prompt-file, whitelist-aware main loop, count_remaining_tasks override
+2. preflight.sh: Add --tasks flag parsing and per-ID validation replacing Check 1
+3. ralph-run SKILL.md: Add tasks parameter to argument table, forward to preflight and ralph.sh
+4. CLAUDE.md (root): Update Ralph Loop section with task-aware picking
+5. skills/ralph-init/templates/CLAUDE.md: Same Ralph Loop update
+6. README.md: Add --tasks row to CLI options table
+7. Tests: argument-validation.bats for --tasks, preflight_test.sh for --tasks validation
+8. Bundled ralph.sh: Update skills/ralph-run/scripts/ralph.sh to match root ralph.sh
+
+Commit: `b454139` - task-65: --tasks whitelist flag for ralph.sh and ralph-run skill
+
+Implemented --tasks whitelist flag across ralph.sh, preflight.sh, ralph-run skill, CLAUDE.md (root + template), and README. 14 new tests (8 unit, 1 integration, 5 preflight). All 140 tests pass. Code review approved.
 <!-- SECTION:NOTES:END -->
