@@ -12,7 +12,7 @@ if echo "$command" | grep -qE '^backlog task create\b'; then
   if [[ -z "$title" ]]; then
     title=$(echo "$command" | sed -n "s/^backlog task create[[:space:]]*'\([^']*\)'.*/\1/p")
   fi
-  if [[ -n "$title" ]] && echo "$title" | grep -qP '[^\x00-\x7F]'; then
+  if [[ -n "$title" ]] && LC_ALL=C grep -q '[^[:print:][:space:]]' <<< "$title"; then
     echo "BLOCKED: title/branch must be ASCII English (filenames are derived from titles). Put translations in -d or --ac." >&2
     exit 2
   fi
@@ -20,7 +20,7 @@ fi
 
 if echo "$command" | grep -qE '^git checkout -b\b'; then
   branch_name=$(echo "$command" | sed -n 's/^git checkout -b[[:space:]]*\([^[:space:]]*\).*/\1/p')
-  if [[ -n "$branch_name" ]] && echo "$branch_name" | grep -qP '[^\x00-\x7F]'; then
+  if [[ -n "$branch_name" ]] && LC_ALL=C grep -q '[^[:print:][:space:]]' <<< "$branch_name"; then
     echo "BLOCKED: title/branch must be ASCII English (filenames are derived from titles). Put translations in -d or --ac." >&2
     exit 2
   fi
