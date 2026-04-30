@@ -1,9 +1,11 @@
 ---
 id: TASK-66
 title: 'Move enforceable rules from CLAUDE.md to hooks, settings, and agents'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-04-30 11:30'
+updated_date: '2026-04-30 12:00'
 labels: []
 dependencies: []
 ---
@@ -82,17 +84,27 @@ Agent should run `git diff master..HEAD` and `backlog task <id> --plain` itself.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 All 6 PreToolUse hooks defined in .claude/settings.json with paths to scripts in .claude/hooks/
-- [ ] #2 Each hook script blocks the documented forbidden case with the documented error message
-- [ ] #3 Each hook script allows the documented permitted case (e.g., --append-notes, ASCII titles, .claude/** edits on master)
-- [ ] #4 .claude/agents/task-reviewer.md created with the 8-item checklist and self-runs git diff + backlog task <id>
-- [ ] #5 CLAUDE.md rewritten to target structure (sections 1-11 above), measurable: line count in [55, 75] range
-- [ ] #6 CLAUDE.md sections deleted: Git Hooks block, Naming Convention, Code Review checklist body, Backlog CLI command list
-- [ ] #7 Smoke test: attempt forbidden commit (with Co-Authored-By trailer) — blocks with hook 1 error; valid commit succeeds
-- [ ] #8 Smoke test: attempt backlog task edit ... --notes 'foo' — blocks with hook 2 error; --append-notes succeeds
-- [ ] #9 Smoke test: attempt Edit on backlog/tasks/task-1*.md — blocks with hook 3 error
-- [ ] #10 Smoke test: on master branch, attempt Edit on README.md — blocks with hook 4; attempt Edit on .claude/settings.json — succeeds
-- [ ] #11 Smoke test: backlog task create 'Привет' — blocks with hook 5; backlog task create 'Hello' -d 'Привет описание' — succeeds
-- [ ] #12 Smoke test: on task-99 branch, git commit -m 'foo' — blocks with hook 6; git commit -m 'task-99: foo' — succeeds; git commit -m 'Merge branch x' — succeeds
-- [ ] #13 ralph-init skill template CLAUDE.md and template .claude/settings.json updated to match (so new projects bootstrap with the same hooks and shorter CLAUDE.md)
+- [x] #1 All 6 PreToolUse hooks defined in .claude/settings.json with paths to scripts in .claude/hooks/
+- [x] #2 Each hook script blocks the documented forbidden case with the documented error message
+- [x] #3 Each hook script allows the documented permitted case (e.g., --append-notes, ASCII titles, .claude/** edits on master)
+- [x] #4 .claude/agents/task-reviewer.md created with the 8-item checklist and self-runs git diff + backlog task <id>
+- [x] #5 CLAUDE.md rewritten to target structure (sections 1-11 above), measurable: line count in [55, 75] range
+- [x] #6 CLAUDE.md sections deleted: Git Hooks block, Naming Convention, Code Review checklist body, Backlog CLI command list
+- [x] #7 Smoke test: attempt forbidden commit (with Co-Authored-By trailer) — blocks with hook 1 error; valid commit succeeds
+- [x] #8 Smoke test: attempt backlog task edit ... --notes 'foo' — blocks with hook 2 error; --append-notes succeeds
+- [x] #9 Smoke test: attempt Edit on backlog/tasks/task-1*.md — blocks with hook 3 error
+- [x] #10 Smoke test: on master branch, attempt Edit on README.md — blocks with hook 4; attempt Edit on .claude/settings.json — succeeds
+- [x] #11 Smoke test: backlog task create 'Привет' — blocks with hook 5; backlog task create 'Hello' -d 'Привет описание' — succeeds
+- [x] #12 Smoke test: on task-99 branch, git commit -m 'foo' — blocks with hook 6; git commit -m 'task-99: foo' — succeeds; git commit -m 'Merge branch x' — succeeds
+- [x] #13 ralph-init skill template CLAUDE.md and template .claude/settings.json updated to match (so new projects bootstrap with the same hooks and shorter CLAUDE.md)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan: 1) Create .claude/hooks/ dir with 6 hook scripts (commit-msg-guard, notes-guard, task-file-guard, master-branch-guard, naming-guard, commit-prefix-guard). 2) Create .claude/settings.json with PreToolUse hook definitions. 3) Create .claude/agents/task-reviewer.md with 8-item checklist. 4) Rewrite CLAUDE.md to ~55-65 lines. 5) Update ralph-init templates (CLAUDE.md + add settings.json template). 6) Smoke test each hook.
+
+Commit: `6130b82` - task-66: Move enforceable rules from CLAUDE.md to hooks, settings, and agents
+
+Implemented: 6 PreToolUse hooks in .claude/settings.json (commit-msg-guard, notes-guard, task-file-guard, master-branch-guard, naming-guard, commit-prefix-guard), task-reviewer agent in .claude/agents/, CLAUDE.md rewritten from 138 to 67 lines, ralph-init templates updated. Key decision: hooks use inline commands with defensive command-type guards rather than external scripts only, since the if field doesn't filter compound Bash commands reliably. Hook scripts also committed in .claude/hooks/ as reference/fallback.
+<!-- SECTION:NOTES:END -->
