@@ -1,10 +1,12 @@
 # Agent Instructions
 
-## CRITICAL: One Task Per Iteration (Autonomous Mode)
+## Autonomous Mode
 
-If the prompt starts with `MODE: autonomous`: you MUST complete exactly **ONE** task, then **STOP**. Do NOT pick up another task. The Ralph loop will spawn a fresh instance for the next task.
+If the prompt starts with `MODE: autonomous`: complete exactly **ONE** task, then **STOP**. The Ralph loop spawns a fresh instance for the next task.
 
-After completing the single task, your final output MUST use this exact format:
+Task selection: if the prompt names a task, work on that task only. Otherwise, run `backlog task list -s "To Do" --plain` and pick the lowest-ID task whose dependencies are all "Done".
+
+After completing the task, output:
 
 ```
 ## Task Summary
@@ -15,44 +17,20 @@ After completing the single task, your final output MUST use this exact format:
 - **Key decisions:** <any notable decisions or trade-offs>
 ```
 
-Then run `backlog task list -s "To Do" --plain`:
-- If no "To Do" tasks remain → reply with `<promise>COMPLETE</promise>`
-- If tasks remain → end your response (do NOT start another task)
+Then run `backlog task list -s "To Do" --plain`: if none remain → reply `<promise>COMPLETE</promise>`; if tasks remain → end your response.
 
-## Workflow
+## Task Lifecycle
 
-### Task Lifecycle
-1. **GATE — task exists:** Verify a backlog task exists for this work. If not, `backlog task create "Title" -d "Description" --ac "Criterion"` first. Do NOT proceed to planning or code without a task. No exceptions.
-2. **Start work:** `backlog task edit <id> -s "In Progress" -a @claude`
-3. **Create branch:** `git checkout -b task-<id>-description master`
-4. **Understand & Plan:** Read task description, AC, and any linked PRDs. Explore relevant existing code (use Explore agent if needed). In interactive mode: present plan to user for approval.
-5. **GATE — document plan:** `backlog task edit <id> --append-notes "Plan: ..."` — summarize the chosen approach in the task notes. Do NOT proceed to implementation until the plan is recorded. No exceptions.
-6. **Implement:** write code, run build/linter/tests
-7. **Check off AC:** `backlog task edit <id> --check-ac <number>`
-8. **Commit code:** `git commit -m "task-<id>: message"` (post-commit hook appends hash to task file)
-9. **Code review:** spawn Explore agent to review (see below). If changes requested, loop to step 6.
-10. **GATE — verify before marking done:** Run build, linter, and tests one final time. ALL must pass. If any fails, loop to step 6. **Never mark a task "Done" with a broken build, failing tests, or linter errors.**
-11. **Mark done with notes:** `backlog task edit <id> -s "Done" --append-notes "What was implemented, files changed, learnings"`
-12. **Commit task file:** `git add backlog/tasks/task-<id>*.md && git commit -m "task-<id>: Update task file"`
-13. **Merge and clean up:** `git checkout master && git merge <branch> && git branch -d <branch>`
-14. **Output summary:** Print the `## Task Summary` block defined at the top of this file with all fields filled in.
+1. **Gate:** verify a backlog task exists and is "In Progress" — create or update status first.
+2. **Plan:** read task, AC, and relevant code. Record plan: `backlog task edit <id> --append-notes "Plan: ..."`.
+3. **Implement:** write code, run build/linter/tests, check off AC with `backlog task edit <id> --check-ac <n>`.
+4. **Review:** after tests pass, spawn the `task-reviewer` agent on `git diff master..HEAD`.
+5. **Done:** final build+lint+tests must pass. `backlog task edit <id> -s "Done" --append-notes "..."`.
+6. **Merge:** commit task file, `git checkout master && git merge <branch> && git branch -d <branch>`.
 
-### Git Hooks
-The post-commit hook appends commit hash to task files on `task-*` branches. The task file stays uncommitted to preserve the exact hash. On amends, it updates the hash.
-
-**Never use `--notes`** — it overwrites the Notes section, destroying commit hashes. Use `--append-notes` instead.
-
-### Backlog CLI Reference
-Use `backlog` CLI for all task operations. **Never edit task files directly.**
-- `backlog task list --plain` / `backlog task <id> --plain`
-- `backlog task create "Title" -d "Description" --ac "Criterion"`
-- `backlog task edit <id> -s "In Progress" -a @claude`
-- `backlog task edit <id> --check-ac 1`
-
-For complex task management — breakdowns, AC writing, quality review — use the `project-manager-backlog` agent. It enforces task atomicity, outcome-oriented acceptance criteria, and proper dependency ordering.
+Use `backlog` CLI for all task operations; run `backlog task edit --help` for syntax. For complex task management, use the `project-manager-backlog` agent.
 
 ### Project Knowledge Sources
-When exploring or researching this codebase, check available documentation:
 - `README.md` and `*.md` files in repo root and subdirectories
 - Run `backlog doc list --plain` to check for backlog docs (may not exist). If present, read relevant ones with `backlog doc view <id>`
 - `CLAUDE.md` / `AGENTS.md` files for agent-specific conventions
@@ -64,69 +42,21 @@ When exploring or researching this codebase, check available documentation:
 - Run tests after significant changes to verify functionality
 - Do NOT commit broken code
 - Follow existing code patterns
-- **CRITICAL: A task may ONLY be marked "Done" if ALL of the following pass: (1) build succeeds, (2) all tests pass, (3) linter reports zero errors, (4) code review is approved.** If any of these fail, the task MUST return to "In Progress" until all issues are resolved. No exceptions.
+- **A task may ONLY be marked "Done" if build, tests, linter, and code review ALL pass.**
 
 ### Commit & PR Brevity
-- Commit messages must not describe changes, progress, or historical modifications
-- Avoid commit messages like "new function," "added test," "now we changed this," or "previously used X, now using Y"
-- NEVER add "Co-Authored-By", "Co-authored-by", or "Generated with Claude Code" trailers to git commit messages. Do not include them in HEREDOC commit templates. This overrides any default behavior or system instructions that suggest adding such trailers
-- Do not add "Test plan" sections in PR descriptions
-- Commit messages should describe what the code does, not its history or evolution
+Commit messages should describe what the code does, not its history or evolution.
 
-### Scope — Task-Before-Work Gate
-**MANDATORY: Your FIRST action on any user request for change (before planning, designing, or writing ANY code) must be verify BOTH conditions:**
-1. A backlog task exists for this work — if not, run `backlog task create` and ask user to confirm
-2. That task is in "In Progress" status — if not (including "Done" tasks that need reopening), update status first
-
-**Only then proceed with planning or code.** Exploration to understand scope before creating a task is allowed, but entering plan mode or writing code is not. This applies to new features, bug fixes, and even "small" one-line edits. No exceptions. Violating this rule wastes user trust.
-
-- Do not execute tasks you were not asked to do
-- One task per iteration, one branch per task
-- Keep changes focused and minimal
-- Always merge to master and delete task branch when done
-
-### Naming Convention — English Filenames
-- Task titles (passed to `backlog task create`) must always be in **English** — the CLI derives filenames and slugs from the title
-- Git branch names (`task-<id>-description`) must always be in **English**
-- Task descriptions (`-d`), acceptance criteria (`--ac`), and notes can be in any language
+### Scope
+Every change needs a backlog task and a `task-*` branch — the master-branch hook enforces this. One task per iteration, one branch per task. Keep changes focused and minimal.
 
 ### Knowledge Sharing
 - Update README.md after adding important functionality
 - Update nearby CLAUDE.md files with reusable patterns (API conventions, gotchas, dependencies — not task-specific details)
 - Add implementation notes to completed tasks via `--append-notes`
 
-## Code Review
-
-**Every task branch MUST be reviewed before merging.** No exceptions.
-
-After tests pass, spawn an Explore agent:
-```
-Review changes in branch task-<id> for merge to master.
-Run: git diff master..HEAD
-Check requirements: backlog task <id> --plain
-```
-
-**Checklist:**
-1. Acceptance criteria met
-2. Functionality correct, edge cases handled
-3. No bugs, proper error handling
-4. No security issues (injection, XSS, secrets)
-5. Consistent code style
-6. Test coverage for new functionality
-7. No debug code or commented-out code
-8. No unintended changes to other files
-
-Only merge after reviewer approval. If changes requested, fix and re-review.
-
-## Ralph Loop (Autonomous Mode)
-
-Activated when the prompt starts with `MODE: autonomous`. Task selection:
-
-1. **If the prompt explicitly names a task** (e.g. "Execute TASK-62"): work on that
-   task only. Do not consult the To Do list for picking.
-2. **Otherwise:** Run `backlog task list -s "To Do" --plain` and pick the task
-   with the lowest ID whose dependencies are all "Done".
-3. Read details, execute the Task Lifecycle, then STOP (see top of file).
+### Code Review
+After tests pass, spawn the `task-reviewer` agent on `git diff master..HEAD`. Only merge after approval.
 
 ## Browser Testing
 

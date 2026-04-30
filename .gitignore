@@ -13,8 +13,13 @@ backlog/.ralph-heartbeat
 # OS files
 .DS_Store
 
-#Claude
+# Claude Code (ignore local overrides, track project config)
 .claude/
+!.claude/settings.json
+!.claude/agents/
+!.claude/agents/**
+!.claude/hooks/
+!.claude/hooks/**
 
 # Node modules
 node_modules/

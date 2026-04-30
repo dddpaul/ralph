@@ -116,8 +116,10 @@ Assemble the Dockerfile from base + language snippets, then write three files:
 - `templates/devcontainer.json` → `.devcontainer/devcontainer.json` — update app label and port if specified
 - `templates/init-firewall.sh` → `.devcontainer/init-firewall.sh`
 
-### 3.7 `.claude/settings.local.json`
-Read `templates/settings.local.json` → write to `.claude/settings.local.json`.
+### 3.7 `.claude/settings.json`, `.claude/settings.local.json`, and `.claude/agents/task-reviewer.md`
+Read `templates/settings.json` → write to `.claude/settings.json` (project-wide hooks).
+Read `templates/settings.local.json` → write to `.claude/settings.local.json` (user permissions).
+Read `templates/task-reviewer.md` → write to `.claude/agents/task-reviewer.md` (code review agent).
 
 ### 3.8 `.obsidian/` config (only if project type is Documentation or Mixed)
 Copy Obsidian configuration from templates:
@@ -148,7 +150,9 @@ Files created:
   .git/hooks/post-commit - Commit hash tracking for tasks
   .gitignore            - Updated with Ralph entries
   backlog/              - Backlog initialized
+  .claude/settings.json      - Claude Code hooks (project-wide)
   .claude/settings.local.json - Claude Code permissions
+  .claude/agents/task-reviewer.md - Code review agent
   .devcontainer/        - (if applicable) Sandboxed execution environment
   .obsidian/            - (if Documentation/Mixed) Obsidian vault configuration
 
@@ -212,11 +216,12 @@ Compare each managed file against its current template. Assign one status per fi
 1. **`ralph.sh`** — exact content match against `templates/ralph.sh`
 2. **`CLAUDE.md`** — compare only lines **above** the `## Project-Specific` heading against the same region in `templates/CLAUDE.md`. Everything from `## Project-Specific` down (including conventions) is the project block and must never be touched.
 3. **`.git/hooks/post-commit`** — exact content match against `templates/post-commit`
-4. **`.claude/settings.local.json`** — exact content match against `templates/settings.local.json`
-5. **`.devcontainer/devcontainer.json`** — exact content match against `templates/devcontainer.json`. If `.devcontainer/` directory does not exist, status is **skipped**.
-6. **`.devcontainer/init-firewall.sh`** — exact content match against `templates/init-firewall.sh`. If `.devcontainer/` directory does not exist, status is **skipped**.
-7. **`.devcontainer/Dockerfile`** — always **skipped** (assembled from fragments, cannot diff meaningfully)
-8. **`.gitignore`** — always **skipped** (append-only logic in init flow)
+4. **`.claude/settings.json`** — exact content match against `templates/settings.json`
+5. **`.claude/settings.local.json`** — exact content match against `templates/settings.local.json`
+6. **`.devcontainer/devcontainer.json`** — exact content match against `templates/devcontainer.json`. If `.devcontainer/` directory does not exist, status is **skipped**.
+7. **`.devcontainer/init-firewall.sh`** — exact content match against `templates/init-firewall.sh`. If `.devcontainer/` directory does not exist, status is **skipped**.
+8. **`.devcontainer/Dockerfile`** — always **skipped** (assembled from fragments, cannot diff meaningfully)
+9. **`.gitignore`** — always **skipped** (append-only logic in init flow)
 
 ---
 
@@ -230,6 +235,7 @@ File                              Status
 ralph.sh                          outdated
 CLAUDE.md (generic section)       current
 .git/hooks/post-commit            outdated
+.claude/settings.json             current
 .claude/settings.local.json       current
 .devcontainer/devcontainer.json   skipped (no .devcontainer/)
 .devcontainer/init-firewall.sh    skipped (no .devcontainer/)
@@ -240,6 +246,7 @@ CLAUDE.md (generic section)       current
 **For outdated files, show details:**
 
 - **`ralph.sh`** and **`.git/hooks/post-commit`**: show a plain language summary of what changed (e.g. "Template adds --model flag support and fixes timeout handling"). Read both versions and describe the meaningful differences — do not dump raw diffs for these files.
+- **`.claude/settings.json`**: show the unified diff (`diff -u`) because the project may have custom hooks the user wants to preserve.
 - **`.claude/settings.local.json`**: show the unified diff (`diff -u`) because the project may have custom permissions the user wants to preserve.
 - **`CLAUDE.md`**: show a plain language summary of what changed in the generic section (above `## Project-Specific`).
 - **`.devcontainer/devcontainer.json`** and **`.devcontainer/init-firewall.sh`**: show a plain language summary of what changed.
@@ -262,6 +269,7 @@ For each file the user approved:
 
 - **`ralph.sh`**: overwrite from `templates/ralph.sh`, then `chmod +x`.
 - **`.git/hooks/post-commit`**: overwrite from `templates/post-commit`, then `chmod +x`.
+- **`.claude/settings.json`**: overwrite from `templates/settings.json`.
 - **`.claude/settings.local.json`**: overwrite from `templates/settings.local.json`.
 - **`.devcontainer/devcontainer.json`**: overwrite from `templates/devcontainer.json`.
 - **`.devcontainer/init-firewall.sh`**: overwrite from `templates/init-firewall.sh`, then `chmod +x`.
@@ -287,6 +295,7 @@ Ralph upgrade complete!
   ralph.sh                          updated
   CLAUDE.md (generic section)       current
   .git/hooks/post-commit            updated
+  .claude/settings.json             current
   .claude/settings.local.json       current
   .devcontainer/devcontainer.json   skipped (no .devcontainer/)
   .devcontainer/init-firewall.sh    skipped (no .devcontainer/)
