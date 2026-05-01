@@ -65,6 +65,13 @@ Apply these rules in order. The first rule that matches determines the output. O
 
 **Condition:** `state` is `"completed"` or `"failed"`
 
+**Timestamp conversion:** Before displaying `completed_at`, convert it from UTC to Europe/Moscow time using this portable Bash snippet:
+
+```bash
+utc_iso="<completed_at value>"
+moscow_time=$(TZ=Europe/Moscow date -d "$utc_iso" "+%Y-%m-%d %H:%M:%S MSK" 2>/dev/null || TZ=Europe/Moscow date -j -f "%Y-%m-%dT%H:%M:%SZ" "$utc_iso" "+%Y-%m-%d %H:%M:%S MSK" 2>/dev/null)
+```
+
 **Output:** Full status block (same format as `/ralph-status`):
 
 ```
@@ -76,7 +83,7 @@ Elapsed:      <elapsed formatted>
 Tasks done:   <tasks_done list or "none">
 Remaining:    <tasks_remaining> tasks
 Exit code:    <exit_code>
-Completed at: <completed_at>
+Completed at: <moscow_time converted from completed_at>
 ========================================
 ```
 

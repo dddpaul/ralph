@@ -53,6 +53,21 @@ Skip this check for `"completed"` and `"failed"` states.
 
 ---
 
+## Step 2.5: Convert Timestamps to Europe/Moscow Time
+
+Before displaying any UTC timestamp from the JSON (e.g. `completed_at`), convert it to Europe/Moscow time using this portable Bash snippet:
+
+```bash
+utc_iso="<the UTC ISO 8601 value, e.g. 2026-05-01T08:50:16Z>"
+moscow_time=$(TZ=Europe/Moscow date -d "$utc_iso" "+%Y-%m-%d %H:%M:%S MSK" 2>/dev/null || TZ=Europe/Moscow date -j -f "%Y-%m-%dT%H:%M:%SZ" "$utc_iso" "+%Y-%m-%d %H:%M:%S MSK" 2>/dev/null)
+```
+
+This tries GNU `date -d` first, then falls back to macOS BSD `date -j -f`. The result is a string like `2026-05-01 11:50:16 MSK`.
+
+Apply this conversion to `completed_at` before displaying it in Step 3. Do NOT modify the JSON file — conversion is display-only.
+
+---
+
 ## Step 3: Format Summary
 
 Output a concise summary block:
@@ -75,7 +90,7 @@ If `state` is `"completed"` or `"failed"`, also show:
 
 ```
 Exit code:    <exit_code>
-Completed at: <completed_at>
+Completed at: <moscow_time converted from completed_at per Step 2.5>
 ```
 
 ### Formatting elapsed time
