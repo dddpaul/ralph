@@ -28,6 +28,7 @@ backlog task list --plain
 - `ralph.sh` - The bash loop that spawns fresh AI instances (supports `--tool claude` or `--tool opencode`)
 - `CLAUDE.md` - Instructions given to each Claude Code instance
 - `backlog/` - Task files managed by backlog.md CLI
+- `.claude/settings.json` - PreToolUse hooks (all hook logic is inlined here, not in separate scripts)
 - `skills/ralph-init/` - Skill for bootstrapping Ralph in a new project
 - `skills/ralph-prd/` - Skill for generating PRDs
 - `skills/ralph-backlog/` - Skill for converting PRDs to backlog tasks
