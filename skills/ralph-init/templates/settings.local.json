@@ -25,6 +25,7 @@
       "Bash(bash -n:*)",
       "Bash(test:*)",
       "Bash(npm test:*)",
+      "Bash(TZ=Europe/Moscow date:*)",
       "Skill(ralph-run)",
       "Skill(ralph-status)",
       "Skill(ralph-stop)",
