@@ -94,8 +94,11 @@ backlog/.ralph-heartbeat
 # OS files
 .DS_Store
 
-# Claude
+# Claude Code (ignore local overrides, track project config)
 .claude/
+!.claude/settings.json
+!.claude/agents/
+!.claude/agents/**
 ```
 Do NOT add `backlog/` — task files should be committed.
 
