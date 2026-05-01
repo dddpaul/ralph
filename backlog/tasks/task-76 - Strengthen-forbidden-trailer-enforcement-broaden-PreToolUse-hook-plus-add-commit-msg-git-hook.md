@@ -3,9 +3,10 @@ id: TASK-76
 title: >-
   Strengthen forbidden-trailer enforcement: broaden PreToolUse hook plus add
   commit-msg git hook
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-05-01 10:14'
+updated_date: '2026-05-01 10:28'
 labels: []
 dependencies: []
 ---
@@ -100,15 +101,25 @@ Layer 2 (commit-msg git hook, runs on every commit):
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 PreToolUse commit-msg-guard in .claude/settings.json drops the ^ anchor: '\\bgit commit\\b' instead of '^git commit\\b'
-- [ ] #2 PreToolUse gh-pr-create guard in .claude/settings.json drops the ^ anchor: '\\bgh pr create\\b' instead of '^gh pr create\\b'
-- [ ] #3 Same regex change mirrored to skills/ralph-init/templates/settings.json
-- [ ] #4 templates/commit-msg created in skills/ralph-init/templates/ with the bash hook logic from the description
-- [ ] #5 skills/ralph-init/SKILL.md updated: section 3.3 also writes templates/commit-msg to .git/hooks/commit-msg, makes executable, follows same overwrite-warning logic as post-commit
-- [ ] #6 .git/hooks/commit-msg installed in this project (copy from templates/commit-msg, chmod +x)
-- [ ] #7 Smoke test: printf 'msg with Co-Authored-By' | git commit -F - → BLOCKED by Layer 1 (PreToolUse)
-- [ ] #8 Smoke test: git config trailer.coauthored.command 'echo Co-Authored-By: X' then plain git commit -m 'foo' → BLOCKED by Layer 2 (commit-msg hook); cleanup unsets config
-- [ ] #9 Smoke test: write multiline message with Co-Authored-By to /tmp/msg, then git commit -F /tmp/msg → BLOCKED by Layer 2
-- [ ] #10 Smoke test: regular git commit -m 'task-99: clean message' → succeeds (regression)
-- [ ] #11 Smoke test: git merge of a clean feature branch → succeeds (merge commits not blocked)
+- [x] #1 PreToolUse commit-msg-guard in .claude/settings.json drops the ^ anchor: '\\bgit commit\\b' instead of '^git commit\\b'
+- [x] #2 PreToolUse gh-pr-create guard in .claude/settings.json drops the ^ anchor: '\\bgh pr create\\b' instead of '^gh pr create\\b'
+- [x] #3 Same regex change mirrored to skills/ralph-init/templates/settings.json
+- [x] #4 templates/commit-msg created in skills/ralph-init/templates/ with the bash hook logic from the description
+- [x] #5 skills/ralph-init/SKILL.md updated: section 3.3 also writes templates/commit-msg to .git/hooks/commit-msg, makes executable, follows same overwrite-warning logic as post-commit
+- [x] #6 .git/hooks/commit-msg installed in this project (copy from templates/commit-msg, chmod +x)
+- [x] #7 Smoke test: printf 'msg with Co-Authored-By' | git commit -F - → BLOCKED by Layer 1 (PreToolUse)
+- [x] #8 Smoke test: git config trailer.coauthored.command 'echo Co-Authored-By: X' then plain git commit -m 'foo' → BLOCKED by Layer 2 (commit-msg hook); cleanup unsets config
+- [x] #9 Smoke test: write multiline message with Co-Authored-By to /tmp/msg, then git commit -F /tmp/msg → BLOCKED by Layer 2
+- [x] #10 Smoke test: regular git commit -m 'task-99: clean message' → succeeds (regression)
+- [x] #11 Smoke test: git merge of a clean feature branch → succeeds (merge commits not blocked)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Starting implementation. Plan: 1) Update PreToolUse hooks in .claude/settings.json (drop ^ anchor), 2) Mirror to ralph-init template, 3) Create commit-msg hook template, 4) Update SKILL.md for distribution, 5) Install in this repo, 6) Run smoke tests.
+
+Commit: `35eed19` - task-76: Broaden PreToolUse forbidden-trailer hooks and add commit-msg git hook
+
+All ACs checked. Code review approved. Two-layer defense: (1) PreToolUse hooks now use \bgit commit\b instead of ^git commit\b to catch compound commands, (2) commit-msg git hook inspects fully-assembled message regardless of commit path.
+<!-- SECTION:NOTES:END -->
