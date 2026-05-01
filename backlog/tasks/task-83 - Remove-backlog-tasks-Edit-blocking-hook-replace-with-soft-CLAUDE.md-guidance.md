@@ -1,10 +1,10 @@
 ---
 id: TASK-83
 title: Remove backlog-tasks Edit-blocking hook; replace with soft CLAUDE.md guidance
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-05-01 17:56'
-updated_date: '2026-05-01 17:59'
+updated_date: '2026-05-01 18:32'
 labels:
   - hook
   - task-management
@@ -62,12 +62,26 @@ Apply the same change to skills/ralph-init/templates/CLAUDE.md so future project
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 PreToolUse hook entry that blocks Edit on 'backlog/tasks/*.md' is removed from .claude/settings.json
-- [ ] #2 Same hook entry is removed from skills/ralph-init/templates/settings.json so newly bootstrapped projects do not ship it
-- [ ] #3 CLAUDE.md gains a short 'Editing tasks' note (or extends the existing Task Lifecycle bullet) describing when to use 'backlog task edit' versus the Edit tool, per the resolution text in this task's description
-- [ ] #4 skills/ralph-init/templates/CLAUDE.md receives the same note in the same location so future projects inherit it
-- [ ] #5 Manual smoke test: invoke the Edit tool on a backlog/tasks/task-N - *.md file (text inside description body); the edit succeeds and is not blocked
-- [ ] #6 Manual smoke test: 'backlog task edit N --append-notes "..."' still works and the post-commit hook still appends commit hashes (existing behavior unchanged)
-- [ ] #7 Manual smoke test: 'backlog task edit N --check-ac M' still works (existing behavior unchanged)
-- [ ] #8 No other PreToolUse / PostToolUse hooks are removed by this task — only the 'backlog/tasks/.*\.md' Edit-block entry
+- [x] #1 PreToolUse hook entry that blocks Edit on 'backlog/tasks/*.md' is removed from .claude/settings.json
+- [x] #2 Same hook entry is removed from skills/ralph-init/templates/settings.json so newly bootstrapped projects do not ship it
+- [x] #3 CLAUDE.md gains a short 'Editing tasks' note (or extends the existing Task Lifecycle bullet) describing when to use 'backlog task edit' versus the Edit tool, per the resolution text in this task's description
+- [x] #4 skills/ralph-init/templates/CLAUDE.md receives the same note in the same location so future projects inherit it
+- [x] #5 Manual smoke test: invoke the Edit tool on a backlog/tasks/task-N - *.md file (text inside description body); the edit succeeds and is not blocked
+- [x] #6 Manual smoke test: 'backlog task edit N --append-notes "..."' still works and the post-commit hook still appends commit hashes (existing behavior unchanged)
+- [x] #7 Manual smoke test: 'backlog task edit N --check-ac M' still works (existing behavior unchanged)
+- [x] #8 No other PreToolUse / PostToolUse hooks are removed by this task — only the 'backlog/tasks/.*\.md' Edit-block entry
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan: 1) Remove the backlog/tasks Edit-block hook entry from .claude/settings.json (line 43-44). 2) Remove the same entry from skills/ralph-init/templates/settings.json (line 43-44). 3) Add soft guidance note to CLAUDE.md Task Lifecycle section. 4) Add same note to templates/CLAUDE.md. 5) Smoke tests. 6) Commit and review.
+
+AC#6 smoke test: --append-notes works
+
+Commit: `7ba81d5` - task-83: Remove backlog-tasks Edit-blocking hook, add soft CLAUDE.md guidance
+
+Commit: `26b5d4c` - task-83: Restore original printf syntax in ASCII-validation hooks
+
+All ACs verified. Code review approved. Hook removed from both settings files, soft guidance added to both CLAUDE.md files.
+<!-- SECTION:NOTES:END -->
