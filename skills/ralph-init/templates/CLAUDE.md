@@ -30,6 +30,8 @@ Then run `backlog task list -s "To Do" --plain`: if none remain → reply `<prom
 
 Use `backlog` CLI for all task operations; run `backlog task edit --help` for syntax. For complex task management, use the `project-manager-backlog` agent.
 
+Prefer `backlog task edit` for: adding/removing acceptance criteria, status changes, dependency edits, label/priority changes, frontmatter changes, append-notes, and AC checkbox flips (`--check-ac` / `--uncheck-ac`). Direct Edit tool is acceptable for in-place text changes inside the description body or inside an existing AC's text — any change whose diff stays within an existing line and does not touch frontmatter, section markers (`<!-- SECTION:... -->`, `<!-- AC:... -->`), or the count of AC lines.
+
 ### Project Knowledge Sources
 - `README.md` and `*.md` files in repo root and subdirectories
 - Run `backlog doc list --plain` to check for backlog docs (may not exist). If present, read relevant ones with `backlog doc view <id>`

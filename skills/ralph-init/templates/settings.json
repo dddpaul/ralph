@@ -41,10 +41,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "path=$(jq -r '.tool_input.file_path // empty'); if echo \"$path\" | grep -qE 'backlog/tasks/.*\\.md$'; then echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"BLOCKED: do not edit task files directly. Use backlog task edit (run `backlog task edit --help` for syntax).\"}}'; fi"
-          },
-          {
-            "type": "command",
             "command": "branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown); if [ \"$branch\" != \"master\" ]; then exit 0; fi; path=$(jq -r '.tool_input.file_path // empty'); case \"$path\" in */.claude/*|.claude/*) exit 0;; esac; if [ \"$(basename \"$path\")\" = \".gitignore\" ]; then exit 0; fi; echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"BLOCKED: no active task branch. Create a backlog task and `git checkout -b task-<id>-<desc> master` first.\"}}'"
           }
         ]
