@@ -28,7 +28,7 @@ Parse `tick_count` as an integer. Default: `1` if not provided (first invocation
 
 ## Step 2: Read Status and Heartbeat
 
-Read `backlog/.ralph-status.json` using the Read tool. If the file does not exist, stay silent — do NOT output anything. Call `ScheduleWakeup` to schedule the next tick and return.
+Read `backlog/.ralph-status.json` using the Read tool. If the file does not exist, stay silent — do NOT output anything. Schedule the next tick per Step 5 (including the incremented `tick_count`) and return.
 
 Then run a single Bash call to get heartbeat mtime and current time:
 
