@@ -3,9 +3,10 @@ id: TASK-85
 title: >-
   Remove dead glob permission rule for utc-to-moscow.sh from settings.local.json
   template
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-05-01 18:22'
+updated_date: '2026-05-01 18:47'
 labels:
   - cleanup
   - permissions
@@ -21,6 +22,14 @@ TASK-84 introduced 'Bash(bash */utc-to-moscow.sh:*)' in skills/ralph-init/templa
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 skills/ralph-init/templates/settings.local.json no longer contains 'Bash(bash */utc-to-moscow.sh:*)'
-- [ ] #2 Template is still valid JSON
+- [x] #1 skills/ralph-init/templates/settings.local.json no longer contains 'Bash(bash */utc-to-moscow.sh:*)'
+- [x] #2 Template is still valid JSON
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Removed dead glob entry Bash(bash */utc-to-moscow.sh:*) from skills/ralph-init/templates/settings.local.json. JSON re-validated.
+
+Commit: `0804921` - task-85: Remove dead glob permission rule for utc-to-moscow.sh
+<!-- SECTION:NOTES:END -->
