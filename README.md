@@ -121,6 +121,12 @@ Default is 10 iterations. Use `--tool claude` (default) or `--tool opencode` to 
 | `--help` | Show help message and exit | |
 | `--version` | Show version and exit | |
 
+**`/ralph-run` skill options** (when launching from an interactive Claude Code session):
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `watch` | Auto-monitor Ralph after launch. Accepts `true` (= `5m`), `false`, or a duration like `30s`, `5m`, `1h`. Invokes `/loop` in dynamic mode to poll status and surface interesting events (failed iteration, stuck, crashed, finished). | none (no monitoring) |
+
 **Strategies:**
 
 - **stop** (default): Immediately exit on any error. Best for production runs where you want to investigate failures manually.
@@ -138,6 +144,12 @@ Default is 10 iterations. Use `--tool claude` (default) or `--tool opencode` to 
 
 # Retry failed iterations up to 3 times
 ./ralph.sh --on-error retry --retry-count 3
+
+# Launch from interactive Claude Code and auto-monitor every 5 minutes
+/ralph-run watch=5m
+
+# Launch with task whitelist and 2-minute monitoring interval
+/ralph-run tasks=70 watch=2m max_iterations=3
 ```
 
 Ralph will:
@@ -175,6 +187,7 @@ The same workflow (branch, implement, review, merge) applies in both modes.
 | `skills/ralph-backlog/` | Skill for converting PRDs to backlog tasks |
 | `skills/ralph-run/` | Skill for launching Ralph in the background from an interactive session |
 | `skills/ralph-status/` | Skill for checking Ralph agent progress |
+| `skills/ralph-status-watch/` | Internal skill for auto-monitoring Ralph via `/loop` (used by `watch` parameter) |
 | `skills/ralph-stop/` | Skill for stopping a running Ralph agent |
 | `flowchart/` | Interactive visualization of how Ralph works |
 
@@ -262,6 +275,43 @@ This lets you customize ralph.sh per-project while still having a working defaul
 ### Double-Run Guard
 
 Ralph refuses to start if another instance is already running. On startup, it checks the status file (`backlog/.ralph-status.json`) — if the state is `"running"` and the heartbeat file is fresh (updated within 15 seconds), Ralph exits with an error. This prevents two instances from picking the same task or creating conflicting branches.
+
+### Status File (`.ralph-status.json`)
+
+Ralph writes `backlog/.ralph-status.json` on every state change. External consumers (dashboards, scripts, the `ralph-status-watch` skill) can read this file to track progress.
+
+```json
+{
+  "pid": 99222,
+  "started_at": "2026-05-01T08:50:16Z",
+  "state": "running",
+  "iteration": 2,
+  "max_iterations": 10,
+  "tool": "claude",
+  "tasks_done": ["TASK-62"],
+  "tasks_remaining": 3,
+  "current_task": "TASK-64",
+  "last_iteration_duration": 142,
+  "elapsed": 300,
+  "errors": [
+    { "iteration": 1, "at": "2026-05-01T08:52:00Z", "message": "timeout after 900s" }
+  ],
+  "completed_at": null,
+  "exit_code": null,
+  "iteration_started_at": "2026-05-01T08:55:16Z",
+  "timeout_sec": 900
+}
+```
+
+Key fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `iteration_started_at` | ISO 8601 string \| `null` | Timestamp when the current iteration began |
+| `timeout_sec` | number | Per-iteration timeout in seconds |
+| `errors` | array of objects | Each error is `{ "iteration": <int>, "at": "<ISO 8601>", "message": "<string>" }` |
+
+**Breaking change:** `errors` was previously an array of bare strings. It is now an array of objects with `iteration`, `at`, and `message` fields. Scripts or dashboards that parse this field will need to be updated.
 
 ### --help and --version
 
