@@ -3,9 +3,10 @@ id: TASK-75
 title: >-
   Display Europe/Moscow time in ralph-status and ralph-status-watch (JSON stays
   UTC)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-05-01 10:05'
+updated_date: '2026-05-01 10:22'
 labels: []
 dependencies: []
 ---
@@ -61,12 +62,24 @@ Writes to `.ralph-status.json` stay UTC (`date -u +%Y-%m-%dT%H:%M:%SZ`). Externa
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 ralph-status SKILL.md converts completed_at and any other displayed UTC timestamps to Europe/Moscow time
-- [ ] #2 ralph-status-watch SKILL.md Rule (e) full status block converts completed_at to Europe/Moscow time
-- [ ] #3 Conversion mechanic is portable (works on macOS BSD date and GNU date)
-- [ ] #4 .ralph-status.json content unchanged — completed_at, started_at, iteration_started_at, errors[].at all remain UTC with Z suffix
-- [ ] #5 ralph.sh source unchanged
-- [ ] #6 Time math (heartbeat liveness, elapsed, stuck detection) continues to work correctly using epoch arithmetic
+- [x] #1 ralph-status SKILL.md converts completed_at and any other displayed UTC timestamps to Europe/Moscow time
+- [x] #2 ralph-status-watch SKILL.md Rule (e) full status block converts completed_at to Europe/Moscow time
+- [x] #3 Conversion mechanic is portable (works on macOS BSD date and GNU date)
+- [x] #4 .ralph-status.json content unchanged — completed_at, started_at, iteration_started_at, errors[].at all remain UTC with Z suffix
+- [x] #5 ralph.sh source unchanged
+- [x] #6 Time math (heartbeat liveness, elapsed, stuck detection) continues to work correctly using epoch arithmetic
 - [ ] #7 Smoke test: /ralph-status after a quick run shows Moscow time in Completed at; underlying JSON is still UTC
 - [ ] #8 Smoke test: /ralph-run watch=2m on a quick task — terminal status block shows Moscow time
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Starting task. Will modify display layer in ralph-status and ralph-status-watch skills to convert UTC to Europe/Moscow time.
+
+Plan: Add a UTC-to-Moscow conversion instruction block in ralph-status SKILL.md (Step 3, Completed at line) and ralph-status-watch SKILL.md (Rule e, Completed at line). Use portable date conversion: try GNU date -d first, fall back to BSD date -j. Hardcode Europe/Moscow (+03:00 / MSK).
+
+Commit: `95f3e17` - task-75: Display Europe/Moscow time in ralph-status and ralph-status-watch
+
+Implementation complete. Conversion verified: UTC 08:50:16Z -> 2026-05-01 11:50:16 MSK. Code review approved. AC 7-8 (smoke tests) require a live Ralph run for manual verification.
+<!-- SECTION:NOTES:END -->
