@@ -23,7 +23,18 @@ The user may pass overrides as skill arguments. Parse them as space-separated ke
 | tasks | (none) | --tasks |
 | devcontainer | true | --devcontainer |
 | verbose | false | --verbose |
+| watch | (none) | — |
 | max_iterations | 10 | (positional, last arg) |
+
+The `watch` parameter enables automatic progress monitoring after launch. Accepted values:
+- `true` — normalized to `5m`
+- `false` — no monitoring (same as omitting)
+- A duration: `<N>s`, `<N>m`, or `<N>h` (e.g. `5m`, `30s`, `1h`)
+
+Validate against regex `^(true|false|[0-9]+(s|m|h))$`. Reject invalid values:
+```
+BLOCKED: watch must be true, false, or a duration like 5m, 30s, 1h.
+```
 
 > **Note: These defaults intentionally differ from ralph.sh CLI defaults.**
 > The skill targets interactive sessions where a user launches Ralph from Claude Code,
@@ -40,6 +51,8 @@ The `tasks` parameter accepts comma-separated numeric task IDs only (e.g. `62,64
 - `/ralph-run devcontainer=false effort=high`
 - `/ralph-run tasks=62` — only TASK-62
 - `/ralph-run tasks=62,64,65 max_iterations=3`
+- `/ralph-run watch=5m` — launch with automatic 5-minute progress alerts
+- `/ralph-run tasks=70 watch=2m max_iterations=3` — watch with custom interval
 
 ---
 
@@ -115,11 +128,25 @@ rm -f "$LAUNCH_LOG"
 
 ## Step 5: Report
 
-On success, output exactly one line:
+On success:
+
+**If `watch` is empty (not set or `false`):** output one line plus a hint:
 
 ```
 Ralph launched (PID <pid>, tool=<tool>, effort=<effort>, timeout=<timeout>m, max=<max_iterations>, devcontainer=<true|false>). /ralph-status to monitor, /ralph-stop to halt.
+
+Hint: pass watch=5m to /ralph-run for automatic progress alerts.
 ```
+
+**If `watch` is set (e.g. `5m`):** output the launch line AND immediately invoke the `/loop` skill to start automatic monitoring:
+
+```
+Ralph launched (PID <pid>, tool=<tool>, effort=<effort>, timeout=<timeout>m, max=<max_iterations>, devcontainer=<true|false>). Watching every <watch>.
+```
+
+Then invoke: `/loop <watch> /ralph-status-watch interval=<watch>`
+
+This starts the dynamic loop that polls Ralph's status at the configured interval.
 
 On failure (process died immediately), output diagnostics from both logs:
 

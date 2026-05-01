@@ -241,6 +241,27 @@ _status_json_array() {
   printf ']'
 }
 
+# Convert newline-delimited raw JSON values into a JSON array (no quoting)
+_status_json_raw_array() {
+  local items="$1"
+  if [[ -z "$items" ]]; then
+    printf '[]'
+    return
+  fi
+  local first=true
+  printf '['
+  while IFS= read -r item; do
+    [[ -z "$item" ]] && continue
+    if [[ "$first" == true ]]; then
+      first=false
+    else
+      printf ','
+    fi
+    printf '%s' "$item"
+  done <<< "$items"
+  printf ']'
+}
+
 
 # --- Inlined from lib/summary.sh ---
 
@@ -337,7 +358,7 @@ _update_status() {
 
   local tasks_done_json errors_json
   tasks_done_json=$(_status_json_array "$TASKS_DONE_IDS")
-  errors_json=$(_status_json_array "$STATUS_ERRORS")
+  errors_json=$(_status_json_raw_array "$STATUS_ERRORS")
 
   local current_task_json="null"
   [[ -n "$CURRENT_TASK" ]] && current_task_json="\"$(_status_json_escape "$CURRENT_TASK")\""
@@ -351,9 +372,25 @@ _update_status() {
   local exit_code_json="null"
   [[ -n "$exit_code" ]] && exit_code_json="$exit_code"
 
+  local iter_started_json="null"
+  [[ -n "$ITERATION_STARTED_AT" ]] && iter_started_json="\"$(_status_json_escape "$ITERATION_STARTED_AT")\""
+
   cat > "$STATUS_FILE" <<STATUSEOF
-{"pid":$$,"started_at":"$(_status_json_escape "$RUN_STARTED_AT")","state":"$(_status_json_escape "$state")","iteration":$CURRENT_ITERATION,"max_iterations":$MAX_ITERATIONS,"tool":"$(_status_json_escape "$TOOL")","tasks_done":$tasks_done_json,"tasks_remaining":${remaining:-0},"current_task":$current_task_json,"last_iteration_duration":$last_iter_json,"elapsed":$elapsed,"errors":$errors_json,"completed_at":$completed_at_json,"exit_code":$exit_code_json}
+{"pid":$$,"started_at":"$(_status_json_escape "$RUN_STARTED_AT")","state":"$(_status_json_escape "$state")","iteration":$CURRENT_ITERATION,"max_iterations":$MAX_ITERATIONS,"tool":"$(_status_json_escape "$TOOL")","tasks_done":$tasks_done_json,"tasks_remaining":${remaining:-0},"current_task":$current_task_json,"last_iteration_duration":$last_iter_json,"elapsed":$elapsed,"errors":$errors_json,"completed_at":$completed_at_json,"exit_code":$exit_code_json,"iteration_started_at":$iter_started_json,"timeout_sec":$TIMEOUT_SEC}
 STATUSEOF
+}
+
+# Append a structured error entry to the STATUS_ERRORS accumulator
+_append_status_error() {
+  local message="$1"
+  local error_at
+  error_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  local entry="{\"iteration\":$CURRENT_ITERATION,\"at\":\"$error_at\",\"message\":\"$(_status_json_escape "$message")\"}"
+  if [[ -n "$STATUS_ERRORS" ]]; then
+    STATUS_ERRORS="$STATUS_ERRORS"$'\n'"$entry"
+  else
+    STATUS_ERRORS="$entry"
+  fi
 }
 
 # --- End inlined libraries ---
@@ -395,19 +432,11 @@ STATUS_ERRORS=""
 CURRENT_TASK=""
 LAST_ITER_DURATION=""
 CURRENT_ITERATION=0
+ITERATION_STARTED_AT=""
 
 # List all task IDs currently in "Done" status, sorted
 _get_done_task_ids() {
   backlog task list -s "Done" --plain 2>/dev/null | grep -o "TASK-[0-9]*" | sort || true
-}
-
-# Append an error message to the STATUS_ERRORS accumulator
-_append_status_error() {
-  if [[ -n "$STATUS_ERRORS" ]]; then
-    STATUS_ERRORS="$STATUS_ERRORS"$'\n'"$1"
-  else
-    STATUS_ERRORS="$1"
-  fi
 }
 
 # Record a failed iteration, incrementing the failure counter and logging the reason
@@ -577,6 +606,18 @@ _ralph_pid=$$
 ( trap 'exit 0' TERM; while kill -0 "$_ralph_pid" 2>/dev/null; do touch "$HEARTBEAT_FILE"; sleep 5 & wait $!; done ) </dev/null >/dev/null 2>&1 &
 HB_PID=$!
 
+# Compute timeout in seconds (used by _update_status and the iteration timeout command)
+if [[ "$TIMEOUT" == *.* ]]; then
+  _t_int="${TIMEOUT%%.*}"
+  _t_frac="${TIMEOUT#*.}"
+  _t_int_sec=$(( ${_t_int:-0} * 60 ))
+  while [[ ${#_t_frac} -lt 3 ]]; do _t_frac="${_t_frac}0"; done
+  _t_frac="${_t_frac:0:3}"
+  TIMEOUT_SEC=$(( _t_int_sec + 10#$_t_frac * 60 / 1000 ))
+else
+  TIMEOUT_SEC=$(( TIMEOUT * 60 ))
+fi
+
 _update_status "running"
 
 DEVCONTAINER_LABEL=""; [[ "$USE_DEVCONTAINER" == true ]] && DEVCONTAINER_LABEL=" (devcontainer)"
@@ -612,6 +653,7 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
 
   ITER_START=$(date +%s)
   CURRENT_ITERATION=$i
+  ITERATION_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   DONE_BEFORE=$(_get_done_task_ids)
   _update_status "running"
 
@@ -631,17 +673,6 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
   EXEC_PREFIX=()
   if [[ "$USE_DEVCONTAINER" == true ]]; then
     EXEC_PREFIX=(devcontainer exec --workspace-folder "$SCRIPT_DIR")
-  fi
-
-  if [[ "$TIMEOUT" == *.* ]]; then
-    _t_int="${TIMEOUT%%.*}"
-    _t_frac="${TIMEOUT#*.}"
-    _t_int_sec=$(( ${_t_int:-0} * 60 ))
-    while [[ ${#_t_frac} -lt 3 ]]; do _t_frac="${_t_frac}0"; done
-    _t_frac="${_t_frac:0:3}"
-    TIMEOUT_SEC=$(( _t_int_sec + 10#$_t_frac * 60 / 1000 ))
-  else
-    TIMEOUT_SEC=$(( TIMEOUT * 60 ))
   fi
 
   # Build prompt: whitelist-targeted, file-loaded, or default

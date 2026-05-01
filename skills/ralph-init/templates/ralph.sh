@@ -2,8 +2,8 @@
 # Ralph Wiggum - Long-running AI agent loop
 # Usage: ./ralph.sh [--tool claude|opencode] [--model model_id] [--effort low|medium|high|max]
 #                    [--timeout minutes] [--on-error stop|continue|retry] [--retry-count N]
-#                    [--log-file path] [--prompt-file path] [--devcontainer]
-#                    [--help] [--version] [max_iterations]
+#                    [--log-file path] [--prompt-file path] [--tasks ids]
+#                    [--devcontainer] [--help] [--version] [max_iterations]
 
 set -uo pipefail
 
@@ -23,6 +23,8 @@ Options:
   --retry-count <N>            Number of retries for --on-error=retry (default: 2)
   --log-file <path>            Log file for errors
   --prompt-file <path>         File to load prompt template from
+  --tasks <ids>                Comma-separated numeric task IDs to run (e.g. 62,64,65)
+                               Mutually exclusive with --prompt-file
   --devcontainer               Run inside a devcontainer
   --help                       Show this help message and exit
   --version                    Show version and exit
@@ -40,6 +42,7 @@ ON_ERROR="stop"  # stop | continue | retry
 RETRY_COUNT=2  # Number of retries for --on-error=retry
 LOG_FILE=""  # Optional log file for errors
 PROMPT_FILE=""  # Optional file to load prompt template from
+TASKS_RAW=""  # Optional comma-separated task IDs whitelist
 
 # Parse command-line arguments into global configuration variables
 parse_args() {
@@ -113,6 +116,14 @@ parse_args() {
         PROMPT_FILE="${1#*=}"
         shift
         ;;
+      --tasks)
+        TASKS_RAW="$2"
+        shift 2
+        ;;
+      --tasks=*)
+        TASKS_RAW="${1#*=}"
+        shift
+        ;;
       --help)
         show_help
         exit 0
@@ -169,11 +180,29 @@ validate_args() {
     echo "Error: Prompt file '$PROMPT_FILE' does not exist or is not readable."
     exit 1
   fi
+
+  if [[ -n "$TASKS_RAW" ]]; then
+    if ! [[ "$TASKS_RAW" =~ ^[0-9]+(,[0-9]+)*$ ]]; then
+      echo "Error: --tasks must be comma-separated numeric IDs (e.g. 62,64,65). Got: '$TASKS_RAW'"
+      exit 1
+    fi
+    if [[ -n "$PROMPT_FILE" ]]; then
+      echo "Error: --tasks and --prompt-file are mutually exclusive"
+      exit 1
+    fi
+  fi
 }
+
+TASK_WHITELIST=()
 
 if [[ "${RALPH_SOURCE_ONLY:-}" != "1" ]]; then
   parse_args "$@"
   validate_args
+fi
+
+# Build whitelist array from TASKS_RAW
+if [[ -n "$TASKS_RAW" ]]; then
+  IFS=',' read -ra TASK_WHITELIST <<< "$TASKS_RAW"
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -208,6 +237,27 @@ _status_json_array() {
       printf ','
     fi
     printf '"%s"' "$(_status_json_escape "$item")"
+  done <<< "$items"
+  printf ']'
+}
+
+# Convert newline-delimited raw JSON values into a JSON array (no quoting)
+_status_json_raw_array() {
+  local items="$1"
+  if [[ -z "$items" ]]; then
+    printf '[]'
+    return
+  fi
+  local first=true
+  printf '['
+  while IFS= read -r item; do
+    [[ -z "$item" ]] && continue
+    if [[ "$first" == true ]]; then
+      first=false
+    else
+      printf ','
+    fi
+    printf '%s' "$item"
   done <<< "$items"
   printf ']'
 }
@@ -276,12 +326,24 @@ _is_heartbeat_fresh() {
 
 # Count the number of backlog tasks still in "To Do" status
 count_remaining_tasks() {
-  local output
-  output=$(backlog task list -s "To Do" --plain 2>/dev/null)
-  if echo "$output" | grep -q "No tasks found"; then
-    echo "0"
+  if [[ ${#TASK_WHITELIST[@]} -gt 0 ]]; then
+    local count=0
+    for _id in "${TASK_WHITELIST[@]}"; do
+      local _task_out
+      _task_out=$(backlog task "$_id" --plain 2>/dev/null)
+      if echo "$_task_out" | grep -q "Status:.*To Do"; then
+        count=$((count + 1))
+      fi
+    done
+    echo "$count"
   else
-    echo "$output" | grep -c "TASK-" || echo "0"
+    local output
+    output=$(backlog task list -s "To Do" --plain 2>/dev/null)
+    if echo "$output" | grep -q "No tasks found"; then
+      echo "0"
+    else
+      echo "$output" | grep -c "TASK-" || echo "0"
+    fi
   fi
 }
 
@@ -296,7 +358,7 @@ _update_status() {
 
   local tasks_done_json errors_json
   tasks_done_json=$(_status_json_array "$TASKS_DONE_IDS")
-  errors_json=$(_status_json_array "$STATUS_ERRORS")
+  errors_json=$(_status_json_raw_array "$STATUS_ERRORS")
 
   local current_task_json="null"
   [[ -n "$CURRENT_TASK" ]] && current_task_json="\"$(_status_json_escape "$CURRENT_TASK")\""
@@ -310,9 +372,25 @@ _update_status() {
   local exit_code_json="null"
   [[ -n "$exit_code" ]] && exit_code_json="$exit_code"
 
+  local iter_started_json="null"
+  [[ -n "$ITERATION_STARTED_AT" ]] && iter_started_json="\"$(_status_json_escape "$ITERATION_STARTED_AT")\""
+
   cat > "$STATUS_FILE" <<STATUSEOF
-{"pid":$$,"started_at":"$(_status_json_escape "$RUN_STARTED_AT")","state":"$(_status_json_escape "$state")","iteration":$CURRENT_ITERATION,"max_iterations":$MAX_ITERATIONS,"tool":"$(_status_json_escape "$TOOL")","tasks_done":$tasks_done_json,"tasks_remaining":${remaining:-0},"current_task":$current_task_json,"last_iteration_duration":$last_iter_json,"elapsed":$elapsed,"errors":$errors_json,"completed_at":$completed_at_json,"exit_code":$exit_code_json}
+{"pid":$$,"started_at":"$(_status_json_escape "$RUN_STARTED_AT")","state":"$(_status_json_escape "$state")","iteration":$CURRENT_ITERATION,"max_iterations":$MAX_ITERATIONS,"tool":"$(_status_json_escape "$TOOL")","tasks_done":$tasks_done_json,"tasks_remaining":${remaining:-0},"current_task":$current_task_json,"last_iteration_duration":$last_iter_json,"elapsed":$elapsed,"errors":$errors_json,"completed_at":$completed_at_json,"exit_code":$exit_code_json,"iteration_started_at":$iter_started_json,"timeout_sec":$TIMEOUT_SEC}
 STATUSEOF
+}
+
+# Append a structured error entry to the STATUS_ERRORS accumulator
+_append_status_error() {
+  local message="$1"
+  local error_at
+  error_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  local entry="{\"iteration\":$CURRENT_ITERATION,\"at\":\"$error_at\",\"message\":\"$(_status_json_escape "$message")\"}"
+  if [[ -n "$STATUS_ERRORS" ]]; then
+    STATUS_ERRORS="$STATUS_ERRORS"$'\n'"$entry"
+  else
+    STATUS_ERRORS="$entry"
+  fi
 }
 
 # --- End inlined libraries ---
@@ -354,19 +432,11 @@ STATUS_ERRORS=""
 CURRENT_TASK=""
 LAST_ITER_DURATION=""
 CURRENT_ITERATION=0
+ITERATION_STARTED_AT=""
 
 # List all task IDs currently in "Done" status, sorted
 _get_done_task_ids() {
   backlog task list -s "Done" --plain 2>/dev/null | grep -o "TASK-[0-9]*" | sort || true
-}
-
-# Append an error message to the STATUS_ERRORS accumulator
-_append_status_error() {
-  if [[ -n "$STATUS_ERRORS" ]]; then
-    STATUS_ERRORS="$STATUS_ERRORS"$'\n'"$1"
-  else
-    STATUS_ERRORS="$1"
-  fi
 }
 
 # Record a failed iteration, incrementing the failure counter and logging the reason
@@ -498,6 +568,24 @@ handle_error() {
   esac
 }
 
+# Validate --tasks whitelist: each task must exist and be in To Do status
+if [[ ${#TASK_WHITELIST[@]} -gt 0 ]]; then
+  for _wl_id in "${TASK_WHITELIST[@]}"; do
+    _wl_out=$(backlog task "$_wl_id" --plain 2>/dev/null)
+    if [[ -z "$_wl_out" ]] || echo "$_wl_out" | grep -q "not found"; then
+      echo "ERROR: TASK-$_wl_id not found in backlog"
+      exit 1
+    fi
+    _wl_status=$(echo "$_wl_out" | grep -o "Status:.*" | sed 's/Status:[[:space:]]*//' | sed 's/^[^[:alpha:]]*//')
+    if [[ "$_wl_status" != *"To Do"* ]]; then
+      echo "ERROR: TASK-$_wl_id is not To Do (status: $_wl_status)"
+      exit 1
+    fi
+  done
+  _wl_labels=$(printf ", TASK-%s" "${TASK_WHITELIST[@]}")
+  echo "Restricted to: ${_wl_labels:2} (${#TASK_WHITELIST[@]} tasks)"
+fi
+
 MODEL_INFO=""
 if [[ "$TOOL" == "claude" ]]; then
   MODEL_INFO=" ($MODEL, effort: $EFFORT)"
@@ -518,6 +606,18 @@ _ralph_pid=$$
 ( trap 'exit 0' TERM; while kill -0 "$_ralph_pid" 2>/dev/null; do touch "$HEARTBEAT_FILE"; sleep 5 & wait $!; done ) </dev/null >/dev/null 2>&1 &
 HB_PID=$!
 
+# Compute timeout in seconds (used by _update_status and the iteration timeout command)
+if [[ "$TIMEOUT" == *.* ]]; then
+  _t_int="${TIMEOUT%%.*}"
+  _t_frac="${TIMEOUT#*.}"
+  _t_int_sec=$(( ${_t_int:-0} * 60 ))
+  while [[ ${#_t_frac} -lt 3 ]]; do _t_frac="${_t_frac}0"; done
+  _t_frac="${_t_frac:0:3}"
+  TIMEOUT_SEC=$(( _t_int_sec + 10#$_t_frac * 60 / 1000 ))
+else
+  TIMEOUT_SEC=$(( TIMEOUT * 60 ))
+fi
+
 _update_status "running"
 
 DEVCONTAINER_LABEL=""; [[ "$USE_DEVCONTAINER" == true ]] && DEVCONTAINER_LABEL=" (devcontainer)"
@@ -525,22 +625,40 @@ echo "Starting Ralph - Tool: $TOOL$MODEL_INFO - Max iterations: $MAX_ITERATIONS 
 echo "Config: $CONFIG_INFO"
 
 for i in $(seq 1 "$MAX_ITERATIONS"); do
-  # Check if any "To Do" tasks remain
-  TODO_OUTPUT=$(backlog task list -s "To Do" --plain 2>/dev/null)
-  if echo "$TODO_OUTPUT" | grep -q "No tasks found"; then
-    EXIT_REASON="all tasks done"
-    cleanup_and_exit 0
+  # Determine next task: whitelist mode vs default mode
+  WHITELIST_TASK_ID=""
+  if [[ ${#TASK_WHITELIST[@]} -gt 0 ]]; then
+    for _wl_id in "${TASK_WHITELIST[@]}"; do
+      _wl_out=$(backlog task "$_wl_id" --plain 2>/dev/null)
+      if echo "$_wl_out" | grep -q "Status:.*To Do"; then
+        WHITELIST_TASK_ID="$_wl_id"
+        break
+      fi
+    done
+    if [[ -z "$WHITELIST_TASK_ID" ]]; then
+      EXIT_REASON="all specified tasks done"
+      cleanup_and_exit 0
+    fi
+    CURRENT_TASK="TASK-$WHITELIST_TASK_ID"
+    REMAINING=$(count_remaining_tasks)
+  else
+    TODO_OUTPUT=$(backlog task list -s "To Do" --plain 2>/dev/null)
+    if echo "$TODO_OUTPUT" | grep -q "No tasks found"; then
+      EXIT_REASON="all tasks done"
+      cleanup_and_exit 0
+    fi
+    CURRENT_TASK=$(echo "$TODO_OUTPUT" | grep -o "TASK-[0-9]*" | head -1)
+    REMAINING=$(echo "$TODO_OUTPUT" | grep -c "TASK-" || echo "0")
   fi
 
   ITER_START=$(date +%s)
   CURRENT_ITERATION=$i
+  ITERATION_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   DONE_BEFORE=$(_get_done_task_ids)
-  CURRENT_TASK=$(echo "$TODO_OUTPUT" | grep -o "TASK-[0-9]*" | head -1)
   _update_status "running"
 
   echo ""
   echo "==============================================================="
-  REMAINING=$(echo "$TODO_OUTPUT" | grep -c "TASK-" || echo "0")
   echo "  Ralph Iteration $i of $MAX_ITERATIONS ($TOOL) - $REMAINING tasks remaining"
   echo "==============================================================="
 
@@ -557,19 +675,11 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
     EXEC_PREFIX=(devcontainer exec --workspace-folder "$SCRIPT_DIR")
   fi
 
-  if [[ "$TIMEOUT" == *.* ]]; then
-    _t_int="${TIMEOUT%%.*}"
-    _t_frac="${TIMEOUT#*.}"
-    _t_int_sec=$(( ${_t_int:-0} * 60 ))
-    while [[ ${#_t_frac} -lt 3 ]]; do _t_frac="${_t_frac}0"; done
-    _t_frac="${_t_frac:0:3}"
-    TIMEOUT_SEC=$(( _t_int_sec + 10#$_t_frac * 60 / 1000 ))
-  else
-    TIMEOUT_SEC=$(( TIMEOUT * 60 ))
-  fi
-
-  # Build prompt: load from file or use default
-  if [[ -n "$PROMPT_FILE" ]]; then
+  # Build prompt: whitelist-targeted, file-loaded, or default
+  if [[ -n "$WHITELIST_TASK_ID" ]]; then
+    PROMPT_BODY="Execute TASK-$WHITELIST_TASK_ID using the full Task Lifecycle from CLAUDE.md. Do NOT pick any other task. If TASK-$WHITELIST_TASK_ID is already Done, reply with <promise>COMPLETE</promise>.
+Your response MUST end with the ## Task Summary block. This is not optional."
+  elif [[ -n "$PROMPT_FILE" ]]; then
     PROMPT_BODY=$(<"$PROMPT_FILE")
   else
     PROMPT_BODY="Pick the next To Do task and execute the full Task Lifecycle from CLAUDE.md.

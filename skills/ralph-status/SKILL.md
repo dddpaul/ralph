@@ -92,13 +92,17 @@ Format as:
 
 ## Step 4: Show Errors
 
+Each entry in the `errors` array is a structured object: `{"iteration": <int>, "at": "<ISO timestamp>", "message": "<string>"}`.
+
 If the `errors` array is non-empty, output:
 
 ```
 Errors:
-  - <error 1>
-  - <error 2>
+  - [iteration <iteration>] <message>
+  - [iteration <iteration>] <message>
 ```
+
+Extract `iteration` and `message` from each object using grep/pattern matching on the JSON. The `at` field is available but not displayed in the summary (used by ralph-status-watch for time-based detection).
 
 ---
 
