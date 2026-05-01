@@ -30,4 +30,6 @@ TASK-84 introduced 'Bash(bash */utc-to-moscow.sh:*)' in skills/ralph-init/templa
 
 <!-- SECTION:NOTES:BEGIN -->
 Removed dead glob entry Bash(bash */utc-to-moscow.sh:*) from skills/ralph-init/templates/settings.local.json. JSON re-validated.
+
+Commit: `0804921` - task-85: Remove dead glob permission rule for utc-to-moscow.sh
 <!-- SECTION:NOTES:END -->
