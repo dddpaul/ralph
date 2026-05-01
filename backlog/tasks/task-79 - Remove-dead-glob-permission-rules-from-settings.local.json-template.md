@@ -4,7 +4,7 @@ title: Remove dead glob permission rules from settings.local.json template
 status: Done
 assignee: []
 created_date: '2026-05-01 13:35'
-updated_date: '2026-05-01 13:35'
+updated_date: '2026-05-01 13:36'
 labels:
   - cleanup
   - permissions
@@ -28,4 +28,6 @@ Bash(bash */preflight.sh:*) and Bash(bash */wait-heartbeat.sh:*) in skills/ralph
 
 <!-- SECTION:NOTES:BEGIN -->
 Removed two dead glob entries (Bash(bash */preflight.sh:*) and Bash(bash */wait-heartbeat.sh:*)) from skills/ralph-init/templates/settings.local.json. JSON re-validated with jq.
+
+Commit: `50fb55b` - task-79: Remove dead glob permission rules from settings.local.json template
 <!-- SECTION:NOTES:END -->
