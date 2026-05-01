@@ -7,12 +7,12 @@
           {
             "type": "command",
             "if": "Bash(git commit *)",
-            "command": "cmd=$(jq -r '.tool_input.command'); echo \"$cmd\" | grep -qE '^git commit\\b' || exit 0; if echo \"$cmd\" | grep -qiE 'Co-Authored-By|Generated with Claude Code' || echo \"$cmd\" | grep -qE '##[[:space:]]*Test [Pp]lan'; then echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"BLOCKED: forbidden trailer/heading. Remove Co-Authored-By, Generated-with, and Test plan sections.\"}}'; fi"
+            "command": "cmd=$(jq -r '.tool_input.command'); echo \"$cmd\" | grep -qE '\\bgit commit\\b' || exit 0; if echo \"$cmd\" | grep -qiE 'Co-Authored-By|Generated with Claude Code' || echo \"$cmd\" | grep -qE '##[[:space:]]*Test [Pp]lan'; then echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"BLOCKED: forbidden trailer/heading. Remove Co-Authored-By, Generated-with, and Test plan sections.\"}}'; fi"
           },
           {
             "type": "command",
             "if": "Bash(gh pr create *)",
-            "command": "cmd=$(jq -r '.tool_input.command'); echo \"$cmd\" | grep -qE '^gh pr create\\b' || exit 0; if echo \"$cmd\" | grep -qiE 'Co-Authored-By|Generated with Claude Code' || echo \"$cmd\" | grep -qE '##[[:space:]]*Test [Pp]lan'; then echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"BLOCKED: forbidden trailer/heading. Remove Co-Authored-By, Generated-with, and Test plan sections.\"}}'; fi"
+            "command": "cmd=$(jq -r '.tool_input.command'); echo \"$cmd\" | grep -qE '\\bgh pr create\\b' || exit 0; if echo \"$cmd\" | grep -qiE 'Co-Authored-By|Generated with Claude Code' || echo \"$cmd\" | grep -qE '##[[:space:]]*Test [Pp]lan'; then echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"BLOCKED: forbidden trailer/heading. Remove Co-Authored-By, Generated-with, and Test plan sections.\"}}'; fi"
           },
           {
             "type": "command",

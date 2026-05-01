@@ -79,8 +79,10 @@ Read `templates/CLAUDE.md` → replace ALL `<FILL IN ...>` placeholders in `## P
 
 Write to project root.
 
-### 3.3 `.git/hooks/post-commit`
+### 3.3 `.git/hooks/post-commit` and `.git/hooks/commit-msg`
 Read `templates/post-commit` → write to `.git/hooks/post-commit`. Make executable (`chmod +x`). If hook already exists, warn user and ask before overwriting.
+
+Read `templates/commit-msg` → write to `.git/hooks/commit-msg`. Make executable (`chmod +x`). If hook already exists, warn user and ask before overwriting.
 
 ### 3.4 `.gitignore`
 Append missing entries (don't duplicate existing lines):
@@ -151,6 +153,7 @@ Files created:
   ralph.sh              - Main autonomous loop script (supports claude, opencode)
   CLAUDE.md             - Agent instructions for Claude Code
   .git/hooks/post-commit - Commit hash tracking for tasks
+  .git/hooks/commit-msg  - Forbidden trailer/heading guard
   .gitignore            - Updated with Ralph entries
   backlog/              - Backlog initialized
   .claude/settings.json      - Claude Code hooks (project-wide)
@@ -219,12 +222,13 @@ Compare each managed file against its current template. Assign one status per fi
 1. **`ralph.sh`** — exact content match against `templates/ralph.sh`
 2. **`CLAUDE.md`** — compare only lines **above** the `## Project-Specific` heading against the same region in `templates/CLAUDE.md`. Everything from `## Project-Specific` down (including conventions) is the project block and must never be touched.
 3. **`.git/hooks/post-commit`** — exact content match against `templates/post-commit`
-4. **`.claude/settings.json`** — exact content match against `templates/settings.json`
-5. **`.claude/settings.local.json`** — exact content match against `templates/settings.local.json`
-6. **`.devcontainer/devcontainer.json`** — exact content match against `templates/devcontainer.json`. If `.devcontainer/` directory does not exist, status is **skipped**.
-7. **`.devcontainer/init-firewall.sh`** — exact content match against `templates/init-firewall.sh`. If `.devcontainer/` directory does not exist, status is **skipped**.
-8. **`.devcontainer/Dockerfile`** — always **skipped** (assembled from fragments, cannot diff meaningfully)
-9. **`.gitignore`** — always **skipped** (append-only logic in init flow)
+4. **`.git/hooks/commit-msg`** — exact content match against `templates/commit-msg`
+5. **`.claude/settings.json`** — exact content match against `templates/settings.json`
+6. **`.claude/settings.local.json`** — exact content match against `templates/settings.local.json`
+7. **`.devcontainer/devcontainer.json`** — exact content match against `templates/devcontainer.json`. If `.devcontainer/` directory does not exist, status is **skipped**.
+8. **`.devcontainer/init-firewall.sh`** — exact content match against `templates/init-firewall.sh`. If `.devcontainer/` directory does not exist, status is **skipped**.
+9. **`.devcontainer/Dockerfile`** — always **skipped** (assembled from fragments, cannot diff meaningfully)
+10. **`.gitignore`** — always **skipped** (append-only logic in init flow)
 
 ---
 
@@ -238,6 +242,7 @@ File                              Status
 ralph.sh                          outdated
 CLAUDE.md (generic section)       current
 .git/hooks/post-commit            outdated
+.git/hooks/commit-msg             outdated
 .claude/settings.json             current
 .claude/settings.local.json       current
 .devcontainer/devcontainer.json   skipped (no .devcontainer/)
@@ -248,7 +253,7 @@ CLAUDE.md (generic section)       current
 
 **For outdated files, show details:**
 
-- **`ralph.sh`** and **`.git/hooks/post-commit`**: show a plain language summary of what changed (e.g. "Template adds --model flag support and fixes timeout handling"). Read both versions and describe the meaningful differences — do not dump raw diffs for these files.
+- **`ralph.sh`**, **`.git/hooks/post-commit`**, and **`.git/hooks/commit-msg`**: show a plain language summary of what changed (e.g. "Template adds --model flag support and fixes timeout handling"). Read both versions and describe the meaningful differences — do not dump raw diffs for these files.
 - **`.claude/settings.json`**: show the unified diff (`diff -u`) because the project may have custom hooks the user wants to preserve.
 - **`.claude/settings.local.json`**: show the unified diff (`diff -u`) because the project may have custom permissions the user wants to preserve.
 - **`CLAUDE.md`**: show a plain language summary of what changed in the generic section (above `## Project-Specific`).
@@ -272,6 +277,7 @@ For each file the user approved:
 
 - **`ralph.sh`**: overwrite from `templates/ralph.sh`, then `chmod +x`.
 - **`.git/hooks/post-commit`**: overwrite from `templates/post-commit`, then `chmod +x`.
+- **`.git/hooks/commit-msg`**: overwrite from `templates/commit-msg`, then `chmod +x`.
 - **`.claude/settings.json`**: overwrite from `templates/settings.json`.
 - **`.claude/settings.local.json`**: overwrite from `templates/settings.local.json`.
 - **`.devcontainer/devcontainer.json`**: overwrite from `templates/devcontainer.json`.
@@ -298,6 +304,7 @@ Ralph upgrade complete!
   ralph.sh                          updated
   CLAUDE.md (generic section)       current
   .git/hooks/post-commit            updated
+  .git/hooks/commit-msg             updated
   .claude/settings.json             current
   .claude/settings.local.json       current
   .devcontainer/devcontainer.json   skipped (no .devcontainer/)
