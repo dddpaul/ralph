@@ -11,7 +11,9 @@ Monitor a running Ralph agent and surface interesting events. Invoked by `/loop`
 
 ## Step 1: Parse Arguments
 
-Extract `interval=<duration>` from skill args. This is the polling interval passed through from `/ralph-run`.
+Extract from skill args:
+- `interval=<duration>` — the polling interval passed through from `/ralph-run`
+- `tick_count=<N>` — the current tick number (self-tracked across invocations)
 
 Parse the duration into seconds (`interval_sec`):
 - `Ns` or just `N` → N seconds
@@ -19,6 +21,8 @@ Parse the duration into seconds (`interval_sec`):
 - `Nh` → N * 3600 seconds
 
 Default: `interval_sec = 300` (5 minutes) if not provided or unparseable.
+
+Parse `tick_count` as an integer. Default: `1` if not provided (first invocation).
 
 ---
 
@@ -135,9 +139,9 @@ Stay silent — output nothing. Schedule the next tick.
 
 ## Step 4: Safety Cap
 
-If the current tick count is >= 24, treat it as terminal regardless of state.
+If `tick_count` (parsed in Step 1) is >= 24, treat it as terminal regardless of state.
 
-To track tick count: read the tick count from the `ScheduleWakeup` call chain. The `/loop` infrastructure passes `--tick-count` or you can count ticks by checking how many times this skill has been invoked. For simplicity, use the conversation turn count or a simple counter approach.
+The tick count is self-tracked: each invocation receives `tick_count=N` via the `ScheduleWakeup` prompt, and increments it when scheduling the next tick (see Step 5). The first invocation defaults to `tick_count=1`.
 
 If at the safety cap, output:
 ```
@@ -153,6 +157,6 @@ Do NOT schedule the next tick.
 If no terminal flag was set and the safety cap has not been reached, call `ScheduleWakeup` with:
 - `delaySeconds`: `interval_sec`
 - `reason`: `"ralph-status-watch: polling Ralph (iteration <iteration>, state=<state>)"`
-- `prompt`: `/ralph-status-watch interval=<original interval arg>`
+- `prompt`: `/ralph-status-watch interval=<original interval arg> tick_count=<tick_count + 1>`
 
-This continues the dynamic `/loop`.
+The `tick_count` is incremented by 1 each tick, enabling the safety cap (Step 4) to terminate the loop after 24 ticks. This self-tracking approach works in dynamic `/loop` mode where the skill controls its own pacing via `ScheduleWakeup`.
