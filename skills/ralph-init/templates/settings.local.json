@@ -19,8 +19,6 @@
       "Bash(git config:*)",
       "Bash(./ralph.sh:*)",
       "Bash(nohup ./ralph.sh:*)",
-      "Bash(bash */preflight.sh:*)",
-      "Bash(bash */wait-heartbeat.sh:*)",
       "Bash(grep:*)",
       "Bash(stat:*)",
       "Bash(command -v:*)",
