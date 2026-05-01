@@ -45,6 +45,23 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(backlog task edit *)",
+            "command": ".claude/hooks/task-validator.sh"
+          },
+          {
+            "type": "command",
+            "if": "Bash(backlog task create *)",
+            "command": ".claude/hooks/task-validator.sh"
+          }
+        ]
+      }
     ]
   }
 }

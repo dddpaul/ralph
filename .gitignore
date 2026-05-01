@@ -18,6 +18,8 @@ backlog/.ralph-heartbeat
 !.claude/settings.json
 !.claude/agents/
 !.claude/agents/**
+!.claude/hooks/
+!.claude/hooks/**
 
 # Node modules
 node_modules/

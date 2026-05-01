@@ -692,6 +692,7 @@ $PROMPT_BODY"
   # Retry loop for --on-error=retry
   retry_attempt=0
   while true; do
+    export RALPH_AUTONOMOUS=1
     if [[ "$TOOL" == "opencode" ]]; then
       timeout "$TIMEOUT_SEC" ${EXEC_PREFIX[@]:+"${EXEC_PREFIX[@]}"} opencode run "$PROMPT" 2>&1 | tee "$OUTFILE"
       EXIT_CODE=${PIPESTATUS[0]}
@@ -699,6 +700,7 @@ $PROMPT_BODY"
       timeout "$TIMEOUT_SEC" ${EXEC_PREFIX[@]:+"${EXEC_PREFIX[@]}"} claude --model "$MODEL" --effort "$EFFORT" --dangerously-skip-permissions --print <<< "$PROMPT" 2>&1 | tee "$OUTFILE"
       EXIT_CODE=${PIPESTATUS[0]}
     fi
+    unset RALPH_AUTONOMOUS
 
     # Check if iteration timed out (exit code 124 = timeout)
     ITER_FAILED=false
