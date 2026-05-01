@@ -55,14 +55,19 @@ Skip this check for `"completed"` and `"failed"` states.
 
 ## Step 2.5: Convert Timestamps to Europe/Moscow Time
 
-Before displaying any UTC timestamp from the JSON (e.g. `completed_at`), convert it to Europe/Moscow time using this portable Bash snippet:
+Before displaying any UTC timestamp from the JSON (e.g. `completed_at`), convert it to Europe/Moscow time using the helper script:
 
 ```bash
 utc_iso="<the UTC ISO 8601 value, e.g. 2026-05-01T08:50:16Z>"
-moscow_time=$(TZ=Europe/Moscow date -d "$utc_iso" "+%Y-%m-%d %H:%M:%S MSK" 2>/dev/null || TZ=Europe/Moscow date -j -f "%Y-%m-%dT%H:%M:%SZ" "$utc_iso" "+%Y-%m-%d %H:%M:%S MSK" 2>/dev/null)
+# Resolve helper: try ./skills/ first (project-local), then $HOME/.claude/skills/ (user-global)
+if [ -x "./skills/ralph-status/scripts/utc-to-moscow.sh" ]; then
+  moscow_time=$(bash ./skills/ralph-status/scripts/utc-to-moscow.sh "$utc_iso")
+elif [ -x "$HOME/.claude/skills/ralph-status/scripts/utc-to-moscow.sh" ]; then
+  moscow_time=$(bash "$HOME/.claude/skills/ralph-status/scripts/utc-to-moscow.sh" "$utc_iso")
+fi
 ```
 
-This tries GNU `date -d` first, then falls back to macOS BSD `date -j -f`. The result is a string like `2026-05-01 11:50:16 MSK`.
+The helper tries GNU `date -d` first, then falls back to macOS BSD `date -j -u -f` with explicit UTC parsing. The result is a string like `2026-05-01 11:50:16 MSK`.
 
 Apply this conversion to `completed_at` before displaying it in Step 3. Do NOT modify the JSON file — conversion is display-only.
 

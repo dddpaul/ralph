@@ -65,11 +65,15 @@ Apply these rules in order. The first rule that matches determines the output. O
 
 **Condition:** `state` is `"completed"` or `"failed"`
 
-**Timestamp conversion:** Before displaying `completed_at`, convert it from UTC to Europe/Moscow time using this portable Bash snippet:
+**Timestamp conversion:** Before displaying `completed_at`, convert it from UTC to Europe/Moscow time using the helper script:
 
 ```bash
 utc_iso="<completed_at value>"
-moscow_time=$(TZ=Europe/Moscow date -d "$utc_iso" "+%Y-%m-%d %H:%M:%S MSK" 2>/dev/null || TZ=Europe/Moscow date -j -f "%Y-%m-%dT%H:%M:%SZ" "$utc_iso" "+%Y-%m-%d %H:%M:%S MSK" 2>/dev/null)
+if [ -x "./skills/ralph-status/scripts/utc-to-moscow.sh" ]; then
+  moscow_time=$(bash ./skills/ralph-status/scripts/utc-to-moscow.sh "$utc_iso")
+elif [ -x "$HOME/.claude/skills/ralph-status/scripts/utc-to-moscow.sh" ]; then
+  moscow_time=$(bash "$HOME/.claude/skills/ralph-status/scripts/utc-to-moscow.sh" "$utc_iso")
+fi
 ```
 
 **Output:** Full status block (same format as `/ralph-status`):

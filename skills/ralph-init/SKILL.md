@@ -126,24 +126,26 @@ Read `templates/settings.json` → write to `.claude/settings.json` (project-wid
 Read `templates/settings.local.json` → write to `.claude/settings.local.json` (user permissions).
 Read `templates/task-reviewer.md` → write to `.claude/agents/task-reviewer.md` (code review agent).
 
-**After writing `settings.local.json`, merge narrow ralph-run script rules into `permissions.allow`:**
+**After writing `settings.local.json`, merge narrow script rules into `permissions.allow`:**
 
-Resolve the user's home directory at install time (use the shell's `$HOME`, NOT a literal `$HOME` or `~` — Claude Code permission patterns are literal-match). Add these two rules if not already present:
+Resolve the user's home directory at install time (use the shell's `$HOME`, NOT a literal `$HOME` or `~` — Claude Code permission patterns are literal-match). Add these rules if not already present:
 
 - `Bash(bash <RESOLVED_HOME>/.claude/skills/ralph-run/scripts/preflight.sh:*)`
 - `Bash(bash <RESOLVED_HOME>/.claude/skills/ralph-run/scripts/wait-heartbeat.sh:*)`
+- `Bash(bash <RESOLVED_HOME>/.claude/skills/ralph-status/scripts/utc-to-moscow.sh:*)`
 
 Use `jq` for the idempotent merge:
 ```bash
 RULE1="Bash(bash $HOME/.claude/skills/ralph-run/scripts/preflight.sh:*)"
 RULE2="Bash(bash $HOME/.claude/skills/ralph-run/scripts/wait-heartbeat.sh:*)"
-jq --arg r1 "$RULE1" --arg r2 "$RULE2" \
-  '.permissions.allow = ((.permissions.allow // []) + [$r1, $r2] | unique)' \
+RULE3="Bash(bash $HOME/.claude/skills/ralph-status/scripts/utc-to-moscow.sh:*)"
+jq --arg r1 "$RULE1" --arg r2 "$RULE2" --arg r3 "$RULE3" \
+  '.permissions.allow = ((.permissions.allow // []) + [$r1, $r2, $r3] | unique)' \
   .claude/settings.local.json > .claude/settings.local.json.tmp \
   && mv .claude/settings.local.json.tmp .claude/settings.local.json
 ```
 
-This ensures every project bootstrapped or upgraded with Ralph gets the narrow permission rules for the ralph-run scripts, avoiding over-broad `Bash(bash:*)` permissions.
+This ensures every project bootstrapped or upgraded with Ralph gets the narrow permission rules for the ralph-run and ralph-status scripts, avoiding over-broad `Bash(bash:*)` permissions.
 
 ### 3.8 `.obsidian/` config (only if project type is Documentation or Mixed)
 Copy Obsidian configuration from templates:
