@@ -1,9 +1,10 @@
 ---
 id: TASK-72
 title: Document ralph-run watch flag and new .ralph-status.json fields in README
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-05-01 08:47'
+updated_date: '2026-05-01 08:58'
 labels: []
 dependencies: []
 ---
@@ -48,9 +49,19 @@ This matters because the watch feature is the primary user-facing addition since
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 README CLI Options table includes watch row with default, accepted values, and behavior summary
-- [ ] #2 README Examples section has at least one /ralph-run watch=... example
-- [ ] #3 README Skills/Key Files section lists ralph-status-watch with one-line description
-- [ ] #4 README documents new .ralph-status.json fields: iteration_started_at, restructured errors[] shape, timeout_sec
-- [ ] #5 README notes the errors[] shape change is breaking for external consumers
+- [x] #1 README CLI Options table includes watch row with default, accepted values, and behavior summary
+- [x] #2 README Examples section has at least one /ralph-run watch=... example
+- [x] #3 README Skills/Key Files section lists ralph-status-watch with one-line description
+- [x] #4 README documents new .ralph-status.json fields: iteration_started_at, restructured errors[] shape, timeout_sec
+- [x] #5 README notes the errors[] shape change is breaking for external consumers
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan: 1) Add watch row to CLI Options table, 2) Add watch examples to Examples section, 3) Add ralph-status-watch to Key Files table, 4) Add .ralph-status.json fields documentation section, 5) Note breaking change for errors[]
+
+Commit: `71f565f` - task-72: Document watch flag, ralph-status-watch skill, and .ralph-status.json fields in README
+
+All 5 ACs met. README updated with watch parameter docs, ralph-status-watch skill entry, .ralph-status.json schema, and breaking change notice for errors[] field.
+<!-- SECTION:NOTES:END -->
