@@ -56,7 +56,7 @@ fi
 
 # 4. No identical AC strings after normalization
 if [[ "$AC_COUNT" -gt 1 ]]; then
-  NORMALIZED_ACS=$(echo "$AC_LINES" | sed 's/^\s*- \[(x| )\]\s*//' | sed 's/^#[0-9]* //' | tr '[:upper:]' '[:lower:]' | sed 's/[[:space:]]\+/ /g' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+  NORMALIZED_ACS=$(echo "$AC_LINES" | sed 's/^[[:space:]]*- \[(x| )\][[:space:]]*//' | sed 's/^#[0-9]* //' | tr '[:upper:]' '[:lower:]' | sed 's/[[:space:]]\+/ /g' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
   UNIQUE_COUNT=$(echo "$NORMALIZED_ACS" | sort -u | grep -c '.' 2>/dev/null || echo "0")
   TOTAL_COUNT=$(echo "$NORMALIZED_ACS" | grep -c '.' 2>/dev/null || echo "0")
   if [[ "$UNIQUE_COUNT" -lt "$TOTAL_COUNT" ]]; then
@@ -65,7 +65,7 @@ if [[ "$AC_COUNT" -gt 1 ]]; then
 fi
 
 # 5. Status Done consistent with all AC checked (and vice versa)
-STATUS=$(echo "$TASK_CONTENT" | grep -oE 'status:\s*\S+' | head -1 | sed 's/status:\s*//')
+STATUS=$(echo "$TASK_CONTENT" | grep -E '^status:' | head -1 | sed 's/^status:[[:space:]]*//')
 if [[ -z "$STATUS" ]]; then
   STATUS=$(echo "$TASK_CONTENT" | grep -E '^Status:' | head -1 | sed 's/^Status:[[:space:]]*//' | sed 's/^[^[:alpha:]]*//')
 fi
@@ -90,7 +90,7 @@ if [[ "$ANY_AC" == true ]]; then
 fi
 
 # 6. Dependencies resolve to existing task IDs
-DEPS=$(echo "$TASK_CONTENT" | grep -E '^dependencies:' | sed 's/^dependencies:\s*//' | tr ',' '\n' | grep -oE '[0-9]+' || true)
+DEPS=$(echo "$TASK_CONTENT" | grep -E '^dependencies:' | sed 's/^dependencies:[[:space:]]*//' | tr ',' '\n' | grep -oE '[0-9]+' || true)
 for dep_id in $DEPS; do
   DEP_FILE=$(find backlog/tasks -maxdepth 1 -name "task-${dep_id} -*" -o -name "task-${dep_id}-*" 2>/dev/null | head -1)
   if [[ -z "$DEP_FILE" ]] || [[ ! -f "$DEP_FILE" ]]; then
