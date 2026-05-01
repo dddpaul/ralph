@@ -28,4 +28,6 @@ Fresh-init projects prompt for permission on the timestamp conversion command fr
 
 <!-- SECTION:NOTES:BEGIN -->
 Added Bash(TZ=Europe/Moscow date:*) to template allow list. Single rule covers both fallback branches (GNU date -d and BSD date -j -f) since both share the prefix 'TZ=Europe/Moscow date'.
+
+Commit: `4c8b800` - task-80: Add TZ=Europe/Moscow date permission to settings.local.json template
 <!-- SECTION:NOTES:END -->
