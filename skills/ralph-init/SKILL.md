@@ -126,6 +126,25 @@ Read `templates/settings.json` → write to `.claude/settings.json` (project-wid
 Read `templates/settings.local.json` → write to `.claude/settings.local.json` (user permissions).
 Read `templates/task-reviewer.md` → write to `.claude/agents/task-reviewer.md` (code review agent).
 
+**After writing `settings.local.json`, merge narrow ralph-run script rules into `permissions.allow`:**
+
+Resolve the user's home directory at install time (use the shell's `$HOME`, NOT a literal `$HOME` or `~` — Claude Code permission patterns are literal-match). Add these two rules if not already present:
+
+- `Bash(bash <RESOLVED_HOME>/.claude/skills/ralph-run/scripts/preflight.sh:*)`
+- `Bash(bash <RESOLVED_HOME>/.claude/skills/ralph-run/scripts/wait-heartbeat.sh:*)`
+
+Use `jq` for the idempotent merge:
+```bash
+RULE1="Bash(bash $HOME/.claude/skills/ralph-run/scripts/preflight.sh:*)"
+RULE2="Bash(bash $HOME/.claude/skills/ralph-run/scripts/wait-heartbeat.sh:*)"
+jq --arg r1 "$RULE1" --arg r2 "$RULE2" \
+  '.permissions.allow = ((.permissions.allow // []) + [$r1, $r2] | unique)' \
+  .claude/settings.local.json > .claude/settings.local.json.tmp \
+  && mv .claude/settings.local.json.tmp .claude/settings.local.json
+```
+
+This ensures every project bootstrapped or upgraded with Ralph gets the narrow permission rules for the ralph-run scripts, avoiding over-broad `Bash(bash:*)` permissions.
+
 ### 3.8 `.obsidian/` config (only if project type is Documentation or Mixed)
 Copy Obsidian configuration from templates:
 
@@ -279,7 +298,7 @@ For each file the user approved:
 - **`.git/hooks/post-commit`**: overwrite from `templates/post-commit`, then `chmod +x`.
 - **`.git/hooks/commit-msg`**: overwrite from `templates/commit-msg`, then `chmod +x`.
 - **`.claude/settings.json`**: overwrite from `templates/settings.json`.
-- **`.claude/settings.local.json`**: overwrite from `templates/settings.local.json`.
+- **`.claude/settings.local.json`**: overwrite from `templates/settings.local.json`. Then run the same narrow-rule merge as Step 3.7 (resolve `$HOME`, add `preflight.sh` and `wait-heartbeat.sh` rules via `jq`, idempotent).
 - **`.devcontainer/devcontainer.json`**: overwrite from `templates/devcontainer.json`.
 - **`.devcontainer/init-firewall.sh`**: overwrite from `templates/init-firewall.sh`, then `chmod +x`.
 - **`CLAUDE.md` (special merge)**:

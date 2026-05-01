@@ -108,21 +108,15 @@ nohup $RALPH_CMD > "$LAUNCH_LOG" 2>&1 & disown
 RALPH_PID=$!
 ```
 
-Wait for the heartbeat file to appear (up to 10 seconds), then verify freshness:
-
-Wait up to 10 seconds for the heartbeat file to appear, then check freshness using `stat`:
+Wait for the heartbeat file to appear using the `wait-heartbeat.sh` script (`scripts/wait-heartbeat.sh` in the directory next to this SKILL.md):
 
 ```bash
-stat -f %m backlog/.ralph-heartbeat 2>/dev/null || stat -c %Y backlog/.ralph-heartbeat 2>/dev/null
+bash <absolute-path-to-scripts/wait-heartbeat.sh>
 ```
 
-Compare the returned epoch with `date +%s`. If age < 15s, launch succeeded. If no heartbeat after 10s, launch failed.
+The script polls 10×1s for a fresh heartbeat (age < 15s). On success it prints `OK heartbeat age=...`, removes the launch log, and exits 0. On failure it prints `FAIL` with tails of both logs and exits 1.
 
-On successful launch, remove the launch log (it only has diagnostic value on failure):
-
-```bash
-rm -f "$LAUNCH_LOG"
-```
+Relay the script's stdout verbatim. Use the exit code: 0 → proceed to Step 5 success report; 1 → proceed to Step 5 failure report; 2 → script invocation error (e.g. not run from project root).
 
 ---
 
