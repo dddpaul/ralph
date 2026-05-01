@@ -1,11 +1,11 @@
 ---
 name: ralph-status-watch
-description: "Internal skill invoked by /loop to monitor Ralph progress. Reads .ralph-status.json + heartbeat, detects events, and terminates the loop on completion. Not user-facing — triggered only via /loop from ralph-run."
+description: "Internal skill for monitoring Ralph progress. Reads .ralph-status.json + heartbeat, detects events, and terminates the loop on completion. Initially scheduled by ralph-run via ScheduleWakeup; subsequent ticks are self-paced."
 ---
 
 # Ralph Status Watch (internal)
 
-Monitor a running Ralph agent and surface interesting events. Invoked by `/loop` only — not directly user-facing.
+Monitor a running Ralph agent and surface interesting events. Initially invoked by `ralph-run` via `ScheduleWakeup`; subsequent ticks are self-paced via the skill's own `ScheduleWakeup` chain. Not directly user-facing.
 
 ---
 
@@ -159,4 +159,4 @@ If no terminal flag was set and the safety cap has not been reached, call `Sched
 - `reason`: `"ralph-status-watch: polling Ralph (iteration <iteration>, state=<state>)"`
 - `prompt`: `/ralph-status-watch interval=<original interval arg> tick_count=<tick_count + 1>`
 
-The `tick_count` is incremented by 1 each tick, enabling the safety cap (Step 4) to terminate the loop after 24 ticks. This self-tracking approach works in dynamic `/loop` mode where the skill controls its own pacing via `ScheduleWakeup`.
+The `tick_count` is incremented by 1 each tick, enabling the safety cap (Step 4) to terminate the loop after 24 ticks. The skill controls its own pacing via `ScheduleWakeup`, with the first tick scheduled by `ralph-run`.

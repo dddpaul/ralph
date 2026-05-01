@@ -125,7 +125,7 @@ Default is 10 iterations. Use `--tool claude` (default) or `--tool opencode` to 
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `watch` | Auto-monitor Ralph after launch. Accepts `true` (= `5m`), `false`, or a duration like `30s`, `5m`, `1h`. Invokes `/loop` in dynamic mode to poll status and surface interesting events (failed iteration, stuck, crashed, finished). | none (no monitoring) |
+| `watch` | Auto-monitor Ralph after launch. Accepts `true` (= `5m`), `false`, or a duration like `30s`, `5m`, `1h`. Schedules a self-paced status-watch loop via `ScheduleWakeup` to poll status and surface interesting events (failed iteration, stuck, crashed, finished). | none (no monitoring) |
 
 **Strategies:**
 
@@ -187,7 +187,7 @@ The same workflow (branch, implement, review, merge) applies in both modes.
 | `skills/ralph-backlog/` | Skill for converting PRDs to backlog tasks |
 | `skills/ralph-run/` | Skill for launching Ralph in the background from an interactive session |
 | `skills/ralph-status/` | Skill for checking Ralph agent progress |
-| `skills/ralph-status-watch/` | Internal skill for auto-monitoring Ralph via `/loop` (used by `watch` parameter) |
+| `skills/ralph-status-watch/` | Internal skill for auto-monitoring Ralph via `ScheduleWakeup` (used by `watch` parameter) |
 | `skills/ralph-stop/` | Skill for stopping a running Ralph agent |
 | `flowchart/` | Interactive visualization of how Ralph works |
 

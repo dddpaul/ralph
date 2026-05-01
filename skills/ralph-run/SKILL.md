@@ -138,15 +138,20 @@ Ralph launched (PID <pid>, tool=<tool>, effort=<effort>, timeout=<timeout>m, max
 Hint: pass watch=5m to /ralph-run for automatic progress alerts.
 ```
 
-**If `watch` is set (e.g. `5m`):** output the launch line AND immediately invoke the `/loop` skill to start a dynamic-mode loop for automatic monitoring:
+**If `watch` is set (e.g. `5m`):** output the launch line AND schedule the first watch tick directly via `ScheduleWakeup`:
 
 ```
 Ralph launched (PID <pid>, tool=<tool>, effort=<effort>, timeout=<timeout>m, max=<max_iterations>, devcontainer=<true|false>). Watching every <watch>.
 ```
 
-Then invoke: `/loop /ralph-status-watch interval=<watch>`
+Convert the `watch` duration to seconds using the same regex parser from Step 1 (e.g. `2m` → 120, `5m` → 300, `1h` → 3600).
 
-This starts a dynamic-mode loop (no positional interval to `/loop`) where the watch skill self-paces via `ScheduleWakeup` at the configured interval. Dynamic mode allows the loop to terminate naturally when the watch skill detects a terminal event and omits the `ScheduleWakeup` call.
+Then call `ScheduleWakeup` with:
+- `delaySeconds`: the parsed interval in seconds
+- `reason`: `"ralph-status-watch first tick (interval=<watch>)"`
+- `prompt`: `/ralph-status-watch interval=<watch>`
+
+Do NOT invoke `/loop`. Subsequent ticks are self-paced by the watch skill via its own `ScheduleWakeup` chain (see ralph-status-watch SKILL.md Step 5).
 
 On failure (process died immediately), output diagnostics from both logs:
 
