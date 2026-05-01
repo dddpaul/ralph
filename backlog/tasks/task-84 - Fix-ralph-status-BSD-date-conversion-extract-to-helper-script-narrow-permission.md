@@ -3,9 +3,10 @@ id: TASK-84
 title: >-
   Fix ralph-status BSD date conversion + extract to helper script (narrow
   permission)
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-05-01 18:02'
+updated_date: '2026-05-01 18:13'
 labels:
   - skills
   - ralph-status
@@ -74,16 +75,26 @@ Out of scope: full audit of TZ-handling correctness in other skills; only ralph-
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 skills/ralph-status/scripts/utc-to-moscow.sh exists, is executable, and accepts one ISO-8601 UTC argument
-- [ ] #2 Helper script tries GNU 'date -d' first and falls back to BSD 'date -j -u -f' with explicit UTC parsing; both branches output a single line in the form 'YYYY-MM-DD HH:MM:SS MSK'
-- [ ] #3 Helper script returns exit 1 with a stderr error message if neither branch can parse the input
-- [ ] #4 skills/ralph-status/SKILL.md Step 2.5 is updated to call the helper script (no inline TZ=Europe/Moscow date commands left in this step)
-- [ ] #5 skills/ralph-status-watch/SKILL.md (Rule e) is updated to call the helper script the same way
-- [ ] #6 skills/ralph-init/templates/settings.local.json contains the $HOME-resolved narrow rule for the helper, merged in by ralph-init Section 3.7 alongside preflight.sh and wait-heartbeat.sh (same pattern)
-- [ ] #7 ralph-init Section 3.7 merge step is extended to add the new utc-to-moscow.sh rule
-- [ ] #8 If 'Bash(TZ=Europe/Moscow date:*)' is no longer needed (i.e. no other callsite uses the inline form), it is removed from skills/ralph-init/templates/settings.local.json
-- [ ] #9 Project-level mirror: skills/ralph-status/scripts/utc-to-moscow.sh and SKILL.md updates also land in ~/.claude/skills/ralph-status/ (and ralph-status-watch) so the loaded skills run the helper without further sync
-- [ ] #10 Project .claude/settings.local.json is updated with the $HOME-resolved narrow rule for the helper
-- [ ] #11 Manual smoke test: on a non-UTC host, run ./scripts/utc-to-moscow.sh '2026-05-01T17:40:53Z' and confirm output is '2026-05-01 20:40:53 MSK' (UTC+3 fixed offset)
+- [x] #1 skills/ralph-status/scripts/utc-to-moscow.sh exists, is executable, and accepts one ISO-8601 UTC argument
+- [x] #2 Helper script tries GNU 'date -d' first and falls back to BSD 'date -j -u -f' with explicit UTC parsing; both branches output a single line in the form 'YYYY-MM-DD HH:MM:SS MSK'
+- [x] #3 Helper script returns exit 1 with a stderr error message if neither branch can parse the input
+- [x] #4 skills/ralph-status/SKILL.md Step 2.5 is updated to call the helper script (no inline TZ=Europe/Moscow date commands left in this step)
+- [x] #5 skills/ralph-status-watch/SKILL.md (Rule e) is updated to call the helper script the same way
+- [x] #6 skills/ralph-init/templates/settings.local.json contains the $HOME-resolved narrow rule for the helper, merged in by ralph-init Section 3.7 alongside preflight.sh and wait-heartbeat.sh (same pattern)
+- [x] #7 ralph-init Section 3.7 merge step is extended to add the new utc-to-moscow.sh rule
+- [x] #8 If 'Bash(TZ=Europe/Moscow date:*)' is no longer needed (i.e. no other callsite uses the inline form), it is removed from skills/ralph-init/templates/settings.local.json
+- [x] #9 Project-level mirror: skills/ralph-status/scripts/utc-to-moscow.sh and SKILL.md updates also land in ~/.claude/skills/ralph-status/ (and ralph-status-watch) so the loaded skills run the helper without further sync
+- [x] #10 Project .claude/settings.local.json is updated with the $HOME-resolved narrow rule for the helper
+- [x] #11 Manual smoke test: on a non-UTC host, run ./scripts/utc-to-moscow.sh '2026-05-01T17:40:53Z' and confirm output is '2026-05-01 20:40:53 MSK' (UTC+3 fixed offset)
 - [ ] #12 Manual smoke test: invoke /ralph-status against a finished run; the displayed completed_at line shows MSK without triggering a permission prompt
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Starting work: BSD date fix + helper script extraction
+
+Plan: A) Create utc-to-moscow.sh helper, B) Update ralph-status SKILL.md Step 2.5, C) Update ralph-status-watch SKILL.md Rule e, D) Add narrow permission to settings.local.json template + merge step in ralph-init 3.7, E) Remove unused TZ=Europe/Moscow date rule, F) Mirror to user-global skills + project settings.local.json
+
+Commit: `fc7e624` - task-84: Extract utc-to-moscow.sh helper for portable BSD/GNU date conversion
+<!-- SECTION:NOTES:END -->
