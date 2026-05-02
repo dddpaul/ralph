@@ -50,4 +50,6 @@ Plan:
 6. Mark Done and merge.
 
 Refactored skills/ralph-init/templates/ from flat 27-file layout into 5 subfolders mirroring install destinations: root/, git-hooks/, claude/{agents,hooks}/, devcontainer/lang/, obsidian/ (untouched). All filenames preserved; all moves via git mv (similarity index 100%). SKILL.md updated: every templates/<file> reference rewritten in Step 3 (init) and U2/U4 (upgrade). Reviewer (subagent_type=task-reviewer) APPROVED — all 6 ACs satisfied.
+
+Commit: `90234a2` - task-89: Group ralph-init templates by install destination
 <!-- SECTION:NOTES:END -->
