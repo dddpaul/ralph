@@ -1,10 +1,10 @@
 ---
 id: TASK-86
 title: Fix two silent regex bugs in task-validator.sh
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-05-02 06:11'
-updated_date: '2026-05-02 06:48'
+updated_date: '2026-05-02 06:53'
 labels:
   - validator
   - bug
@@ -84,4 +84,8 @@ Apply the same fixes to skills/ralph-init/templates/task-validator.sh so future 
 
 <!-- SECTION:NOTES:BEGIN -->
 Plan: Fix Bug A (line 59) by adding -E flag to sed for ERE alternation. Fix Bug B (lines 165-167) by rewriting substantive-edit predicate so AC text additions/changes are classified as substantive, while checkbox-only flips are excluded. Apply same fixes to template. Verify with smoke tests.
+
+Commit: `26616ee` - task-86: Fix sed ERE bug and section-aware substantive-edit predicate
+
+Fixed Bug A (sed -E for ERE alternation) and Bug B (section-aware substantive-edit predicate using diff hunk line positions). All 10 ACs verified via smoke tests. Code review approved.
 <!-- SECTION:NOTES:END -->
