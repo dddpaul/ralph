@@ -1,6 +1,6 @@
 ---
 name: task-reviewer
-description: Use this agent to review changes on a task branch before merging to master. Reads the task's acceptance criteria, runs git diff master..HEAD, evaluates against an 8-item checklist plus optional custom rules from .claude/agents/task-reviewer-rules.md (project) or ~/.claude/agents/task-reviewer-rules.md (user-global), and returns APPROVED or CHANGES REQUESTED with line-level feedback. Triggers on: review task, review changes, review my changes, review the diff, code review for task, review before merge.
+description: Use this agent to review changes on a task branch before merging to master. Reads the task's acceptance criteria, runs git diff master..HEAD, evaluates against an 8-item checklist plus optional custom rules from .claude/task-reviewer-rules.md (project) or ~/.claude/task-reviewer-rules.md (user-global), and returns APPROVED or CHANGES REQUESTED with line-level feedback. Triggers on: review task, review changes, review my changes, review the diff, code review for task, review before merge.
 color: green
 ---
 
@@ -15,12 +15,12 @@ Before reviewing, load optional custom review rules. Project-level rules take pr
 ```bash
 CUSTOM_RULES=""
 CUSTOM_RULES_TIER=""
-if [ -s .claude/agents/task-reviewer-rules.md ]; then
-  CUSTOM_RULES="$(cat .claude/agents/task-reviewer-rules.md)"
-  CUSTOM_RULES_TIER="project (.claude/agents/task-reviewer-rules.md)"
-elif [ -s "$HOME/.claude/agents/task-reviewer-rules.md" ]; then
-  CUSTOM_RULES="$(cat "$HOME/.claude/agents/task-reviewer-rules.md")"
-  CUSTOM_RULES_TIER="user-global (~/.claude/agents/task-reviewer-rules.md)"
+if [ -s .claude/task-reviewer-rules.md ]; then
+  CUSTOM_RULES="$(cat .claude/task-reviewer-rules.md)"
+  CUSTOM_RULES_TIER="project (.claude/task-reviewer-rules.md)"
+elif [ -s "$HOME/.claude/task-reviewer-rules.md" ]; then
+  CUSTOM_RULES="$(cat "$HOME/.claude/task-reviewer-rules.md")"
+  CUSTOM_RULES_TIER="user-global (~/.claude/task-reviewer-rules.md)"
 fi
 ```
 

@@ -110,7 +110,7 @@ The Ralph project ships a template tree at `skills/ralph-init/templates/` that i
 
 Note on `CLAUDE.md`: the `## Project-Specific` section is intentionally project-local and is NOT part of the parity rule. Only the generic section above that heading is mirrored.
 
-**Excluded from parity (project-specific):** `.claude/agents/task-reviewer-rules.md` is project-specific content — each project bootstrapped via ralph-init writes its own rules from scratch (or starts without any). The loading mechanism in `task-reviewer.md` is templated; the rules content is not. Do NOT flag the absence of a template mirror for this file.
+**Excluded from parity (project-specific):** `.claude/task-reviewer-rules.md` is project-specific content — each project bootstrapped via ralph-init writes its own rules from scratch (or starts without any). The loading mechanism in `task-reviewer.md` is templated; the rules content is not. Do NOT flag the absence of a template mirror for this file.
 
 ## R12 — Markdown deliverables must be logically consistent
 

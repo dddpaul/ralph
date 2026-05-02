@@ -97,10 +97,11 @@ backlog/.ralph-heartbeat
 .DS_Store
 
 # Claude Code (ignore local overrides, track project config)
-.claude/
+.claude/*
 !.claude/settings.json
+!.claude/task-reviewer-rules.md
 !.claude/agents/
-!.claude/agents/**
+!.claude/hooks/
 ```
 Do NOT add `backlog/` — task files should be committed.
 
