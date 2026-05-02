@@ -3,10 +3,10 @@ id: TASK-91
 title: >-
   Move task-reviewer-rules.md to .claude/ root and fix .gitignore re-include
   patterns
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-05-02 17:56'
-updated_date: '2026-05-02 18:02'
+updated_date: '2026-05-02 18:04'
 labels:
   - agent
   - task-reviewer
@@ -61,4 +61,8 @@ Plan:
 7. Update R11 'Excluded from parity' note in the rules file to reference the new path.
 8. Spawn task-reviewer; verify it loads from .claude/task-reviewer-rules.md (smoke test).
 9. Mark Done, merge.
+
+Commit: `89495e2` - task-91: Move task-reviewer-rules to .claude/ root; fix gitignore
+
+Re-reviewed at commit 89495e2 — task-reviewer APPROVED. Custom rules loaded from new path (.claude/task-reviewer-rules.md) — smoke test passed (AC #5). All 5 ACs satisfied. Reviewer noted AC #5 substantively overlaps AC #2's empirical verification; both covered by the same evidence.
 <!-- SECTION:NOTES:END -->
