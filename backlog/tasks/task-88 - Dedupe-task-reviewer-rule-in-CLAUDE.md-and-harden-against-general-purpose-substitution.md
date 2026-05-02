@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-05-02 15:28'
-updated_date: '2026-05-02 15:38'
+updated_date: '2026-05-02 15:47'
 labels:
   - docs
   - workflow
@@ -45,11 +45,18 @@ Proposed step 4 wording:
 - [x] #2 The ### Code Review section under ## Rules is deleted in CLAUDE.md (the rule now lives only in lifecycle step 4)
 - [x] #3 skills/ralph-init/templates/CLAUDE.md receives the same edits in the same locations
 - [x] #4 Manual smoke check: grep -n task-reviewer CLAUDE.md returns exactly one location (lifecycle step 4 region) in both project and template CLAUDE.md
-- [ ] #5 task-reviewer agent is invoked on this task's diff and returns APPROVED before merge
+- [ ] #5 task-reviewer.md has YAML frontmatter (name: task-reviewer, description, color) so subagent_type=task-reviewer is registered as a valid Agent tool enum value in new Claude Code sessions
+- [ ] #6 Same frontmatter applied to skills/ralph-init/templates/task-reviewer.md and ~/.claude/agents/task-reviewer.md (user-global mirror)
+- [ ] #7 Smoke check: head -5 of all three task-reviewer.md files shows the same frontmatter block
+- [ ] #8 DEFERRED to next session: invoke subagent_type=task-reviewer on this task's diff and confirm APPROVED verdict; only then mark task Done and merge to master
 <!-- AC:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 Plan: 1) Rewrite lifecycle step 4 in CLAUDE.md (line 27). 2) Delete ### Code Review section (lines 60-61). 3) Mirror to skills/ralph-init/templates/CLAUDE.md. 4) Run task-reviewer. 5) Mark Done and merge.
+
+Commit: `da18437` - task-88: Dedupe task-reviewer rule in CLAUDE.md and template
+
+Discovery: task-reviewer.md previously had no frontmatter, so subagent_type=task-reviewer was not registered in Claude Code's Agent tool enum. The CLAUDE.md rule was unenforceable at the tool layer until this fix. Added frontmatter to project, template, and user-global. AC #5 (verify by invoking subagent_type=task-reviewer) is deferred to a fresh Claude Code session because the Agent tool's subagent_type enum is fixed at session start.
 <!-- SECTION:NOTES:END -->
