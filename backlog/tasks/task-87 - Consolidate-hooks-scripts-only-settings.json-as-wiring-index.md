@@ -1,9 +1,10 @@
 ---
 id: TASK-87
 title: 'Consolidate hooks: scripts only, settings.json as wiring index'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-05-02 06:33'
+updated_date: '2026-05-02 07:12'
 labels:
   - hook
   - refactor
@@ -41,16 +42,26 @@ Single approach: scripts only. Settings.json holds wiring (matcher, if:, command
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Every inline command: bash blob in .claude/settings.json is replaced with a path to a script in .claude/hooks/
-- [ ] #2 Each replacement reuses an existing script when one matches (commit-msg-guard.sh, commit-prefix-guard.sh, naming-guard.sh, notes-guard.sh, master-branch-guard.sh); new scripts are created only when no match exists
-- [ ] #3 Scripts no longer re-grep the command pattern that the if: clause already gates (defensive 'grep -qE ^X\\b || exit 0' lines removed)
-- [ ] #4 Each hook script in .claude/hooks/ begins with the standard header comment block (name, purpose, trigger, action, input)
-- [ ] #5 Any script in .claude/hooks/ not referenced from .claude/settings.json is deleted
-- [ ] #6 skills/ralph-init/templates/.claude/settings.json mirrors the project .claude/settings.json hooks section byte-for-byte (modulo path differences if any)
-- [ ] #7 skills/ralph-init/templates/.claude/hooks/ mirrors .claude/hooks/ (same files, same headers)
-- [ ] #8 Smoke test: git commit -m with a Co-Authored-By trailer is denied with the existing forbidden-trailer message
-- [ ] #9 Smoke test: backlog task edit N --notes 'x' is denied by notes-guard.sh; --append-notes 'x' is allowed
-- [ ] #10 Smoke test: git checkout -b task-99-тест is denied by naming-guard.sh; ASCII branch name is allowed
-- [ ] #11 Smoke test: backlog task edit N --append-notes 'x' triggers task-validator.sh PostToolUse output
-- [ ] #12 Smoke test: Edit tool on a non-.claude/ path while on master is denied; the same Edit on a task-* branch is allowed
+- [x] #1 Every inline command: bash blob in .claude/settings.json is replaced with a path to a script in .claude/hooks/
+- [x] #2 Each replacement reuses an existing script when one matches (commit-msg-guard.sh, commit-prefix-guard.sh, naming-guard.sh, notes-guard.sh, master-branch-guard.sh); new scripts are created only when no match exists
+- [x] #3 Scripts no longer re-grep the command pattern that the if: clause already gates (defensive 'grep -qE ^X\\b || exit 0' lines removed)
+- [x] #4 Each hook script in .claude/hooks/ begins with the standard header comment block (name, purpose, trigger, action, input)
+- [x] #5 Any script in .claude/hooks/ not referenced from .claude/settings.json is deleted
+- [x] #6 skills/ralph-init/templates/.claude/settings.json mirrors the project .claude/settings.json hooks section byte-for-byte (modulo path differences if any)
+- [x] #7 skills/ralph-init/templates/.claude/hooks/ mirrors .claude/hooks/ (same files, same headers)
+- [x] #8 Smoke test: git commit -m with a Co-Authored-By trailer is denied with the existing forbidden-trailer message
+- [x] #9 Smoke test: backlog task edit N --notes 'x' is denied by notes-guard.sh; --append-notes 'x' is allowed
+- [x] #10 Smoke test: git checkout -b task-99-тест is denied by naming-guard.sh; ASCII branch name is allowed
+- [x] #11 Smoke test: backlog task edit N --append-notes 'x' triggers task-validator.sh PostToolUse output
+- [x] #12 Smoke test: Edit tool on a non-.claude/ path while on master is denied; the same Edit on a task-* branch is allowed
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Starting work on TASK-87. Will consolidate inline bash blobs to script references.
+
+Commit: `5e96151` - task-87: Extract inline hook blobs to scripts, settings.json as wiring index
+
+Extracted all 7 inline bash blobs from settings.json into 5 dedicated scripts in .claude/hooks/. Removed re-grep guards per AC #3. Updated task-validator.sh header. Mirrored all scripts and settings.json to ralph-init templates. Updated SKILL.md with hooks deployment docs. Updated unit tests to run scripts directly (24/24 pass). Code review: approved.
+<!-- SECTION:NOTES:END -->
