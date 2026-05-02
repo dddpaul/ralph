@@ -3,10 +3,10 @@ id: TASK-88
 title: >-
   Dedupe task-reviewer rule in CLAUDE.md and harden against general-purpose
   substitution
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-05-02 15:28'
-updated_date: '2026-05-02 15:48'
+updated_date: '2026-05-02 16:15'
 labels:
   - docs
   - workflow
@@ -48,7 +48,7 @@ Proposed step 4 wording:
 - [x] #5 task-reviewer.md has YAML frontmatter (name: task-reviewer, description, color) so subagent_type=task-reviewer is registered as a valid Agent tool enum value in new Claude Code sessions
 - [x] #6 Same frontmatter applied to skills/ralph-init/templates/task-reviewer.md and ~/.claude/agents/task-reviewer.md (user-global mirror)
 - [x] #7 Smoke check: head -5 of all three task-reviewer.md files shows the same frontmatter block
-- [ ] #8 DEFERRED to next session: invoke subagent_type=task-reviewer on this task's diff and confirm APPROVED verdict; only then mark task Done and merge to master
+- [x] #8 DEFERRED to next session: invoke subagent_type=task-reviewer on this task's diff and confirm APPROVED verdict; only then mark task Done and merge to master
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -61,4 +61,6 @@ Commit: `da18437` - task-88: Dedupe task-reviewer rule in CLAUDE.md and template
 Discovery: task-reviewer.md previously had no frontmatter, so subagent_type=task-reviewer was not registered in Claude Code's Agent tool enum. The CLAUDE.md rule was unenforceable at the tool layer until this fix. Added frontmatter to project, template, and user-global. AC #5 (verify by invoking subagent_type=task-reviewer) is deferred to a fresh Claude Code session because the Agent tool's subagent_type enum is fixed at session start.
 
 Commit: `0ad7ad7` - task-88: Add YAML frontmatter to task-reviewer agent for subagent_type registration
+
+AC #8: Spawned subagent_type=task-reviewer in fresh session on git diff master..HEAD. Verdict: APPROVED. All 8 ACs and the 8-item review checklist pass. Frontmatter registration confirmed working — task-reviewer is now in the Agent tool enum at session start.
 <!-- SECTION:NOTES:END -->
