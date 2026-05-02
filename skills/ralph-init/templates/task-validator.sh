@@ -1,6 +1,8 @@
 #!/bin/bash
-# PostToolUse hook: validates backlog tasks after edit/create
-# Runs deterministic structural checks and optionally emits an LLM nudge.
+# task-validator.sh — Validate backlog task structure after edit/create
+# Trigger: Bash(backlog task edit *), Bash(backlog task create *)
+# Action: stdout diagnostics + system-reminder (PostToolUse)
+# Input: tool_input JSON on stdin
 
 set -uo pipefail
 
@@ -9,12 +11,6 @@ INPUT=$(cat)
 
 # Extract the command that was run
 CMD=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
-
-# Only process backlog task edit/create commands
-if ! echo "$CMD" | grep -qE '^backlog task (edit|create)\b'; then
-  exit 0
-fi
-
 # Extract task ID from command
 TASK_ID=$(echo "$CMD" | grep -oE '\btask (edit|create)[[:space:]]+([0-9]+)' | grep -oE '[0-9]+$')
 if [[ -z "$TASK_ID" ]]; then

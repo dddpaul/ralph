@@ -7,32 +7,32 @@
           {
             "type": "command",
             "if": "Bash(git commit *)",
-            "command": "cmd=$(jq -r '.tool_input.command'); echo \"$cmd\" | grep -qE '\\bgit commit\\b' || exit 0; if echo \"$cmd\" | grep -qiE 'Co-Authored-By|Generated with Claude Code' || echo \"$cmd\" | grep -qE '##[[:space:]]*Test [Pp]lan'; then echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"BLOCKED: forbidden trailer/heading. Remove Co-Authored-By, Generated-with, and Test plan sections.\"}}'; fi"
+            "command": ".claude/hooks/commit-msg-guard.sh"
           },
           {
             "type": "command",
             "if": "Bash(gh pr create *)",
-            "command": "cmd=$(jq -r '.tool_input.command'); echo \"$cmd\" | grep -qE '\\bgh pr create\\b' || exit 0; if echo \"$cmd\" | grep -qiE 'Co-Authored-By|Generated with Claude Code' || echo \"$cmd\" | grep -qE '##[[:space:]]*Test [Pp]lan'; then echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"BLOCKED: forbidden trailer/heading. Remove Co-Authored-By, Generated-with, and Test plan sections.\"}}'; fi"
+            "command": ".claude/hooks/commit-msg-guard.sh"
           },
           {
             "type": "command",
             "if": "Bash(backlog task edit *)",
-            "command": "cmd=$(jq -r '.tool_input.command'); echo \"$cmd\" | grep -qE '^backlog task edit\\b' || exit 0; if echo \"$cmd\" | grep -qE ' --notes([= ]|$)' && ! echo \"$cmd\" | grep -qE ' --append-notes'; then echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"BLOCKED: --notes overwrites the Notes section and destroys commit hashes. Use --append-notes instead.\"}}'; fi"
+            "command": ".claude/hooks/notes-guard.sh"
           },
           {
             "type": "command",
             "if": "Bash(backlog task create *)",
-            "command": "cmd=$(jq -r '.tool_input.command'); echo \"$cmd\" | grep -qE '^backlog task create\\b' || exit 0; title=$(echo \"$cmd\" | sed -n 's/^backlog task create[[:space:]]*\"\\([^\"]*\\)\".*/\\1/p'); if [ -z \"$title\" ]; then title=$(echo \"$cmd\" | sed -n \"s/^backlog task create[[:space:]]*'\\([^']*\\)'.*/\\1/p\"); fi; if [ -n \"$title\" ] && printf '%s' \"$title\" | LC_ALL=C grep -q '[^[:print:][:space:]]'; then echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"BLOCKED: title/branch must be ASCII English (filenames are derived from titles). Put translations in -d or --ac.\"}}'; fi"
+            "command": ".claude/hooks/naming-guard.sh"
           },
           {
             "type": "command",
             "if": "Bash(git checkout -b *)",
-            "command": "cmd=$(jq -r '.tool_input.command'); echo \"$cmd\" | grep -qE '^git checkout -b\\b' || exit 0; branch=$(echo \"$cmd\" | sed -n 's/^git checkout -b[[:space:]]*\\([^[:space:]]*\\).*/\\1/p'); if [ -n \"$branch\" ] && printf '%s' \"$branch\" | LC_ALL=C grep -q '[^[:print:][:space:]]'; then echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"BLOCKED: title/branch must be ASCII English (filenames are derived from titles). Put translations in -d or --ac.\"}}'; fi"
+            "command": ".claude/hooks/naming-guard.sh"
           },
           {
             "type": "command",
             "if": "Bash(git commit *)",
-            "command": "cmd=$(jq -r '.tool_input.command'); echo \"$cmd\" | grep -qE '^git commit\\b' || exit 0; branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown); case \"$branch\" in task-*) ;; *) exit 0;; esac; task_id=$(echo \"$branch\" | grep -oE '^task-[0-9]+' | sed 's/task-//'); msg=$(echo \"$cmd\" | sed -n 's/.*-m[[:space:]]*\"\\(.*\\)\".*/\\1/p'); if [ -z \"$msg\" ]; then msg=$(echo \"$cmd\" | sed -n \"s/.*-m[[:space:]]*'\\(.*\\)'.*/\\1/p\"); fi; if [ -z \"$msg\" ]; then msg=$(echo \"$cmd\" | sed -n '/cat <</{n;s/^[[:space:]]*//;p;q;}'); fi; if echo \"$msg\" | grep -qiE '^Merge branch'; then exit 0; fi; if ! echo \"$msg\" | grep -qE \"^task-${task_id}: \"; then printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"BLOCKED: commit message on task-%s branch must start with `task-%s: `.\"}}' \"$task_id\" \"$task_id\"; fi"
+            "command": ".claude/hooks/commit-prefix-guard.sh"
           }
         ]
       },
@@ -41,7 +41,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown); if [ \"$branch\" != \"master\" ]; then exit 0; fi; path=$(jq -r '.tool_input.file_path // empty'); case \"$path\" in */.claude/*|.claude/*) exit 0;; esac; if [ \"$(basename \"$path\")\" = \".gitignore\" ]; then exit 0; fi; echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"BLOCKED: no active task branch. Create a backlog task and `git checkout -b task-<id>-<desc> master` first.\"}}'"
+            "command": ".claude/hooks/master-branch-guard.sh"
           }
         ]
       }

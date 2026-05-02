@@ -121,8 +121,9 @@ Assemble the Dockerfile from base + language snippets, then write three files:
 - `templates/devcontainer.json` → `.devcontainer/devcontainer.json` — update app label and port if specified
 - `templates/init-firewall.sh` → `.devcontainer/init-firewall.sh`
 
-### 3.7 `.claude/settings.json`, `.claude/settings.local.json`, and `.claude/agents/task-reviewer.md`
+### 3.7 `.claude/settings.json`, `.claude/hooks/`, `.claude/settings.local.json`, and `.claude/agents/task-reviewer.md`
 Read `templates/settings.json` → write to `.claude/settings.json` (project-wide hooks).
+Read each `templates/*-guard.sh` and `templates/task-validator.sh` → write to `.claude/hooks/<name>.sh`. Make executable (`chmod +x`). Create `.claude/hooks/` directory if it does not exist.
 Read `templates/settings.local.json` → write to `.claude/settings.local.json` (user permissions).
 Read `templates/task-reviewer.md` → write to `.claude/agents/task-reviewer.md` (code review agent).
 
@@ -178,6 +179,7 @@ Files created:
   .gitignore            - Updated with Ralph entries
   backlog/              - Backlog initialized
   .claude/settings.json      - Claude Code hooks (project-wide)
+  .claude/hooks/             - Hook scripts referenced by settings.json
   .claude/settings.local.json - Claude Code permissions
   .claude/agents/task-reviewer.md - Code review agent
   .devcontainer/        - (if applicable) Sandboxed execution environment
@@ -245,11 +247,12 @@ Compare each managed file against its current template. Assign one status per fi
 3. **`.git/hooks/post-commit`** — exact content match against `templates/post-commit`
 4. **`.git/hooks/commit-msg`** — exact content match against `templates/commit-msg`
 5. **`.claude/settings.json`** — exact content match against `templates/settings.json`
-6. **`.claude/settings.local.json`** — exact content match against `templates/settings.local.json`
-7. **`.devcontainer/devcontainer.json`** — exact content match against `templates/devcontainer.json`. If `.devcontainer/` directory does not exist, status is **skipped**.
-8. **`.devcontainer/init-firewall.sh`** — exact content match against `templates/init-firewall.sh`. If `.devcontainer/` directory does not exist, status is **skipped**.
-9. **`.devcontainer/Dockerfile`** — always **skipped** (assembled from fragments, cannot diff meaningfully)
-10. **`.gitignore`** — always **skipped** (append-only logic in init flow)
+6. **`.claude/hooks/`** — each script in `templates/*-guard.sh` and `templates/task-validator.sh` must match `.claude/hooks/<name>.sh`
+7. **`.claude/settings.local.json`** — exact content match against `templates/settings.local.json`
+8. **`.devcontainer/devcontainer.json`** — exact content match against `templates/devcontainer.json`. If `.devcontainer/` directory does not exist, status is **skipped**.
+9. **`.devcontainer/init-firewall.sh`** — exact content match against `templates/init-firewall.sh`. If `.devcontainer/` directory does not exist, status is **skipped**.
+10. **`.devcontainer/Dockerfile`** — always **skipped** (assembled from fragments, cannot diff meaningfully)
+11. **`.gitignore`** — always **skipped** (append-only logic in init flow)
 
 ---
 
@@ -265,6 +268,7 @@ CLAUDE.md (generic section)       current
 .git/hooks/post-commit            outdated
 .git/hooks/commit-msg             outdated
 .claude/settings.json             current
+.claude/hooks/                    current
 .claude/settings.local.json       current
 .devcontainer/devcontainer.json   skipped (no .devcontainer/)
 .devcontainer/init-firewall.sh    skipped (no .devcontainer/)
@@ -300,6 +304,7 @@ For each file the user approved:
 - **`.git/hooks/post-commit`**: overwrite from `templates/post-commit`, then `chmod +x`.
 - **`.git/hooks/commit-msg`**: overwrite from `templates/commit-msg`, then `chmod +x`.
 - **`.claude/settings.json`**: overwrite from `templates/settings.json`.
+- **`.claude/hooks/`**: for each `templates/*-guard.sh` and `templates/task-validator.sh`, overwrite `.claude/hooks/<name>.sh`, then `chmod +x`. Create directory if needed.
 - **`.claude/settings.local.json`**: overwrite from `templates/settings.local.json`. Then run the same narrow-rule merge as Step 3.7 (resolve `$HOME`, add `preflight.sh` and `wait-heartbeat.sh` rules via `jq`, idempotent).
 - **`.devcontainer/devcontainer.json`**: overwrite from `templates/devcontainer.json`.
 - **`.devcontainer/init-firewall.sh`**: overwrite from `templates/init-firewall.sh`, then `chmod +x`.
@@ -327,6 +332,7 @@ Ralph upgrade complete!
   .git/hooks/post-commit            updated
   .git/hooks/commit-msg             updated
   .claude/settings.json             current
+  .claude/hooks/                    current
   .claude/settings.local.json       current
   .devcontainer/devcontainer.json   skipped (no .devcontainer/)
   .devcontainer/init-firewall.sh    skipped (no .devcontainer/)
