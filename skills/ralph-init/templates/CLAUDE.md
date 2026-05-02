@@ -24,7 +24,7 @@ Then run `backlog task list -s "To Do" --plain`: if none remain → reply `<prom
 1. **Gate:** verify a backlog task exists and is "In Progress" — create or update status first.
 2. **Plan:** read task, AC, and relevant code. Record plan: `backlog task edit <id> --append-notes "Plan: ..."`.
 3. **Implement:** write code, run build/linter/tests, check off AC with `backlog task edit <id> --check-ac <n>`.
-4. **Review:** after tests pass, spawn the `task-reviewer` agent on `git diff master..HEAD`.
+4. **Review:** after tests pass, spawn the `task-reviewer` agent (NOT `general-purpose` or any other) on `git diff master..HEAD`. Do not proceed to step 5 (Done) or step 6 (Merge) without an APPROVED verdict from the task-reviewer agent.
 5. **Done:** final build+lint+tests must pass. `backlog task edit <id> -s "Done" --append-notes "..."`.
 6. **Merge:** commit task file, `git checkout master && git merge <branch> && git branch -d <branch>`.
 
@@ -56,9 +56,6 @@ Every change needs a backlog task and a `task-*` branch — the master-branch ho
 - Update README.md after adding important functionality
 - Update nearby CLAUDE.md files with reusable patterns (API conventions, gotchas, dependencies — not task-specific details)
 - Add implementation notes to completed tasks via `--append-notes`
-
-### Code Review
-After tests pass, spawn the `task-reviewer` agent on `git diff master..HEAD`. Only merge after approval.
 
 ## Browser Testing
 
