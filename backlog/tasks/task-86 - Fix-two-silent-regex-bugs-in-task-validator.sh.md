@@ -1,9 +1,10 @@
 ---
 id: TASK-86
 title: Fix two silent regex bugs in task-validator.sh
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-05-02 06:11'
+updated_date: '2026-05-02 06:48'
 labels:
   - validator
   - bug
@@ -67,14 +68,20 @@ Apply the same fixes to skills/ralph-init/templates/task-validator.sh so future 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Line 59 normalization uses 'sed -E' (or escaped BRE) so the checkbox prefix is actually stripped from each AC line
-- [ ] #2 Manual smoke test: two identical AC strings on the same task produce 'Validator [det]: Duplicate acceptance criteria detected'
-- [ ] #3 Substantive-edit predicate (lines 165-167) no longer excludes '+- [ ] #N <text>' lines from the candidate diff
-- [ ] #4 The nonsense '[A-Z]' filter on SUBST_ADDED is removed
-- [ ] #5 Manual smoke test: 'backlog task edit N --ac "new criterion"' produces a 'Validator [llm]: task-N' system-reminder block
-- [ ] #6 Manual smoke test: 'backlog task edit N --check-ac 1' does NOT produce an LLM nudge (only checkbox state changed)
-- [ ] #7 Manual smoke test: 'backlog task edit N --append-notes "..."' does NOT produce an LLM nudge
-- [ ] #8 Manual smoke test: 'backlog task edit N -d "<new desc body>"' produces an LLM nudge
-- [ ] #9 Same fixes applied to skills/ralph-init/templates/task-validator.sh; templates and .claude/hooks/ remain in sync (diff -q clean)
-- [ ] #10 Manual smoke test from TASK-82 #12 now passes: introducing a contradicting AC produces an LLM-nudged contradiction flag in the next reply
+- [x] #1 Line 59 normalization uses 'sed -E' (or escaped BRE) so the checkbox prefix is actually stripped from each AC line
+- [x] #2 Manual smoke test: two identical AC strings on the same task produce 'Validator [det]: Duplicate acceptance criteria detected'
+- [x] #3 Substantive-edit predicate (lines 165-167) no longer excludes '+- [ ] #N <text>' lines from the candidate diff
+- [x] #4 The nonsense '[A-Z]' filter on SUBST_ADDED is removed
+- [x] #5 Manual smoke test: 'backlog task edit N --ac "new criterion"' produces a 'Validator [llm]: task-N' system-reminder block
+- [x] #6 Manual smoke test: 'backlog task edit N --check-ac 1' does NOT produce an LLM nudge (only checkbox state changed)
+- [x] #7 Manual smoke test: 'backlog task edit N --append-notes "..."' does NOT produce an LLM nudge
+- [x] #8 Manual smoke test: 'backlog task edit N -d "<new desc body>"' produces an LLM nudge
+- [x] #9 Same fixes applied to skills/ralph-init/templates/task-validator.sh; templates and .claude/hooks/ remain in sync (diff -q clean)
+- [x] #10 Manual smoke test from TASK-82 #12 now passes: introducing a contradicting AC produces an LLM-nudged contradiction flag in the next reply
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan: Fix Bug A (line 59) by adding -E flag to sed for ERE alternation. Fix Bug B (lines 165-167) by rewriting substantive-edit predicate so AC text additions/changes are classified as substantive, while checkbox-only flips are excluded. Apply same fixes to template. Verify with smoke tests.
+<!-- SECTION:NOTES:END -->

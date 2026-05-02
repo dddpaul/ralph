@@ -56,7 +56,8 @@ fi
 
 # 4. No identical AC strings after normalization
 if [[ "$AC_COUNT" -gt 1 ]]; then
-  NORMALIZED_ACS=$(echo "$AC_LINES" | sed 's/^[[:space:]]*- \[(x| )\][[:space:]]*//' | sed 's/^#[0-9]* //' | tr '[:upper:]' '[:lower:]' | sed 's/[[:space:]]\+/ /g' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+  # -E enables ERE so (x| ) is alternation, not literal
+  NORMALIZED_ACS=$(echo "$AC_LINES" | sed -E 's/^[[:space:]]*- \[(x| )\][[:space:]]*//' | sed 's/^#[0-9]* //' | tr '[:upper:]' '[:lower:]' | sed 's/[[:space:]]\+/ /g' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
   UNIQUE_COUNT=$(echo "$NORMALIZED_ACS" | sort -u | grep -c '.' 2>/dev/null || echo "0")
   TOTAL_COUNT=$(echo "$NORMALIZED_ACS" | grep -c '.' 2>/dev/null || echo "0")
   if [[ "$UNIQUE_COUNT" -lt "$TOTAL_COUNT" ]]; then
@@ -159,14 +160,62 @@ SUBSTANTIVE=false
 if echo "$CMD" | grep -qE '^backlog task create\b'; then
   SUBSTANTIVE=true
 else
-  ADDED_LINES=$(echo "$DIFF_OUTPUT" | grep '^+' | grep -v '^+++' || true)
-  REMOVED_LINES=$(echo "$DIFF_OUTPUT" | grep '^-' | grep -v '^---' || true)
+  # Find line range for description+AC sections in the task file
+  DESC_START=$(grep -nE '<!-- SECTION:description -->|^## Description' "$TASK_FILE" | head -1 | cut -d: -f1)
+  AC_END_LINE=$(grep -nE '<!-- AC:END -->|<!-- SECTION:dod -->|^## Definition of Done' "$TASK_FILE" | head -1 | cut -d: -f1)
+  DESC_START=${DESC_START:-0}
+  AC_END_LINE=${AC_END_LINE:-0}
 
-  SUBST_ADDED=$(echo "$ADDED_LINES" | grep -vE '^\+(status:|updated:|notes:|<!-- |[[:space:]]*$)' | grep -vE '^\+- \[(x| )\] #[0-9]+ [A-Z]' || true)
-  SUBST_REMOVED=$(echo "$REMOVED_LINES" | grep -vE '^\-(status:|updated:|notes:|<!-- |[[:space:]]*$)' | grep -vE '^\-- \[(x| )\] #[0-9]+ [A-Z]' || true)
-  AC_TEXT_CHANGED=$(echo "$DIFF_OUTPUT" | grep -E '^\+.*- \[(x| )\]' | grep -vE '^\+- \[(x| )\] #[0-9]+\s' || true)
+  # Parse diff hunks to extract changed lines within desc/AC range
+  SUBST_ADDED=""
+  SUBST_REMOVED=""
+  CUR_OLD=0
+  CUR_NEW=0
+  while IFS= read -r line; do
+    if [[ "$line" =~ ^@@\ -([0-9]+)(,[0-9]+)?\ \+([0-9]+)(,[0-9]+)?\ @@ ]]; then
+      CUR_OLD=${BASH_REMATCH[1]}
+      CUR_NEW=${BASH_REMATCH[3]}
+      continue
+    fi
+    [[ "$line" =~ ^(---|\+\+\+|diff) ]] && continue
+    if [[ "$line" == +* ]]; then
+      if [[ "$CUR_NEW" -ge "$DESC_START" ]] && [[ "$AC_END_LINE" -eq 0 || "$CUR_NEW" -le "$AC_END_LINE" ]]; then
+        SUBST_ADDED="${SUBST_ADDED}${line}"$'\n'
+      fi
+      CUR_NEW=$((CUR_NEW + 1))
+    elif [[ "$line" == -* ]]; then
+      if [[ "$CUR_OLD" -ge "$DESC_START" ]] && [[ "$AC_END_LINE" -eq 0 || "$CUR_OLD" -le "$AC_END_LINE" ]]; then
+        SUBST_REMOVED="${SUBST_REMOVED}${line}"$'\n'
+      fi
+      CUR_OLD=$((CUR_OLD + 1))
+    else
+      CUR_OLD=$((CUR_OLD + 1))
+      CUR_NEW=$((CUR_NEW + 1))
+    fi
+  done <<< "$DIFF_OUTPUT"
 
-  if [[ -n "$SUBST_ADDED" ]] || [[ -n "$SUBST_REMOVED" ]] || [[ -n "$AC_TEXT_CHANGED" ]]; then
+  # Further filter markers and blanks from substantive candidates
+  SUBST_ADDED=$(echo "$SUBST_ADDED" | grep -vE '^\+(<!-- |## |[[:space:]]*$)' || true)
+  SUBST_REMOVED=$(echo "$SUBST_REMOVED" | grep -vE '^\-(<!-- |## |[[:space:]]*$)' || true)
+
+  # Detect checkbox-only flips: if all remaining AC diffs have identical text
+  CHECKBOX_ONLY=false
+  if [[ -n "$SUBST_ADDED" ]] || [[ -n "$SUBST_REMOVED" ]]; then
+    NON_AC_ADDED=$(echo "$SUBST_ADDED" | grep -vE '^\+- \[(x| )\] #[0-9]+' || true)
+    NON_AC_REMOVED=$(echo "$SUBST_REMOVED" | grep -vE '^\-- \[(x| )\] #[0-9]+' || true)
+    AC_ADDED=$(echo "$SUBST_ADDED" | grep -E '^\+- \[(x| )\] #[0-9]+' || true)
+    AC_REMOVED=$(echo "$SUBST_REMOVED" | grep -E '^\-- \[(x| )\] #[0-9]+' || true)
+
+    if [[ -z "$NON_AC_ADDED" ]] && [[ -z "$NON_AC_REMOVED" ]] && [[ -n "$AC_ADDED" ]] && [[ -n "$AC_REMOVED" ]]; then
+      ADDED_TEXTS=$(echo "$AC_ADDED" | sed -E 's/^\+- \[(x| )\] //' | sort)
+      REMOVED_TEXTS=$(echo "$AC_REMOVED" | sed -E 's/^-- \[(x| )\] //' | sort)
+      if [[ "$ADDED_TEXTS" == "$REMOVED_TEXTS" ]]; then
+        CHECKBOX_ONLY=true
+      fi
+    fi
+  fi
+
+  if [[ "$CHECKBOX_ONLY" == false ]] && { [[ -n "$SUBST_ADDED" ]] || [[ -n "$SUBST_REMOVED" ]]; }; then
     SUBSTANTIVE=true
   fi
 fi
