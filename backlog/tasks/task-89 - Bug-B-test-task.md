@@ -18,7 +18,7 @@ Testing substantive edit predicate
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Use TypeScript for all new code
-- [ ] #2 Write unit tests
+- [x] #2 Write unit tests
 - [ ] #3 New contradicting criterion
 - [ ] #4 New contradicting criterion
 <!-- AC:END -->
