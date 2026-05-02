@@ -1,10 +1,10 @@
 ---
 id: TASK-90
 title: Add task-reviewer-rules.md with project-specific review rules
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-05-02 17:38'
-updated_date: '2026-05-02 17:49'
+updated_date: '2026-05-02 17:52'
 labels:
   - agent
   - task-reviewer
@@ -60,4 +60,8 @@ task-reviewer (subagent_type=task-reviewer) APPROVED on commit dca06a6. Custom r
 Note: encountered .gitignore bug — new files in .claude/agents/ are matched by the .claude/ exclusion despite negation patterns (line 17 of .gitignore). Existing tracked files unaffected. Used git add -f to bypass for this commit; follow-up TASK-91 will fix the gitignore properly.
 
 Reopening: user feedback — task-reviewer-rules.md is project-specific content, NOT template content. Removing template mirror at skills/ralph-init/templates/claude/agents/task-reviewer-rules.md. AC #2 (template parity) retracted; rules R11 table updated to exclude the rules file from the parity list.
+
+Commit: `cb373e2` - task-90: Remove ralph-init template mirror; rules are project-specific
+
+Re-reviewed at commit cb373e2 — task-reviewer APPROVED. Scope reduction (removed template mirror) confirmed consistent with R11's new exclusion note. AC #2 retracted (project-specific content, not for templating); ACs #1, #3, #4 satisfied.
 <!-- SECTION:NOTES:END -->
