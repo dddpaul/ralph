@@ -1,0 +1,21 @@
+---
+id: TASK-89
+title: Bug B test task
+status: To Do
+assignee: []
+created_date: '2026-05-02 06:43'
+labels: []
+dependencies: []
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+Testing substantive edit predicate
+<!-- SECTION:DESCRIPTION:END -->
+
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 Use TypeScript for all new code
+- [ ] #2 Write unit tests
+<!-- AC:END -->
