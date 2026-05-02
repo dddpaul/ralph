@@ -101,7 +101,6 @@ The Ralph project ships a template tree at `skills/ralph-init/templates/` that i
 | `.claude/settings.local.json`          | `skills/ralph-init/templates/claude/settings.local.json`             |
 | `.claude/hooks/<name>.sh`              | `skills/ralph-init/templates/claude/hooks/<name>.sh`                 |
 | `.claude/agents/<name>.md`             | `skills/ralph-init/templates/claude/agents/<name>.md`                |
-| `.claude/agents/task-reviewer-rules.md`| `skills/ralph-init/templates/claude/agents/task-reviewer-rules.md`   |
 | `ralph.sh`                             | `skills/ralph-init/templates/root/ralph.sh`                          |
 | `CLAUDE.md` (generic section above `## Project-Specific`) | `skills/ralph-init/templates/root/CLAUDE.md` (same region) |
 | `.git/hooks/post-commit`               | `skills/ralph-init/templates/git-hooks/post-commit`                  |
@@ -110,6 +109,8 @@ The Ralph project ships a template tree at `skills/ralph-init/templates/` that i
 | `.devcontainer/init-firewall.sh`       | `skills/ralph-init/templates/devcontainer/init-firewall.sh`          |
 
 Note on `CLAUDE.md`: the `## Project-Specific` section is intentionally project-local and is NOT part of the parity rule. Only the generic section above that heading is mirrored.
+
+**Excluded from parity (project-specific):** `.claude/agents/task-reviewer-rules.md` is project-specific content — each project bootstrapped via ralph-init writes its own rules from scratch (or starts without any). The loading mechanism in `task-reviewer.md` is templated; the rules content is not. Do NOT flag the absence of a template mirror for this file.
 
 ## R12 — Markdown deliverables must be logically consistent
 

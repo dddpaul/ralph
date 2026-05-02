@@ -1,10 +1,10 @@
 ---
 id: TASK-90
 title: Add task-reviewer-rules.md with project-specific review rules
-status: Done
+status: In Progress
 assignee: []
 created_date: '2026-05-02 17:38'
-updated_date: '2026-05-02 17:47'
+updated_date: '2026-05-02 17:49'
 labels:
   - agent
   - task-reviewer
@@ -39,7 +39,7 @@ Tone: strict, prohibitive (MUST / MUST NOT). Project-level only. Mirror to skill
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Project rules file '.claude/agents/task-reviewer-rules.md' exists with all 12 rules in strict prohibitive tone
-- [x] #2 Template mirror 'skills/ralph-init/templates/claude/agents/task-reviewer-rules.md' has identical content (template parity per R11)
+- [ ] #2 Template mirror 'skills/ralph-init/templates/claude/agents/task-reviewer-rules.md' has identical content (template parity per R11)
 - [x] #3 Each rule has a one-line title and a body explaining what to flag and why
 - [x] #4 task-reviewer agent (subagent_type=task-reviewer) returns APPROVED on git diff master..HEAD AND reports 'Custom rules applied from project tier' at the top of the review (self-bootstrap test of TASK-81 loading mechanism)
 <!-- AC:END -->
@@ -58,4 +58,6 @@ Commit: `dca06a6` - task-90: Add task-reviewer-rules.md with 12 project review r
 task-reviewer (subagent_type=task-reviewer) APPROVED on commit dca06a6. Custom rules loading from project tier verified live in the review (smoke test for TASK-81 mechanism passed — agent reported all 12 loaded rule titles). Template parity byte-perfect (R11). All 4 ACs satisfied.
 
 Note: encountered .gitignore bug — new files in .claude/agents/ are matched by the .claude/ exclusion despite negation patterns (line 17 of .gitignore). Existing tracked files unaffected. Used git add -f to bypass for this commit; follow-up TASK-91 will fix the gitignore properly.
+
+Reopening: user feedback — task-reviewer-rules.md is project-specific content, NOT template content. Removing template mirror at skills/ralph-init/templates/claude/agents/task-reviewer-rules.md. AC #2 (template parity) retracted; rules R11 table updated to exclude the rules file from the parity list.
 <!-- SECTION:NOTES:END -->
