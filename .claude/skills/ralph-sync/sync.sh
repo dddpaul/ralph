@@ -76,9 +76,7 @@ do_classify() {
 
   if echo "$output" | grep -qE '^\[(new|updated)\]'; then
     has_changes=1
-  fi
-
-  if ! echo "$output" | grep -qE '^\[(new|updated)\]'; then
+  else
     echo ""
     echo "Already in sync."
   fi

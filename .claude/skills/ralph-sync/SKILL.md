@@ -14,10 +14,8 @@ Sync `agents/` and `skills/` from the Ralph repo to `~/.claude/agents/` and `~/.
 Run the sync script in classify mode to see what needs updating:
 
 ```bash
-bash {REPO_ROOT}/.claude/skills/ralph-sync/sync.sh classify
+bash "$(git rev-parse --show-toplevel)"/.claude/skills/ralph-sync/sync.sh classify
 ```
-
-Where `{REPO_ROOT}` is the absolute path to the current working directory (use `$PWD`).
 
 Capture the exit code:
 - Exit 0: everything is in sync. Output the result and **stop** (do not prompt).
@@ -47,11 +45,11 @@ Wait for the user's response:
 For each `[updated]` item in the classify output, run the diff mode:
 
 ```bash
-bash {REPO_ROOT}/.claude/skills/ralph-sync/sync.sh diff agent/<name>
-bash {REPO_ROOT}/.claude/skills/ralph-sync/sync.sh diff skill/<name>
+bash "$(git rev-parse --show-toplevel)"/.claude/skills/ralph-sync/sync.sh diff agent/<name>
+bash "$(git rev-parse --show-toplevel)"/.claude/skills/ralph-sync/sync.sh diff skill/<name>
 ```
 
-Display the diff output, then re-prompt with `Apply N updates? [y/N]`.
+Display the diff output, then re-prompt with `Apply N updates? [y/N]` (the `diff` option is not re-offered since diffs were just shown).
 
 ---
 
@@ -60,7 +58,7 @@ Display the diff output, then re-prompt with `Apply N updates? [y/N]`.
 Run the sync script in apply mode:
 
 ```bash
-bash {REPO_ROOT}/.claude/skills/ralph-sync/sync.sh apply
+bash "$(git rev-parse --show-toplevel)"/.claude/skills/ralph-sync/sync.sh apply
 ```
 
 Display the output. This is the ONE moment that requires sandbox-bypass approval (writing to `~/.claude/`).
