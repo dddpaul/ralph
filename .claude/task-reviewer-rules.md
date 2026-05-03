@@ -31,6 +31,8 @@ description: <one-line>    # used by Claude Code to route subagent_type
 
 Without frontmatter, `subagent_type=<name>` is never registered in the Agent enum and any caller silently falls back to `general-purpose`. The reviewer MUST reject any agent file lacking frontmatter, even if the rest of the prompt body is well-formed.
 
+**No exception applies for files being moved, renamed, or refactored** — `git mv` preserves content, and the post-move file is still an agent file under R3's scope. Task notes, commit messages, or design narrative claiming *"frontmatter added by user later"*, *"intentional omission"*, *"frontmatter optional in distribution form"*, or similar MUST NOT be accepted as exceptions. The frontmatter MUST be present in the post-diff file, period. (TASK-92 shipped without frontmatter behind the rationale "users add frontmatter when copying" — that is exactly the kind of post-hoc excuse this clause forbids.)
+
 ## R4 — Frontmatter changes do not take effect mid-session
 
 The Agent enum is fixed at session start. If the diff adds or modifies frontmatter under `agents/*.md`, `.claude/agents/*.md`, or `~/.claude/agents/*.md`, any AC of the form "verify the agent is callable as `subagent_type=...`" MUST be marked deferred to a fresh session in the task notes. The reviewer MUST NOT accept claims of mid-session verification for newly-registered subagent types.
@@ -123,3 +125,39 @@ For tasks whose deliverable is a markdown document (architecture docs, plans, sp
 - **Cross-reference resolution:** every "see X above," "as in section Y," or anchor-style reference MUST resolve to a real, present section.
 
 The reviewer MUST reject the diff if the markdown deliverable contradicts itself, leaves an AC untraceable, or contains unresolved gaps. Stylistic polish is out of scope; logical integrity is in scope.
+
+## R13 — Rationalization is not exemption
+
+The reviewer MUST apply rules R1–R14 strictly. Task description, implementation notes, commit messages, and design narrative MUST NOT be treated as overriding a rule violation. If the diff violates a rule, the diff is rejected — even when the implementer claims the violation is intentional, by design, or pre-approved.
+
+The following excuses are **automatically rejected** when invoked to justify a rule violation:
+
+- *"intentional per design"*
+- *"pre-existing, not a new change"* (a file being modified is in scope; staleness inherited from prior commits is the right thing to fix during the modification)
+- *"users will fix when copying"* / *"users add it manually later"*
+- *"not in scope for this task"* (if the diff touches the file, the file's compliance is in scope)
+- *"by convention"* / *"matches existing pattern"* (a violation propagated by prior commits is still a violation)
+- *"the prior reviewer accepted this"*
+
+The ONLY legitimate way to relax a rule is to amend `.claude/task-reviewer-rules.md` itself via a separate task with explicit user approval. Until the rules file changes, the rules apply as written.
+
+This rule exists because TASK-92 shipped two defects that the reviewer waved through after accepting Ralph's post-hoc rationalizations — both verbatim from the above list. Future reviewers MUST apply the rules first and read narrative second.
+
+## R14 — Content preservation during moves
+
+When a file is moved or renamed via `git mv`, its content MUST be preserved verbatim unless the task explicitly authorizes content changes in its description or acceptance criteria. The reviewer MUST verify rename diffs show `similarity index 100%` (or near-100% with the deviation explicitly authorized by an AC).
+
+Forbidden during a move (without explicit AC authorization):
+
+- Stripping frontmatter
+- Adding frontmatter
+- Updating import paths or `cat`/`source` references
+- Fixing typos
+- Reformatting whitespace
+- Renaming internal symbols
+- Updating cross-references in the file's body
+- Any other in-flight content edit "while we're at it"
+
+If both a move AND content changes are needed, the task SHOULD describe both in its description and ACs (e.g. "AC #N: agents/foo.md uses the new path X for the user-global fallback"). Otherwise, the move is one commit and the content change is a separate commit on the same branch — never bundled silently. The reviewer MUST reject any rename diff with content drift that is not explicitly authorized.
+
+This rule exists because TASK-92's `git mv .claude/agents/task-reviewer.md → agents/task-reviewer.md` silently stripped the frontmatter and left a stale path inside the file. A 100%-similarity move would have caught both.
