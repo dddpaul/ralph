@@ -14,7 +14,7 @@ Sync `agents/` and `skills/` from the Ralph repo to `~/.claude/agents/` and `~/.
 Run the sync script in classify mode to see what needs updating:
 
 ```bash
-bash "$(git rev-parse --show-toplevel)"/.claude/skills/ralph-sync/sync.sh classify
+bash .claude/skills/ralph-sync/sync.sh classify
 ```
 
 Capture the exit code:
@@ -45,8 +45,8 @@ Wait for the user's response:
 For each `[updated]` item in the classify output, run the diff mode:
 
 ```bash
-bash "$(git rev-parse --show-toplevel)"/.claude/skills/ralph-sync/sync.sh diff agent/<name>
-bash "$(git rev-parse --show-toplevel)"/.claude/skills/ralph-sync/sync.sh diff skill/<name>
+bash .claude/skills/ralph-sync/sync.sh diff agent/<name>
+bash .claude/skills/ralph-sync/sync.sh diff skill/<name>
 ```
 
 Display the diff output, then re-prompt with `Apply N updates? [y/N]` (the `diff` option is not re-offered since diffs were just shown).
@@ -58,7 +58,7 @@ Display the diff output, then re-prompt with `Apply N updates? [y/N]` (the `diff
 Run the sync script in apply mode:
 
 ```bash
-bash "$(git rev-parse --show-toplevel)"/.claude/skills/ralph-sync/sync.sh apply
+bash .claude/skills/ralph-sync/sync.sh apply
 ```
 
 Display the output. This is the ONE moment that requires sandbox-bypass approval (writing to `~/.claude/`).
@@ -76,3 +76,4 @@ Warning: Agent files were updated. Restart your Claude Code session for frontmat
 - **Orphans are never deleted** -- only reported. The user decides whether to manually remove them.
 - The classify and diff modes are read-only. Only the apply step writes to `~/.claude/`.
 - This skill is project-local to the Ralph repo (lives under `.claude/skills/`). It is NOT distributed via ralph-init.
+- Invocations use a relative path (`.claude/skills/ralph-sync/sync.sh`). This works because Claude Code's cwd equals the repo root when project-local skills load. Invoking from a subdirectory will fail; `cd` to the repo root first.
