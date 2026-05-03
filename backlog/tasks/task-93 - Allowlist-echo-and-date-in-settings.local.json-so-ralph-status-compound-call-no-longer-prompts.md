@@ -3,10 +3,10 @@ id: TASK-93
 title: >-
   Allowlist echo and date in settings.local.json so /ralph-status compound call
   no longer prompts
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-05-03 07:24'
-updated_date: '2026-05-03 07:25'
+updated_date: '2026-05-03 07:29'
 labels:
   - permissions
   - settings
@@ -34,7 +34,7 @@ Mirror to skills/ralph-init/templates/claude/settings.local.json per R11 (templa
 - [x] #1 Add 'Bash(echo:*)' and 'Bash(date:*)' to .claude/settings.local.json permissions.allow
 - [x] #2 Mirror the two entries to skills/ralph-init/templates/claude/settings.local.json (R11 template parity); diff -q on the two files post-edit shows them differing only in the non-permissions sections that already differed before (or being byte-identical if they were before)
 - [x] #3 Verify the SKILL's compound call would no longer prompt: with the new allowlist, all four components (stat, echo, date, backlog task list) match an allowlist entry
-- [ ] #4 task-reviewer (subagent_type=task-reviewer) returns APPROVED on git diff master..HEAD
+- [x] #4 task-reviewer (subagent_type=task-reviewer) returns APPROVED on git diff master..HEAD
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -43,4 +43,8 @@ Mirror to skills/ralph-init/templates/claude/settings.local.json per R11 (templa
 Added 'Bash(date:*)' and 'Bash(echo:*)' to both .claude/settings.local.json (project) and skills/ralph-init/templates/claude/settings.local.json (template). Compound /ralph-status call now matches all four components: Bash(stat:*), Bash(echo:*), Bash(date:*), Bash(backlog task list:*). 
 
 Scope-creep cleanup also done in same edit (project file only): removed redundant 'Bash(echo "exit=0")' literal-match (now covered by Bash(echo:*)) and dropped a stray trailing-comma JSON syntax issue. Template was clean already.
+
+Commit: `477f80c` - task-93: Allowlist echo and date so /ralph-status compound call doesn't prompt
+
+Re-reviewed at commit 477f80c — task-reviewer APPROVED. AC #1 satisfied out-of-band on Paul's gitignored project copy; AC #2 (template), AC #3 (compound coverage), AC #4 (review) verified in-diff.
 <!-- SECTION:NOTES:END -->
