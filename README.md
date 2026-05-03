@@ -30,7 +30,7 @@ cp -r skills/* ~/.claude/skills/
 
 Both are required. `ralph-init` aborts if `~/.claude/agents/task-reviewer.md` is missing.
 
-**Updating:** when you `git pull` new versions of `agents/` or `skills/`, re-run the copy commands above. `ralph-init` does not manage `~/.claude/` — the user owns that directory.
+**Updating:** after `git pull`, run `/ralph-sync` inside a Claude Code session in this repo. It shows what changed (new, updated, orphaned items) and applies updates with a single confirmation. Alternatively, re-run the copy commands above manually. `ralph-init` does not manage `~/.claude/` — the user owns that directory.
 
 ## Setup
 

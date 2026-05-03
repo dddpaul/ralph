@@ -113,6 +113,8 @@ Note on `CLAUDE.md`: the `## Project-Specific` section is intentionally project-
 
 **Excluded from parity (project-specific):** `.claude/task-reviewer-rules.md` is project-specific content — each project bootstrapped via ralph-init writes its own rules from scratch (or starts without any). The loading mechanism in the task-reviewer agent is templated; the rules content is not. Do NOT flag the absence of a template mirror for this file.
 
+**Excluded from parity (project-local skill):** `.claude/skills/ralph-sync/` is a project-local skill that only loads when Claude Code opens the Ralph repo. It syncs `agents/` and `skills/` to `~/.claude/` and is intrinsically Ralph-repo-specific — other projects don't have `agents/` or `skills/` to sync FROM. ralph-init does NOT template or mirror this skill. Do NOT flag the absence of a template for ralph-sync files.
+
 **Excluded from parity (user-global distribution):** files under `agents/` are user-global content distributed manually; the user copies them to `~/.claude/agents/`, the same way they copy `skills/*` to `~/.claude/skills/`. ralph-init does NOT mirror these into project-local `.claude/agents/` and there is NO template under `skills/ralph-init/templates/claude/agents/`. Do NOT flag the absence of a template mirror for agent files.
 
 ## R12 — Markdown deliverables must be logically consistent
