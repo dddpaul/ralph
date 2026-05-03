@@ -21,6 +21,8 @@
       "Bash(nohup ./ralph.sh:*)",
       "Bash(grep:*)",
       "Bash(stat:*)",
+      "Bash(date:*)",
+      "Bash(echo:*)",
       "Bash(command -v:*)",
       "Bash(bash -n:*)",
       "Bash(test:*)",
