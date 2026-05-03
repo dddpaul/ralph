@@ -3,10 +3,10 @@ id: TASK-94
 title: >-
   Fix TASK-92 defects: restore frontmatter to agents/task-reviewer.md and remove
   stale .claude/agents/ leftover
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-05-03 07:33'
-updated_date: '2026-05-03 07:49'
+updated_date: '2026-05-03 07:50'
 labels:
   - agent
   - bug-fix
@@ -37,5 +37,13 @@ After the fix, Paul should refresh user-global: 'cp agents/task-reviewer.md ~/.c
 - [x] #2 agents/task-reviewer.md user-global fallback path (line ~22 inside the bash resolver) reads '~/.claude/task-reviewer-rules.md' (NOT '~/.claude/agents/task-reviewer-rules.md')
 - [x] #3 On-disk .claude/agents/ directory is removed entirely (rm -rf) — no working-tree leftovers
 - [x] #4 Verify: 'git ls-files .claude/agents/' returns nothing; 'ls .claude/agents/' fails with No such directory; 'head -5 agents/task-reviewer.md' shows YAML frontmatter
-- [ ] #5 task-reviewer (subagent_type=task-reviewer) returns APPROVED on git diff master..HEAD
+- [x] #5 task-reviewer (subagent_type=task-reviewer) returns APPROVED on git diff master..HEAD
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Commit: `31cc533` - task-94: Restore frontmatter to agents/task-reviewer.md; remove .claude/agents leftover
+
+Re-reviewed at commit 31cc533 — task-reviewer APPROVED. Both TASK-92 defects fixed: frontmatter restored, stale rules path corrected, on-disk .claude/agents/ leftover removed.
+<!-- SECTION:NOTES:END -->
