@@ -17,7 +17,6 @@ backlog/.ralph-heartbeat
 .claude/*
 !.claude/settings.json
 !.claude/task-reviewer-rules.md
-!.claude/agents/
 !.claude/hooks/
 
 # Node modules

@@ -23,6 +23,16 @@ command -v backlog          # Must have backlog CLI
 If `backlog` is missing: `npm install -g backlog.md`
 If not a git repo: `git init -b master`
 
+```bash
+[ -s "$HOME/.claude/agents/task-reviewer.md" ] || {
+  echo "ERROR: ~/.claude/agents/task-reviewer.md missing. Copy it from the Ralph repo:"
+  echo "  cp <ralph-repo>/agents/task-reviewer.md ~/.claude/agents/"
+  exit 1
+}
+```
+
+If the user-global agent file is missing, print the error and **abort** — do NOT proceed to Step 2 or write any project files.
+
 ---
 
 ## Step 2: Clarifying Questions
@@ -100,7 +110,6 @@ backlog/.ralph-heartbeat
 .claude/*
 !.claude/settings.json
 !.claude/task-reviewer-rules.md
-!.claude/agents/
 !.claude/hooks/
 ```
 Do NOT add `backlog/` — task files should be committed.
@@ -122,11 +131,10 @@ Assemble the Dockerfile from base + language snippets, then write three files:
 - `templates/devcontainer/devcontainer.json` → `.devcontainer/devcontainer.json` — update app label and port if specified
 - `templates/devcontainer/init-firewall.sh` → `.devcontainer/init-firewall.sh`
 
-### 3.7 `.claude/settings.json`, `.claude/hooks/`, `.claude/settings.local.json`, and `.claude/agents/task-reviewer.md`
+### 3.7 `.claude/settings.json`, `.claude/hooks/`, and `.claude/settings.local.json`
 Read `templates/claude/settings.json` → write to `.claude/settings.json` (project-wide hooks).
 Read each `templates/claude/hooks/*-guard.sh` and `templates/claude/hooks/task-validator.sh` → write to `.claude/hooks/<name>.sh`. Make executable (`chmod +x`). Create `.claude/hooks/` directory if it does not exist.
 Read `templates/claude/settings.local.json` → write to `.claude/settings.local.json` (user permissions).
-Read `templates/claude/agents/task-reviewer.md` → write to `.claude/agents/task-reviewer.md` (code review agent).
 
 **After writing `settings.local.json`, merge narrow script rules into `permissions.allow`:**
 
@@ -182,7 +190,6 @@ Files created:
   .claude/settings.json      - Claude Code hooks (project-wide)
   .claude/hooks/             - Hook scripts referenced by settings.json
   .claude/settings.local.json - Claude Code permissions
-  .claude/agents/task-reviewer.md - Code review agent
   .devcontainer/        - (if applicable) Sandboxed execution environment
   .obsidian/            - (if Documentation/Mixed) Obsidian vault configuration
 

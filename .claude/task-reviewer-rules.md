@@ -1,6 +1,6 @@
 # task-reviewer Custom Rules
 
-These rules SUPPLEMENT the standard 8-item checklist in `.claude/agents/task-reviewer.md`. They do not replace it. Apply both. All rules use strict prohibitive language: violations are review failures, not suggestions.
+These rules SUPPLEMENT the standard 8-item checklist in the task-reviewer agent (`agents/task-reviewer.md` or `~/.claude/agents/task-reviewer.md`). They do not replace it. Apply both. All rules use strict prohibitive language: violations are review failures, not suggestions.
 
 ---
 
@@ -20,7 +20,7 @@ Silent unchecked ACs are a hard fail. The reviewer MUST cross-reference each AC 
 
 ## R3 — Agent files require valid YAML frontmatter
 
-Any change that creates or modifies a file under `.claude/agents/` (or its template mirror under `skills/ralph-init/templates/claude/agents/`) MUST include valid YAML frontmatter at the top of the file with at least:
+Any change that creates or modifies a file under `agents/` (top-level), `.claude/agents/` (project-local), or `~/.claude/agents/` (user-global) MUST include valid YAML frontmatter at the top of the file with at least:
 
 ```yaml
 ---
@@ -33,7 +33,7 @@ Without frontmatter, `subagent_type=<name>` is never registered in the Agent enu
 
 ## R4 — Frontmatter changes do not take effect mid-session
 
-The Agent enum is fixed at session start. If the diff adds or modifies frontmatter under `.claude/agents/*.md`, any AC of the form "verify the agent is callable as `subagent_type=...`" MUST be marked deferred to a fresh session in the task notes. The reviewer MUST NOT accept claims of mid-session verification for newly-registered subagent types.
+The Agent enum is fixed at session start. If the diff adds or modifies frontmatter under `agents/*.md`, `.claude/agents/*.md`, or `~/.claude/agents/*.md`, any AC of the form "verify the agent is callable as `subagent_type=...`" MUST be marked deferred to a fresh session in the task notes. The reviewer MUST NOT accept claims of mid-session verification for newly-registered subagent types.
 
 ## R5 — Shell scripts must work on both GNU and BSD tools
 
@@ -100,7 +100,6 @@ The Ralph project ships a template tree at `skills/ralph-init/templates/` that i
 | `.claude/settings.json`                | `skills/ralph-init/templates/claude/settings.json`                   |
 | `.claude/settings.local.json`          | `skills/ralph-init/templates/claude/settings.local.json`             |
 | `.claude/hooks/<name>.sh`              | `skills/ralph-init/templates/claude/hooks/<name>.sh`                 |
-| `.claude/agents/<name>.md`             | `skills/ralph-init/templates/claude/agents/<name>.md`                |
 | `ralph.sh`                             | `skills/ralph-init/templates/root/ralph.sh`                          |
 | `CLAUDE.md` (generic section above `## Project-Specific`) | `skills/ralph-init/templates/root/CLAUDE.md` (same region) |
 | `.git/hooks/post-commit`               | `skills/ralph-init/templates/git-hooks/post-commit`                  |
@@ -110,7 +109,9 @@ The Ralph project ships a template tree at `skills/ralph-init/templates/` that i
 
 Note on `CLAUDE.md`: the `## Project-Specific` section is intentionally project-local and is NOT part of the parity rule. Only the generic section above that heading is mirrored.
 
-**Excluded from parity (project-specific):** `.claude/task-reviewer-rules.md` is project-specific content — each project bootstrapped via ralph-init writes its own rules from scratch (or starts without any). The loading mechanism in `task-reviewer.md` is templated; the rules content is not. Do NOT flag the absence of a template mirror for this file.
+**Excluded from parity (project-specific):** `.claude/task-reviewer-rules.md` is project-specific content — each project bootstrapped via ralph-init writes its own rules from scratch (or starts without any). The loading mechanism in the task-reviewer agent is templated; the rules content is not. Do NOT flag the absence of a template mirror for this file.
+
+**Excluded from parity (user-global distribution):** files under `agents/` are user-global content distributed manually; the user copies them to `~/.claude/agents/`, the same way they copy `skills/*` to `~/.claude/skills/`. ralph-init does NOT mirror these into project-local `.claude/agents/` and there is NO template under `skills/ralph-init/templates/claude/agents/`. Do NOT flag the absence of a template mirror for agent files.
 
 ## R12 — Markdown deliverables must be logically consistent
 

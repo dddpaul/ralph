@@ -19,6 +19,19 @@ The original Ralph uses a single `prd.json` file with `jq` parsing, a shared `pr
 - A git repository for your project
 - For running tests: [bats-core](https://github.com/bats-core/bats-core) (`npm install` or see [bats-core installation](https://github.com/bats-core/bats-core#installation))
 
+## First-time setup
+
+Copy agents and skills to your Claude Code user-global config:
+
+```bash
+cp -r agents/* ~/.claude/agents/
+cp -r skills/* ~/.claude/skills/
+```
+
+Both are required. `ralph-init` aborts if `~/.claude/agents/task-reviewer.md` is missing.
+
+**Updating:** when you `git pull` new versions of `agents/` or `skills/`, re-run the copy commands above. `ralph-init` does not manage `~/.claude/` — the user owns that directory.
+
 ## Setup
 
 ### Option 1: Copy to your project
@@ -180,6 +193,7 @@ The same workflow (branch, implement, review, merge) applies in both modes.
 |------|---------|
 | `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool claude\|opencode` and `--devcontainer`) |
 | `CLAUDE.md` | Agent instructions for Claude Code (autonomous + interactive) |
+| `agents/` | User-global agents (copy to `~/.claude/agents/`) |
 | `backlog/` | Task files managed by backlog.md CLI |
 | `.devcontainer/` | DevContainer configuration with firewall for sandboxed execution |
 | `skills/ralph-init/` | Skill for bootstrapping Ralph in a new project |

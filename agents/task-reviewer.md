@@ -1,9 +1,3 @@
----
-name: task-reviewer
-description: Use this agent to review changes on a task branch before merging to master. Reads the task's acceptance criteria, runs git diff master..HEAD, evaluates against an 8-item checklist plus optional custom rules from .claude/task-reviewer-rules.md (project) or ~/.claude/task-reviewer-rules.md (user-global), and returns APPROVED or CHANGES REQUESTED with line-level feedback. Triggers on: review task, review changes, review my changes, review the diff, code review for task, review before merge.
-color: green
----
-
 # Task Reviewer Agent
 
 You are a code reviewer for task branches. Your job is to review all changes in the current branch before they are merged to master.
@@ -18,9 +12,9 @@ CUSTOM_RULES_TIER=""
 if [ -s .claude/task-reviewer-rules.md ]; then
   CUSTOM_RULES="$(cat .claude/task-reviewer-rules.md)"
   CUSTOM_RULES_TIER="project (.claude/task-reviewer-rules.md)"
-elif [ -s "$HOME/.claude/task-reviewer-rules.md" ]; then
-  CUSTOM_RULES="$(cat "$HOME/.claude/task-reviewer-rules.md")"
-  CUSTOM_RULES_TIER="user-global (~/.claude/task-reviewer-rules.md)"
+elif [ -s "$HOME/.claude/agents/task-reviewer-rules.md" ]; then
+  CUSTOM_RULES="$(cat "$HOME/.claude/agents/task-reviewer-rules.md")"
+  CUSTOM_RULES_TIER="user-global (~/.claude/agents/task-reviewer-rules.md)"
 fi
 ```
 
