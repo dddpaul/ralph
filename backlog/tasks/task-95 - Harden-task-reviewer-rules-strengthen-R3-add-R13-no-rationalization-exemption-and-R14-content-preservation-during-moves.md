@@ -3,10 +3,10 @@ id: TASK-95
 title: >-
   Harden task-reviewer-rules: strengthen R3, add R13 (no rationalization
   exemption) and R14 (content preservation during moves)
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-05-03 07:55'
-updated_date: '2026-05-03 07:56'
+updated_date: '2026-05-03 08:01'
 labels:
   - agent
   - task-reviewer
@@ -41,5 +41,13 @@ Full text: 'When a file is moved or renamed via git mv, its content MUST be pres
 - [x] #2 R13 (Rationalization is not exemption) added as a new section after R12, with the banned excuses list verbatim and the rule-amendment escape hatch documented
 - [x] #3 R14 (Content preservation during moves) added as a new section after R13, requiring similarity index ~100% on rename diffs unless an AC authorizes content changes
 - [x] #4 Standard 8-item checklist preamble in agents/task-reviewer.md remains unchanged (rules supplement; checklist still runs)
-- [ ] #5 task-reviewer agent (subagent_type=task-reviewer) returns APPROVED on git diff master..HEAD AND reports 'Custom rules applied from project tier' listing the new R13 and R14 in the loaded list (smoke test that the additions are loaded)
+- [x] #5 task-reviewer agent (subagent_type=task-reviewer) returns APPROVED on git diff master..HEAD AND reports 'Custom rules applied from project tier' listing the new R13 and R14 in the loaded list (smoke test that the additions are loaded)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Commit: `9e365b2` - task-95: Strengthen R3 + add R13 (no rationalization) and R14 (move integrity)
+
+Re-reviewed at commit 9e365b2 — task-reviewer APPROVED. Reviewer correctly applied R13 to itself: rationale in task description is allowed (justifies change); R13 only forbids narrative used to override a rule violation. Smoke test passed: review preamble explicitly listed R13 and R14 as loaded.
+<!-- SECTION:NOTES:END -->
