@@ -76,7 +76,17 @@ This starts the container automatically and executes Ralph inside the isolated e
 
 ## Workflow
 
-### 1. Create a PRD
+### 1. Brainstorm (recommended)
+
+For new projects or substantial features, start with the [brainstorm skill](https://github.com/umputun/cc-thingz/tree/master/plugins/brainstorm) to converge on architecture, integration boundaries, and scope before writing anything to disk:
+
+```
+/brainstorm <your feature description>
+```
+
+The dialogue produces a clear architectural decision and a list of components/flows that feed into Step 2. Skip this step for trivial changes where the design is obvious.
+
+### 2. Create a PRD
 
 Use the PRD skill to generate a detailed requirements document:
 
@@ -86,7 +96,7 @@ Load the ralph-prd skill and create a PRD for [your feature description]
 
 Answer the clarifying questions. The skill saves output to `tasks/prd-[feature-name].md`.
 
-### 2. Convert PRD to backlog tasks
+### 3. Convert PRD to backlog tasks
 
 Use the Ralph backlog skill to convert the markdown PRD to backlog tasks:
 
@@ -96,7 +106,7 @@ Load the ralph-backlog skill and convert tasks/prd-[feature-name].md to backlog 
 
 This creates individual backlog tasks with acceptance criteria, priorities, and dependencies.
 
-### 3. Run Ralph
+### 4. Run Ralph
 
 ```bash
 # Using Claude Code (default)
