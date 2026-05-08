@@ -84,7 +84,9 @@ For new projects or substantial features, start with the [brainstorm skill](http
 /brainstorm <your feature description>
 ```
 
-The dialogue produces a clear architectural decision and a list of components/flows that feed into Step 2. Skip this step for trivial changes where the design is obvious.
+The dialogue produces a clear architectural decision and a list of components/flows that feed into Step 2. After the dialogue, save conclusions to `design/<name>-brainstorm.md` (the project `brainstorm-rules.md` will propose this). Skip this step for trivial changes where the design is obvious.
+
+The `design/` folder is the canonical location for intent documents — brainstorms, PRDs, and reviews all live here.
 
 ### 2. Create a PRD
 
@@ -94,14 +96,14 @@ Use the PRD skill to generate a detailed requirements document:
 Load the ralph-prd skill and create a PRD for [your feature description]
 ```
 
-Answer the clarifying questions. The skill saves output to `tasks/prd-[feature-name].md`.
+Answer the clarifying questions. The skill saves output to `design/[feature-name]-prd.md`.
 
 ### 3. Convert PRD to backlog tasks
 
 Use the Ralph backlog skill to convert the markdown PRD to backlog tasks:
 
 ```
-Load the ralph-backlog skill and convert tasks/prd-[feature-name].md to backlog tasks
+Load the ralph-backlog skill and convert design/[feature-name]-prd.md to backlog tasks
 ```
 
 This creates individual backlog tasks with acceptance criteria, priorities, and dependencies.
@@ -187,6 +189,16 @@ Ralph will:
 9. Repeat until all tasks are done or max iterations reached
 
 Each iteration gets a `MODE: autonomous` prefix so the agent knows it's running in the Ralph loop vs interactive mode.
+
+### 5. Cumulative review (recommended)
+
+After Ralph completes the in-scope tasks, run the review skill to score the bundle of completed work against the upstream intent:
+
+```
+/ralph-review name=<feature-name>
+```
+
+The skill reads `design/<name>-prd.md` and `design/<name>-brainstorm.md`, evaluates the completed tasks against the original requirements, and writes a scored review to `design/<name>-review-<YYYY-MM-DD>.md`.
 
 ## Dual Mode: Autonomous + Interactive
 
