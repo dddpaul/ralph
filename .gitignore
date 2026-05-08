@@ -16,6 +16,7 @@ backlog/.ralph-heartbeat
 # Claude Code (ignore local overrides, track project config)
 .claude/*
 !.claude/settings.json
+!.claude/brainstorm-rules.md
 !.claude/task-reviewer-rules.md
 !.claude/hooks/
 !.claude/skills/
