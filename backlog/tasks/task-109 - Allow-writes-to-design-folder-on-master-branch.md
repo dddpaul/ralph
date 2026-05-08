@@ -1,10 +1,10 @@
 ---
 id: TASK-109
 title: Allow writes to design/ folder on master branch
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-05-08 21:15'
-updated_date: '2026-05-08 21:22'
+updated_date: '2026-05-08 21:24'
 labels: []
 dependencies: []
 priority: high
@@ -22,3 +22,11 @@ Master-branch-guard hook currently blocks all writes outside .claude/ and .gitig
 - [x] #2 Both .claude/hooks/master-branch-guard.sh and skills/ralph-init/templates/claude/hooks/master-branch-guard.sh updated identically (template parity)
 - [x] #3 Hook still blocks writes to other top-level paths on master (regression check: writing to README.md from master still denied)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Commit: `a3df2da` - task-109: Add design/ folder to master-branch-guard.sh exemption list (mirror in template copy)
+
+Hook updated to allow design/ folder writes on master. Both live and template copies updated identically (R11 parity). Reviewer APPROVED.
+<!-- SECTION:NOTES:END -->
