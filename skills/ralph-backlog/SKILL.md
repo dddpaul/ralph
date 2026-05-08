@@ -47,8 +47,11 @@ backlog task create "<title>" \
   --ac "<criterion1>" \
   --ac "<criterion2>" \
   --ac "Typecheck passes" \
+  -l "feature:<name>" \
   --priority <number>
 ```
+
+Where `<name>` is the feature slug derived from the PRD filename: strip the `design/` prefix and `-prd.md` suffix (e.g., `design/task-priority-prd.md` → `feature:task-priority`).
 
 For tasks with dependencies on earlier tasks:
 
@@ -58,6 +61,7 @@ backlog task create "<title>" \
   --ac "<criterion1>" \
   --ac "<criterion2>" \
   --ac "Typecheck passes" \
+  -l "feature:<name>" \
   --dep task-<id> \
   --priority <number>
 ```
@@ -143,9 +147,11 @@ Frontend tasks are NOT complete until visually verified. Ralph will use the dev-
 
 1. **Each user story becomes one backlog task**
 2. **English titles only**: Task titles passed to `backlog task create` must always be in **English** — the CLI derives filenames from the title. Descriptions (`-d`) and acceptance criteria (`--ac`) can be in any language.
-3. **Priority**: Based on dependency order, then document order
-4. **Dependencies**: Use `--dep task-<id>` for tasks that depend on earlier ones
-5. **Always add**: "Typecheck passes" to every task's acceptance criteria
+3. **PRD location**: PRDs live in `design/[feature-name]-prd.md` (suffix style)
+4. **Feature label**: Every task gets `-l "feature:<name>"` where `<name>` is derived from the PRD filename (strip `design/` prefix and `-prd.md` suffix)
+5. **Priority**: Based on dependency order, then document order
+6. **Dependencies**: Use `--dep task-<id>` for tasks that depend on earlier ones
+7. **Always add**: "Typecheck passes" to every task's acceptance criteria
 
 ---
 
@@ -170,7 +176,7 @@ Each is one focused change that can be completed and verified independently.
 
 ## Example
 
-**Input PRD: "Task Priority System"**
+**Input PRD: `design/task-priority-prd.md`**
 
 ```bash
 backlog task create "Add priority field to database" \
@@ -178,6 +184,7 @@ backlog task create "Add priority field to database" \
   --ac "Add priority column to tasks table" \
   --ac "Generate and run migration" \
   --ac "Typecheck passes" \
+  -l "feature:task-priority" \
   --priority 1
 
 backlog task create "Display priority indicator on task cards" \
@@ -186,6 +193,7 @@ backlog task create "Display priority indicator on task cards" \
   --ac "Priority visible without hovering" \
   --ac "Typecheck passes" \
   --ac "Verify in browser using dev-browser skill" \
+  -l "feature:task-priority" \
   --dep task-1 \
   --priority 2
 
@@ -196,6 +204,7 @@ backlog task create "Add priority selector to task edit" \
   --ac "Saves immediately on selection change" \
   --ac "Typecheck passes" \
   --ac "Verify in browser using dev-browser skill" \
+  -l "feature:task-priority" \
   --dep task-2 \
   --priority 3
 
@@ -206,6 +215,7 @@ backlog task create "Filter tasks by priority" \
   --ac "Empty state message when no tasks match filter" \
   --ac "Typecheck passes" \
   --ac "Verify in browser using dev-browser skill" \
+  -l "feature:task-priority" \
   --dep task-3 \
   --priority 4
 ```
