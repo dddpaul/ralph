@@ -1,10 +1,10 @@
 ---
 id: TASK-107
 title: Add ralph-init upgrade migration prompt for legacy tasks/prd-* files
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-05-08 19:06'
-updated_date: '2026-05-08 19:34'
+updated_date: '2026-05-08 19:35'
 labels:
   - 'feature:ralph-review'
 dependencies:
@@ -45,4 +45,8 @@ Out of scope: ralph-prd path change (TASK-102), other upgrade-flow file addition
 
 <!-- SECTION:NOTES:BEGIN -->
 Plan: Add a 'U1.5: Legacy File Migration' section between U1 (Preflight) and U2 (Build File Status Table). This section will: (1) glob for tasks/prd-*.md and tasks/brainstorm-*.md, (2) for each match, propose git mv to design/<name>-prd.md or design/<name>-brainstorm.md, (3) accept y/N per file, (4) silently skip if no legacy files found. Placed as a separate section before U2, documented in notes.
+
+Commit: `c9cae7b` - task-107: Add legacy file migration step to ralph-init upgrade flow
+
+Placement: separate U1.5 section between U1 (Preflight) and U2 (Build File Status Table). Both workspace and user-global copies updated. No template changes needed (AC #6 verified). Reviewer: APPROVED.
 <!-- SECTION:NOTES:END -->
