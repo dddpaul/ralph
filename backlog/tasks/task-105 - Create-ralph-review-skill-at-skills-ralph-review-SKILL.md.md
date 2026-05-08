@@ -1,9 +1,10 @@
 ---
 id: TASK-105
 title: Create /ralph-review skill at skills/ralph-review/SKILL.md
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-05-08 19:05'
+updated_date: '2026-05-08 19:29'
 labels:
   - 'feature:ralph-review'
 dependencies:
@@ -38,11 +39,23 @@ Out of scope: ralph-reviewer agent itself (TASK-104), README updates, migration 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 skills/ralph-review/SKILL.md exists with valid YAML frontmatter and clear trigger keywords (ralph review, cumulative review, review feature)
-- [ ] #2 Pre-conditions enforced: BLOCKED messages match the exact strings designed in Section 4
-- [ ] #3 Tasks resolution supports both 'feature:<name>' label and explicit tasks= override (Approach D)
-- [ ] #4 Diff base derivation reads 'Commit:' hashes from in-scope task files (not git log inference)
-- [ ] #5 Output saved to design/<name>-review-<YYYY-MM-DD>.md with -NN suffix on collision (never overwrites)
-- [ ] #6 Spawns ralph-reviewer subagent (subagent_type=ralph-reviewer); does NOT fall back to general-purpose
-- [ ] #7 Chat output includes verdict line and drift list only; full matrix is in the saved file
+- [x] #1 skills/ralph-review/SKILL.md exists with valid YAML frontmatter and clear trigger keywords (ralph review, cumulative review, review feature)
+- [x] #2 Pre-conditions enforced: BLOCKED messages match the exact strings designed in Section 4
+- [x] #3 Tasks resolution supports both 'feature:<name>' label and explicit tasks= override (Approach D)
+- [x] #4 Diff base derivation reads 'Commit:' hashes from in-scope task files (not git log inference)
+- [x] #5 Output saved to design/<name>-review-<YYYY-MM-DD>.md with -NN suffix on collision (never overwrites)
+- [x] #6 Spawns ralph-reviewer subagent (subagent_type=ralph-reviewer); does NOT fall back to general-purpose
+- [x] #7 Chat output includes verdict line and drift list only; full matrix is in the saved file
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan: Create skills/ralph-review/SKILL.md with YAML frontmatter and trigger keywords. Implement 6 steps: (1) parse args name= and optional tasks=, (2) pre-condition checks for design docs and done tasks, (3) diff base derivation from Commit: hashes in task files, (4) bundle building (brainstorm + PRD + task summaries + diff), (5) spawn ralph-reviewer agent, (6) save output and report. Follow existing skill patterns from ralph-run/ralph-prd for structure.
+
+Commit: `2d6eb64` - task-105: Add ralph-review skill for cumulative feature review
+
+Commit: `f74af10` - task-105: Fix Commit: hash regex and earliest-commit derivation
+
+Implemented skills/ralph-review/SKILL.md with 6-step orchestration: arg parsing, pre-conditions (design docs + done tasks + diff range), bundle building, ralph-reviewer agent spawn, output persistence with collision handling, and chat reporting. Fixed Commit: hash regex to match backtick-wrapped format and improved earliest-commit derivation to sort by commit date.
+<!-- SECTION:NOTES:END -->
