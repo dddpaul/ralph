@@ -1,7 +1,7 @@
 #!/bin/bash
 # task-validator.sh — Validate backlog task structure after edit/create
 # Trigger: Bash(backlog task edit *), Bash(backlog task create *)
-# Action: stdout diagnostics + system-reminder (PostToolUse)
+# Action: PostToolUse JSON feedback via hookSpecificOutput.additionalContext
 # Input: tool_input JSON on stdin
 
 set -uo pipefail
@@ -131,19 +131,23 @@ while IFS= read -r line; do
   done <<< "$PATHS_TO_CHECK"
 done <<< "$TASK_CONTENT"
 
-# === Output deterministic check results ===
-# Suppressed entirely when RALPH_AUTONOMOUS=1
-if [[ "${RALPH_AUTONOMOUS:-}" != "1" ]] && [[ ${#DET_ISSUES[@]} -gt 0 ]]; then
-  printf '<system-reminder>\n'
-  printf 'Task validator [det] issues for TASK-%s:\n' "$TASK_ID"
+# === Build deterministic check message (defer output for single JSON emission) ===
+DET_TEXT=""
+if [[ ${#DET_ISSUES[@]} -gt 0 ]]; then
+  DET_TEXT="Task validator [det] issues for TASK-${TASK_ID}:"
   for issue in "${DET_ISSUES[@]}"; do
-    printf '  - %s\n' "$issue"
+    DET_TEXT="${DET_TEXT}"$'\n'"  - ${issue}"
   done
-  printf '</system-reminder>\n'
 fi
 
+emit_context() {
+  if [[ -n "$1" ]]; then
+    jq -n --arg ctx "$1" '{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":$ctx}}'
+  fi
+}
+
 # === LLM Nudge ===
-# Short-circuit if autonomous mode
+# Short-circuit if autonomous mode (zero output)
 if [[ "${RALPH_AUTONOMOUS:-}" == "1" ]]; then
   exit 0
 fi
@@ -152,6 +156,7 @@ fi
 DIFF_OUTPUT=$(git diff HEAD -- "backlog/tasks/task-${TASK_ID}"* 2>/dev/null || true)
 if [[ -z "$DIFF_OUTPUT" ]]; then
   if ! echo "$CMD" | grep -qE '^backlog task create\b'; then
+    emit_context "$DET_TEXT"
     exit 0
   fi
 fi
@@ -222,6 +227,7 @@ else
 fi
 
 if [[ "$SUBSTANTIVE" == false ]]; then
+  emit_context "$DET_TEXT"
   exit 0
 fi
 
@@ -251,11 +257,17 @@ fi
 
 RUBRIC="${RUBRIC}${ITEM_NUM}. Self-containment (task can be completed without unstated context).\n"
 
-# Emit system-reminder with LLM nudge
-printf '<system-reminder>\n'
-printf 'Task validator triggered for TASK-%s.\n' "$TASK_ID"
-printf 'File: %s\n\n' "$TASK_FILE"
-printf 'Read the task file and evaluate against this rubric:\n'
-printf '%b\n' "$RUBRIC"
-printf 'Output format: "Validator [llm]: task-%s OK" if no issues, or "Validator [llm]: task-%s" followed by terse one-line issues. No remediation suggestions, no rewrites.\n' "$TASK_ID" "$TASK_ID"
-printf '</system-reminder>\n'
+# Build rubric text and combine with det issues for single JSON emission
+RUBRIC_TEXT=$(printf 'Task validator triggered for TASK-%s.\nFile: %s\n\nRead the task file and evaluate against this rubric:\n%b\nOutput format: "Validator [llm]: task-%s OK" if no issues, or "Validator [llm]: task-%s" followed by terse one-line issues. No remediation suggestions, no rewrites.' "$TASK_ID" "$TASK_FILE" "$RUBRIC" "$TASK_ID" "$TASK_ID")
+
+# === Emit combined JSON output ===
+COMBINED=""
+if [[ -n "$DET_TEXT" ]] && [[ -n "$RUBRIC_TEXT" ]]; then
+  COMBINED="${DET_TEXT}"$'\n\n'"${RUBRIC_TEXT}"
+elif [[ -n "$DET_TEXT" ]]; then
+  COMBINED="$DET_TEXT"
+elif [[ -n "$RUBRIC_TEXT" ]]; then
+  COMBINED="$RUBRIC_TEXT"
+fi
+
+emit_context "$COMBINED"

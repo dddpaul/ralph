@@ -163,3 +163,17 @@ Forbidden during a move (without explicit AC authorization):
 If both a move AND content changes are needed, the task SHOULD describe both in its description and ACs (e.g. "AC #N: agents/foo.md uses the new path X for the user-global fallback"). Otherwise, the move is one commit and the content change is a separate commit on the same branch — never bundled silently. The reviewer MUST reject any rename diff with content drift that is not explicitly authorized.
 
 This rule exists because TASK-92's `git mv .claude/agents/task-reviewer.md → agents/task-reviewer.md` silently stripped the frontmatter and left a stale path inside the file. A 100%-similarity move would have caught both.
+
+## R15 — PostToolUse hooks must emit JSON via hookSpecificOutput
+
+Hooks registered under `PostToolUse` in `.claude/settings.json` that need to deliver model-visible feedback MUST emit a single JSON object on stdout with the structure:
+
+```json
+{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"<text>"}}
+```
+
+Raw stdout text — including text wrapped in `<system-reminder>` tags — is silently dropped by the Claude Code harness and never reaches the model. The reviewer MUST reject any PostToolUse hook that uses `printf`, `echo`, or any other mechanism to emit raw text intended for the model, even if the text is correctly formatted as XML tags.
+
+When a hook has multiple feedback sections (e.g. deterministic issues AND an LLM rubric), it MUST combine them into a single `additionalContext` string separated by blank lines — not emit multiple JSON objects. The harness parses exactly one JSON object per hook invocation.
+
+This rule exists because TASK-100 wrapped validator output in `<system-reminder>` tags (correct format) but emitted them as raw stdout (wrong protocol). The model never received the feedback, and the smoke test only verified the script's stdout — not model receipt.
