@@ -1,9 +1,10 @@
 ---
 id: TASK-107
 title: Add ralph-init upgrade migration prompt for legacy tasks/prd-* files
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-05-08 19:06'
+updated_date: '2026-05-08 19:34'
 labels:
   - 'feature:ralph-review'
 dependencies:
@@ -32,10 +33,16 @@ Out of scope: ralph-prd path change (TASK-102), other upgrade-flow file addition
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 ralph-init upgrade flow detects tasks/prd-*.md files and proposes moving each to design/<name>-prd.md (suffix style)
-- [ ] #2 User can decline per-file with N; declined files are left alone, not deleted
-- [ ] #3 Move uses 'git mv' (not raw mv) to preserve history
-- [ ] #4 Migration is idempotent: no-op when no legacy files exist
-- [ ] #5 Migration also handles tasks/brainstorm-*.md files in the same way
-- [ ] #6 Template parity (R11): skills/ralph-init/SKILL.md is the user-global skill, not in the project-template parity table — verify no ralph-init/templates/ files need a corresponding change
+- [x] #1 ralph-init upgrade flow detects tasks/prd-*.md files and proposes moving each to design/<name>-prd.md (suffix style)
+- [x] #2 User can decline per-file with N; declined files are left alone, not deleted
+- [x] #3 Move uses 'git mv' (not raw mv) to preserve history
+- [x] #4 Migration is idempotent: no-op when no legacy files exist
+- [x] #5 Migration also handles tasks/brainstorm-*.md files in the same way
+- [x] #6 Template parity (R11): skills/ralph-init/SKILL.md is the user-global skill, not in the project-template parity table — verify no ralph-init/templates/ files need a corresponding change
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan: Add a 'U1.5: Legacy File Migration' section between U1 (Preflight) and U2 (Build File Status Table). This section will: (1) glob for tasks/prd-*.md and tasks/brainstorm-*.md, (2) for each match, propose git mv to design/<name>-prd.md or design/<name>-brainstorm.md, (3) accept y/N per file, (4) silently skip if no legacy files found. Placed as a separate section before U2, documented in notes.
+<!-- SECTION:NOTES:END -->

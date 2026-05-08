@@ -237,6 +237,33 @@ If neither exists, tell the user: "Ralph has not been initialized in this projec
 
 ---
 
+### U1.5: Legacy File Migration
+
+Detect PRD and brainstorm files created before the `design/` convention (TASK-102) and offer to relocate them.
+
+**This step is silent when no legacy files exist** — print nothing, proceed directly to U2.
+
+1. Glob for `tasks/prd-*.md` and `tasks/brainstorm-*.md`.
+2. If no matches, skip silently to U2.
+3. If matches exist, ensure `design/` directory exists (`mkdir -p design`).
+4. For each matched file, extract `<name>` from the filename pattern and propose the move:
+
+   - `tasks/prd-<name>.md` → `design/<name>-prd.md`
+   - `tasks/brainstorm-<name>.md` → `design/<name>-brainstorm.md`
+
+   Print:
+   ```
+   Detected legacy PRD at tasks/prd-<name>.md. Move to design/<name>-prd.md? [y/N]
+   ```
+   (or the brainstorm equivalent)
+
+   - On **y**: run `git mv tasks/prd-<name>.md design/<name>-prd.md`, print `  moved`.
+   - On **N** (default): leave the file alone, print `  skipped (user)`.
+
+5. After processing all files, print a one-line summary: `Legacy migration: <moved> moved, <skipped> skipped.`
+
+---
+
 ### U2: Build File Status Table
 
 Compare each managed file against its current template. Assign one status per file:
