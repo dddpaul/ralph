@@ -3,10 +3,10 @@ id: TASK-101
 title: >-
   Switch task-validator hook to PostToolUse JSON output
   (hookSpecificOutput.additionalContext)
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-05-08 05:52'
-updated_date: '2026-05-08 06:34'
+updated_date: '2026-05-08 06:36'
 labels: []
 dependencies:
   - TASK-100
@@ -80,4 +80,8 @@ Add a new rule (R15?) to `.claude/task-reviewer-rules.md`: PostToolUse hooks MUS
 
 <!-- SECTION:NOTES:BEGIN -->
 Plan: (1) Replace both raw system-reminder printf blocks with single JSON output using jq -n + hookSpecificOutput.additionalContext. (2) Combine det+rubric into single additionalContext when both apply. (3) RALPH_AUTONOMOUS=1 still exits with no output. (4) Apply same fix to template. (5) Add R15 to task-reviewer-rules.md. (6) bash -n check both files.
+
+Commit: `2168d54` - task-101: Switch task-validator hook to PostToolUse JSON output
+
+task-reviewer APPROVED. All 7 ACs verified. Live test confirmed model receives additionalContext via PostToolUse JSON protocol.
 <!-- SECTION:NOTES:END -->
