@@ -113,7 +113,9 @@ while IFS= read -r line; do
   # Extract markdown link paths
   LINK_PATHS=$(echo "$line" | grep -oE '\]\([^)]+\)' | sed 's/^\](//' | sed 's/)$//' || true)
 
-  for path in $BACKTICK_PATHS $LINK_PATHS; do
+  PATHS_TO_CHECK=$(printf '%s\n%s\n' "$BACKTICK_PATHS" "$LINK_PATHS" | sed '/^[[:space:]]*$/d')
+  while IFS= read -r path; do
+    [[ -z "$path" ]] && continue
     # Skip URLs
     echo "$path" | grep -qE '^https?://|^www\.' && continue
     # Skip wildcards/globs
@@ -126,15 +128,18 @@ while IFS= read -r line; do
     if [[ ! -e "$path" ]]; then
       DET_ISSUES+=("Referenced path '$path' does not exist")
     fi
-  done
+  done <<< "$PATHS_TO_CHECK"
 done <<< "$TASK_CONTENT"
 
 # === Output deterministic check results ===
 # Suppressed entirely when RALPH_AUTONOMOUS=1
-if [[ "${RALPH_AUTONOMOUS:-}" != "1" ]]; then
-  for issue in "${DET_ISSUES[@]+"${DET_ISSUES[@]}"}"; do
-    echo "Validator [det]: $issue"
+if [[ "${RALPH_AUTONOMOUS:-}" != "1" ]] && [[ ${#DET_ISSUES[@]} -gt 0 ]]; then
+  printf '<system-reminder>\n'
+  printf 'Task validator [det] issues for TASK-%s:\n' "$TASK_ID"
+  for issue in "${DET_ISSUES[@]}"; do
+    printf '  - %s\n' "$issue"
   done
+  printf '</system-reminder>\n'
 fi
 
 # === LLM Nudge ===
