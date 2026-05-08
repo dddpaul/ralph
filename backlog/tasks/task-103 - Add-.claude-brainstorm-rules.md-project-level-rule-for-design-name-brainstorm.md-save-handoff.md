@@ -3,9 +3,10 @@ id: TASK-103
 title: >-
   Add .claude/brainstorm-rules.md project-level rule for
   design/<name>-brainstorm.md save handoff
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-05-08 19:05'
+updated_date: '2026-05-08 19:20'
 labels:
   - 'feature:ralph-review'
 dependencies: []
@@ -32,10 +33,20 @@ Out of scope: ralph-prd path change (TASK-102), ralph-reviewer agent (separate).
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 .claude/brainstorm-rules.md exists and is non-empty in this repo
-- [ ] #2 Rule text instructs brainstorm to propose saving design conclusions to design/<name>-brainstorm.md before Phase 4 options
-- [ ] #3 Rule defines the brainstorm doc structure: Architecture decision, Components/flows, Scope cuts, Open questions, Hand-off
-- [ ] #4 Rule clarifies it supplements (does not replace) the existing Phase 4 'Create backlog task first' user-global rule
-- [ ] #5 Rule explicitly notes <name> must be kebab-case and shared with the eventual PRD slug
-- [ ] #6 Manual smoke verification: invoke brainstorm with a fake topic; confirm the loaded rule mentions design/<name>-brainstorm.md (read brainstorm's resolve-rules.sh output)
+- [x] #1 .claude/brainstorm-rules.md exists and is non-empty in this repo
+- [x] #2 Rule text instructs brainstorm to propose saving design conclusions to design/<name>-brainstorm.md before Phase 4 options
+- [x] #3 Rule defines the brainstorm doc structure: Architecture decision, Components/flows, Scope cuts, Open questions, Hand-off
+- [x] #4 Rule clarifies it supplements (does not replace) the existing Phase 4 'Create backlog task first' user-global rule
+- [x] #5 Rule explicitly notes <name> must be kebab-case and shared with the eventual PRD slug
+- [x] #6 Manual smoke verification: invoke brainstorm with a fake topic; confirm the loaded rule mentions design/<name>-brainstorm.md (read brainstorm's resolve-rules.sh output)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan: Add project-level rule to existing .claude/brainstorm-rules.md. Insert a new section BEFORE the existing Phase 4 Override that instructs brainstorm to propose saving design conclusions to design/<name>-brainstorm.md. Keep existing Phase 4 Override intact. Rule defines the doc structure per AC#3, notes kebab-case naming per AC#5, and clarifies supplement relationship per AC#4.
+
+Commit: `5fc39b9` - task-103: Add project-level brainstorm rule for design/<name>-brainstorm.md save handoff
+
+Implemented project-level brainstorm rule in .claude/brainstorm-rules.md. Added Save Design Conclusions section before Phase 4 that proposes writing design/<name>-brainstorm.md with kebab-case naming. Preserved existing Phase 4 Override rule. Added .gitignore exclusion to track the file. Smoke-tested via resolve-rules.sh. Reviewer approved.
+<!-- SECTION:NOTES:END -->
