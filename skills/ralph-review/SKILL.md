@@ -76,7 +76,7 @@ BLOCKED: No completed tasks found for feature:<name>. Complete at least one task
 
 Walk the in-scope task files and collect all `Commit:` hash lines. These are appended by the post-commit hook.
 
-For each task, read its file path (shown in `backlog task view` output) and grep for lines matching `^Commit: [0-9a-f]+`.
+For each task, read its file path (shown in `backlog task view` output) and grep for lines matching `` ^Commit: `[0-9a-f]+` ``. The post-commit hook writes hashes wrapped in backticks (e.g. `` Commit: `94b6e69` - task-16: ... ``). Strip the backticks to extract the raw hash.
 
 Collect all hashes into a list. If no commit hashes are found across any task file, output and stop:
 
@@ -84,10 +84,10 @@ Collect all hashes into a list. If no commit hashes are found across any task fi
 BLOCKED: No Commit: hashes found in task files. The post-commit hook may not have run for these tasks.
 ```
 
-Find the earliest commit by running:
+Find the earliest commit by sorting the collected hashes by commit date:
 
 ```bash
-git log --format="%H" --reverse <hash1> <hash2> ... | head -1
+for h in <hash1> <hash2> ...; do echo "$(git log -1 --format=%ct $h) $h"; done | sort -n | head -1 | awk '{print $2}'
 ```
 
 Then derive `<base>` as the parent of that earliest commit:
