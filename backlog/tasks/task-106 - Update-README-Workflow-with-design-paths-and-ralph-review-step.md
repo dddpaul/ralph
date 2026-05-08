@@ -1,9 +1,10 @@
 ---
 id: TASK-106
 title: Update README Workflow with design/ paths and /ralph-review step
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-05-08 19:06'
+updated_date: '2026-05-08 19:32'
 labels:
   - 'feature:ralph-review'
 dependencies:
@@ -30,10 +31,20 @@ Out of scope: actual code changes for ralph-prd / ralph-backlog (TASK-102), ralp
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 README.md Workflow Step 2 references design/<name>-prd.md (not tasks/prd-...)
-- [ ] #2 README.md Workflow Step 3 references design/<name>-prd.md as input
-- [ ] #3 README.md Workflow contains a new Step 5 — Cumulative review (recommended) describing /ralph-review name=<name>
-- [ ] #4 README.md Workflow Step 1 (Brainstorm) mentions saving conclusions to design/<name>-brainstorm.md
-- [ ] #5 All workflow step numbers are sequential (1, 2, 3, 4, 5) with no gaps or duplicates
-- [ ] #6 No surviving references to the old tasks/prd-* path elsewhere in README.md
+- [x] #1 README.md Workflow Step 2 references design/<name>-prd.md (not tasks/prd-...)
+- [x] #2 README.md Workflow Step 3 references design/<name>-prd.md as input
+- [x] #3 README.md Workflow contains a new Step 5 — Cumulative review (recommended) describing /ralph-review name=<name>
+- [x] #4 README.md Workflow Step 1 (Brainstorm) mentions saving conclusions to design/<name>-brainstorm.md
+- [x] #5 All workflow step numbers are sequential (1, 2, 3, 4, 5) with no gaps or duplicates
+- [x] #6 No surviving references to the old tasks/prd-* path elsewhere in README.md
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Starting implementation. Will update README.md Workflow section with design/ paths and /ralph-review step.
+
+Commit: `22548f8` - task-106: Update README Workflow with design/ paths and /ralph-review step
+
+All AC verified. README Workflow updated: design/ paths in Steps 1-3, new Step 5 for /ralph-review.
+<!-- SECTION:NOTES:END -->
