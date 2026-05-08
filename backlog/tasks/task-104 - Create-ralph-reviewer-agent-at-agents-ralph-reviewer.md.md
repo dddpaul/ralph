@@ -1,9 +1,10 @@
 ---
 id: TASK-104
 title: Create ralph-reviewer agent at agents/ralph-reviewer.md
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-05-08 19:05'
+updated_date: '2026-05-08 19:23'
 labels:
   - 'feature:ralph-review'
 dependencies: []
@@ -36,10 +37,20 @@ Out of scope: the /ralph-review skill that invokes this agent (TASK-105), README
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 agents/ralph-reviewer.md exists with valid YAML frontmatter (name: ralph-reviewer, description, color)
-- [ ] #2 Agent prompt body covers all 5 rubric passes (PRD coverage, non-goal protection, brainstorm scope cuts, success-metric realism, out-of-scope creep) with skip conditions when input is missing
-- [ ] #3 Agent verdict scale is exactly: Aligned / Partial / Drifted (not numeric, not other words)
-- [ ] #4 Agent loads project-tier custom rules from .claude/ralph-review-rules.md if present, mirroring task-reviewer.md's loader
-- [ ] #5 Agent body explicitly notes verdict only weighs passes that ran (per Section 4 revision)
-- [ ] #6 Output format specifies a Markdown deliverable with Verdict, Intent→Implementation matrix, Drift list, Reviewer notes
+- [x] #1 agents/ralph-reviewer.md exists with valid YAML frontmatter (name: ralph-reviewer, description, color)
+- [x] #2 Agent prompt body covers all 5 rubric passes (PRD coverage, non-goal protection, brainstorm scope cuts, success-metric realism, out-of-scope creep) with skip conditions when input is missing
+- [x] #3 Agent verdict scale is exactly: Aligned / Partial / Drifted (not numeric, not other words)
+- [x] #4 Agent loads project-tier custom rules from .claude/ralph-review-rules.md if present, mirroring task-reviewer.md's loader
+- [x] #5 Agent body explicitly notes verdict only weighs passes that ran (per Section 4 revision)
+- [x] #6 Output format specifies a Markdown deliverable with Verdict, Intent→Implementation matrix, Drift list, Reviewer notes
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan: Create agents/ralph-reviewer.md mirroring task-reviewer.md structure. Frontmatter with name/description/color, custom rules loader for .claude/ralph-review-rules.md, 5-pass rubric with skip conditions, verdict scale (Aligned/Partial/Drifted), markdown output format.
+
+Commit: `3dccaa7` - task-104: Add ralph-reviewer agent for cumulative feature review
+
+Implemented: agents/ralph-reviewer.md with 5-pass rubric, Aligned/Partial/Drifted verdict, custom rules loader, markdown output format. Reviewed and approved.
+<!-- SECTION:NOTES:END -->
