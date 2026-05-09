@@ -3,10 +3,10 @@ id: TASK-113
 title: >-
   Add xhigh effort level and update ralph.sh / ralph-run defaults to opus-4-7 +
   max
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-05-09 18:51'
-updated_date: '2026-05-09 18:55'
+updated_date: '2026-05-09 18:57'
 labels: []
 dependencies: []
 priority: medium
@@ -65,10 +65,12 @@ In the Defaults table (Step 1):
 - [x] #8 bash -n passes on all three ralph.sh copies and ./ralph.sh --effort xhigh --help exits 0
 <!-- AC:END -->
 
-
-
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 Plan: Update all 3 ralph.sh copies (./ralph.sh, skills/ralph-run/scripts/ralph.sh, skills/ralph-init/templates/root/ralph.sh) — add xhigh to enum, change MODEL to claude-opus-4-7, change EFFORT to max, update --help text and header comment. Update skills/ralph-run/SKILL.md Defaults table. Verify byte-identical via diff and bash -n + smoke test.
+
+Commit: `4fea02f` - task-113: Add xhigh effort level; ralph.sh and ralph-run defaults to opus-4-7 + max
+
+All 8 ACs verified. ralph.sh: xhigh added to enum; MODEL=claude-opus-4-7; EFFORT=max; --help text updated. R11 parity restored across all 3 ralph.sh copies (diff exit 0). Side-effect: skill-bundled copy gained pre-existing missing RALPH_AUTONOMOUS guards (latent inconsistency fixed). SKILL.md: model row added to Defaults table, launch command + report line include --model, divergence note rewritten. Reviewer APPROVED.
 <!-- SECTION:NOTES:END -->
