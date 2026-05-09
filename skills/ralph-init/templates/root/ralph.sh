@@ -1,6 +1,6 @@
 #!/bin/bash
 # Ralph Wiggum - Long-running AI agent loop
-# Usage: ./ralph.sh [--tool claude|opencode] [--model model_id] [--effort low|medium|high|max]
+# Usage: ./ralph.sh [--tool claude|opencode] [--model model_id] [--effort low|medium|high|xhigh|max]
 #                    [--timeout minutes] [--on-error stop|continue|retry] [--retry-count N]
 #                    [--log-file path] [--prompt-file path] [--tasks ids]
 #                    [--devcontainer] [--help] [--version] [max_iterations]
@@ -16,8 +16,8 @@ Usage: ralph.sh [OPTIONS] [max_iterations]
 
 Options:
   --tool <claude|opencode>     AI tool to use (default: claude)
-  --model <model_id>           Model ID for claude tool (default: claude-opus-4-6)
-  --effort <low|medium|high|max>  Effort level for claude tool (default: medium)
+  --model <model_id>           Model ID for claude tool (default: claude-opus-4-7)
+  --effort <low|medium|high|xhigh|max>  Effort level for claude tool (default: max)
   --timeout <minutes>          Per-iteration timeout in minutes (default: 15)
   --on-error <stop|continue|retry>  Error handling strategy (default: stop)
   --retry-count <N>            Number of retries for --on-error=retry (default: 2)
@@ -33,8 +33,8 @@ HELPEOF
 
 # Parse arguments
 TOOL="claude"
-MODEL="claude-opus-4-6"  # Default model for claude tool
-EFFORT="medium"  # Default effort level for claude tool (low|medium|high|max)
+MODEL="claude-opus-4-7"  # Default model for claude tool
+EFFORT="max"  # Default effort level for claude tool (low|medium|high|xhigh|max)
 TIMEOUT=15  # Per-iteration timeout in minutes
 MAX_ITERATIONS=10
 USE_DEVCONTAINER=false
@@ -161,8 +161,8 @@ validate_args() {
     exit 1
   fi
 
-  if [[ "$EFFORT" != "low" && "$EFFORT" != "medium" && "$EFFORT" != "high" && "$EFFORT" != "max" ]]; then
-    echo "Error: Invalid effort level '$EFFORT'. Must be 'low', 'medium', 'high', or 'max'."
+  if [[ "$EFFORT" != "low" && "$EFFORT" != "medium" && "$EFFORT" != "high" && "$EFFORT" != "xhigh" && "$EFFORT" != "max" ]]; then
+    echo "Error: Invalid effort level '$EFFORT'. Must be 'low', 'medium', 'high', 'xhigh', or 'max'."
     exit 1
   fi
 

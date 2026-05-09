@@ -18,6 +18,7 @@ The user may pass overrides as skill arguments. Parse them as space-separated ke
 | Parameter | Default | Flag |
 |-----------|---------|------|
 | tool | claude | --tool |
+| model | claude-opus-4-7 | --model |
 | effort | max | --effort |
 | timeout | 60 | --timeout |
 | tasks | (none) | --tasks |
@@ -36,12 +37,13 @@ Validate against regex `^(true|false|[0-9]+(s|m|h))$`. Reject invalid values:
 BLOCKED: watch must be true, false, or a duration like 5m, 30s, 1h.
 ```
 
-> **Note: These defaults intentionally differ from ralph.sh CLI defaults.**
+> **Note: Some skill defaults intentionally differ from ralph.sh CLI defaults.**
 > The skill targets interactive sessions where a user launches Ralph from Claude Code,
 > so it optimizes for thoroughness and isolation over speed:
-> - **effort** (skill: `max`, CLI: `medium`) — interactive launches are typically fewer iterations on harder tasks; max effort avoids shallow results.
 > - **timeout** (skill: `60`, CLI: `15`) — max-effort iterations take longer; 15 minutes would time out most complex tasks.
 > - **devcontainer** (skill: `true`, CLI: `false`) — interactive users expect sandboxed runs by default; the CLI leaves this opt-in for scripted/CI use.
+>
+> The `model` and `effort` defaults match `ralph.sh`'s own defaults (`claude-opus-4-7` and `max`); the skill pins them explicitly so the launch command logs them and per-invocation overrides remain easy.
 
 The `tasks` parameter accepts comma-separated numeric task IDs only (e.g. `62,64,65`). Reject `TASK-` prefix or non-numeric values. Mutually exclusive with `--prompt-file`.
 
@@ -93,7 +95,7 @@ If the output starts with `ERROR:`, report the message verbatim to the user and 
 Build the command from parsed arguments:
 
 ```bash
-RALPH_CMD="<path-to-ralph.sh> --tool <tool> --effort <effort> --timeout <timeout> <max_iterations>"
+RALPH_CMD="<path-to-ralph.sh> --tool <tool> --model <model> --effort <effort> --timeout <timeout> <max_iterations>"
 ```
 
 Add `--devcontainer` flag only if devcontainer=true.
@@ -127,7 +129,7 @@ On success:
 **If `watch` is empty (not set or `false`):** output one line plus a hint:
 
 ```
-Ralph launched (PID <pid>, tool=<tool>, effort=<effort>, timeout=<timeout>m, max=<max_iterations>, devcontainer=<true|false>). /ralph-status to monitor, /ralph-stop to halt.
+Ralph launched (PID <pid>, tool=<tool>, model=<model>, effort=<effort>, timeout=<timeout>m, max=<max_iterations>, devcontainer=<true|false>). /ralph-status to monitor, /ralph-stop to halt.
 
 Hint: pass watch=5m to /ralph-run for automatic progress alerts.
 ```
@@ -135,7 +137,7 @@ Hint: pass watch=5m to /ralph-run for automatic progress alerts.
 **If `watch` is set (e.g. `5m`):** output the launch line AND schedule the first watch tick directly via `ScheduleWakeup`:
 
 ```
-Ralph launched (PID <pid>, tool=<tool>, effort=<effort>, timeout=<timeout>m, max=<max_iterations>, devcontainer=<true|false>). Watching every <watch>.
+Ralph launched (PID <pid>, tool=<tool>, model=<model>, effort=<effort>, timeout=<timeout>m, max=<max_iterations>, devcontainer=<true|false>). Watching every <watch>.
 ```
 
 Convert the `watch` duration to seconds using the same regex parser from Step 1 (e.g. `2m` → 120, `5m` → 300, `1h` → 3600).
