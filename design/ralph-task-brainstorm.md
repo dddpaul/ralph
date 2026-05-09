@@ -14,8 +14,8 @@ The lens distinction: `ralph-backlog` is bulk, PRD-driven, `feature:<name>`-labe
 
 ### `skills/ralph-task/SKILL.md` (new)
 
-- **Creation triggers** — "create a task", "add a task", "new task", "track this as a task", "log a task"
-- **Edit-deliberation triggers (judgment moments)** — "should I split this task", "scope grew", "should I add this as an AC or new task", "is this AC clear / verifiable", "rework this AC", "this fix belongs to TASK-X or its own". Mechanical action verbs ("edit task 110 status to Done", "mark AC 3 done") deliberately do NOT trigger; they redirect to CLAUDE.md.
+- **Creation triggers (language-agnostic)** — the skill's `description` field states matching is by **semantic intent in any natural language**, not exact keyword. English examples: "create a task", "add a task", "new task", "track this as a task", "log a task". Russian examples: "создай задачу", "добавь задачу", "новая задача", "оформи задачу". The description includes both example sets so Claude has anchor strings for matching, but the explicit "any language" note keeps the door open for other languages without re-listing.
+- **Edit-deliberation triggers (judgment moments, language-agnostic)** — English examples: "should I split this task", "scope grew", "should I add this as an AC or new task", "is this AC clear / verifiable", "rework this AC", "this fix belongs to TASK-X or its own". Russian examples: "разбить задачу", "расширилась задача", "AC размытый", "переложить в отдельную задачу". Mechanical action verbs ("edit task 110 status to Done", "mark AC 3 done", "отредактируй задачу") deliberately do NOT trigger; they redirect to CLAUDE.md.
 - **Pre-checks (delegate when out of lane):**
   - PRD-shaped ask → propose `ralph-prd` → `ralph-backlog`
   - Open exploration → propose `brainstorm`
@@ -66,6 +66,7 @@ Decisions made during the brainstorm dialogue, recorded so future readers can ve
 - **Line-count caps dropped from rule 1.** Number of ACs is the actionable signal; line count varies wildly with format (a 30-line drawio XML edit ≠ 30 lines of TypeScript).
 - **No mechanical edit ops in skill.** `--check-ac`, status changes, `--append-notes`, `--dep`, `--add-label`, `--priority`, `-t` (rename), and direct Edit-tool description tweaks stay in CLAUDE.md as the canonical reference. The skill never duplicates them. Rationale: CLAUDE.md is always loaded (zero overhead); routing mechanical ops through a skill would burn context for no judgment gain. Trigger separation enforces this — mechanical action verbs don't fire the skill.
 - **Edit triggers are conversational, not action-shaped.** "Edit task 110" doesn't trigger; "should I split task 110?" does. Rationale: judgment is most valuable BEFORE the action; once `backlog task edit` runs with a vague AC, the task is polluted. The skill is the deliberation companion, not the executor.
+- **Trigger description is language-agnostic.** Considered listing all variants per language exhaustively — rejected: bloats the description and locks us to a fixed set. Considered English-only with no language note — rejected: weaker semantic match for non-English phrasings. Chose the middle path: an explicit "any natural language" note plus English + Russian example sets for anchor strings. Other languages match by semantic intent; if a third language becomes common, add example variants without removing existing ones.
 
 ## Open questions
 

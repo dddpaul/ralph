@@ -4,7 +4,7 @@ title: Replace project-manager-backlog agent with ralph-task skill
 status: To Do
 assignee: []
 created_date: '2026-05-09 17:03'
-updated_date: '2026-05-09 18:34'
+updated_date: '2026-05-09 18:44'
 labels: []
 dependencies: []
 priority: medium
@@ -75,14 +75,14 @@ See design/ralph-task-brainstorm.md for full hand-off, scope cuts, and open ques
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 skills/ralph-task/SKILL.md exists with valid YAML frontmatter (name: ralph-task, description with triggers: create a task / add a task / new task / track this as a task)
-- [ ] #2 skills/ralph-task/SKILL.md documents the canonical 'backlog task create' pattern with three MUST rules: repeated --ac flags, code blocks allowed in -d, feature:<slug> label optional with design-doc sanity check
-- [ ] #3 skills/ralph-task/SKILL.md documents the 6-rule decomposition heuristic exactly as in design/ralph-task-brainstorm.md: 0 Purpose-value, 1 One-PR (~10 ACs cap), 2 Dependency, 3 Mirror (R11), 4 Rollback, 5 Verification — plus the cadence note (autonomous 5-7, human ~10)
-- [ ] #4 skills/ralph-task/SKILL.md documents the mandatory self-check: 'backlog task view <id> --plain | grep -A20 Acceptance' and the fix recipe 'backlog task edit <id> --remove-ac N --ac ... --ac ...'
-- [ ] #5 .claude/brainstorm-rules.md Phase 4 first option text is updated to explicitly name the ralph-task skill (replacing the implicit project-manager-backlog grab)
-- [ ] #6 CLAUDE.md Task Lifecycle section contains a 1-2 line pointer: ralph-task for ad-hoc, ralph-prd then ralph-backlog for PRD-driven feature work
-- [ ] #7 ~/.claude/agents/project-manager-backlog.md is deleted (verifiable: 'ls ~/.claude/agents/project-manager-backlog.md' returns 'No such file')
-- [ ] #8 After merge, 'bash .claude/skills/ralph-sync/sync.sh classify' shows skills/ralph-task/SKILL.md as [new] before sync, [unchanged] after
-- [ ] #9 skills/ralph-task/SKILL.md 'Editing existing tasks' section exists with conversational deliberation triggers (split this task / scope grew / AC unclear / belongs to TASK-X), applies the 6 rules with decision recipes (split into sibling task with --dep vs add as new AC), and explicitly redirects mechanical ops (--check-ac, status, --append-notes, --dep, --add-label, --priority, -t) to CLAUDE.md
-- [ ] #10 skills/ralph-task/SKILL.md documents the path-fence writing rule: paths to created-on-merge files (including the SKILL.md's own forward references) appear inside fenced code blocks to avoid task-validator hook false-positive flags from its path-existence check
+- [ ] #1 skills/ralph-task/SKILL.md documents the canonical 'backlog task create' pattern with three MUST rules: repeated --ac flags, code blocks allowed in -d, feature:<slug> label optional with design-doc sanity check
+- [ ] #2 skills/ralph-task/SKILL.md documents the 6-rule decomposition heuristic exactly as in design/ralph-task-brainstorm.md: 0 Purpose-value, 1 One-PR (~10 ACs cap), 2 Dependency, 3 Mirror (R11), 4 Rollback, 5 Verification — plus the cadence note (autonomous 5-7, human ~10)
+- [ ] #3 skills/ralph-task/SKILL.md documents the mandatory self-check: 'backlog task view <id> --plain | grep -A20 Acceptance' and the fix recipe 'backlog task edit <id> --remove-ac N --ac ... --ac ...'
+- [ ] #4 .claude/brainstorm-rules.md Phase 4 first option text is updated to explicitly name the ralph-task skill (replacing the implicit project-manager-backlog grab)
+- [ ] #5 CLAUDE.md Task Lifecycle section contains a 1-2 line pointer: ralph-task for ad-hoc, ralph-prd then ralph-backlog for PRD-driven feature work
+- [ ] #6 ~/.claude/agents/project-manager-backlog.md is deleted (verifiable: 'ls ~/.claude/agents/project-manager-backlog.md' returns 'No such file')
+- [ ] #7 After merge, 'bash .claude/skills/ralph-sync/sync.sh classify' shows skills/ralph-task/SKILL.md as [new] before sync, [unchanged] after
+- [ ] #8 skills/ralph-task/SKILL.md documents the path-fence writing rule: paths to created-on-merge files (including the SKILL.md's own forward references) appear inside fenced code blocks to avoid task-validator hook false-positive flags from its path-existence check
+- [ ] #9 skills/ralph-task/SKILL.md exists with valid YAML frontmatter (name: ralph-task, description triggers on semantic intent in any natural language — English examples: create a task / add a task / new task / track this as a task; Russian examples: создай задачу / добавь задачу / новая задача / оформи задачу — and the description text states matching is by intent, not exact keyword)
+- [ ] #10 skills/ralph-task/SKILL.md 'Editing existing tasks' section exists with language-agnostic conversational deliberation triggers (English: split this task / scope grew / AC unclear / belongs to TASK-X; Russian: разбить задачу / расширилась задача / AC размытый / переложить в отдельную задачу), applies the 6 rules with decision recipes (split into sibling task with --dep vs add as new AC), and redirects mechanical ops (--check-ac, status, --append-notes, --add-label, --priority, -t) to CLAUDE.md
 <!-- AC:END -->
