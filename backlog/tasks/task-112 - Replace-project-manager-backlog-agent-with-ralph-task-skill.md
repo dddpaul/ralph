@@ -4,6 +4,7 @@ title: Replace project-manager-backlog agent with ralph-task skill
 status: To Do
 assignee: []
 created_date: '2026-05-09 17:03'
+updated_date: '2026-05-09 18:34'
 labels: []
 dependencies: []
 priority: medium
@@ -82,4 +83,6 @@ See design/ralph-task-brainstorm.md for full hand-off, scope cuts, and open ques
 - [ ] #6 CLAUDE.md Task Lifecycle section contains a 1-2 line pointer: ralph-task for ad-hoc, ralph-prd then ralph-backlog for PRD-driven feature work
 - [ ] #7 ~/.claude/agents/project-manager-backlog.md is deleted (verifiable: 'ls ~/.claude/agents/project-manager-backlog.md' returns 'No such file')
 - [ ] #8 After merge, 'bash .claude/skills/ralph-sync/sync.sh classify' shows skills/ralph-task/SKILL.md as [new] before sync, [unchanged] after
+- [ ] #9 skills/ralph-task/SKILL.md 'Editing existing tasks' section exists with conversational deliberation triggers (split this task / scope grew / AC unclear / belongs to TASK-X), applies the 6 rules with decision recipes (split into sibling task with --dep vs add as new AC), and explicitly redirects mechanical ops (--check-ac, status, --append-notes, --dep, --add-label, --priority, -t) to CLAUDE.md
+- [ ] #10 skills/ralph-task/SKILL.md documents the path-fence writing rule: paths to created-on-merge files (including the SKILL.md's own forward references) appear inside fenced code blocks to avoid task-validator hook false-positive flags from its path-existence check
 <!-- AC:END -->

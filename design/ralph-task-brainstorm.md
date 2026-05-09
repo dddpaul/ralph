@@ -8,11 +8,14 @@ Drop `~/.claude/agents/project-manager-backlog.md` entirely. Replace its narrow 
 
 The lens distinction: `ralph-backlog` is bulk, PRD-driven, `feature:<name>`-labeled. `ralph-task` is one or a few ad-hoc tasks (defects, chores, small fixes), label optional. They do not overlap.
 
+**Scope:** the skill covers task **creation** AND **judgment-bearing edits** (mid-flight decisions about adding ACs, splitting growing tasks, reworking vague ACs). Mechanical edits (`--check-ac`, status changes, `--append-notes`, `--dep`) stay in CLAUDE.md as canonical; the skill never owns them. Triggers separate the two: creation phrasings ("create a task") fire the create flow; conversational deliberation phrasings ("should I split this", "scope grew", "is this AC clear") fire the edit flow. Mechanical action verbs ("edit task 110 status to Done") deliberately do NOT trigger the skill.
+
 ## Components / flows
 
 ### `skills/ralph-task/SKILL.md` (new)
 
-- **Triggers** — "create a task", "add a task", "new task", "track this as a task", "log a task"
+- **Creation triggers** — "create a task", "add a task", "new task", "track this as a task", "log a task"
+- **Edit-deliberation triggers (judgment moments)** — "should I split this task", "scope grew", "should I add this as an AC or new task", "is this AC clear / verifiable", "rework this AC", "this fix belongs to TASK-X or its own". Mechanical action verbs ("edit task 110 status to Done", "mark AC 3 done") deliberately do NOT trigger; they redirect to CLAUDE.md.
 - **Pre-checks (delegate when out of lane):**
   - PRD-shaped ask → propose `ralph-prd` → `ralph-backlog`
   - Open exploration → propose `brainstorm`
@@ -20,8 +23,14 @@ The lens distinction: `ralph-backlog` is bulk, PRD-driven, `feature:<name>`-labe
   1. **Repeat `--ac` per criterion.** The CLI does NOT split on commas (`--ac "a,b"` creates ONE AC).
   2. **Description may include code blocks** when an implementer needs the exact snippet (regex, bash pipeline, SQL). Override the generic "WHY without HOW" — Ralph runs autonomously and can't re-derive.
   3. **`feature:<slug>` label optional.** Default off; attach when the task is a missed/follow-on item for an existing feature. If user names a feature, verify `design/<name>-prd.md` or `design/<name>-brainstorm.md` exists; warn if not.
-- **6-rule decomposition heuristic** — see table below.
+- **6-rule decomposition heuristic** — see table below. Applies equally to creation (one task or many?) and edit-deliberation (add as AC or split into sibling task?).
+- **Editing existing tasks (judgment moments)** — when an edit-deliberation trigger fires, apply the 6 rules:
+  - Rule 0 (purpose-value): is the new outcome part of the existing task's deliverable, or its own deliverable?
+  - Rule 1 (one-PR / ~10 ACs): would adding this push the task over the cap?
+  - Rule 5 (verification): is each AC objectively pass/fail? Reword or split any vague AC.
+  - **Decision recipes:** "split into sibling task" → use the canonical create pattern above with `--dep <existing>` if needed. "Add as AC" → `backlog task edit <id> --ac "<atomic outcome>"`. For mechanical operations (status, append-notes, AC checkbox flips), redirect to CLAUDE.md — the skill does not own them.
 - **Mandatory self-check after create** — `backlog task view <id> --plain | grep -A20 Acceptance`; if collapsed ACs found, fix with `backlog task edit <id> --remove-ac N --ac "..." --ac "..."`.
+- **Writing rule (skill self-protection)** — when the SKILL.md itself documents paths to files that don't yet exist (e.g., `skills/ralph-task/SKILL.md` referenced from inside `skills/ralph-task/SKILL.md` during pre-merge state, or future deliverables in worked examples), keep those paths inside fenced code blocks. The task-validator hook's path-existence check skips fenced code, avoiding false positives. Plain prose mentions of yet-to-exist paths trigger validator warnings.
 
 ### Decomposition heuristic (load-bearing for the skill)
 
@@ -55,6 +64,8 @@ Decisions made during the brainstorm dialogue, recorded so future readers can ve
 - **No multi-feature batching in ralph-task.** The skill creates 1–N tasks per invocation but never tries to be ralph-backlog. If the ask grows feature-shaped, the pre-check stops and proposes ralph-prd → ralph-backlog.
 - **No ralph-sync logic change.** Sync's `agents/` ↔ `~/.claude/agents/` and `skills/` ↔ `~/.claude/skills/` mapping handles the new skill folder automatically; no special-case code.
 - **Line-count caps dropped from rule 1.** Number of ACs is the actionable signal; line count varies wildly with format (a 30-line drawio XML edit ≠ 30 lines of TypeScript).
+- **No mechanical edit ops in skill.** `--check-ac`, status changes, `--append-notes`, `--dep`, `--add-label`, `--priority`, `-t` (rename), and direct Edit-tool description tweaks stay in CLAUDE.md as the canonical reference. The skill never duplicates them. Rationale: CLAUDE.md is always loaded (zero overhead); routing mechanical ops through a skill would burn context for no judgment gain. Trigger separation enforces this — mechanical action verbs don't fire the skill.
+- **Edit triggers are conversational, not action-shaped.** "Edit task 110" doesn't trigger; "should I split task 110?" does. Rationale: judgment is most valuable BEFORE the action; once `backlog task edit` runs with a vague AC, the task is polluted. The skill is the deliberation companion, not the executor.
 
 ## Open questions
 
@@ -64,16 +75,19 @@ Decisions made during the brainstorm dialogue, recorded so future readers can ve
 
 ## Hand-off
 
-Per Rule 0 (purpose-value), implementation is **one backlog task**: "Replace project-manager-backlog with ralph-task skill in Ralph workflow." Single user-visible deliverable: the Ralph project uses `ralph-task` for ad-hoc task creation; the buggy agent is gone.
+Per Rule 0 (purpose-value), implementation is **one backlog task** (TASK-112): "Replace project-manager-backlog with ralph-task skill in Ralph workflow." Single user-visible deliverable: the Ralph project uses `ralph-task` for ad-hoc task creation AND for judgment-bearing edit deliberations; the buggy agent is gone; mechanical edits remain canonical in CLAUDE.md.
 
-Acceptance criteria (target ~7 ACs):
+Acceptance criteria (10):
 
-1. `skills/ralph-task/SKILL.md` exists with frontmatter, triggers, pre-checks, canonical create pattern (3 MUST rules), 6-rule decomposition heuristic with cadence note, mandatory self-check
-2. `.claude/brainstorm-rules.md` Phase 4 rule names `ralph-task` skill explicitly (text matches the wording in the brainstorm doc above)
-3. `CLAUDE.md` Task Lifecycle section has the 2-line pointer to ralph-task / ralph-prd→ralph-backlog
-4. `~/.claude/agents/project-manager-backlog.md` is deleted (`ls` confirms no file)
-5. `ralph-sync classify` returns `[new]` for `skills/ralph-task/SKILL.md` before sync
-6. After sync, `~/.claude/skills/ralph-task/SKILL.md` exists and `ralph-sync classify` returns `[unchanged]`
-7. Smoke test: a fresh Claude conversation invoking "create a task to fix typo X" routes to ralph-task (no fall-back to project-manager-backlog, since the agent is gone)
+1. `skills/ralph-task/SKILL.md` exists with valid YAML frontmatter (name: ralph-task, description with creation triggers: create a task / add a task / new task / track this as a task)
+2. SKILL.md documents the canonical `backlog task create` pattern with three MUST rules: repeated `--ac` flags, code blocks allowed in `-d`, `feature:<slug>` label optional with design-doc sanity check
+3. SKILL.md documents the 6-rule decomposition heuristic: 0 Purpose-value, 1 One-PR (~10 ACs cap), 2 Dependency, 3 Mirror (R11), 4 Rollback, 5 Verification — plus the cadence note (autonomous 5–7, human ~10)
+4. SKILL.md documents the mandatory self-check after create: `backlog task view <id> --plain | grep -A20 Acceptance` and the fix recipe `backlog task edit <id> --remove-ac N --ac ... --ac ...`
+5. SKILL.md "Editing existing tasks" section exists with conversational deliberation triggers (split task / scope grew / AC unclear / belongs to TASK-X), applies the 6 rules with decision recipes (split-into-sibling vs add-as-AC), and explicitly redirects mechanical ops to CLAUDE.md
+6. SKILL.md documents the writing-rule path-fence convention: paths to created-on-merge files go inside fenced code blocks to avoid task-validator false-positive flags
+7. `.claude/brainstorm-rules.md` Phase 4 first option text is updated to explicitly name the `ralph-task` skill (replacing the implicit project-manager-backlog grab)
+8. `CLAUDE.md` Task Lifecycle section contains a 1–2 line pointer: ralph-task for ad-hoc + edit deliberation, ralph-prd then ralph-backlog for PRD-driven feature work
+9. `~/.claude/agents/project-manager-backlog.md` is deleted (verifiable: `ls ~/.claude/agents/project-manager-backlog.md` returns "No such file")
+10. After merge, `bash .claude/skills/ralph-sync/sync.sh classify` shows `skills/ralph-task/SKILL.md` as `[new]` before sync, `[unchanged]` after
 
-Next: skip ralph-prd (single-skill scope, no PRD warranted) → directly create the implementation task via the new pattern (bootstrap case — apply the skill's documented `backlog task create` pattern manually, since the skill doesn't exist yet at task-creation time).
+Next: skip ralph-prd (single-skill scope, no PRD warranted) → TASK-112 is the implementation task. Worked manually via the canonical `backlog task create` pattern at brainstorm time (bootstrap case — the skill didn't exist yet at task-creation time). Existing TASK-112 to be edited to grow from 8 to 10 ACs (adds the editing section AC and the path-fence writing rule AC).
