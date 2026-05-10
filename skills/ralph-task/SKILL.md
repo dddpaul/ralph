@@ -115,6 +115,50 @@ This catches the historical defect where comma-joined `--ac "a,b,c"` collapsed m
 
 ---
 
+## What next? (after create)
+
+Immediately after the mandatory self-check passes — and **before** any branch creation, implementation, or skill-stop — surface a structured choice to the user instead of silently proceeding into interactive implementation. Use the `AskUserQuestion` tool.
+
+### The 4-option block (single task)
+
+- **Question stem:** `Task TASK-<id> created. What next?`
+- **Header:** `What next?`
+
+| # | Label | Description | Action on selection |
+|---|---|---|---|
+| 1 | Interactive now | "I branch, implement, review, merge in this session." | `backlog task edit <id> -s "In Progress"` → `git checkout -b task-<id>` → CLAUDE.md Task Lifecycle steps 2–6 |
+| 2 | Ralph now | "I launch /ralph-run tasks=<id> watch=5m in the devcontainer." | Invoke `/ralph-run tasks=<id> watch=5m devcontainer=true`. Do NOT pre-set status — Ralph manages it |
+| 3 | Continue chatting | "Task waits in To Do; you decide later." | One-line acknowledgment. No state change |
+| 4 | Other | "Type your own — e.g., 'ralph 1,2 not 3 without watch', 'interactive but skip review'." | Ask one clarifying question, then act. If still ambiguous after the clarification → fall back to option 3 |
+
+### Multi-task variant
+
+When the same trigger turn produced multiple tasks (a batch dictated in one breath), fire **one** prompt covering the batch, not one per task.
+
+- **Question stem:** `Tasks TASK-<id1>, TASK-<id2>, ... created. What next?`
+- **Header:** `What next?`
+- **Option 2 description switches to:** `/ralph-run tasks=<id1>,<id2>,... watch=5m`
+
+The four labels stay the same. Action mapping for option 2 passes the comma-joined task list to `/ralph-run` (still with `devcontainer=true`).
+
+### Skip condition (no prompt fires)
+
+If the trigger turn already contained an unambiguous execution-mode verb, skip the prompt and act directly. Bar for skip is high: a verb that names the execution mode. Vague tails ("...and we'll see") do NOT skip — they fire the prompt.
+
+| Intent in trigger turn | Action without prompting |
+|---|---|
+| "...and start it" / "implement X" / "fix it now" | Option 1 path |
+| "...and ralph it" / "run it with ralph" / "автономно" | Option 2 path |
+| "...for later" / "just log it" / "на потом" | Option 3 path |
+
+### Defensive defaults
+
+- **AskUserQuestion failure or parse error → fall back to option 3** (no-op + one-line acknowledgment). Never silently launch Ralph and never silently branch.
+- **`devcontainer=true` is passed explicitly to `/ralph-run`** even though it is the current default — defends against future skill-default flips. Devcontainer isolation is safety-critical (firewall, file boundary). Other launch knobs (model, effort, timeout, max_iterations) are left implicit and inherited from `/ralph-run`.
+- **Edit-deliberation lane does NOT fire this prompt.** Only the create lane does. Recipes A/B/C in the "Editing existing tasks" section below run their own state changes inline and stop without asking.
+
+---
+
 ## Editing existing tasks (judgment moments)
 
 When an edit-deliberation trigger fires, apply the 6 rules to decide between two recipes:
@@ -210,5 +254,7 @@ If same deliverable and within cap → recipe B (`backlog task edit 110 --ac "<o
 - [ ] `feature:<name>` label only attached after design-doc sanity check passed (or user opted in)
 - [ ] Self-check ran: `backlog task view <id> --plain | grep -A20 Acceptance`
 - [ ] Any collapsed AC was fixed with `--remove-ac N --ac "..." --ac "..."`
+- [ ] After create: AskUserQuestion fired unless skip-condition matched
+- [ ] Acted on the chosen option (1/2/3/4)
 - [ ] For edit-deliberation: applied rules 0/1/2/5 before choosing recipe A vs B vs C
 - [ ] Mechanical ops were NOT routed through this skill
