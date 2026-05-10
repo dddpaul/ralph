@@ -1,6 +1,10 @@
 ## Save Design Conclusions (before Phase 4)
 
-At the end of Phase 3 (after convergence, before presenting Phase 4 options), propose saving the design conclusions to `design/<name>-brainstorm.md` where `<name>` is a kebab-case slug shared with the eventual PRD (e.g., `design/auth-token-rotation-brainstorm.md`).
+At the end of Phase 3 (after convergence, before presenting Phase 4 options), the design must be persisted to `design/`. Two cases — pick one before Phase 4:
+
+### Case A — new brainstorm
+
+Propose saving the design conclusions to `design/<name>-brainstorm.md` where `<name>` is a kebab-case slug shared with the eventual PRD (e.g., `design/auth-token-rotation-brainstorm.md`).
 
 The file must follow this structure:
 
@@ -23,7 +27,32 @@ What was chosen, briefly.
 Next: `ralph-prd` to formalize as PRD, then `ralph-backlog` to generate tasks.
 ```
 
-If the user approves, write the file and confirm. If declined, skip and proceed to Phase 4.
+### Case B — extending or modifying an already-saved brainstorm
+
+If the current session is a follow-on to an existing `design/<name>-brainstorm.md` (e.g., adding a feature to an already-designed component, revisiting scope, deciding a previously deferred open question, capturing a defect that reshapes the design), propose **appending a dated addendum** to that file rather than writing a new one.
+
+Append at the bottom of the file in chronological order. The addendum must use this structure:
+
+```markdown
+---
+
+## Addendum: <topic> (added YYYY-MM-DD)
+
+### Why
+<one paragraph — the trigger / defect / new requirement that prompted the extension>
+
+### What changed
+<the decision, in the same shape as the parent brainstorm: prose, tables, or lists matching the parent's style>
+
+### Implementation checklist
+<bullets the implementer will execute, including any cleanup such as memory pruning, ralph-sync runs, or file deletions>
+```
+
+The dated heading lets future readers reconstruct decision history. Do not edit prior addenda or the original sections — always append.
+
+### In both cases
+
+If the user approves, write the file (or append the addendum) and confirm. If declined, skip and proceed to Phase 4 — but note in the conversation that the design exists only in ephemeral conversation context, so any backlog task created in Phase 4 will not have a stable doc reference for autonomous Ralph to read.
 
 This rule supplements (does not replace) any user-global Phase 4 rules — both apply.
 
