@@ -1,10 +1,10 @@
 ---
 id: TASK-110
 title: Fix broken backlog task list -l reference in ralph-review skill
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-05-09 06:15'
-updated_date: '2026-05-09 06:52'
+updated_date: '2026-05-10 12:50'
 labels: []
 dependencies: []
 ---
@@ -30,10 +30,20 @@ Emits one numeric task ID per line; downstream callers feed each into `backlog t
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 skills/ralph-review/SKILL.md Step 2b no longer references 'backlog task list -l <label>'; instead uses a grep pipeline that resolves task IDs from backlog/tasks/*.md
-- [ ] #2 The grep regex anchors on ^\s*-\s*['"]?feature:<name>['"]?\s*$ (YAML list-item form) to prevent false positives from description text
-- [ ] #3 The pipeline filters by ^status:\s*Done\s*$ so only Done tasks are returned
-- [ ] #4 Step 2b explains that downstream steps feed each resulting numeric ID into 'backlog task view <id> --plain'
-- [ ] #5 A short note in SKILL.md documents WHY the grep approach is used (backlog.md v1.44.0 has no -l filter on task list)
-- [ ] #6 ralph-sync classifies the project copy as [updated] after the change is committed (verifiable via 'bash .claude/skills/ralph-sync/sync.sh classify')
+- [x] #1 skills/ralph-review/SKILL.md Step 2b no longer references 'backlog task list -l <label>'; instead uses a grep pipeline that resolves task IDs from backlog/tasks/*.md
+- [x] #2 The grep regex anchors on ^\s*-\s*['"]?feature:<name>['"]?\s*$ (YAML list-item form) to prevent false positives from description text
+- [x] #3 The pipeline filters by ^status:\s*Done\s*$ so only Done tasks are returned
+- [x] #4 Step 2b explains that downstream steps feed each resulting numeric ID into 'backlog task view <id> --plain'
+- [x] #5 A short note in SKILL.md documents WHY the grep approach is used (backlog.md v1.44.0 has no -l filter on task list)
+- [x] #6 ralph-sync classifies the project copy as [updated] after the change is committed (verifiable via 'bash .claude/skills/ralph-sync/sync.sh classify')
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan: Replace Step 2b's 'backlog task list -l feature:<name> -s Done --plain' command with the pre-designed grep pipeline anchored on YAML list-item form. Add a brief WHY note explaining that backlog.md v1.44.0 has no -l filter on task list. Verify ralph-sync classifies as [updated] post-commit.
+
+Commit: `2750f08` - task-110: replace broken backlog task list -l with grep pipeline in ralph-review Step 2b
+
+Implementation complete: Step 2b in skills/ralph-review/SKILL.md now uses the grep pipeline against backlog/tasks/*.md, anchored on YAML list-item form, filtered by status:Done. WHY note added (backlog.md v1.44.0 has no -l/--label filter on task list). All 6 AC checked. ralph-sync classify confirms [updated] skill ralph-review. task-reviewer agent: APPROVED.
+<!-- SECTION:NOTES:END -->
