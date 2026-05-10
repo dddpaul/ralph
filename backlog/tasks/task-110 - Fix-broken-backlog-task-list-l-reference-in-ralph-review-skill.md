@@ -1,10 +1,10 @@
 ---
 id: TASK-110
 title: Fix broken backlog task list -l reference in ralph-review skill
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-05-09 06:15'
-updated_date: '2026-05-10 12:48'
+updated_date: '2026-05-10 12:50'
 labels: []
 dependencies: []
 ---
@@ -38,10 +38,12 @@ Emits one numeric task ID per line; downstream callers feed each into `backlog t
 - [x] #6 ralph-sync classifies the project copy as [updated] after the change is committed (verifiable via 'bash .claude/skills/ralph-sync/sync.sh classify')
 <!-- AC:END -->
 
-
-
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 Plan: Replace Step 2b's 'backlog task list -l feature:<name> -s Done --plain' command with the pre-designed grep pipeline anchored on YAML list-item form. Add a brief WHY note explaining that backlog.md v1.44.0 has no -l filter on task list. Verify ralph-sync classifies as [updated] post-commit.
+
+Commit: `2750f08` - task-110: replace broken backlog task list -l with grep pipeline in ralph-review Step 2b
+
+Implementation complete: Step 2b in skills/ralph-review/SKILL.md now uses the grep pipeline against backlog/tasks/*.md, anchored on YAML list-item form, filtered by status:Done. WHY note added (backlog.md v1.44.0 has no -l/--label filter on task list). All 6 AC checked. ralph-sync classify confirms [updated] skill ralph-review. task-reviewer agent: APPROVED.
 <!-- SECTION:NOTES:END -->
