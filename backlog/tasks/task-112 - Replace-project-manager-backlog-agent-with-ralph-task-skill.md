@@ -4,8 +4,9 @@ title: Replace project-manager-backlog agent with ralph-task skill
 status: To Do
 assignee: []
 created_date: '2026-05-09 17:03'
-updated_date: '2026-05-09 18:44'
-labels: []
+updated_date: '2026-05-10 08:28'
+labels:
+  - 'feature:ralph-task'
 dependencies: []
 priority: medium
 ---
