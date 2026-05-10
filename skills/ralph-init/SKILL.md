@@ -131,6 +131,24 @@ Assemble the Dockerfile from base + language snippets, then write three files:
 - `templates/devcontainer/devcontainer.json` → `.devcontainer/devcontainer.json` — update app label and port if specified
 - `templates/devcontainer/init-firewall.sh` → `.devcontainer/init-firewall.sh`
 
+**Host-side prerequisites for devcontainer auth (macOS):** the template forwards `CLAUDE_CODE_OAUTH_TOKEN` from the host into the container via `containerEnv` + `${localEnv:...}`. macOS hosts store Claude OAuth credentials in the system Keychain (not on disk), so the bind-mounted host credentials file is empty inside the container. Without the env-var forward, `claude` inside the container fails auth. After running `ralph-init`, tell the user to do the following on the host (one-time setup, token is valid for ~1 year):
+
+1. **Mint a long-lived token** by running `claude setup-token` once on the host. Reference: https://code.claude.com/docs/en/authentication.md#generate-a-long-lived-token
+
+2. **Export the token from the shell's always-sourced env file** so it propagates to non-interactive subshells. zsh users: add the export to `~/.zshenv` (NOT `~/.zshrc` — the latter is interactive-only). bash users: the equivalent always-sourced env file. macOS Keychain users can pull the token from Keychain inside that env file:
+
+   ```sh
+   export CLAUDE_CODE_OAUTH_TOKEN="$(security find-generic-password -a "$USER" -s "claude-code-oauth-token" -w 2>/dev/null)"
+   ```
+
+3. **GUI-app caveat:** VS Code launched from Dock/Spotlight does **not** source the shell's env file, so `${localEnv:CLAUDE_CODE_OAUTH_TOKEN}` resolves to empty when VS Code starts the devcontainer. Either (a) restart VS Code from a terminal that has the token in its environment, or (b) run `launchctl setenv CLAUDE_CODE_OAUTH_TOKEN <value>` once for a launchd-domain export visible to all GUI apps.
+
+4. **`launchctl setenv` does not persist across reboots.** Either re-run it after each reboot, or persist via a launchd plist (e.g. `~/Library/LaunchAgents/com.user.claude-oauth.plist` with a `RunAtLoad` `launchctl setenv` invocation).
+
+**Graceful degradation:** when the host shell does not export the token, `${localEnv:CLAUDE_CODE_OAUTH_TOKEN}` resolves to empty string and the container starts unaffected. The existing host Keychain auth path stays intact for non-devcontainer use.
+
+**Do not** commit the token value anywhere — only the env var name and the `${localEnv:...}` substitution belong in `devcontainer.json`.
+
 ### 3.7 `.claude/settings.json`, `.claude/hooks/`, and `.claude/settings.local.json`
 Read `templates/claude/settings.json` → write to `.claude/settings.json` (project-wide hooks).
 Read each `templates/claude/hooks/*-guard.sh` and `templates/claude/hooks/task-validator.sh` → write to `.claude/hooks/<name>.sh`. Make executable (`chmod +x`). Create `.claude/hooks/` directory if it does not exist.
