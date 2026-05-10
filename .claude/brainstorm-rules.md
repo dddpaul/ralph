@@ -33,6 +33,6 @@ This rule supplements (does not replace) any user-global Phase 4 rules — both 
 
 In Phase 4 (Next Steps), the first option must always be:
 
-- **Create backlog task** — Create a backlog task with full context from the brainstorm (selected approach, design decisions, acceptance criteria, testing strategy) sufficient for autonomous execution in a Ralph loop without human guidance.
+- **Create backlog task(s)** — Invoke the `ralph-task` skill with the brainstorm context (selected approach, design decisions, acceptance criteria, testing strategy) sufficient for autonomous execution in a Ralph loop without human guidance. If the scope is PRD-shaped (≥3 user stories, multiple lanes), `ralph-task`'s pre-check will redirect to `ralph-prd` → `ralph-backlog`.
 
 The remaining options (Write plan, Plan mode, Start now) follow after.
