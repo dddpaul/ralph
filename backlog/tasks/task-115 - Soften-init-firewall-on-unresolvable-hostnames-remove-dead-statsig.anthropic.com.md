@@ -3,10 +3,10 @@ id: TASK-115
 title: >-
   Soften init-firewall on unresolvable hostnames; remove dead
   statsig.anthropic.com
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-05-10 18:35'
-updated_date: '2026-05-10 18:36'
+updated_date: '2026-05-10 18:37'
 labels: []
 dependencies: []
 priority: high
@@ -72,10 +72,12 @@ After edits, run the script with a known-NXDOMAIN domain temporarily prepended t
 - [x] #5 No surviving "exit 1" on the per-domain resolution path; the only exit-on-error in the for-loop is for the IP-format validation (which remains)
 <!-- AC:END -->
 
-
-
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 Plan: Edit .devcontainer/init-firewall.sh to (a) replace exit 1 with continue + WARN on resolution failure, (b) remove statsig.anthropic.com from the allowed-domains list. Mirror to skills/ralph-init/templates/devcontainer/init-firewall.sh via cp. Verify byte-identical via diff and bash -n on both.
+
+Commit: `269c1fc` - task-115: Soften init-firewall on unresolvable hostnames; remove dead statsig.anthropic.com
+
+All 5 ACs verified. Resolution-failure path now logs WARN and continues; statsig.anthropic.com removed from allow list. R11 parity confirmed. Reviewer APPROVED.
 <!-- SECTION:NOTES:END -->
