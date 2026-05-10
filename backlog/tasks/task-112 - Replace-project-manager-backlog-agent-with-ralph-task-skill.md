@@ -1,10 +1,10 @@
 ---
 id: TASK-112
 title: Replace project-manager-backlog agent with ralph-task skill
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-05-09 17:03'
-updated_date: '2026-05-10 11:26'
+updated_date: '2026-05-10 11:29'
 labels:
   - 'feature:ralph-task'
 dependencies: []
@@ -88,10 +88,12 @@ See design/ralph-task-brainstorm.md for full hand-off, scope cuts, and open ques
 - [x] #10 skills/ralph-task/SKILL.md 'Editing existing tasks' section exists with language-agnostic conversational deliberation triggers (English: split this task / scope grew / AC unclear / belongs to TASK-X; Russian: разбить задачу / расширилась задача / AC размытый / переложить в отдельную задачу), applies the 6 rules with decision recipes (split into sibling task with --dep vs add as new AC), and redirects mechanical ops (--check-ac, status, --append-notes, --add-label, --priority, -t) to CLAUDE.md
 <!-- AC:END -->
 
-
-
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 Plan: (1) Create skills/ralph-task/SKILL.md following design/ralph-task-brainstorm.md — three MUST rules, 6-rule decomposition heuristic table, mandatory self-check, editing-existing-tasks section with conversational triggers, language-agnostic creation+edit triggers (English+Russian), path-fence writing rule. (2) Update .claude/brainstorm-rules.md Phase 4 first option to name ralph-task. (3) Add Task Lifecycle pointer (~2 lines) to CLAUDE.md and remove the stale project-manager-backlog reference. (4) Delete ~/.claude/agents/project-manager-backlog.md. (5) Verify ralph-sync classify shows skills/ralph-task/SKILL.md as [new]. (6) Run task-reviewer agent on diff. (7) Final lint via bash -n on sync.sh + classify run; merge.
+
+Commit: `96ce97a` - task-112: Replace project-manager-backlog agent with ralph-task skill
+
+Implemented ralph-task skill at skills/ralph-task/SKILL.md (214 lines) with three MUST rules, the 6-rule decomposition heuristic + cadence note, mandatory self-check, English+Russian intent-based triggers, editing-existing-tasks section with decision recipes A/B/C, mechanical-ops redirect to CLAUDE.md, and the path-fence writing rule. Updated .claude/brainstorm-rules.md Phase 4 first option to invoke ralph-task; updated CLAUDE.md Task Lifecycle to point to ralph-task (ad-hoc + edit deliberation) and ralph-prd -> ralph-backlog (PRD-driven). Deleted user-global ~/.claude/agents/project-manager-backlog.md. Removed stale project-manager-backlog reference from skills/ralph-init/templates/root/CLAUDE.md to prevent footgun for new bootstraps. ralph-sync round-trip verified: pre-sync [new], post-sync [unchanged]. task-reviewer agent: APPROVED.
 <!-- SECTION:NOTES:END -->
