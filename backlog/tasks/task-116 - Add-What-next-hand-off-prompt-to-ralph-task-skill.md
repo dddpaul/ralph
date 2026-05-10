@@ -1,10 +1,10 @@
 ---
 id: TASK-116
 title: Add 'What next?' hand-off prompt to ralph-task skill
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-05-10 19:09'
-updated_date: '2026-05-10 19:20'
+updated_date: '2026-05-10 19:23'
 labels:
   - 'feature:ralph-task'
 dependencies: []
@@ -36,10 +36,12 @@ Bootstrap note: this task is created BEFORE the skill carries the new section, s
 - [x] #9 After merge, running 'bash .claude/skills/ralph-sync/sync.sh classify' on skills/ralph-task/SKILL.md shows the file as needing sync; after running the sync, the same command shows it as [unchanged]
 <!-- AC:END -->
 
-
-
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 Plan: 1) Insert new 'What next? (after create)' section in skills/ralph-task/SKILL.md between Mandatory self-check and Editing existing tasks. Document 4-option AskUserQuestion block, multi-task variant, action mapping, skip conditions, defensive defaults. 2) Add 2 bullets to Checklist before stopping. 3) Delete ~/.claude/projects/-Users-paul-Private-Projects-ai-ralph/memory/feedback_ask_before_implementing_new_tasks.md and remove its MEMORY.md line. 4) Verify ralph-sync classify reports the file as needing sync. 5) Spawn task-reviewer agent on git diff master..HEAD before marking Done.
+
+Commit: `53acfa0` - task-116: Add 'What next? (after create)' section to ralph-task skill
+
+Implemented: skills/ralph-task/SKILL.md now carries the 'What next? (after create)' section (4-option AskUserQuestion block + multi-task variant + skip-condition table + defensive defaults). Closing checklist gained two bullets. Side effects: deleted auto-memory feedback file feedback_ask_before_implementing_new_tasks.md and removed its MEMORY.md line — rule lives in the skill from now on. Verified ralph-sync flow: classify [updated] → apply → classify [unchanged]. task-reviewer agent: APPROVED.
 <!-- SECTION:NOTES:END -->
