@@ -62,9 +62,18 @@ Collect all tasks regardless of status (the user explicitly chose them).
 
 **If `tasks=` was NOT provided (label-based default):**
 
+Resolve Done tasks for the feature by grepping `backlog/tasks/*.md` directly. The `backlog` CLI (v1.44.0) has no `-l/--label` filter on `task list`, so we read task files instead. The regex anchors on the YAML list-item form `^\s*-\s*['"]?feature:<name>['"]?\s*$` to avoid false positives from description prose; `^status:\s*Done\s*$` filters to completed tasks; `sort -V` gives natural numeric ordering.
+
 ```bash
-backlog task list -l feature:<name> -s Done --plain
+name=<feature-slug>
+grep -rl --include="*.md" -E "^\s*-\s*['\"]?feature:${name}['\"]?\s*\$" backlog/tasks/ \
+  | while IFS= read -r f; do
+      grep -qE "^status:\s*Done\s*\$" "$f" \
+        && grep -m1 -E "^id:\s*TASK-" "$f" | sed -E 's/^id:[[:space:]]*TASK-//'
+    done | sort -V
 ```
+
+The pipeline emits one numeric task ID per line. For each ID, run `backlog task view <id> --plain` to load the full task for downstream steps.
 
 If no tasks are returned, output and stop:
 
