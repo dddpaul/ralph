@@ -1,0 +1,214 @@
+---
+name: ralph-task
+description: "Create one or a few ad-hoc backlog tasks (defects, chores, small fixes) outside the PRD/brainstorm pipeline, AND deliberate judgment-bearing edits to existing tasks (split / add as AC / rework vague AC). Matching is by **semantic intent in any natural language**, not exact keyword. English creation triggers: create a task, add a task, new task, track this as a task, log a task. Russian creation triggers: создай задачу, добавь задачу, новая задача, оформи задачу. English edit-deliberation triggers: should I split this task, scope grew, AC unclear, this belongs to TASK-X. Russian edit-deliberation triggers: разбить задачу, расширилась задача, AC размытый, переложить в отдельную задачу. Mechanical action verbs (edit task X status to Done, mark AC 3 done, отредактируй задачу) deliberately do NOT trigger — they are owned by CLAUDE.md."
+---
+
+# Ralph Task Creator & Edit-Deliberation Companion
+
+Thin skill for ad-hoc backlog work. Two lanes:
+
+1. **Create** one or a few backlog tasks outside the PRD/brainstorm pipeline.
+2. **Deliberate** mid-flight judgment calls on existing tasks (split, add as AC, rework vague AC).
+
+This skill complements — does not replace — `ralph-prd` → `ralph-backlog` (PRD-driven feature decomposition). It also does NOT own mechanical edits (`--check-ac`, status changes, `--append-notes`, `--add-label`, `--priority`, `-t` rename, `--dep`); those stay in CLAUDE.md.
+
+---
+
+## Triggers
+
+Matching is **by semantic intent in any natural language**, not exact keyword. Other languages match the same intent without requiring a re-listing of variants.
+
+### Creation triggers
+
+| Language | Examples |
+|---|---|
+| English | "create a task", "add a task", "new task", "track this as a task", "log a task" |
+| Russian | "создай задачу", "добавь задачу", "новая задача", "оформи задачу" |
+
+### Edit-deliberation triggers (judgment moments)
+
+| Language | Examples |
+|---|---|
+| English | "should I split this task", "scope grew", "should I add this as an AC or new task", "is this AC clear / verifiable", "rework this AC", "this fix belongs to TASK-X or its own" |
+| Russian | "разбить задачу", "расширилась задача", "AC размытый", "переложить в отдельную задачу" |
+
+### Non-triggers (redirect to CLAUDE.md)
+
+Mechanical action verbs: "edit task 110 status to Done", "mark AC 3 done", "append note to task 5", "отредактируй задачу 7", "set priority high on task 9". These are routine `backlog task edit` operations — apply directly per CLAUDE.md, without invoking this skill.
+
+---
+
+## Pre-checks (delegate when out of lane)
+
+Before creating, classify the ask:
+
+- **PRD-shaped** (≥3 user stories, multiple lanes, broad scope) → propose `ralph-prd` → `ralph-backlog` instead.
+- **Open exploration** ("what could we do about X?", "should we even build this?") → propose `brainstorm` first.
+- **One or a few well-formed asks** → continue with the create flow.
+
+---
+
+## Canonical `backlog task create` pattern
+
+```bash
+backlog task create "<English title>" \
+  -d "<WHY: paragraph; may include code blocks for verbatim implementer use>" \
+  --ac "<atomic outcome 1>" \
+  --ac "<atomic outcome 2>" \
+  --priority <high|medium|low>
+```
+
+### Three MUST rules
+
+1. **MUST: repeat `--ac` per criterion.** The CLI does NOT split on commas. `--ac "a,b,c"` creates **one** AC literally containing the commas, not three. Repeat the flag once per criterion.
+
+2. **MUST: description may include code blocks.** Override any generic "WHY without HOW" guidance — autonomous Ralph runs without the original conversation context and cannot re-derive a regex, bash pipeline, SQL fragment, or specific command. If the implementer needs the exact snippet, embed it inside a fenced block in `-d`.
+
+3. **MUST: `feature:<slug>` label is optional.** Default off. Attach `-l "feature:<name>"` only when the task is a missed/follow-on item for an existing feature. If the user names a feature, **verify** that one of the design docs exists before attaching the label:
+
+   ```bash
+   ls design/<name>-prd.md design/<name>-brainstorm.md 2>/dev/null
+   ```
+
+   If neither exists, warn the user and ask whether to (a) skip the label, (b) create the design doc first via `ralph-prd`, or (c) attach anyway as a stub.
+
+### Title language constraint
+
+Task titles passed to `backlog task create` must be in **English** — the CLI derives filenames from the title. The description (`-d`) and acceptance criteria (`--ac`) may be in any language.
+
+---
+
+## 6-rule decomposition heuristic
+
+Applies equally to creation ("one task or many?") and edit-deliberation ("add as AC or split into sibling task?").
+
+| # | Rule | Signal |
+|---|---|---|
+| 0 | **Purpose-value** (highest) | One task = one user-visible deliverable. Intermediate artifacts (regenerated files, format conversions, mirror updates) are **ACs**, not tasks. Test: "If only step N shipped, would the user have anything they asked for?" |
+| 1 | One-PR | ~10 ACs soft cap. Beyond that, two purpose-values are bundled — split. |
+| 2 | Dependency | Cross-purpose-value reference → split + `--dep`. Same-purpose-value reference → keep together. |
+| 3 | Mirror (R11) | Mechanical mirror in parity location → same task. |
+| 4 | Rollback | Partial merge breaks coherence → same task. |
+| 5 | Verification | Every AC objectively pass/fail (grep, test, `bash -n`, file existence). |
+
+### Cadence note
+
+Autonomous Ralph loops favor smaller tasks (**5–7 ACs typical**). Human-led work runs closer to **~10 cap**. Same heuristic; different soft cap on rule 1.
+
+---
+
+## Mandatory self-check (after create)
+
+Immediately after `backlog task create` returns an ID, verify the ACs were actually split:
+
+```bash
+backlog task view <id> --plain | grep -A20 "Acceptance"
+```
+
+Read each AC line. If a single AC line contains commas joining what should be separate atomic outcomes, fix in one command:
+
+```bash
+backlog task edit <id> --remove-ac N --ac "<split outcome 1>" --ac "<split outcome 2>"
+```
+
+This catches the historical defect where comma-joined `--ac "a,b,c"` collapsed multiple intended criteria into one literal AC.
+
+---
+
+## Editing existing tasks (judgment moments)
+
+When an edit-deliberation trigger fires, apply the 6 rules to decide between two recipes:
+
+### Decision: split into sibling task vs. add as new AC
+
+- **Rule 0 (purpose-value):** Is the new outcome part of the existing task's deliverable, or its own deliverable? Different deliverable → split.
+- **Rule 1 (one-PR / ~10 ACs):** Would adding this push the task over the cap? Over → split.
+- **Rule 2 (dependency):** Cross-purpose-value reference → split with `--dep`. Same-purpose-value → keep.
+- **Rule 5 (verification):** Is each AC objectively pass/fail? If the AC is vague ("works correctly", "good UX"), reword it to a verifiable form. If it cannot be made verifiable in one line, split it.
+
+### Recipe A — split into sibling task
+
+```bash
+backlog task create "<new English title>" \
+  -d "<WHY>" \
+  --ac "<atomic outcome 1>" \
+  --ac "<atomic outcome 2>" \
+  --dep task-<existing-id> \
+  --priority <high|medium|low>
+```
+
+Then run the mandatory self-check on the new task.
+
+### Recipe B — add as new AC
+
+```bash
+backlog task edit <id> --ac "<atomic outcome>"
+```
+
+### Recipe C — rework vague AC
+
+```bash
+backlog task edit <id> --remove-ac N --ac "<verifiable rewrite>"
+```
+
+If the rewrite naturally splits into multiple atomic outcomes, repeat `--ac` per outcome in the same command.
+
+### Mechanical operations — NOT this skill's lane
+
+For routine state changes — checking off ACs (`--check-ac` / `--uncheck-ac`), status transitions (`-s "In Progress"` / `-s "Done"`), appending notes (`--append-notes`), labels (`--add-label` / `--remove-label`), priority (`--priority`), title rename (`-t`), or dependency edits (`--dep`) — apply directly per CLAUDE.md Task Lifecycle. Do NOT route through this skill.
+
+---
+
+## Writing rule (skill self-protection)
+
+The task-validator hook (`.claude/hooks/task-validator.sh`) checks that backtick-quoted paths and markdown link targets exist on disk, but it **skips fenced code blocks**. When this skill or any task description references a path to a file that will only exist *after merge* (e.g., during pre-merge state, the SKILL.md may need to forward-reference its own path), keep that path inside a fenced block:
+
+```text
+skills/ralph-task/SKILL.md
+```
+
+Plain prose mentions of yet-to-exist paths trigger validator false positives. Fenced blocks are the safe channel.
+
+---
+
+## Quick examples
+
+### Example 1 — single ad-hoc defect
+
+User: "Create a task for the broken redirect on /settings."
+
+```bash
+backlog task create "Fix broken redirect on /settings" \
+  -d "After the auth refactor in TASK-99, /settings redirects to /login even for authenticated users. Reproduce: log in, visit /settings, observe redirect chain. Likely cause: middleware order in app/middleware.ts." \
+  --ac "Authenticated user visiting /settings sees the settings page (no redirect)" \
+  --ac "Unauthenticated user visiting /settings is still redirected to /login" \
+  --ac "bash -n on app/middleware.ts passes" \
+  --priority high
+```
+
+Then self-check:
+
+```bash
+backlog task view <new-id> --plain | grep -A20 "Acceptance"
+```
+
+### Example 2 — edit deliberation
+
+User: "I'm working on TASK-110 and the scope grew — should I add another AC or split?"
+
+Apply rule 0: is the new outcome part of TASK-110's purpose-value, or its own? Apply rule 1: would TASK-110 exceed ~10 ACs? Apply rule 5: is each new AC verifiable?
+
+If different deliverable or AC count would exceed cap → recipe A (split into sibling with `--dep task-110`).
+If same deliverable and within cap → recipe B (`backlog task edit 110 --ac "<outcome>"`).
+
+---
+
+## Checklist before stopping
+
+- [ ] Each `--ac` flag was repeated per criterion (no comma-joined lists)
+- [ ] Description includes code blocks where the implementer needs the exact snippet
+- [ ] `feature:<name>` label only attached after design-doc sanity check passed (or user opted in)
+- [ ] Self-check ran: `backlog task view <id> --plain | grep -A20 Acceptance`
+- [ ] Any collapsed AC was fixed with `--remove-ac N --ac "..." --ac "..."`
+- [ ] For edit-deliberation: applied rules 0/1/2/5 before choosing recipe A vs B vs C
+- [ ] Mechanical ops were NOT routed through this skill

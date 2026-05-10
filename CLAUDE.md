@@ -28,7 +28,7 @@ Then run `backlog task list -s "To Do" --plain`: if none remain → reply `<prom
 5. **Done:** final build+lint+tests must pass. `backlog task edit <id> -s "Done" --append-notes "..."`.
 6. **Merge:** commit task file, `git checkout master && git merge <branch> && git branch -d <branch>`.
 
-Use `backlog` CLI for all task operations; run `backlog task edit --help` for syntax. For complex task management, use the `project-manager-backlog` agent.
+Use `backlog` CLI for all task operations; run `backlog task edit --help` for syntax. For one-off / ad-hoc task creation and judgment-bearing edits (split / add as AC / rework vague AC), use the `ralph-task` skill ("create a task" / "add a task" / "should I split this"). For PRD-driven feature decomposition, use `ralph-prd` then `ralph-backlog`.
 
 Prefer `backlog task edit` for: adding/removing acceptance criteria, status changes, dependency edits, label/priority changes, frontmatter changes, append-notes, and AC checkbox flips (`--check-ac` / `--uncheck-ac`). Direct Edit tool is acceptable for in-place text changes inside the description body or inside an existing AC's text — any change whose diff stays within an existing line and does not touch frontmatter, section markers (`<!-- SECTION:... -->`, `<!-- AC:... -->`), or the count of AC lines.
 
