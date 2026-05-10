@@ -1,10 +1,10 @@
 ---
 id: TASK-114
 title: Forward CLAUDE_CODE_OAUTH_TOKEN through devcontainer (template + this project)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-05-10 13:07'
-updated_date: '2026-05-10 15:17'
+updated_date: '2026-05-10 17:03'
 labels:
   - devcontainer
   - template
@@ -87,13 +87,23 @@ Not an AC because Ralph cannot run this autonomously from inside the very contai
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Inside the existing `containerEnv` block in `skills/ralph-init/templates/devcontainer/devcontainer.json`, the entry `"CLAUDE_CODE_OAUTH_TOKEN": "${localEnv:CLAUDE_CODE_OAUTH_TOKEN}"` is present
-- [ ] #2 The new entry is the first key in the `containerEnv` block (placed before `NODE_OPTIONS`)
-- [ ] #3 All other keys in containerEnv (NODE_OPTIONS, CLAUDE_CONFIG_DIR, POWERLEVEL9K_DISABLE_GITSTATUS, HTTP_PROXY, HTTPS_PROXY, NO_PROXY, TZ) keep their existing values and relative order
-- [ ] #4 Template file `skills/ralph-init/templates/devcontainer/devcontainer.json` parses as valid JSONC (a URL-aware comment-stripper followed by `json.loads` succeeds — the naive `re.sub(r"//[^\n]*", "", ...)` regex must NOT be used to validate, because it eats `//` inside URL string values)
-- [ ] #5 Either `skills/ralph-init/SKILL.md` or `README.md` gains a host-side prerequisites note covering: (a) `claude setup-token`, (b) export from the shell's always-sourced env file with the optional Keychain helper one-liner, (c) the GUI-app caveat (VS Code launched from Dock/Spotlight does not source the shell env file; restart from shell or use `launchctl setenv`), (d) `launchctl setenv` does not persist across reboots (re-run on reboot, or persist via a launchd plist)
-- [ ] #6 No occurrence of an actual OAuth token value (no string starting with `sk-ant-` or similar) appears anywhere in the diff
-- [ ] #7 task-reviewer agent verdict on `git diff master..HEAD` is APPROVED
-- [ ] #8 Inside this repo's live .devcontainer/devcontainer.json containerEnv block, the entry "CLAUDE_CODE_OAUTH_TOKEN": "${localEnv:CLAUDE_CODE_OAUTH_TOKEN}" is present as the FIRST key (before NODE_OPTIONS), and the file parses as valid JSONC
-- [ ] #9 Live .devcontainer/devcontainer.json and skills/ralph-init/templates/devcontainer/devcontainer.json mirror byte-for-byte for the new entry: same key, same value, same first-key position (R11 parity)
+- [x] #1 Inside the existing `containerEnv` block in `skills/ralph-init/templates/devcontainer/devcontainer.json`, the entry `"CLAUDE_CODE_OAUTH_TOKEN": "${localEnv:CLAUDE_CODE_OAUTH_TOKEN}"` is present
+- [x] #2 The new entry is the first key in the `containerEnv` block (placed before `NODE_OPTIONS`)
+- [x] #3 All other keys in containerEnv (NODE_OPTIONS, CLAUDE_CONFIG_DIR, POWERLEVEL9K_DISABLE_GITSTATUS, HTTP_PROXY, HTTPS_PROXY, NO_PROXY, TZ) keep their existing values and relative order
+- [x] #4 Template file `skills/ralph-init/templates/devcontainer/devcontainer.json` parses as valid JSONC (a URL-aware comment-stripper followed by `json.loads` succeeds — the naive `re.sub(r"//[^\n]*", "", ...)` regex must NOT be used to validate, because it eats `//` inside URL string values)
+- [x] #5 Either `skills/ralph-init/SKILL.md` or `README.md` gains a host-side prerequisites note covering: (a) `claude setup-token`, (b) export from the shell's always-sourced env file with the optional Keychain helper one-liner, (c) the GUI-app caveat (VS Code launched from Dock/Spotlight does not source the shell env file; restart from shell or use `launchctl setenv`), (d) `launchctl setenv` does not persist across reboots (re-run on reboot, or persist via a launchd plist)
+- [x] #6 No occurrence of an actual OAuth token value (no string starting with `sk-ant-` or similar) appears anywhere in the diff
+- [x] #7 task-reviewer agent verdict on `git diff master..HEAD` is APPROVED
+- [x] #8 Inside this repo's live .devcontainer/devcontainer.json containerEnv block, the entry "CLAUDE_CODE_OAUTH_TOKEN": "${localEnv:CLAUDE_CODE_OAUTH_TOKEN}" is present as the FIRST key (before NODE_OPTIONS), and the file parses as valid JSONC
+- [x] #9 Live .devcontainer/devcontainer.json and skills/ralph-init/templates/devcontainer/devcontainer.json mirror byte-for-byte for the new entry: same key, same value, same first-key position (R11 parity)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan: (1) Add CLAUDE_CODE_OAUTH_TOKEN as the FIRST key in containerEnv block of skills/ralph-init/templates/devcontainer/devcontainer.json. (2) Mirror byte-for-byte to .devcontainer/devcontainer.json. (3) Validate both files parse as JSONC (URL-aware comment stripper, NOT naive regex). (4) Append host-side prerequisites note to skills/ralph-init/SKILL.md near Step 3.6 covering claude setup-token, .zshenv export with optional Keychain helper, GUI-app caveat, and launchctl persistence note. (5) Verify diff has no real token values. (6) task-reviewer agent on master..HEAD. (7) Done + merge.
+
+Commit: `822e1ff` - task-114: forward CLAUDE_CODE_OAUTH_TOKEN through devcontainer
+
+Implementation: added CLAUDE_CODE_OAUTH_TOKEN as the first containerEnv key in both skills/ralph-init/templates/devcontainer/devcontainer.json and .devcontainer/devcontainer.json (byte-for-byte parity at line 51). Added host-side prerequisites section to skills/ralph-init/SKILL.md just inside Step 3.6 covering: claude setup-token, .zshenv export with optional Keychain helper, GUI-app caveat with launchctl setenv, and reboot-persistence note via launchd plist. Both files validated as JSONC via URL-aware comment stripper (/tmp/claude/validate_jsonc.py), key order preserved. task-reviewer agent verdict: APPROVED (9/9 ACs met, all standard checklist items clean, R7/R10/R11/R12 custom rules pass). Manual smoke test deferred per task description (Ralph cannot self-verify from inside the container being tested).
+<!-- SECTION:NOTES:END -->
