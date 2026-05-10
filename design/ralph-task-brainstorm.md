@@ -92,3 +92,56 @@ Acceptance criteria (10):
 10. After merge, `bash .claude/skills/ralph-sync/sync.sh classify` shows `skills/ralph-task/SKILL.md` as `[new]` before sync, `[unchanged]` after
 
 Next: skip ralph-prd (single-skill scope, no PRD warranted) → TASK-112 is the implementation task. Worked manually via the canonical `backlog task create` pattern at brainstorm time (bootstrap case — the skill didn't exist yet at task-creation time). Existing TASK-112 to be edited to grow from 8 to 10 ACs (adds the editing section AC and the path-fence writing rule AC).
+
+---
+
+## Addendum: "What next?" hand-off (added 2026-05-10)
+
+Follow-on extension to the skill: after `backlog task create` returns a new ID and the mandatory self-check passes, the skill must surface a structured choice to the user instead of silently proceeding into implementation.
+
+### Why
+
+Witnessed defect on TASK-115 (init-firewall fix): the skill (proxied through Claude Code conversation) created the task and immediately branched + implemented interactively without asking. User pushback: *"why do you start task interactive? i'd prefer ralph run later. or better — you should ask with options"*. Defaulting to interactive bypasses the autonomous Ralph loop the project is built around and burns Opus context unnecessarily. The fix must live in the skill (not auto-memory) so it's enforced uniformly across sessions and survives memory pruning.
+
+### The 4-option block
+
+Rendered via `AskUserQuestion` immediately after the self-check, before the final checklist:
+
+| # | Label | Description | Action |
+|---|---|---|---|
+| 1 | Interactive now | "I branch, implement, review, merge in this session." | `backlog task edit <id> -s "In Progress"` → `git checkout -b task-<id>` → CLAUDE.md Task Lifecycle steps 2–6 |
+| 2 | Ralph now | "I launch /ralph-run tasks=<id> watch=5m in the devcontainer." | Invoke `/ralph-run tasks=<id> watch=5m devcontainer=true` via Skill tool. Do NOT pre-set status — Ralph manages it |
+| 3 | Continue chatting | "Task waits in To Do; you decide later." | One-line acknowledgment. No state change |
+| 4 | Other | "Type your own — e.g., 'ralph 1,2 not 3 without watch', 'interactive but skip review'." | Ask one clarifying question, then act. If still ambiguous → fall back to option 3 |
+
+Question stem (single-task): `"Task TASK-<id> created. What next?"`. Header: `"What next?"`. Multi-task variant: `"Tasks TASK-<id1>, TASK-<id2>, ... created. What next?"`; option 2 description switches to `tasks=<id1>,<id2>,...`. Single prompt per batch (not per-task) — multiple tasks dictated in one breath share one hand-off decision.
+
+### Skip condition (no prompt fires)
+
+If the trigger turn already contained an unambiguous execution-mode verb, skip the prompt:
+
+| Intent in trigger turn | Action taken without prompting |
+|---|---|
+| "...and start it" / "implement X" / "fix it now" | Option 1 path |
+| "...and ralph it" / "run it with ralph" / "автономно" | Option 2 path |
+| "...for later" / "just log it" / "на потом" | Option 3 path |
+
+Bar for skip is high: a verb that names the execution mode. Vague tails ("...and we'll see") do NOT skip — they fire the prompt.
+
+### Defensive defaults
+
+- `AskUserQuestion` parse failure or tool error → fall back to option 3 (no-op + acknowledge). Never silently launch Ralph or branch.
+- `devcontainer=true` is passed explicitly to `/ralph-run` even though it's the current default — defends against future skill-default flips. Devcontainer is safety-critical (firewall, file isolation); other launch knobs (model, effort, timeout, max_iterations) are left implicit and inherited from `/ralph-run` so ralph-task doesn't drift when defaults change.
+- Edit-deliberation lane (split / add-as-AC / rework) does NOT fire the prompt. Only the create lane does.
+
+### Section name parity
+
+The new SKILL.md section is named **"What next? (after create)"** — matches the user-facing question header so the prompt body and section name are the same string.
+
+### Implementation checklist
+
+1. `skills/ralph-task/SKILL.md`: insert "What next? (after create)" section between "Mandatory self-check" and "Editing existing tasks".
+2. `skills/ralph-task/SKILL.md`: append two lines to "Checklist before stopping" — AskUserQuestion fired (or skip-condition matched), action taken on the chosen option.
+3. Remove `~/.claude/projects/-Users-paul-Private-Projects-ai-ralph/memory/feedback_ask_before_implementing_new_tasks.md` and its `MEMORY.md` line. The rule lives in the skill from now on; auto-memory copy would be drift surface.
+4. ralph-sync to push updated `skills/ralph-task/SKILL.md` to `~/.claude/skills/ralph-task/SKILL.md`.
+5. Bootstrap caveat: the new task that implements this addendum is created BEFORE the skill carries the new section, so the very first invocation of the prompt will fire from the conversation following the (manual) create — same bootstrap pattern as the original skill build.
