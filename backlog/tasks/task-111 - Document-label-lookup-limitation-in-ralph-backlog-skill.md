@@ -1,10 +1,10 @@
 ---
 id: TASK-111
 title: Document label-lookup limitation in ralph-backlog skill
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-05-09 06:15'
-updated_date: '2026-05-09 06:52'
+updated_date: '2026-05-10 11:07'
 labels: []
 dependencies: []
 ---
@@ -22,3 +22,9 @@ skills/ralph-backlog/SKILL.md mandates -l "feature:<name>" on every backlog task
 - [ ] #3 The existing -l "feature:<name>" emission rule on 'backlog task create' is preserved unchanged
 - [ ] #4 ralph-sync classifies the project copy as [updated] after commit
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan: Add 'Looking up tasks by feature label' subsection to skills/ralph-backlog/SKILL.md, noting that 'backlog task list -l' does not support label filtering as of backlog.md v1.44.0, and cross-referencing skills/ralph-review/SKILL.md Step 2b for the grep-based lookup pattern. Preserve the existing -l "feature:<name>" emission rule for backlog task create. Verify ralph-sync classifies the project copy as [updated] after the change.
+<!-- SECTION:NOTES:END -->

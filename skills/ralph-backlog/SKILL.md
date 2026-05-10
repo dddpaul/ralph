@@ -53,6 +53,8 @@ backlog task create "<title>" \
 
 Where `<name>` is the feature slug derived from the PRD filename: strip the `design/` prefix and `-prd.md` suffix (e.g., `design/task-priority-prd.md` → `feature:task-priority`).
 
+> **Looking up tasks by feature label.** As of **backlog.md v1.44.0**, `backlog task list` does **not** accept a `-l` / `--label` flag — labels are set on creation but cannot be filtered on via the CLI. To resolve `feature:<name>` into a task list, use the grep-based lookup pipeline documented in `skills/ralph-review/SKILL.md` Step 2b. That skill is the single source of truth for the workaround; do not duplicate the pipeline here.
+
 For tasks with dependencies on earlier tasks:
 
 ```bash
