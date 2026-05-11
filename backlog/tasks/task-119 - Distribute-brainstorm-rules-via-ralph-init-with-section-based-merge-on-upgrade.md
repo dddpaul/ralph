@@ -1,10 +1,10 @@
 ---
 id: TASK-119
 title: Distribute brainstorm-rules via ralph-init with section-based merge on upgrade
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-05-11 11:22'
-updated_date: '2026-05-11 11:28'
+updated_date: '2026-05-11 11:33'
 labels:
   - 'feature:ralph-init'
 dependencies: []
@@ -67,8 +67,6 @@ Ship the canonical Ralph brainstorm rules (Save Design Conclusions Case A/B + Ph
 - [x] #7 skills/ralph-init/SKILL.md upgrade flow documents the section-aware merge algorithm: split existing file at '## Project additions' heading; regenerate above from template; preserve heading+below verbatim; if heading is absent (legacy file lacking the convention), treat entire existing file as user content and append under freshly-added heading (one-time migration)
 <!-- AC:END -->
 
-
-
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
@@ -80,4 +78,10 @@ Plan:
    - Add entry in U2 status table (item 12) with merge semantics note.
    - Add merge algorithm in U4 special-merge section.
 4. Verify ralph-sync classify shows ralph-init as [updated], apply sync, verify [unchanged].
+
+Commit: `ad17483` - task-119: Distribute brainstorm-rules via ralph-init with section-aware merge
+
+Commit: `3017772` - task-119: Allowlist .claude/brainstorm-rules.md in Step 3.4 gitignore snippet
+
+task-reviewer APPROVED on second pass after fixing the .gitignore template drift (Step 3.4 now allowlists .claude/brainstorm-rules.md). All 7 ACs satisfied; ralph-sync classify confirms [unchanged].
 <!-- SECTION:NOTES:END -->
