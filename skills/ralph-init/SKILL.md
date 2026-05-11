@@ -110,6 +110,7 @@ backlog/.ralph-heartbeat
 .claude/*
 !.claude/settings.json
 !.claude/task-reviewer-rules.md
+!.claude/brainstorm-rules.md
 !.claude/hooks/
 ```
 Do NOT add `backlog/` — task files should be committed.
