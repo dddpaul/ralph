@@ -4,7 +4,7 @@ title: 'Increase ralph-review cumulative diff cap from 50,000 to 100,000 chars'
 status: In Progress
 assignee: []
 created_date: '2026-05-11 07:05'
-updated_date: '2026-05-11 07:08'
+updated_date: '2026-05-11 07:11'
 labels:
   - 'feature:ralph-review'
 dependencies: []
@@ -38,4 +38,8 @@ After the edit, run ralph-sync to push to ~/.claude/skills/ralph-review/SKILL.md
 
 <!-- SECTION:NOTES:BEGIN -->
 Edit applied: skills/ralph-review/SKILL.md lines 159 and 162 updated from 50,000 to 100,000. Verified via grep (no remaining 50,000 references).
+
+Commit: `8540114` - task-117: Raise ralph-review cumulative diff cap from 50k to 100k chars
+
+Reviewed and APPROVED by task-reviewer agent (commit 8540114). AC #4 verified post-merge below.
 <!-- SECTION:NOTES:END -->
