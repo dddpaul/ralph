@@ -4,7 +4,7 @@ title: Fix false-positive 'not found' check in preflight.sh tasks_whitelist
 status: In Progress
 assignee: []
 created_date: '2026-05-11 11:36'
-updated_date: '2026-05-11 11:51'
+updated_date: '2026-05-11 11:54'
 labels:
   - 'feature:ralph-run'
 dependencies: []
@@ -71,4 +71,8 @@ Anchors (`^` and `$`) + literal period escape ensure the match only triggers on 
 
 <!-- SECTION:NOTES:BEGIN -->
 Fix applied: preflight.sh line 44 substring 'not found' replaced with anchored regex '^Task [0-9]+ not found\.$'. ACs 2/3/4 verified via direct test. AC 1 verified by grep. AC 5 (post-merge ralph-sync) pending.
+
+Commit: `a23608f` - task-120: Anchor preflight not-found check to canonical error line
+
+Reviewer APPROVED (a23608f) on second pass after reverting unrelated brainstorm-rules.md drift.
 <!-- SECTION:NOTES:END -->
