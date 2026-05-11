@@ -156,10 +156,10 @@ For each in-scope task, include a summary block:
 
 ### 3c: Cumulative Diff
 
-Run `git diff <base>..HEAD` and include it. If the diff exceeds 50,000 characters, truncate and append:
+Run `git diff <base>..HEAD` and include it. If the diff exceeds 100,000 characters, truncate and append:
 
 ```
-[WARN: Diff truncated at 50,000 chars. Review may be incomplete.]
+[WARN: Diff truncated at 100,000 chars. Review may be incomplete.]
 ```
 
 ---
