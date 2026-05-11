@@ -41,7 +41,7 @@ if [[ -n "$TASKS_RAW" ]]; then
   IFS=',' read -ra _WL_IDS <<< "$TASKS_RAW"
   for _wl_id in "${_WL_IDS[@]}"; do
     _wl_out=$(backlog task "$_wl_id" --plain 2>/dev/null)
-    if [[ -z "$_wl_out" ]] || echo "$_wl_out" | grep -q "not found"; then
+    if [[ -z "$_wl_out" ]] || echo "$_wl_out" | grep -qE "^Task [0-9]+ not found\.$"; then
       verbose "check tasks_whitelist: FAIL (TASK-$_wl_id not found)"
       echo "ERROR: TASK-$_wl_id not found in backlog"
       exit 1
