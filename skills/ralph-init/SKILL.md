@@ -175,7 +175,12 @@ jq --arg r1 "$RULE1" --arg r2 "$RULE2" --arg r3 "$RULE3" \
 
 This ensures every project bootstrapped or upgraded with Ralph gets the narrow permission rules for the ralph-run and ralph-status scripts, avoiding over-broad `Bash(bash:*)` permissions.
 
-### 3.8 `.obsidian/` config (only if project type is Documentation or Mixed)
+### 3.8 `.claude/brainstorm-rules.md`
+Read `templates/claude/brainstorm-rules.md` → write to `.claude/brainstorm-rules.md`. Skip if file already exists (same skip-if-exists policy as other init files in Step 3).
+
+The template ships with Ralph-managed sections (Save Design Conclusions Case A/B + Phase 4 Override) above a literal `## Project additions` heading. On upgrade, content above the heading is regenerated from the template; content from `## Project additions` onward is preserved verbatim (see U4 special-merge for the algorithm).
+
+### 3.9 `.obsidian/` config (only if project type is Documentation or Mixed)
 Copy Obsidian configuration from templates:
 
 - `templates/obsidian/app.json` → `.obsidian/app.json`
@@ -208,6 +213,7 @@ Files created:
   .claude/settings.json      - Claude Code hooks (project-wide)
   .claude/hooks/             - Hook scripts referenced by settings.json
   .claude/settings.local.json - Claude Code permissions
+  .claude/brainstorm-rules.md - Phase 3/4 brainstorm rules (section-aware merge on upgrade)
   .devcontainer/        - (if applicable) Sandboxed execution environment
   .obsidian/            - (if Documentation/Mixed) Obsidian vault configuration
 
@@ -306,6 +312,7 @@ Compare each managed file against its current template. Assign one status per fi
 9. **`.devcontainer/init-firewall.sh`** — exact content match against `templates/devcontainer/init-firewall.sh`. If `.devcontainer/` directory does not exist, status is **skipped**.
 10. **`.devcontainer/Dockerfile`** — always **skipped** (assembled from fragments, cannot diff meaningfully)
 11. **`.gitignore`** — always **skipped** (append-only logic in init flow)
+12. **`.claude/brainstorm-rules.md`** — managed via section-aware merge: pre-heading content is regenerated from `templates/claude/brainstorm-rules.md`; the `## Project additions` heading and everything below it are preserved verbatim. Status is **current** when the pre-heading region matches the template byte-for-byte; **outdated** when it differs; **missing** when the file does not exist (would be created from template).
 
 ---
 
@@ -323,6 +330,7 @@ CLAUDE.md (generic section)       current
 .claude/settings.json             current
 .claude/hooks/                    current
 .claude/settings.local.json       current
+.claude/brainstorm-rules.md       outdated
 .devcontainer/devcontainer.json   skipped (no .devcontainer/)
 .devcontainer/init-firewall.sh    skipped (no .devcontainer/)
 .devcontainer/Dockerfile          skipped (assembled)
@@ -335,6 +343,7 @@ CLAUDE.md (generic section)       current
 - **`.claude/settings.json`**: show the unified diff (`diff -u`) because the project may have custom hooks the user wants to preserve.
 - **`.claude/settings.local.json`**: show the unified diff (`diff -u`) because the project may have custom permissions the user wants to preserve.
 - **`CLAUDE.md`**: show a plain language summary of what changed in the generic section (above `## Project-Specific`).
+- **`.claude/brainstorm-rules.md`**: show a plain language summary of what changed in the Ralph-managed region (above `## Project additions`).
 - **`.devcontainer/devcontainer.json`** and **`.devcontainer/init-firewall.sh`**: show a plain language summary of what changed.
 
 If all files are **current** or **skipped**, print "All Ralph files are up to date." and stop.
@@ -368,6 +377,12 @@ For each file the user approved:
   4. Read `templates/root/CLAUDE.md`
   5. Take everything **above** `## Project-Specific` from the template — this is the **generic block**
   6. Write: generic block + project block (concatenated, no extra blank lines between them)
+- **`.claude/brainstorm-rules.md` (special merge — section-aware)**:
+  1. Read the existing `.claude/brainstorm-rules.md`.
+  2. Locate the first line that exactly equals `## Project additions` (line-level exact match).
+  3. **If the heading is present:** split the existing file at that line. The heading + everything below is the **user block** (preserved verbatim). Read `templates/claude/brainstorm-rules.md` and take everything **above** the same `## Project additions` heading — this is the **template block**. Write: template block + user block (concatenated, no extra blank lines between them).
+  4. **If the heading is absent** (legacy file lacking the convention): one-time migration. Treat the entire existing file as user content. Write: template block (everything above `## Project additions` in the template) + the template's `## Project additions` heading + HTML comment + the existing file content appended verbatim below the heading.
+  5. Write the merged result back to `.claude/brainstorm-rules.md`.
 
 **Missing files**: create from template using the same logic as the init flow (copy template, `chmod +x` where applicable).
 
@@ -387,6 +402,7 @@ Ralph upgrade complete!
   .claude/settings.json             current
   .claude/hooks/                    current
   .claude/settings.local.json       current
+  .claude/brainstorm-rules.md       updated
   .devcontainer/devcontainer.json   skipped (no .devcontainer/)
   .devcontainer/init-firewall.sh    skipped (no .devcontainer/)
   .devcontainer/Dockerfile          skipped (assembled)
