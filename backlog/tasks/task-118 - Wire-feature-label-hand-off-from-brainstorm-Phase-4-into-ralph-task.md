@@ -1,9 +1,10 @@
 ---
 id: TASK-118
 title: Wire feature-label hand-off from brainstorm Phase 4 into ralph-task
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-05-11 11:05'
+updated_date: '2026-05-11 11:14'
 labels: []
 dependencies: []
 priority: high
@@ -76,11 +77,19 @@ Real-session симптом (наблюдён 2026-05-11 в соседнем п�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 В skills/ralph-task/SKILL.md MUST rule 3 содержит явную подсекцию или абзац «Brainstorm Phase 4 hand-off (default ON)», описывающую поведение при наличии feature=<slug> arg: attach label automatically + skip verify-prompt
-- [ ] #2 В skills/ralph-task/SKILL.md новый текст явно ссылается на «Save Design Conclusions» правило из brainstorm-rules как justification пропуска verify-step
-- [ ] #3 В .claude/brainstorm-rules.md Phase 4 Override (line ~65) обновлён: явно требует передачу feature=<slug> при invocation ralph-task; даёт пример сопоставления slug ↔ design-file
-- [ ] #4 В .claude/brainstorm-rules.md обновлённая Phase 4 Override явно упоминает downstream-цель — поддержку /ralph-review feature=<slug> для cumulative consistency check
-- [ ] #5 Обратная совместимость: вызов ralph-task без feature=<slug> arg сохраняет существующее поведение default-off + verify-prompt (a/b/c); это видно из формулировки в SKILL.md
-- [ ] #6 Diff содержит ровно 2 файла (исключая task-файл): skills/ralph-task/SKILL.md и .claude/brainstorm-rules.md
+- [x] #1 В skills/ralph-task/SKILL.md MUST rule 3 содержит явную подсекцию или абзац «Brainstorm Phase 4 hand-off (default ON)», описывающую поведение при наличии feature=<slug> arg: attach label automatically + skip verify-prompt
+- [x] #2 В skills/ralph-task/SKILL.md новый текст явно ссылается на «Save Design Conclusions» правило из brainstorm-rules как justification пропуска verify-step
+- [x] #3 В .claude/brainstorm-rules.md Phase 4 Override (line ~65) обновлён: явно требует передачу feature=<slug> при invocation ralph-task; даёт пример сопоставления slug ↔ design-file
+- [x] #4 В .claude/brainstorm-rules.md обновлённая Phase 4 Override явно упоминает downstream-цель — поддержку /ralph-review feature=<slug> для cumulative consistency check
+- [x] #5 Обратная совместимость: вызов ralph-task без feature=<slug> arg сохраняет существующее поведение default-off + verify-prompt (a/b/c); это видно из формулировки в SKILL.md
+- [x] #6 Diff содержит ровно 2 файла (исключая task-файл): skills/ralph-task/SKILL.md и .claude/brainstorm-rules.md
 - [ ] #7 task-reviewer agent APPROVED перед мержем
 <!-- AC:END -->
+
+
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan: 1) Update skills/ralph-task/SKILL.md MUST rule 3 to add 'Brainstorm Phase 4 hand-off (default ON)' subsection that references the Save Design Conclusions rule as justification for skipping verify-prompt. 2) Update .claude/brainstorm-rules.md Phase 4 Override line 65 to require feature=<slug> arg with example slug↔file mapping and downstream /ralph-review feature=<slug> mention. 3) Preserve backwards compat: no feature= arg → existing default-off + verify-prompt behavior unchanged. 4) Diff = exactly 2 files (excl task file). 5) Spawn task-reviewer.
+<!-- SECTION:NOTES:END -->

@@ -62,6 +62,6 @@ This rule supplements (does not replace) any user-global Phase 4 rules — both 
 
 In Phase 4 (Next Steps), the first option must always be:
 
-- **Create backlog task(s)** — Invoke the `ralph-task` skill with the brainstorm context (selected approach, design decisions, acceptance criteria, testing strategy) sufficient for autonomous execution in a Ralph loop without human guidance. If the scope is PRD-shaped (≥3 user stories, multiple lanes), `ralph-task`'s pre-check will redirect to `ralph-prd` → `ralph-backlog`.
+- **Create backlog task(s)** — Invoke the `ralph-task` skill with `feature=<slug>` (where `<slug>` matches the design-file slug saved in Phase 3 — e.g., `feature=auth-token-rotation` for `design/auth-token-rotation-brainstorm.md`) plus the brainstorm context (selected approach, design decisions, acceptance criteria, testing strategy) sufficient for autonomous execution in a Ralph loop without human guidance. Passing the slug enables ralph-task to auto-attach the `feature:<slug>` label to every created task — required downstream so `/ralph-review feature=<slug>` can find every task that belongs to this feature for cumulative consistency checks against design intent. If the scope is PRD-shaped (≥3 user stories, multiple lanes), `ralph-task`'s pre-check will redirect to `ralph-prd` → `ralph-backlog`.
 
 The remaining options (Write plan, Plan mode, Start now) follow after.
