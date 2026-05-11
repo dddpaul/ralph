@@ -72,6 +72,8 @@ backlog task create "<English title>" \
 
    If neither exists, warn the user and ask whether to (a) skip the label, (b) create the design doc first via `ralph-prd`, or (c) attach anyway as a stub.
 
+   **Brainstorm Phase 4 hand-off (default ON):** If the skill is invoked with a `feature=<slug>` arg, attach `-l "feature:<slug>"` automatically to every task created in this invocation. Skip the verify-prompt — the brainstorm-rules "Save Design Conclusions" rule already wrote and verified the design file (`design/<slug>-brainstorm.md` or its addendum) before the Phase 4 hand-off. Treat the slug as authoritative; do NOT re-run the `ls design/<slug>-*` check. The label is required downstream so `/ralph-review feature=<slug>` can find every task that belongs to the feature for cumulative consistency checks.
+
 ### Title language constraint
 
 Task titles passed to `backlog task create` must be in **English** — the CLI derives filenames from the title. The description (`-d`) and acceptance criteria (`--ac`) may be in any language.
