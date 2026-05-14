@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-05-14 06:53'
-updated_date: '2026-05-14 14:54'
+updated_date: '2026-05-14 14:56'
 labels:
   - 'feature:ralph-init'
 dependencies: []
@@ -104,4 +104,8 @@ Plan:
 4. Confirm scope: only SKILL.md prose + task md change. Run ralph-sync classify post-merge for AC6.
 
 Implementation: Step 3.7 split into 3.7a (template write) + 3.7b (jq merge); added Step 3.10 verification with grep -F fixed-string match for the 3 expected script paths; upgrade flow (U4 line) updated to reference Step 3.7b + Step 3.10. Snippet passes bash -n. Ralph's iteration 1 (which hit rate limit) already split 3.7a/b — this interactive completion added 3.10 + wired U4.
+
+Commit: `e1bf722` - task-122: Promote jq merge to 3.7b and add 3.10 verification
+
+Reviewer APPROVED (e1bf722).
 <!-- SECTION:NOTES:END -->
