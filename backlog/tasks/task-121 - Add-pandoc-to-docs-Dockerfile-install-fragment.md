@@ -1,7 +1,7 @@
 ---
 id: TASK-121
 title: Add pandoc to docs Dockerfile install fragment
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-05-14 06:13'
 updated_date: '2026-05-14 06:42'
@@ -52,7 +52,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 - [x] #1 skills/ralph-init/templates/devcontainer/lang/Dockerfile.install.docs apt-get install list contains the literal token 'pandoc' between 'build-essential' and the '&& rm -rf' line, preserving the existing backslash-continuation style
 - [x] #2 grep -c '^\s*pandoc \\\\$' skills/ralph-init/templates/devcontainer/lang/Dockerfile.install.docs returns 1
 - [x] #3 No other lang fragment files (node, python, go) are modified — diff scope is exactly the docs fragment plus the task markdown
-- [ ] #4 After merge, bash .claude/skills/ralph-sync/sync.sh classify shows skill ralph-init as [unchanged] (post-sync)
+- [x] #4 After merge, bash .claude/skills/ralph-sync/sync.sh classify shows skill ralph-init as [unchanged] (post-sync)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -63,4 +63,6 @@ Edit applied: skills/ralph-init/templates/devcontainer/lang/Dockerfile.install.d
 Commit: `eb6447b` - task-121: Add pandoc to docs Dockerfile install fragment
 
 Reviewer APPROVED (eb6447b).
+
+Post-merge: ralph-sync applied (skill ralph-init updated); classify now shows [unchanged]. AC #4 verified.
 <!-- SECTION:NOTES:END -->
