@@ -3,7 +3,7 @@ id: TASK-122
 title: >-
   Promote ralph-init's jq merge to numbered sub-step + add post-init
   verification
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-05-14 06:53'
 updated_date: '2026-05-14 14:56'
@@ -91,7 +91,7 @@ SKILL.md line ~371 documents that upgrade also runs the narrow-rule merge. The v
 - [x] #3 skills/ralph-init/SKILL.md upgrade flow section (current line ~371 area covering settings.local.json) references the same verification check so it fires post-upgrade too
 - [x] #4 The verification grep uses fixed-string match (grep -F) for the 3 paths so it tolerates regex-special characters in HOME paths
 - [x] #5 No template files are modified — diff scope is exactly skills/ralph-init/SKILL.md plus the task markdown
-- [ ] #6 After merge, bash .claude/skills/ralph-sync/sync.sh classify shows skill ralph-init as [unchanged] (post-sync)
+- [x] #6 After merge, bash .claude/skills/ralph-sync/sync.sh classify shows skill ralph-init as [unchanged] (post-sync)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -108,4 +108,6 @@ Implementation: Step 3.7 split into 3.7a (template write) + 3.7b (jq merge); add
 Commit: `e1bf722` - task-122: Promote jq merge to 3.7b and add 3.10 verification
 
 Reviewer APPROVED (e1bf722).
+
+Post-merge: ralph-sync applied (skill ralph-init updated); classify now shows [unchanged]. AC #6 verified.
 <!-- SECTION:NOTES:END -->
