@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libreoffice-impress-nogui \
     poppler-utils \
     build-essential \
+    pandoc \
     && rm -rf /var/lib/apt/lists/*
 
 RUN npm install -g pptxgenjs
