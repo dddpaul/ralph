@@ -4,7 +4,7 @@ title: Add pandoc to docs Dockerfile install fragment
 status: In Progress
 assignee: []
 created_date: '2026-05-14 06:13'
-updated_date: '2026-05-14 06:41'
+updated_date: '2026-05-14 06:42'
 labels:
   - 'feature:ralph-init'
 dependencies: []
@@ -59,4 +59,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 <!-- SECTION:NOTES:BEGIN -->
 Edit applied: skills/ralph-init/templates/devcontainer/lang/Dockerfile.install.docs gains 'pandoc' between 'build-essential' and the '&& rm' line. ACs 1-3 verified.
+
+Commit: `eb6447b` - task-121: Add pandoc to docs Dockerfile install fragment
+
+Reviewer APPROVED (eb6447b).
 <!-- SECTION:NOTES:END -->
