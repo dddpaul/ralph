@@ -150,12 +150,14 @@ Assemble the Dockerfile from base + language snippets, then write three files:
 
 **Do not** commit the token value anywhere — only the env var name and the `${localEnv:...}` substitution belong in `devcontainer.json`.
 
-### 3.7 `.claude/settings.json`, `.claude/hooks/`, and `.claude/settings.local.json`
+### 3.7a `.claude/settings.json`, `.claude/hooks/`, and `.claude/settings.local.json` (template write)
 Read `templates/claude/settings.json` → write to `.claude/settings.json` (project-wide hooks).
 Read each `templates/claude/hooks/*-guard.sh` and `templates/claude/hooks/task-validator.sh` → write to `.claude/hooks/<name>.sh`. Make executable (`chmod +x`). Create `.claude/hooks/` directory if it does not exist.
 Read `templates/claude/settings.local.json` → write to `.claude/settings.local.json` (user permissions).
 
-**After writing `settings.local.json`, merge narrow script rules into `permissions.allow`:**
+### 3.7b Merge narrow script rules into `settings.local.json` permissions
+
+This sub-step is **required** — the template-written `settings.local.json` does not yet contain narrow rules for the ralph-run and ralph-status helper scripts, and this merge is what avoids over-broad `Bash(bash:*)` permissions. Step 3.10 verifies the merge landed; skipping 3.7b will trip that check.
 
 Resolve the user's home directory at install time (use the shell's `$HOME`, NOT a literal `$HOME` or `~` — Claude Code permission patterns are literal-match). Add these rules if not already present:
 
@@ -173,8 +175,6 @@ jq --arg r1 "$RULE1" --arg r2 "$RULE2" --arg r3 "$RULE3" \
   .claude/settings.local.json > .claude/settings.local.json.tmp \
   && mv .claude/settings.local.json.tmp .claude/settings.local.json
 ```
-
-This ensures every project bootstrapped or upgraded with Ralph gets the narrow permission rules for the ralph-run and ralph-status scripts, avoiding over-broad `Bash(bash:*)` permissions.
 
 ### 3.8 `.claude/brainstorm-rules.md`
 Read `templates/claude/brainstorm-rules.md` → write to `.claude/brainstorm-rules.md`. Skip if file already exists (same skip-if-exists policy as other init files in Step 3).
@@ -196,6 +196,31 @@ Also append these entries to `.gitignore` (don't duplicate existing lines):
 .obsidian/plugins/
 .obsidian/community-plugins.json
 ```
+
+### 3.10 Verify `settings.local.json` narrow rules landed
+
+After all Step 3.x writes complete, verify the three narrow script rules from Step 3.7b are present. This catches silent omissions of the merge sub-step (e.g. if Step 3.7b was accidentally skipped, or `jq` was missing on the host and the pipeline failed without surfacing).
+
+```bash
+expected=(
+  "$HOME/.claude/skills/ralph-run/scripts/preflight.sh"
+  "$HOME/.claude/skills/ralph-run/scripts/wait-heartbeat.sh"
+  "$HOME/.claude/skills/ralph-status/scripts/utc-to-moscow.sh"
+)
+missing=()
+for p in "${expected[@]}"; do
+  grep -q -F "$p" .claude/settings.local.json || missing+=("$p")
+done
+if (( ${#missing[@]} > 0 )); then
+  echo "WARN: settings.local.json missing narrow rules:"
+  printf '  - Bash(bash %s:*)\n' "${missing[@]}"
+  echo "Re-run the jq merge from Step 3.7b to fix."
+else
+  echo "PASS: all 3 narrow rules present in settings.local.json"
+fi
+```
+
+`grep -F` matches the literal path string so home-directory paths containing regex-special characters (e.g. `.`, `+`) do not cause false negatives.
 
 ---
 
@@ -368,7 +393,7 @@ For each file the user approved:
 - **`.git/hooks/commit-msg`**: overwrite from `templates/git-hooks/commit-msg`, then `chmod +x`.
 - **`.claude/settings.json`**: overwrite from `templates/claude/settings.json`.
 - **`.claude/hooks/`**: for each `templates/claude/hooks/*-guard.sh` and `templates/claude/hooks/task-validator.sh`, overwrite `.claude/hooks/<name>.sh`, then `chmod +x`. Create directory if needed.
-- **`.claude/settings.local.json`**: overwrite from `templates/claude/settings.local.json`. Then run the same narrow-rule merge as Step 3.7 (resolve `$HOME`, add `preflight.sh` and `wait-heartbeat.sh` rules via `jq`, idempotent).
+- **`.claude/settings.local.json`**: overwrite from `templates/claude/settings.local.json`. Then run the same narrow-rule merge as Step 3.7b (resolve `$HOME`, add `preflight.sh`, `wait-heartbeat.sh`, and `utc-to-moscow.sh` rules via `jq`, idempotent). After the merge, run the Step 3.10 verification block to confirm all three rules landed; surface any `WARN` to the user before completing the upgrade.
 - **`.devcontainer/devcontainer.json`**: overwrite from `templates/devcontainer/devcontainer.json`.
 - **`.devcontainer/init-firewall.sh`**: overwrite from `templates/devcontainer/init-firewall.sh`, then `chmod +x`.
 - **`CLAUDE.md` (special merge)**:
