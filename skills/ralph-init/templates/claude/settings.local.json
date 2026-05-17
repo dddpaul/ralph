@@ -27,6 +27,8 @@
       "Bash(bash -n:*)",
       "Bash(test:*)",
       "Bash(npm test:*)",
+      "Write(/tmp/**)",
+      "Edit(/tmp/**)",
       "Skill(ralph-run)",
       "Skill(ralph-status)",
       "Skill(ralph-stop)",
