@@ -4,7 +4,7 @@ title: Scope master-branch-guard to project tree; drop /tmp special case
 status: In Progress
 assignee: []
 created_date: '2026-05-17 09:06'
-updated_date: '2026-05-17 11:28'
+updated_date: '2026-05-17 12:36'
 labels: []
 dependencies: []
 priority: medium
@@ -62,4 +62,8 @@ Drop the artifacts that TASK-124 added but are no longer needed:
 
 <!-- SECTION:NOTES:BEGIN -->
 Implementation: rewrote master-branch-guard.sh to compute project_root via git rev-parse --show-toplevel; paths outside the root exit 0 silently. Removed the literal /tmp/* case (subsumed). R11 parity verified (live + template byte-identical). Behavior tests (with branch guard stripped): /tmp/foo, /Users/paul/Downloads/foo, /private/tmp/foo, /Users/paul/Private/Projects/other/x all exit 0; in-tree src/foo emits BLOCKED; in-tree .claude/design/.gitignore exit 0. Not-in-git-repo case: exit 0. bash -n PASS on both copies. Removed Write/Edit /tmp entries from template settings.local.json.
+
+Commit: `859ae4b` - task-125: Scope master-branch-guard to project tree
+
+Reviewer APPROVED (859ae4b).
 <!-- SECTION:NOTES:END -->
