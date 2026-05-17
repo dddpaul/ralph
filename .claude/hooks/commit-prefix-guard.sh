@@ -6,6 +6,10 @@
 
 cmd=$(jq -r '.tool_input.command')
 
+# Only act on git commit invocations; ignore any other Bash command so a
+# message-less command on a task-* branch is not spuriously denied.
+case "$cmd" in *"git commit"*) ;; *) exit 0;; esac
+
 branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)
 case "$branch" in task-*) ;; *) exit 0;; esac
 

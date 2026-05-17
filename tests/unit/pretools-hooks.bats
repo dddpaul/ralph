@@ -222,3 +222,11 @@ run_hook_in_repo() {
     '{"tool_name":"Bash","tool_input":{"command":"git commit -m \"random message\""}}'
   [[ -z "$output" ]]
 }
+
+@test "commit-prefix-guard: ignores non-commit command on task branch (TASK-123 regression)" {
+  setup_git_repo
+  git -C "$TEST_DIR/repo" checkout -b task-99-feature >/dev/null 2>&1
+  run run_hook_in_repo "commit-prefix-guard.sh" \
+    '{"tool_name":"Bash","tool_input":{"command":"kill 1"}}'
+  [[ -z "$output" ]]
+}
