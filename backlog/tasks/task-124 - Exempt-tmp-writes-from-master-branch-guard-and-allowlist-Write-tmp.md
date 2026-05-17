@@ -1,7 +1,7 @@
 ---
 id: TASK-124
 title: Exempt /tmp writes from master-branch-guard and allowlist Write(/tmp/**)
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-05-17 08:38'
 updated_date: '2026-05-17 09:00'
@@ -63,7 +63,7 @@ Hook + permission only. No new scripts. No SKILL.md changes.
 - [x] #5 Hook behavior verified by running 'echo {"tool_input":{"file_path":"/tmp/test.txt"}} | bash .claude/hooks/master-branch-guard.sh' on master — exits 0 with no JSON deny output
 - [x] #6 Hook behavior verified by running the same with file_path=/Users/paul/Private/Projects/ai/ralph/src/foo.txt — still emits the BLOCKED deny JSON (negative test)
 - [x] #7 bash -n on both .claude/hooks/master-branch-guard.sh copies passes
-- [ ] #8 After merge, bash .claude/skills/ralph-sync/sync.sh classify shows skill ralph-init as [unchanged] (post-sync)
+- [x] #8 After merge, bash .claude/skills/ralph-sync/sync.sh classify shows skill ralph-init as [unchanged] (post-sync)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -74,4 +74,6 @@ Implementation: master-branch-guard.sh gains '/tmp/*|/private/tmp/*' exemption a
 Commit: `3f1ee3c` - task-124: Exempt /tmp writes from master-branch-guard and allowlist
 
 Reviewer APPROVED (3f1ee3c).
+
+Post-merge: ralph-sync applied (skill ralph-init updated); classify now shows [unchanged]. AC #8 verified.
 <!-- SECTION:NOTES:END -->
