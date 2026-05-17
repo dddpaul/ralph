@@ -1,7 +1,7 @@
 ---
 id: TASK-125
 title: Scope master-branch-guard to project tree; drop /tmp special case
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-05-17 09:06'
 updated_date: '2026-05-17 12:36'
@@ -55,7 +55,7 @@ Drop the artifacts that TASK-124 added but are no longer needed:
 - [x] #5 Behavior verified by branch-stripped hook test: /tmp/foo.txt exits 0 silently, $HOME/Downloads/foo.txt exits 0 silently, <project>/src/foo.txt emits BLOCKED, <project>/.claude/foo exits 0, <project>/design/foo exits 0, <project>/.gitignore exits 0
 - [x] #6 Behavior verified for the not-in-git-repo case: hook exits 0 silently when 'git rev-parse --show-toplevel' fails
 - [x] #7 bash -n on both .claude/hooks/master-branch-guard.sh copies passes
-- [ ] #8 After merge, bash .claude/skills/ralph-sync/sync.sh classify shows skill ralph-init as [unchanged] (post-sync)
+- [x] #8 After merge, bash .claude/skills/ralph-sync/sync.sh classify shows skill ralph-init as [unchanged] (post-sync)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -66,4 +66,6 @@ Implementation: rewrote master-branch-guard.sh to compute project_root via git r
 Commit: `859ae4b` - task-125: Scope master-branch-guard to project tree
 
 Reviewer APPROVED (859ae4b).
+
+Post-merge: ralph-sync applied (skill ralph-init updated); classify now shows [unchanged]. AC #8 verified.
 <!-- SECTION:NOTES:END -->
