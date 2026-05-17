@@ -4,7 +4,7 @@ title: Exempt /tmp writes from master-branch-guard and allowlist Write(/tmp/**)
 status: In Progress
 assignee: []
 created_date: '2026-05-17 08:38'
-updated_date: '2026-05-17 08:57'
+updated_date: '2026-05-17 09:00'
 labels: []
 dependencies: []
 priority: medium
@@ -70,4 +70,8 @@ Hook + permission only. No new scripts. No SKILL.md changes.
 
 <!-- SECTION:NOTES:BEGIN -->
 Implementation: master-branch-guard.sh gains '/tmp/*|/private/tmp/*' exemption alongside design/ (both live + template, R11 parity verified by diff). settings.local.json adds Write(/tmp/**) + Edit(/tmp/**) in both live + template. Behavior verified by branch-stripped hook test: /tmp paths exit 0 silently, src/ paths emit BLOCKED, design/ still passes (no regression).
+
+Commit: `3f1ee3c` - task-124: Exempt /tmp writes from master-branch-guard and allowlist
+
+Reviewer APPROVED (3f1ee3c).
 <!-- SECTION:NOTES:END -->
