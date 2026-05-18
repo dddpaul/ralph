@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-05-18 11:16'
-updated_date: '2026-05-18 12:59'
+updated_date: '2026-05-18 15:55'
 labels: []
 dependencies: []
 priority: high
@@ -88,8 +88,6 @@ Option A is the only viable lane.
 - [ ] #5 Manual smoke test on a freshly ralph-init'd project: /ralph-run tasks=N watch=5m completes one full iteration and does NOT trigger a permission prompt for utc-to-moscow.sh, preflight.sh, or wait-heartbeat.sh
 <!-- AC:END -->
 
-
-
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
@@ -99,4 +97,9 @@ Plan:
 3. Step 3.10 verification: extend expected[] from 3 to 6 entries — paths AND $HOME-form strings — and tighten the missing-rule message to name the specific form.
 4. Confirm Step U4 special-merge path: U4 already lives in upgrade flow; the merge re-runs Step 3.7b via jq + unique, so the 3 new $HOME-form rules land idempotently on upgrade without clobbering user customizations. No separate U4 edit needed unless current U4 docs explicitly list expected rules (will check).
 5. Smoke test on a fixture project — verify /ralph-run with watch=5m completes without permission prompts for the three scripts.
+
+Commit: `2db5008` - task-126: Write both absolute and $HOME-form permission rules in ralph-init
+
+Deferred:
+- AC #5: requires a live Claude Code session against a freshly ralph-init'd project to verify end-to-end matcher behavior under /ralph-run. Mechanical preconditions (both rule forms land, idempotent merge, U4 upgrade preserves user customizations via + unique, Step 3.10 detects missing forms with per-script labels) are verified via fixture smoke tests in this branch. Follow-up: user runs /ralph-run tasks=N watch=5m on a fresh init and confirms no permission prompt fires for utc-to-moscow.sh / preflight.sh / wait-heartbeat.sh.
 <!-- SECTION:NOTES:END -->
