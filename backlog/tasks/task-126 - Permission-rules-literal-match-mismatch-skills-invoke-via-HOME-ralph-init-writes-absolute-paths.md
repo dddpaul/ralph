@@ -3,10 +3,10 @@ id: TASK-126
 title: >-
   Permission rules literal-match mismatch: skills invoke via $HOME, ralph-init
   writes absolute paths
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-05-18 11:16'
-updated_date: '2026-05-18 15:55'
+updated_date: '2026-05-18 15:58'
 labels: []
 dependencies: []
 priority: high
@@ -102,4 +102,6 @@ Commit: `2db5008` - task-126: Write both absolute and $HOME-form permission rule
 
 Deferred:
 - AC #5: requires a live Claude Code session against a freshly ralph-init'd project to verify end-to-end matcher behavior under /ralph-run. Mechanical preconditions (both rule forms land, idempotent merge, U4 upgrade preserves user customizations via + unique, Step 3.10 detects missing forms with per-script labels) are verified via fixture smoke tests in this branch. Follow-up: user runs /ralph-run tasks=N watch=5m on a fresh init and confirms no permission prompt fires for utc-to-moscow.sh / preflight.sh / wait-heartbeat.sh.
+
+Reviewer APPROVED (3-pass review). Mechanical preconditions verified by fixture; AC #5 deferred per R2 with follow-up recorded for the user.
 <!-- SECTION:NOTES:END -->
