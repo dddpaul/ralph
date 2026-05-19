@@ -3,10 +3,10 @@ id: TASK-130
 title: >-
   Fix or document :* wildcard not matching no-arg invocations in ralph-init
   narrow rules
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-05-19 08:45'
-updated_date: '2026-05-19 13:20'
+updated_date: '2026-05-19 13:23'
 labels: []
 dependencies:
   - TASK-127
@@ -62,8 +62,6 @@ If repro refutes the hypothesis: close the task with the controlled-repro eviden
 - [x] #6 If repro refutes: task notes record the negative result with the exact session evidence; task is closed as not-needed without code changes
 <!-- AC:END -->
 
-
-
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
@@ -93,4 +91,6 @@ Claude Code matches the LITERAL command text against the LITERAL rule text and d
 
 --- Disposition ---
 AC #1 SATISFIED (repro recorded verbatim above). AC #6 SATISFIED (negative result + exact evidence recorded; closing not-needed, ZERO code changes to skills/ralph-init/SKILL.md). AC #2/#3/#4/#5 NOT APPLICABLE — each is gated on 'If repro confirms the pitfall'; the repro refutes it, so their precondition is false and no SKILL.md Step 3.7b/3.10 edits are made (intentionally). No wait-heartbeat.sh / utc-to-moscow.sh no-:* variants needed. TASK-127 (literal-match, the real issue) remains the correct vehicle.
+
+task-reviewer: APPROVED (commit 503eb97). Verified AC #1 + #6 satisfied, AC #2-5 correctly N/A (refutation precondition false), diff scoped to task file only, master-branch-guard.sh correctly excluded, no R1-R15 violation. No build/lint/tests applicable: zero code changes (investigation-only, AC #6 path).
 <!-- SECTION:NOTES:END -->
