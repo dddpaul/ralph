@@ -30,7 +30,11 @@
       "Skill(ralph-run)",
       "Skill(ralph-status)",
       "Skill(ralph-stop)",
-      "Skill(brainstorm)"
+      "Skill(brainstorm)",
+      "Skill(ralph-status-watch)",
+      "Skill(ralph-task)",
+      "Skill(ralph-init)",
+      "ScheduleWakeup"
     ]
   },
   "sandbox": {
