@@ -1,10 +1,10 @@
 ---
 id: TASK-127
 title: ralph-init permission allowlist misses many Ralph workflow tools
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-05-19 08:34'
-updated_date: '2026-05-19 08:46'
+updated_date: '2026-05-19 14:00'
 labels: []
 dependencies: []
 priority: high
@@ -104,4 +104,16 @@ Split into sibling tasks per user request:
 - TASK-131 (MEDIUM) — pptx helpers for Documentation/Mixed project types (Section E)
 
 This umbrella task can be closed once all four siblings reach Done. Each has --dep task-127.
+
+Closed as umbrella — all five sections decomposed into siblings TASK-128/129/130/131 and merged to master.
+
+- Section A (skills): TASK-128 added Skill(ralph-status-watch), Skill(ralph-task), Skill(ralph-init). Out-of-scope skills (pptx-arch-style, example-skills:pptx, fewer-permission-prompts) deliberately omitted as non-stock.
+- Section B (deferred tools): TASK-128 added ScheduleWakeup (highest pain point). TaskCreate/Update/Get/List/Stop/Output, ToolSearch, mcp__happy__change_title intentionally left out: harness-built-ins (version-dependent) and third-party MCP.
+- Section C (bash): TASK-129 added 17 safe wildcards (count 30->47); destructive-prefix grep guard clean — no rm:*/cp:*/mv:*/rmdir:*/kill:*/bash:*/sh:*/zsh:* present.
+- Section D (:* no-arg pitfall): TASK-130 controlled repro REFUTED the hypothesis using the authoritative Claude Code permission docs (':*' is equivalent to ' *' and trailing ' *' matches end-of-string). Zero code changes. Real cause of the user's original observation was the literal-match / $HOME-expansion mismatch already owned by TASK-126.
+- Section E (pptx helpers): TASK-131 added gated Step 3.7c for Documentation/Mixed (Bash(python scripts/office/soffice.py:*), Bash(pdftoppm:*)); Step 3.10 verification + U4 upgrade flow extended. Code-only projects print [skip] and the rules never land.
+
+Final template count: 26 -> 47 (Code-only) or 49 (Documentation/Mixed).
+
+Three live smoke-test ACs (128#4, 129#3, 131#4) deferred under reviewer rule R2 — each requires a fresh ralph-init + interactive Claude Code session not reproducible inside an autonomous Ralph loop. All four sibling reviews returned APPROVED.
 <!-- SECTION:NOTES:END -->
