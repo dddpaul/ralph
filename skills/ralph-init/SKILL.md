@@ -191,6 +191,32 @@ jq --arg r1a "$RULE1A" --arg r1b "$RULE1B" \
   && mv .claude/settings.local.json.tmp .claude/settings.local.json
 ```
 
+### 3.7c Merge pptx helper rules into `settings.local.json` (Documentation / Mixed only)
+
+**Gate:** run this sub-step **only when `project_type ∈ {Documentation, Mixed}`** (Q0 answer B or C). For **Code-only** projects (Q0 answer A), skip entirely — print `[skip] 3.7c pptx helper rules (Code-only project)` and proceed to Step 3.8. This gate is what keeps Code-only `settings.local.json` free of pptx rules.
+
+Documentation / Mixed projects provision Obsidian + devcontainer support for presentation work (Step 3.9). The `example-skills:pptx` skill body shells out to two commands not covered by the template allowlist:
+
+- `python scripts/office/soffice.py` — LibreOffice headless conversion
+- `pdftoppm` — PDF → image rasterization
+
+Without these rules, every pptx conversion in a Documentation/Mixed project trips a permission prompt. Add these two **narrow-form** rules if not already present. The path-narrowed `python scripts/office/soffice.py` form is deliberate — a blanket `Bash(python:*)` is too broad.
+
+- `Bash(python scripts/office/soffice.py:*)`
+- `Bash(pdftoppm:*)`
+
+Use `jq` for the idempotent merge (same `+ unique` pattern as Step 3.7b, so re-running init never duplicates rules):
+```bash
+PPTX1='Bash(python scripts/office/soffice.py:*)'
+PPTX2='Bash(pdftoppm:*)'
+jq --arg p1 "$PPTX1" --arg p2 "$PPTX2" \
+  '.permissions.allow = ((.permissions.allow // []) + [$p1, $p2] | unique)' \
+  .claude/settings.local.json > .claude/settings.local.json.tmp \
+  && mv .claude/settings.local.json.tmp .claude/settings.local.json
+```
+
+Both rules use single-quoted bash strings: there is no `$HOME` to expand here (unlike Step 3.7b), so the literal characters must be preserved verbatim.
+
 ### 3.8 `.claude/brainstorm-rules.md`
 Read `templates/claude/brainstorm-rules.md` → write to `.claude/brainstorm-rules.md`. Skip if file already exists (same skip-if-exists policy as other init files in Step 3).
 
@@ -215,6 +241,8 @@ Also append these entries to `.gitignore` (don't duplicate existing lines):
 ### 3.10 Verify `settings.local.json` narrow rules landed
 
 After all Step 3.x writes complete, verify the six narrow script rules from Step 3.7b are present — two forms per script (absolute path and literal `$HOME`). This catches silent omissions of the merge sub-step (e.g. if Step 3.7b was accidentally skipped, or `jq` was missing on the host and the pipeline failed without surfacing). Both forms must land; missing either one causes a permission prompt when the corresponding skill invocation shape is used.
+
+For **Documentation / Mixed** projects, the verification additionally checks the two pptx helper rules from Step 3.7c and surfaces a `WARN` naming each missing one. This block is skipped for Code-only projects (where Step 3.7c does not run and the rules are intentionally absent).
 
 ```bash
 # Each entry pairs a human-readable label with its expected literal string.
@@ -243,6 +271,25 @@ if (( ${#missing[@]} > 0 )); then
   echo "Re-run the jq merge from Step 3.7b to fix."
 else
   echo "PASS: all 6 narrow rules (3 absolute + 3 \$HOME-form) present in settings.local.json"
+fi
+
+# Documentation / Mixed projects only: also verify the two pptx helper rules
+# from Step 3.7c. Skip this entire block for Code-only projects — those rules
+# are intentionally absent there (Step 3.7c does not run).
+pptx_expected=(
+  'Bash(python scripts/office/soffice.py:*)'
+  'Bash(pdftoppm:*)'
+)
+pptx_missing=()
+for p in "${pptx_expected[@]}"; do
+  grep -q -F "$p" .claude/settings.local.json || pptx_missing+=("$p")
+done
+if (( ${#pptx_missing[@]} > 0 )); then
+  echo "WARN: settings.local.json missing pptx helper rules (Documentation/Mixed):"
+  printf '  - %s\n' "${pptx_missing[@]}"
+  echo "Re-run the jq merge from Step 3.7c to fix."
+else
+  echo "PASS: both pptx helper rules present in settings.local.json"
 fi
 ```
 
@@ -419,7 +466,7 @@ For each file the user approved:
 - **`.git/hooks/commit-msg`**: overwrite from `templates/git-hooks/commit-msg`, then `chmod +x`.
 - **`.claude/settings.json`**: overwrite from `templates/claude/settings.json`.
 - **`.claude/hooks/`**: for each `templates/claude/hooks/*-guard.sh` and `templates/claude/hooks/task-validator.sh`, overwrite `.claude/hooks/<name>.sh`, then `chmod +x`. Create directory if needed.
-- **`.claude/settings.local.json`**: overwrite from `templates/claude/settings.local.json`. Then run the same narrow-rule merge as Step 3.7b (writes **both** the absolute-path and literal-`$HOME` forms of the `preflight.sh`, `wait-heartbeat.sh`, and `utc-to-moscow.sh` rules — 6 rules total — via `jq`, idempotent through `unique`). User-added custom permissions in the existing `allow` array are preserved by the `+ unique` merge. After the merge, run the Step 3.10 verification block to confirm all six rules landed; surface any `WARN` to the user before completing the upgrade.
+- **`.claude/settings.local.json`**: overwrite from `templates/claude/settings.local.json`. Then run the same narrow-rule merge as Step 3.7b (writes **both** the absolute-path and literal-`$HOME` forms of the `preflight.sh`, `wait-heartbeat.sh`, and `utc-to-moscow.sh` rules — 6 rules total — via `jq`, idempotent through `unique`). **If the project is Documentation or Mixed** (detect via existing `.obsidian/` directory), also run the Step 3.7c pptx merge so the overwrite does not strip the `Bash(python scripts/office/soffice.py:*)` and `Bash(pdftoppm:*)` rules. User-added custom permissions in the existing `allow` array are preserved by the `+ unique` merge. After the merge(s), run the Step 3.10 verification block to confirm all rules landed; surface any `WARN` to the user before completing the upgrade.
 - **`.devcontainer/devcontainer.json`**: overwrite from `templates/devcontainer/devcontainer.json`.
 - **`.devcontainer/init-firewall.sh`**: overwrite from `templates/devcontainer/init-firewall.sh`, then `chmod +x`.
 - **`CLAUDE.md` (special merge)**:
