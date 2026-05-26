@@ -331,6 +331,12 @@ Next steps:
   3. Convert to tasks:  /ralph-backlog
   4. Run Ralph:  ./ralph.sh --tool claude
                  ./ralph.sh --tool opencode
+  5. Receive a planned task from another Ralph project: have the source
+     project run /ralph-handoff against this project's path. The handoff
+     drops a self-contained task in this repo's backlog/ (status To Do)
+     with a Source: line and a Before-starting validation checklist. To
+     accept, type in this session: "check new task TASK-NNN — do you
+     understand, can you run it?"
 ```
 
 ---

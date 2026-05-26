@@ -61,6 +61,26 @@ Every change needs a backlog task and a `task-*` branch — the master-branch ho
 
 For UI tasks, verify in browser if tools are available (e.g., MCP). Note in task if manual verification is needed.
 
+## Handoff Inbox
+
+Some tasks in this project's backlog are inbound handoffs from another Ralph project (created via `/ralph-handoff` in the source). They carry a `Source: <abs-path>@<sha>` line in the description and a "Before starting" validation checklist.
+
+When the user types something like `check new task TASK-NNN — do you understand, can you run it?`, treat it as a handoff acceptance gate:
+
+1. Read the task body in full (`backlog task view <id> --plain`).
+2. Run the task's "Before starting" checklist literally:
+   - Verify every `(exists)` file path in the Files section is present on disk in this repo.
+   - Confirm each AC is objectively pass/fail (a grep, test invocation, build command, or visible behavior — not "works correctly").
+   - Confirm all dependencies listed in the task's frontmatter are status=Done.
+   - Confirm out-of-scope items will not be accidentally pulled in.
+3. Report green / yellow / red:
+   - **green** — all checks pass, AC is testable, paths exist. You can run it. Reply with a one-paragraph restatement of what you would do, then wait for the user to say "go".
+   - **yellow** — one or two ambiguities. List them and ask the user to clarify before starting.
+   - **red** — multiple checks fail (paths missing, AC untestable, deps unmet). STOP. Report the failures and ask the user to either fix the task or rescind the handoff.
+4. Do NOT start work until the user confirms after a green or clarified-yellow report.
+
+This gate applies even if autonomous mode is otherwise active — a Source-carrying task pulled by the autonomous selector must run the checklist first and stop on red.
+
 ## Project-Specific
 
 - **Language:** <FILL IN from user's answer to Q1>
