@@ -1,10 +1,10 @@
 ---
 id: TASK-132
 title: Add ralph-handoff skill for cross-project Ralph task handoff
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-05-26 17:43'
-updated_date: '2026-05-26 17:54'
+updated_date: '2026-05-26 18:00'
 labels: []
 dependencies: []
 priority: medium
@@ -42,8 +42,6 @@ Out of scope: source-side audit doc, helper script, supporting status other than
 - [x] #10 skills/ralph-init/templates/root/CLAUDE.md includes a 'Handoff Inbox' section instructing destination-side Ralph: tasks containing a 'Source:' line are inbound handoffs — run the validation checklist before starting; STOP and ask the user if anything is unclear
 <!-- AC:END -->
 
-
-
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
@@ -53,4 +51,19 @@ Plan:
 3. Update skills/ralph-init/templates/root/CLAUDE.md — add a 'Handoff Inbox' section so destination-side Ralph validates Source: handoffs.
 4. Spawn task-reviewer agent on the diff.
 5. Mark Done; commit; merge.
+
+Commit: `fd21013` - task-132: Add ralph-handoff skill for cross-project task handoff
+
+Commit: `2ad7cf2` - task-132: Mirror Handoff Inbox section to live CLAUDE.md (R11 parity)
+
+task-reviewer APPROVED on commit 2ad7cf2 (re-review). Initial review caught R11 parity drift between template and live CLAUDE.md — fixed by mirroring the Handoff Inbox section to live CLAUDE.md verbatim. All 10 ACs satisfied. No build/lint/test for markdown-only changes.
+
+Implementation notes:
+- skills/ralph-handoff/SKILL.md (NEW, 248 lines, pure markdown): 6-step protocol — preflight → recon destination → gather fields → compose body → create task in destination CWD via (cd $DEST && backlog task create --status 'To Do') → print magic phrase.
+- Source: line uses 'git describe --always --dirty --abbrev=12' so uncommitted source state is visible to destination.
+- Body template includes Why/Scope/Files (annotated exists vs to-create)/Source/Before-starting validation checklist.
+- skills/ralph-init/SKILL.md: added item 5 to Next steps with the magic phrase verbatim.
+- Live CLAUDE.md + skills/ralph-init/templates/root/CLAUDE.md: identical 'Handoff Inbox' section, green/yellow/red gate with autonomous-mode caveat.
+
+Manual verification deferred: smoke test by handing off a real task to a sibling Ralph project — destination should detect Source: line, run checklist, report green/yellow/red. Not blocking Done since the destination-side gate is just docs in CLAUDE.md (destination Claude reads + applies).
 <!-- SECTION:NOTES:END -->
