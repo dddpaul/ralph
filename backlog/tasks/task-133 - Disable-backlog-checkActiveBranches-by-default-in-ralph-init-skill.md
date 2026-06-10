@@ -1,10 +1,10 @@
 ---
 id: TASK-133
 title: Disable backlog checkActiveBranches by default in ralph-init skill
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-06-10 04:44'
-updated_date: '2026-06-10 04:59'
+updated_date: '2026-06-10 05:00'
 labels: []
 dependencies: []
 priority: medium
@@ -67,10 +67,12 @@ If anything is unclear or any check fails: STOP and ask the user. Do NOT start w
 - [x] #4 grep -c 'backlog config set' skills/ralph-init/SKILL.md returns at least 2
 <!-- AC:END -->
 
-
-
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 Plan: Edit skills/ralph-init/SKILL.md section 3.5 to add 'backlog config set checkActiveBranches false' line immediately after the existing remoteOperations line, with parallel inline comments on both lines (remoteOperations: SSH passphrase prompts; checkActiveBranches: backlog CLI stalls in offline/restricted-git envs). Verify with grep -c 'backlog config set' == 2. No mirror to live CLAUDE.md needed — only the templates/root/CLAUDE.md file is R11-parity tracked, SKILL.md is not.
+
+Commit: `8f958e3` - task-133: Disable backlog checkActiveBranches by default in ralph-init
+
+Implemented and merged. Single-line addition to skills/ralph-init/SKILL.md section 3.5 (line 123): 'backlog config set checkActiveBranches false', with parallel inline rationale comments on both config-set lines. task-reviewer APPROVED on commit 8f958e3 — no R11 parity (SKILL.md is ralph-init source-of-truth, not template-mirrored), no scope creep, all 4 ACs grep-verified pass.
 <!-- SECTION:NOTES:END -->
