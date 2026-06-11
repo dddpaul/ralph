@@ -14,8 +14,16 @@ case "$(cat "$msg_file")" in
   squash\!*|fixup\!*) exit 0 ;;
 esac
 
-if grep -qiE 'Co-Authored-By|Generated with Claude Code' "$msg_file" || \
-   grep -qE '##[[:space:]]*Test [Pp]lan' "$msg_file"; then
+# Strip the verbose-commit scissor section ("# --- >8 ---" and everything below)
+# before scanning. Without this, the diff appended by commit.verbose=true /
+# `git commit -v` trips the guard whenever the diff mentions a forbidden pattern
+# (e.g. when the diff adds or modifies this very hook). Only the scissor section
+# is stripped — leading-"#" lines above the scissor are kept so the "## Test plan"
+# heading check still works.
+cleaned=$(sed '/^# -\{1,\} >8 -\{1,\}$/,$d' "$msg_file")
+
+if echo "$cleaned" | grep -qiE 'Co-Authored-By|Generated with Claude Code' || \
+   echo "$cleaned" | grep -qE '##[[:space:]]*Test [Pp]lan'; then
   echo "BLOCKED: commit message contains forbidden trailer/heading." >&2
   echo "Remove Co-Authored-By, Generated-with, and Test plan sections." >&2
   exit 1
