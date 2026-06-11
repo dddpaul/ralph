@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-06-11 17:33'
-updated_date: '2026-06-11 18:04'
+updated_date: '2026-06-11 18:14'
 labels: []
 dependencies: []
 priority: high
@@ -74,4 +74,8 @@ If anything is unclear or any check fails: STOP and ask the user. Do NOT start w
 Plan: Use sed pipe to git stripspace per approach A discussed with user (source author's preferred approach B fails because stripspace --strip-comments only removes # lines, not diff body below scissor). New hook flow: sed strips from scissor line to EOF, then stripspace removes remaining # comments, then grep runs on cleaned text. Add 4 bats tests in tests/unit/commit-msg-hook.bats: positive (scissor-bug fixture passes), three negatives (Co-Authored-By, Generated-with, Test plan in author body all blocked). AC #7 e2e check: bootstrap throwaway project in /tmp via ralph-init, set commit.verbose true, verify git commit -av exits 0.
 
 Implementation: patched skills/ralph-init/templates/git-hooks/commit-msg to strip the scissor section via sed '/^# -{1,} >8 -{1,}$/,$d' before grepping. Approach (b) git-stripspace --strip-comments was rejected because it also removes '## Test plan' (a # line) — broke AC #5 in initial run. Final hook uses sed alone. Added tests/unit/commit-msg-hook.bats with 9 cases: 1 positive (scissor regression), 3 negatives for each forbidden pattern in author body, 1 sanity-clean, 3 sanity-bypass (merge / fixup / squash). All 174 tests in npm test pass. AC #7 e2e: bootstrapped tmpdir/ralph-test-134, installed patched hook, set commit.verbose=true, exercised verbose-commit flow with a simulated editor that prepends 'Initial commit' — succeeded; throwaway repo recorded commit b9567f0 even though the staged file was .claude/hooks/commit-msg-guard.sh whose body contains the literal forbidden-trailer regex.
+
+Commit: `d65986d` - task-134: Strip verbose-commit scissor section before scanning forbidden patterns
+
+Correction to prior note re R11: parity DOES apply — .git/hooks/commit-msg ↔ skills/ralph-init/templates/git-hooks/commit-msg per task-reviewer-rules.md R11 table. Synced live .git/hooks/commit-msg from patched template; verified byte-identical via diff. Live file is git-excluded so no commit-tree change; SKILL.md U2 exact-content-match compare will now pass.
 <!-- SECTION:NOTES:END -->
