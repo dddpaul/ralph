@@ -3,10 +3,10 @@ id: TASK-134
 title: >-
   Fix commit-msg hook to ignore content below the scissor line (false-positive
   on verbose commits)
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-06-11 17:33'
-updated_date: '2026-06-11 18:14'
+updated_date: '2026-06-11 18:22'
 labels: []
 dependencies: []
 priority: high
@@ -78,4 +78,6 @@ Implementation: patched skills/ralph-init/templates/git-hooks/commit-msg to stri
 Commit: `d65986d` - task-134: Strip verbose-commit scissor section before scanning forbidden patterns
 
 Correction to prior note re R11: parity DOES apply — .git/hooks/commit-msg ↔ skills/ralph-init/templates/git-hooks/commit-msg per task-reviewer-rules.md R11 table. Synced live .git/hooks/commit-msg from patched template; verified byte-identical via diff. Live file is git-excluded so no commit-tree change; SKILL.md U2 exact-content-match compare will now pass.
+
+Implemented, reviewed, merged. Patched template hook + synced live .git/hooks/commit-msg (R11 parity). Added 9-case bats regression suite. All 174 tests pass; AC #7 e2e proven via throwaway repo b9567f0. task-reviewer APPROVED on 251e22b after R11 correction round.
 <!-- SECTION:NOTES:END -->
