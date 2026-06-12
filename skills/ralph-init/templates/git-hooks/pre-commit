@@ -1,0 +1,64 @@
+#!/bin/bash
+# Reject commits whose staged paths duplicate an existing tree path under a
+# different Unicode normalization (NFC vs NFD). macOS APFS auto-collapses both
+# forms into one working-tree file, but `git ls-tree` records the byte form
+# that reached the index — so a tree can end up with two entries that render
+# identically on macOS yet check out as duplicates on Linux/Windows.
+#
+# Reproducer: a downstream project accumulated 4 NFD-duplicate paths after
+# an autonomous commit synthesized filenames in NFD while NFC originals were
+# already on master. See TASK-136 for the incident.
+
+set -euo pipefail
+
+# core.quotePath=false → emit raw UTF-8 bytes instead of C-style \320\271 escapes.
+# Without this, NFC and NFD forms render as different escape strings, so the
+# normalization check below sees two distinct paths whose bytes appear "equal"
+# under any encoding round-trip.
+staged=$(git -c core.quotePath=false diff --cached --name-only)
+[ -z "$staged" ] && exit 0
+
+# No HEAD yet (empty repo, first commit) → nothing to compare against.
+head_paths=$(git -c core.quotePath=false ls-tree -r HEAD --name-only 2>/dev/null) || exit 0
+[ -z "$head_paths" ] && exit 0
+
+# Pick a normalizer once. macOS BSD iconv ships utf-8-mac (NFD → NFC).
+# Linux glibc iconv does not; fall back to python3.
+if printf '' | iconv -f utf-8-mac -t utf-8 >/dev/null 2>&1; then
+  to_nfc() { printf '%s' "$1" | iconv -f utf-8-mac -t utf-8; }
+elif command -v python3 >/dev/null 2>&1; then
+  to_nfc() { python3 -c 'import sys, unicodedata; sys.stdout.write(unicodedata.normalize("NFC", sys.argv[1]))' "$1"; }
+else
+  echo "pre-commit: neither iconv -f utf-8-mac nor python3 available; cannot normalize. Skipping NFC check." >&2
+  exit 0
+fi
+
+declare -A head_by_nfc
+while IFS= read -r p; do
+  [ -z "$p" ] && continue
+  nfc=$(to_nfc "$p")
+  head_by_nfc["$nfc"]+="$p"$'\n'
+done <<< "$head_paths"
+
+violations=()
+while IFS= read -r p; do
+  [ -z "$p" ] && continue
+  nfc=$(to_nfc "$p")
+  existing="${head_by_nfc["$nfc"]:-}"
+  [ -z "$existing" ] && continue
+  while IFS= read -r e; do
+    [ -z "$e" ] && continue
+    if [ "$e" != "$p" ]; then
+      violations+=("staged: $p  vs  tree: $e")
+    fi
+  done <<< "$existing"
+done <<< "$staged"
+
+if [ ${#violations[@]} -gt 0 ]; then
+  echo "BLOCKED: staged path duplicates existing tree path under a different Unicode normalization (NFD vs NFC)." >&2
+  printf '  %s\n' "${violations[@]}" >&2
+  echo "Resolve: 'git mv <staged> <tree>' to keep the existing tree-form, or 'git rm --cached <tree>' if the new form is correct." >&2
+  exit 1
+fi
+
+exit 0

@@ -98,10 +98,20 @@ Read `templates/root/CLAUDE.md` → replace ALL `<FILL IN ...>` placeholders in 
 
 Write to project root.
 
-### 3.3 `.git/hooks/post-commit` and `.git/hooks/commit-msg`
+### 3.3 `.git/hooks/post-commit`, `.git/hooks/commit-msg`, `.git/hooks/pre-commit`, and Unicode normalization
 Read `templates/git-hooks/post-commit` → write to `.git/hooks/post-commit`. Make executable (`chmod +x`). If hook already exists, warn user and ask before overwriting.
 
 Read `templates/git-hooks/commit-msg` → write to `.git/hooks/commit-msg`. Make executable (`chmod +x`). If hook already exists, warn user and ask before overwriting.
+
+Read `templates/git-hooks/pre-commit` → write to `.git/hooks/pre-commit`. Make executable (`chmod +x`). If hook already exists, warn user and ask before overwriting. The hook rejects a commit when a staged path duplicates an existing tree path under a different Unicode normalization (NFD vs NFC) — see TASK-136 for the downstream incident that prompted it.
+
+Then bootstrap git's Unicode normalization so working-tree paths are recorded in NFC even on macOS APFS, which hands filenames back in NFD:
+
+```bash
+git config --local core.precomposeunicode true
+```
+
+This setting plus the pre-commit guard form a belt-and-suspenders defense: the config catches new files written via macOS, the hook catches NFD bytes that slip in via patch import, `git mv`, or a foreign filesystem.
 
 ### 3.4 `.gitignore`
 Append missing entries (don't duplicate existing lines):
@@ -317,6 +327,7 @@ Files created:
   CLAUDE.md             - Agent instructions for Claude Code
   .git/hooks/post-commit - Commit hash tracking for tasks
   .git/hooks/commit-msg  - Forbidden trailer/heading guard
+  .git/hooks/pre-commit  - Unicode NFC/NFD duplicate-path guard
   .gitignore            - Updated with Ralph entries
   backlog/              - Backlog initialized
   .claude/settings.json      - Claude Code hooks (project-wide)
@@ -420,14 +431,15 @@ Compare each managed file against its current template. Assign one status per fi
 2. **`CLAUDE.md`** — compare only lines **above** the `## Project-Specific` heading against the same region in `templates/root/CLAUDE.md`. Everything from `## Project-Specific` down (including conventions) is the project block and must never be touched.
 3. **`.git/hooks/post-commit`** — exact content match against `templates/git-hooks/post-commit`
 4. **`.git/hooks/commit-msg`** — exact content match against `templates/git-hooks/commit-msg`
-5. **`.claude/settings.json`** — exact content match against `templates/claude/settings.json`
-6. **`.claude/hooks/`** — each script in `templates/claude/hooks/*-guard.sh` and `templates/claude/hooks/task-validator.sh` must match `.claude/hooks/<name>.sh`
-7. **`.claude/settings.local.json`** — exact content match against `templates/claude/settings.local.json`
-8. **`.devcontainer/devcontainer.json`** — exact content match against `templates/devcontainer/devcontainer.json`. If `.devcontainer/` directory does not exist, status is **skipped**.
-9. **`.devcontainer/init-firewall.sh`** — exact content match against `templates/devcontainer/init-firewall.sh`. If `.devcontainer/` directory does not exist, status is **skipped**.
-10. **`.devcontainer/Dockerfile`** — always **skipped** (assembled from fragments, cannot diff meaningfully)
-11. **`.gitignore`** — always **skipped** (append-only logic in init flow)
-12. **`.claude/brainstorm-rules.md`** — managed via section-aware merge: pre-heading content is regenerated from `templates/claude/brainstorm-rules.md`; the `## Project additions` heading and everything below it are preserved verbatim. Status is **current** when the pre-heading region matches the template byte-for-byte; **outdated** when it differs; **missing** when the file does not exist (would be created from template).
+5. **`.git/hooks/pre-commit`** — exact content match against `templates/git-hooks/pre-commit` (Unicode NFC/NFD duplicate guard, see TASK-136)
+6. **`.claude/settings.json`** — exact content match against `templates/claude/settings.json`
+7. **`.claude/hooks/`** — each script in `templates/claude/hooks/*-guard.sh` and `templates/claude/hooks/task-validator.sh` must match `.claude/hooks/<name>.sh`
+8. **`.claude/settings.local.json`** — exact content match against `templates/claude/settings.local.json`
+9. **`.devcontainer/devcontainer.json`** — exact content match against `templates/devcontainer/devcontainer.json`. If `.devcontainer/` directory does not exist, status is **skipped**.
+10. **`.devcontainer/init-firewall.sh`** — exact content match against `templates/devcontainer/init-firewall.sh`. If `.devcontainer/` directory does not exist, status is **skipped**.
+11. **`.devcontainer/Dockerfile`** — always **skipped** (assembled from fragments, cannot diff meaningfully)
+12. **`.gitignore`** — always **skipped** (append-only logic in init flow)
+13. **`.claude/brainstorm-rules.md`** — managed via section-aware merge: pre-heading content is regenerated from `templates/claude/brainstorm-rules.md`; the `## Project additions` heading and everything below it are preserved verbatim. Status is **current** when the pre-heading region matches the template byte-for-byte; **outdated** when it differs; **missing** when the file does not exist (would be created from template).
 
 ---
 
@@ -442,6 +454,7 @@ ralph.sh                          outdated
 CLAUDE.md (generic section)       current
 .git/hooks/post-commit            outdated
 .git/hooks/commit-msg             outdated
+.git/hooks/pre-commit             outdated
 .claude/settings.json             current
 .claude/hooks/                    current
 .claude/settings.local.json       current
@@ -454,7 +467,7 @@ CLAUDE.md (generic section)       current
 
 **For outdated files, show details:**
 
-- **`ralph.sh`**, **`.git/hooks/post-commit`**, and **`.git/hooks/commit-msg`**: show a plain language summary of what changed (e.g. "Template adds --model flag support and fixes timeout handling"). Read both versions and describe the meaningful differences — do not dump raw diffs for these files.
+- **`ralph.sh`**, **`.git/hooks/post-commit`**, **`.git/hooks/commit-msg`**, and **`.git/hooks/pre-commit`**: show a plain language summary of what changed (e.g. "Template adds --model flag support and fixes timeout handling"). Read both versions and describe the meaningful differences — do not dump raw diffs for these files.
 - **`.claude/settings.json`**: show the unified diff (`diff -u`) because the project may have custom hooks the user wants to preserve.
 - **`.claude/settings.local.json`**: show the unified diff (`diff -u`) because the project may have custom permissions the user wants to preserve.
 - **`CLAUDE.md`**: show a plain language summary of what changed in the generic section (above `## Project-Specific`).
@@ -480,6 +493,7 @@ For each file the user approved:
 - **`ralph.sh`**: overwrite from `templates/root/ralph.sh`, then `chmod +x`.
 - **`.git/hooks/post-commit`**: overwrite from `templates/git-hooks/post-commit`, then `chmod +x`.
 - **`.git/hooks/commit-msg`**: overwrite from `templates/git-hooks/commit-msg`, then `chmod +x`.
+- **`.git/hooks/pre-commit`**: overwrite from `templates/git-hooks/pre-commit`, then `chmod +x`. Also re-assert `git config --local core.precomposeunicode true` (idempotent — no-op if already set) so the macOS NFD-on-write defense ships alongside the hook.
 - **`.claude/settings.json`**: overwrite from `templates/claude/settings.json`.
 - **`.claude/hooks/`**: for each `templates/claude/hooks/*-guard.sh` and `templates/claude/hooks/task-validator.sh`, overwrite `.claude/hooks/<name>.sh`, then `chmod +x`. Create directory if needed.
 - **`.claude/settings.local.json`**: overwrite from `templates/claude/settings.local.json`. Then run the same narrow-rule merge as Step 3.7b (writes **both** the absolute-path and literal-`$HOME` forms of the `preflight.sh`, `wait-heartbeat.sh`, and `utc-to-moscow.sh` rules — 6 rules total — via `jq`, idempotent through `unique`). **If the project is Documentation or Mixed** (detect via existing `.obsidian/` directory), also run the Step 3.7c pptx merge so the overwrite does not strip the `Bash(python scripts/office/soffice.py:*)` and `Bash(pdftoppm:*)` rules. User-added custom permissions in the existing `allow` array are preserved by the `+ unique` merge. After the merge(s), run the Step 3.10 verification block to confirm all rules landed; surface any `WARN` to the user before completing the upgrade.
@@ -514,6 +528,7 @@ Ralph upgrade complete!
   CLAUDE.md (generic section)       current
   .git/hooks/post-commit            updated
   .git/hooks/commit-msg             updated
+  .git/hooks/pre-commit             updated
   .claude/settings.json             current
   .claude/hooks/                    current
   .claude/settings.local.json       current
