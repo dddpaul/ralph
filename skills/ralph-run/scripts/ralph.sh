@@ -25,6 +25,11 @@ Options:
   --prompt-file <path>         File to load prompt template from
   --tasks <ids>                Comma-separated numeric task IDs to run (e.g. 62,64,65)
                                Mutually exclusive with --prompt-file
+  --block-end-buffer-min <N>   Pause when the active 5h block ends in <= N
+                               minutes. Default: 0 (check disabled — no ccusage
+                               invocation). No subscription-tier knowledge needed:
+                               this only guards the block boundary, not cumulative
+                               quota drain.
   --devcontainer               Run inside a devcontainer
   --help                       Show this help message and exit
   --version                    Show version and exit
@@ -43,6 +48,7 @@ RETRY_COUNT=2  # Number of retries for --on-error=retry
 LOG_FILE=""  # Optional log file for errors
 PROMPT_FILE=""  # Optional file to load prompt template from
 TASKS_RAW=""  # Optional comma-separated task IDs whitelist
+BLOCK_END_BUFFER_MIN=0  # 0 disables the ccusage block-boundary check
 
 # Parse command-line arguments into global configuration variables
 parse_args() {
@@ -124,6 +130,14 @@ parse_args() {
         TASKS_RAW="${1#*=}"
         shift
         ;;
+      --block-end-buffer-min)
+        BLOCK_END_BUFFER_MIN="$2"
+        shift 2
+        ;;
+      --block-end-buffer-min=*)
+        BLOCK_END_BUFFER_MIN="${1#*=}"
+        shift
+        ;;
       --help)
         show_help
         exit 0
@@ -190,6 +204,11 @@ validate_args() {
       echo "Error: --tasks and --prompt-file are mutually exclusive"
       exit 1
     fi
+  fi
+
+  if ! [[ "$BLOCK_END_BUFFER_MIN" =~ ^[0-9]+$ ]]; then
+    echo "Error: --block-end-buffer-min must be a non-negative integer. Got: '$BLOCK_END_BUFFER_MIN'"
+    exit 1
   fi
 }
 
@@ -375,8 +394,22 @@ _update_status() {
   local iter_started_json="null"
   [[ -n "$ITERATION_STARTED_AT" ]] && iter_started_json="\"$(_status_json_escape "$ITERATION_STARTED_AT")\""
 
+  # Paused-state fields: populated only when state=paused, null otherwise.
+  local paused_reason_json="null"
+  local paused_buffer_json="null"
+  local paused_remaining_json="null"
+  local paused_block_end_json="null"
+  local paused_at_json="null"
+  if [[ "$state" == "paused" ]]; then
+    [[ -n "$PAUSED_REASON" ]] && paused_reason_json="\"$(_status_json_escape "$PAUSED_REASON")\""
+    [[ -n "$PAUSED_BUFFER_MIN" ]] && paused_buffer_json="$PAUSED_BUFFER_MIN"
+    [[ -n "$PAUSED_REMAINING_MIN" ]] && paused_remaining_json="$PAUSED_REMAINING_MIN"
+    [[ -n "$PAUSED_BLOCK_END_TIME" ]] && paused_block_end_json="\"$(_status_json_escape "$PAUSED_BLOCK_END_TIME")\""
+    [[ -n "$PAUSED_AT" ]] && paused_at_json="\"$(_status_json_escape "$PAUSED_AT")\""
+  fi
+
   cat > "$STATUS_FILE" <<STATUSEOF
-{"pid":$$,"started_at":"$(_status_json_escape "$RUN_STARTED_AT")","state":"$(_status_json_escape "$state")","iteration":$CURRENT_ITERATION,"max_iterations":$MAX_ITERATIONS,"tool":"$(_status_json_escape "$TOOL")","tasks_done":$tasks_done_json,"tasks_remaining":${remaining:-0},"current_task":$current_task_json,"last_iteration_duration":$last_iter_json,"elapsed":$elapsed,"errors":$errors_json,"completed_at":$completed_at_json,"exit_code":$exit_code_json,"iteration_started_at":$iter_started_json,"timeout_sec":$TIMEOUT_SEC}
+{"pid":$$,"started_at":"$(_status_json_escape "$RUN_STARTED_AT")","state":"$(_status_json_escape "$state")","iteration":$CURRENT_ITERATION,"max_iterations":$MAX_ITERATIONS,"tool":"$(_status_json_escape "$TOOL")","tasks_done":$tasks_done_json,"tasks_remaining":${remaining:-0},"current_task":$current_task_json,"last_iteration_duration":$last_iter_json,"elapsed":$elapsed,"errors":$errors_json,"completed_at":$completed_at_json,"exit_code":$exit_code_json,"iteration_started_at":$iter_started_json,"timeout_sec":$TIMEOUT_SEC,"paused_reason":$paused_reason_json,"paused_buffer_min":$paused_buffer_json,"paused_remaining_min":$paused_remaining_json,"paused_block_end_time":$paused_block_end_json,"paused_at":$paused_at_json}
 STATUSEOF
 }
 
@@ -433,6 +466,65 @@ CURRENT_TASK=""
 LAST_ITER_DURATION=""
 CURRENT_ITERATION=0
 ITERATION_STARTED_AT=""
+PAUSED_REASON=""
+PAUSED_BUFFER_MIN=""
+PAUSED_REMAINING_MIN=""
+PAUSED_BLOCK_END_TIME=""
+PAUSED_AT=""
+
+# Per-iteration usage check: invoke usage-check.sh with BLOCK_END_BUFFER_MIN.
+# Exit 1 sets PAUSED_* state and signals the loop to break (returns 1).
+# Exit 2 warns once (via the disabled-flag file) and returns 0 (continue).
+# Exit 0 returns 0 (continue normally).
+USAGE_CHECK_SCRIPT="${RALPH_USAGE_CHECK_SCRIPT:-$SCRIPT_DIR/skills/ralph-run/scripts/usage-check.sh}"
+USAGE_DISABLED_FLAG="${RALPH_USAGE_DISABLED_FLAG:-$SCRIPT_DIR/backlog/.ralph-usage-check-disabled}"
+
+# Returns 1 when usage-check tripped (caller should break); 0 otherwise.
+_check_usage_or_pause() {
+  [[ "$BLOCK_END_BUFFER_MIN" -eq 0 ]] && return 0
+  if [[ ! -x "$USAGE_CHECK_SCRIPT" ]]; then
+    # Helper missing — treat as unmeasurable, warn once.
+    if [[ ! -f "$USAGE_DISABLED_FLAG" ]]; then
+      echo "WARNING: usage-check.sh not found at $USAGE_CHECK_SCRIPT — block-end check disabled for this run" >&2
+      mkdir -p "$(dirname "$USAGE_DISABLED_FLAG")" 2>/dev/null
+      : > "$USAGE_DISABLED_FLAG"
+    fi
+    return 0
+  fi
+  local out rc
+  out=$("$USAGE_CHECK_SCRIPT" "$BLOCK_END_BUFFER_MIN" 2>/dev/null)
+  rc=$?
+  case "$rc" in
+    0) return 0 ;;
+    1)
+      PAUSED_REASON="$out"
+      PAUSED_BUFFER_MIN="$BLOCK_END_BUFFER_MIN"
+      # Parse remaining minutes back out of the reason string for the status field.
+      if [[ "$out" =~ block_end_in_([0-9]+)min_below_ ]]; then
+        PAUSED_REMAINING_MIN="${BASH_REMATCH[1]}"
+      else
+        PAUSED_REMAINING_MIN=0
+      fi
+      # Re-read endTime for the status field (best effort; fall back to empty).
+      if command -v ccusage >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+        PAUSED_BLOCK_END_TIME=$(ccusage blocks --active --token-limit max --json 2>/dev/null | jq -r '.blocks[0].endTime // empty' 2>/dev/null)
+      fi
+      PAUSED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+      return 1
+      ;;
+    2)
+      if [[ ! -f "$USAGE_DISABLED_FLAG" ]]; then
+        echo "WARNING: usage-check.sh cannot measure block boundary — block-end check disabled for this run" >&2
+        mkdir -p "$(dirname "$USAGE_DISABLED_FLAG")" 2>/dev/null
+        : > "$USAGE_DISABLED_FLAG"
+      fi
+      return 0
+      ;;
+    *)
+      return 0
+      ;;
+  esac
+}
 
 # List all task IDs currently in "Done" status, sorted
 _get_done_task_ids() {
@@ -625,6 +717,18 @@ echo "Starting Ralph - Tool: $TOOL$MODEL_INFO - Max iterations: $MAX_ITERATIONS 
 echo "Config: $CONFIG_INFO"
 
 for i in $(seq 1 "$MAX_ITERATIONS"); do
+  # Per-iteration usage check (runs before each AI tool invocation, including
+  # the very first iteration). Trips state=paused if active 5h block ends
+  # within $BLOCK_END_BUFFER_MIN minutes.
+  if ! _check_usage_or_pause; then
+    EXIT_REASON="paused"
+    _update_status "paused" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "0"
+    echo ""
+    echo "Ralph paused: $PAUSED_REASON. Resume with /ralph-run after the next 5h block starts."
+    show_summary "paused"
+    exit 0
+  fi
+
   # Determine next task: whitelist mode vs default mode
   WHITELIST_TASK_ID=""
   if [[ ${#TASK_WHITELIST[@]} -gt 0 ]]; then
