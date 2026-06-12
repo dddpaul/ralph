@@ -2,18 +2,21 @@
 set -uo pipefail
 
 usage() {
-  echo "Usage: preflight.sh <ralph_path> <devcontainer:true|false> [--verbose] [--tasks <ids>]"
+  echo "Usage: preflight.sh <ralph_path> <devcontainer:true|false> [--verbose] [--tasks <ids>] [--block-end-buffer-min <N>]"
   exit 1
 }
 
 VERBOSE=false
 TASKS_RAW=""
+BLOCK_END_BUFFER_MIN=0
 POSITIONAL=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --verbose) VERBOSE=true; shift ;;
     --tasks) TASKS_RAW="$2"; shift 2 ;;
     --tasks=*) TASKS_RAW="${1#*=}"; shift ;;
+    --block-end-buffer-min) BLOCK_END_BUFFER_MIN="$2"; shift 2 ;;
+    --block-end-buffer-min=*) BLOCK_END_BUFFER_MIN="${1#*=}"; shift ;;
     *) POSITIONAL+=("$1"); shift ;;
   esac
 done
@@ -116,5 +119,44 @@ if ! bash -n "$RALPH_PATH" 2>"$SYNTAX_ERR"; then
 fi
 rm -f "$SYNTAX_ERR"
 verbose "check ralph_syntax: ok"
+
+# Check 6: usage cap (block-end buffer). Only invoke when BUFFER_MIN > 0.
+if ! [[ "$BLOCK_END_BUFFER_MIN" =~ ^[0-9]+$ ]]; then
+  verbose "check block_end_buffer: FAIL (non-integer: $BLOCK_END_BUFFER_MIN)"
+  echo "ERROR: --block-end-buffer-min must be a non-negative integer. Got: '$BLOCK_END_BUFFER_MIN'"
+  exit 1
+fi
+if [[ "$BLOCK_END_BUFFER_MIN" -gt 0 ]]; then
+  USAGE_CHECK_SCRIPT="${RALPH_USAGE_CHECK_SCRIPT:-$(dirname "$0")/usage-check.sh}"
+  USAGE_DISABLED_FLAG="${RALPH_USAGE_DISABLED_FLAG:-backlog/.ralph-usage-check-disabled}"
+  if [[ ! -x "$USAGE_CHECK_SCRIPT" ]]; then
+    verbose "check usage_check_script: FAIL ($USAGE_CHECK_SCRIPT)"
+    echo "ERROR: usage-check.sh not found or not executable at $USAGE_CHECK_SCRIPT"
+    exit 1
+  fi
+  _uc_out=$("$USAGE_CHECK_SCRIPT" "$BLOCK_END_BUFFER_MIN" 2>/dev/null)
+  _uc_rc=$?
+  case "$_uc_rc" in
+    0)
+      verbose "check usage: ok (block boundary outside ${BLOCK_END_BUFFER_MIN}m buffer)"
+      ;;
+    1)
+      verbose "check usage: FAIL ($_uc_out)"
+      echo "ERROR: usage cap tripped — $_uc_out"
+      exit 1
+      ;;
+    2)
+      verbose "check usage: WARN (cannot measure — block-end check disabled this run)"
+      echo "WARNING: usage-check.sh cannot measure block boundary — continuing without block-end protection" >&2
+      mkdir -p "$(dirname "$USAGE_DISABLED_FLAG")" 2>/dev/null
+      : > "$USAGE_DISABLED_FLAG"
+      ;;
+    *)
+      verbose "check usage: WARN (unexpected exit $_uc_rc — continuing)"
+      ;;
+  esac
+else
+  verbose "check usage: ok (skipped, buffer=0)"
+fi
 
 echo "OK RALPH_PATH=$RALPH_PATH"

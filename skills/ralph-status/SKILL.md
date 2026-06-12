@@ -23,6 +23,7 @@ Extract fields using grep from the file content (no jq/python dependency):
 - `tasks_done`, `tasks_remaining`, `current_task`
 - `last_iteration_duration`, `elapsed`, `errors`
 - `completed_at`, `exit_code`
+- `paused_reason`, `paused_buffer_min`, `paused_remaining_min`, `paused_block_end_time`, `paused_at` (populated only when state=paused)
 
 Then run a **single** Bash call to get heartbeat mtime, current time, and backlog snapshot:
 
@@ -97,6 +98,15 @@ If `state` is `"completed"` or `"failed"`, also show:
 Exit code:    <exit_code>
 Completed at: <moscow_time converted from completed_at per Step 2.5>
 ```
+
+If `state` is `"paused"`, also show:
+
+```
+Paused:       block ends in <paused_remaining_min>m (buffer <paused_buffer_min>m)
+              resume with /ralph-run
+```
+
+The first line restates the trip condition (e.g. "block ends in 12m (buffer 30m)"); the second line is the operator-resumable hint. Do not auto-resume — re-running `/ralph-run` is the only resume path.
 
 ### Formatting elapsed time
 

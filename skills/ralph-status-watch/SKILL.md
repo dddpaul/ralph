@@ -63,7 +63,7 @@ Apply these rules in order. The first rule that matches determines the output. O
 
 ### Rule (e): Finished
 
-**Condition:** `state` is `"completed"` or `"failed"`
+**Condition:** `state` is `"completed"`, `"failed"`, or `"paused"`
 
 **Timestamp conversion:** Before displaying `completed_at`, convert it from UTC to Europe/Moscow time using the helper script:
 
@@ -97,7 +97,14 @@ Errors:
   - [iteration <N>] <message>
 ```
 
-**Terminal:** YES — do NOT schedule the next tick.
+When `state == "paused"`, append the block-end pause reason and the resume hint instead of (or in addition to) the standard exit_code/completed_at lines:
+
+```
+Paused:       block ends in <paused_remaining_min>m (buffer <paused_buffer_min>m)
+              resume with /ralph-run
+```
+
+**Terminal:** YES — do NOT schedule the next tick. `paused` is a clean operator-resumable terminal state; the watch loop must NOT declare crash via heartbeat staleness when state=paused.
 
 ---
 
