@@ -441,13 +441,13 @@ ITER_DURATIONS=()
 EXIT_REASON=""
 
 # Status file tracking
-STATUS_FILE="${RALPH_STATUS_FILE:-$SCRIPT_DIR/backlog/.ralph-status.json}"
+STATUS_FILE="${RALPH_STATUS_FILE:-${RALPH_PROJECT_ROOT:-$SCRIPT_DIR}/backlog/.ralph-status.json}"
 
 # Double-run guard: refuse to start if another Ralph instance is alive
 if [[ -f "$STATUS_FILE" ]]; then
   _existing_state=$(grep -o '"state":"[^"]*"' "$STATUS_FILE" | grep -o '"[^"]*"$' | tr -d '"')
   if [[ "$_existing_state" == "running" ]]; then
-    _hb_file="${RALPH_HEARTBEAT_FILE:-$SCRIPT_DIR/backlog/.ralph-heartbeat}"
+    _hb_file="${RALPH_HEARTBEAT_FILE:-${RALPH_PROJECT_ROOT:-$SCRIPT_DIR}/backlog/.ralph-heartbeat}"
     if _is_heartbeat_fresh "$_hb_file"; then
       _existing_pid=$(grep -o '"pid":[0-9]*' "$STATUS_FILE" | grep -o '[0-9]*')
       echo "Error: Ralph is already running (PID ${_existing_pid:-unknown}). Use /ralph-status to check progress, or kill ${_existing_pid:-the process} to stop it."
@@ -458,7 +458,7 @@ if [[ -f "$STATUS_FILE" ]]; then
   unset _existing_state
 fi
 
-RUN_LOG="${RALPH_RUN_LOG:-$SCRIPT_DIR/backlog/.ralph-run.log}"
+RUN_LOG="${RALPH_RUN_LOG:-${RALPH_PROJECT_ROOT:-$SCRIPT_DIR}/backlog/.ralph-run.log}"
 RUN_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 TASKS_DONE_IDS=""
 STATUS_ERRORS=""
@@ -476,8 +476,8 @@ PAUSED_AT=""
 # Exit 1 sets PAUSED_* state and signals the loop to break (returns 1).
 # Exit 2 warns once (via the disabled-flag file) and returns 0 (continue).
 # Exit 0 returns 0 (continue normally).
-USAGE_CHECK_SCRIPT="${RALPH_USAGE_CHECK_SCRIPT:-$SCRIPT_DIR/skills/ralph-run/scripts/usage-check.sh}"
-USAGE_DISABLED_FLAG="${RALPH_USAGE_DISABLED_FLAG:-$SCRIPT_DIR/backlog/.ralph-usage-check-disabled}"
+USAGE_CHECK_SCRIPT="${RALPH_USAGE_CHECK_SCRIPT:-$SCRIPT_DIR/usage-check.sh}"
+USAGE_DISABLED_FLAG="${RALPH_USAGE_DISABLED_FLAG:-${RALPH_PROJECT_ROOT:-$SCRIPT_DIR}/backlog/.ralph-usage-check-disabled}"
 
 # Returns 1 when usage-check tripped (caller should break); 0 otherwise.
 _check_usage_or_pause() {
@@ -559,7 +559,7 @@ cleanup_and_exit() {
 }
 
 _ralph_cleanup_files=()
-HEARTBEAT_FILE="${RALPH_HEARTBEAT_FILE:-$SCRIPT_DIR/backlog/.ralph-heartbeat}"
+HEARTBEAT_FILE="${RALPH_HEARTBEAT_FILE:-${RALPH_PROJECT_ROOT:-$SCRIPT_DIR}/backlog/.ralph-heartbeat}"
 HB_PID=""
 # Clean up heartbeat process and temporary files on exit
 _ralph_cleanup() {
@@ -606,7 +606,7 @@ if [[ "$USE_DEVCONTAINER" == true ]]; then
     exit 1
   fi
   echo "Starting devcontainer..."
-  devcontainer up --workspace-folder "$SCRIPT_DIR"
+  devcontainer up --workspace-folder "${RALPH_PROJECT_ROOT:-$SCRIPT_DIR}"
   echo "Devcontainer is ready."
 fi
 
@@ -688,7 +688,7 @@ CONFIG_INFO="on-error: $ON_ERROR"
 [[ -n "$LOG_FILE" ]] && CONFIG_INFO="$CONFIG_INFO, log: $LOG_FILE"
 
 # Set up run logging
-mkdir -p "$SCRIPT_DIR/backlog"
+mkdir -p "${RALPH_PROJECT_ROOT:-$SCRIPT_DIR}/backlog"
 : > "$RUN_LOG"
 exec > >(tee -a "$RUN_LOG") 2>&1
 RUN_LOG_TEE_PID=$!
@@ -776,7 +776,7 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
   # Build the exec prefix for devcontainer mode
   EXEC_PREFIX=()
   if [[ "$USE_DEVCONTAINER" == true ]]; then
-    EXEC_PREFIX=(devcontainer exec --workspace-folder "$SCRIPT_DIR")
+    EXEC_PREFIX=(devcontainer exec --workspace-folder "${RALPH_PROJECT_ROOT:-$SCRIPT_DIR}")
   fi
 
   # Build prompt: whitelist-targeted, file-loaded, or default

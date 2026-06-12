@@ -33,6 +33,15 @@ If not a git repo: `git init -b master`
 
 If the user-global agent file is missing, print the error and **abort** — do NOT proceed to Step 2 or write any project files.
 
+```bash
+[ -s "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/ralph-run/scripts/ralph.sh" ] || {
+  echo "ERROR: install user-global skills first via /ralph-sync, then re-run ralph-init"
+  exit 1
+}
+```
+
+The project-root `ralph.sh` written in Step 3.1 is a thin shim that `exec`s the canonical script at `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/ralph-run/scripts/ralph.sh`. If that canonical is missing, the shim points at nothing and the bootstrap is broken. Hard-stop here and instruct the user to install user-global skills first.
+
 ---
 
 ## Step 2: Clarifying Questions
