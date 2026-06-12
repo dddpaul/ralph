@@ -42,3 +42,92 @@ Pause the Ralph autonomous loop when Claude Code subscription usage hits a confi
 ## Hand-off
 
 Next: `ralph-task` with `feature=ralph-usage-cap` to create the single backlog task carrying the AC set (preflight integration, loop integration, status fields, ralph-status rendering, ralph-status-watch terminal-state handling, ralph-init template parity for `--usage-cap` flag + allowlist, the two new bats files, and the existing-bats update). PRD-shape escape valve: ralph-task's pre-check will redirect to `ralph-prd` → `ralph-backlog` if it disagrees on size — but at ~8 ACs this fits the one-task heuristic.
+
+---
+
+## Addendum: ccusage exposes tokens not percentage — pivot to projection-based cap (added 2026-06-11)
+
+### Why
+
+Empirical probing of ccusage 20.1.0 against the live host showed the assumed measurement source does not exist:
+
+- `ccusage blocks --active --token-limit max --json` returns `totalTokens`, `projection.totalTokens`, `costUSD`, `burnRate`, and per-model breakdowns — but **no `used_percent`, no plan-limit field, no `remaining_percent`**.
+- `--token-limit max` only affects in-table warnings (warns when usage approaches a threshold *the operator passes in*), not the JSON shape.
+- `ccusage weekly --json` is date-grouped totals with no quota awareness.
+- `ccusage statusline` shows `$X session / $Y today / $Z block` but no percentage.
+- No quota-aware subcommand exists in 20.1.0 (`ccusage --help | grep -i limit\|quota\|remain` is empty).
+
+Anthropic's actual 5h token caps per subscription tier are not published in machine-readable form and not derived by ccusage. The Claude web UI's "remaining %" is computed server-side and not surfaced via any local CLI.
+
+This invalidates the percentage-based design above. The user picked option **β** (projection-based, single absolute-token flag).
+
+### What changed
+
+Polarity: **drop "percentage" entirely.** The cap is an absolute 5h-window token threshold, expressed in tokens. The operator picks the number based on their plan tier (well-known for Max subscribers, fuzzier for Pro — operator chooses what they're comfortable with). The 100-as-disabled convention is replaced by **0-as-disabled** (matches "no threshold").
+
+Measurement: compare ccusage's `blocks[0].projection.totalTokens` (extrapolated 5h-block total at current burn rate) against the operator's cap. Pause proactively *before* the limit is hit — leverages ccusage's own burn-rate math.
+
+| Old shape | New shape |
+|---|---|
+| `--usage-cap <pct>` (default 80, range 0–100, 100 disables) | `--usage-cap-5h-tokens <N>` (default 0 = disabled, integer) |
+| Read 5h.<model>.used_percent + weekly.<model>.used_percent | Read `blocks[0].projection.totalTokens` from `ccusage blocks --active --token-limit max --json` |
+| Pause if either window's used% ≥ cap | Pause if `projection.totalTokens` ≥ cap |
+| Both 5h + weekly windows | 5h only (weekly dropped — ccusage doesn't expose weekly quota; revisit later as a follow-up) |
+| Status: `paused_reason: usage_5h_opus_82pct` | Status: `paused_reason: projected_5h_opus_49M_over_50M_cap` (token-based) |
+| Status: `paused_cap` (int %) | Status: `paused_cap_5h_tokens` (int tokens) + `paused_projection_tokens` (int tokens) |
+| ralph-status: `Paused: usage 5h opus 82% (cap 80%)` | ralph-status: `Paused: projected 5h opus ~49M tokens (cap 50M)` |
+
+### Implementation checklist
+
+- [ ] Edit TASK-135 description and all 10 ACs in place (`backlog task edit 135 --remove-ac N --ac "..."` per AC, descending order to keep indices stable).
+- [ ] usage-check.sh signature unchanged: `$1=MODEL`, `$2=CAP_5H_TOKENS`. Exit codes unchanged. Internal logic switches to `projection.totalTokens` read via `ccusage blocks --active --token-limit max --json | jq '.blocks[0].projection.totalTokens'`.
+- [ ] `--token-limit max` flag is harmless even when irrelevant — keep it for forward compatibility with future ccusage versions that may surface a limit field.
+- [ ] CAP=0 short-circuit verified in unit tests (PATH-mocked ccusage must NOT be invoked).
+- [ ] Brainstorm doc kept; the original sections record the rejected percentage-based path for posterity (rule R14: content preservation).
+- [ ] Weekly-window check is dropped from scope for v1; if it turns out to matter, file a follow-up task once Anthropic / ccusage expose a weekly quota field.
+
+---
+
+## Addendum: token cap still binds to subscription limits — pivot to time-based boundary heuristic (added 2026-06-11)
+
+### Why
+
+Option β (projection-based, `--usage-cap-5h-tokens <N>`) closes the percentage-vs-tokens gap but does **not** close the operator-knowledge gap. Picking a sensible `N` still requires knowing the 5h-block token allowance of the subscription tier, which Anthropic does not publish in machine-readable form and no local CLI surfaces.
+
+Probing of all candidate sources confirmed the gap is structural, not a ccusage limitation:
+
+- `claude --help`: no `usage` / `quota` / `limit` / `remaining` / `status` subcommand.
+- `claude -p /status`: "/status isn't available in this environment" (interactive-only).
+- `claude -p /cost`: returns session cost (USD), not subscription %.
+- `ccusage statusline`: emits `$X session / $Y today / $Z block (Nh left)` — dollars and time, no %.
+- API rate-limit response headers (`anthropic-ratelimit-tokens-remaining`): API tier TPM/RPM, not subscription 5h window. Wrong dimension.
+
+The percentage the Claude web UI displays is computed server-side and is not exposed via any local source. Any token- or cost-based cap will retain the same operator-knowledge tax.
+
+Two options remained: (a) accept the tax and document tier-by-tier rough caps in the SKILL.md (the "honest documentation" path), or (b) sidestep quota entirely by using the **block-boundary heuristic** — pause when the active 5h block is within N minutes of its end so Ralph never starts a task that would cross the boundary and die mid-stream. The user picked (b).
+
+The boundary heuristic does not catch cumulative drain inside the block — Ralph could still blow through a small plan's quota mid-block without warning. The user accepted that trade as v1 — boundary protection covers the dominant failure mode (task killed by block reset) and needs zero plan knowledge.
+
+### What changed
+
+| Old shape (β) | New shape (time-based) |
+|---|---|
+| `--usage-cap-5h-tokens <N>` (integer ≥ 0, 0 disables) | `--block-end-buffer-min <N>` (integer ≥ 0, 0 disables) |
+| Read `blocks[0].projection.totalTokens` | Read `blocks[0].endTime` and `blocks[0].isActive` |
+| Pause if `projection.totalTokens` ≥ cap | Pause if `isActive` and (`endTime - now`) ≤ buffer minutes |
+| Both MODEL and CAP args to helper | Single BUFFER_MIN arg (MODEL no longer needed — block end is model-agnostic) |
+| Status: `paused_reason: projected_5h_opus_49M_over_50M_cap` | Status: `paused_reason: block_end_in_12min_below_30min_buffer` |
+| Status: `paused_cap_5h_tokens`, `paused_projection_tokens` | Status: `paused_buffer_min`, `paused_remaining_min`, `paused_block_end_time` |
+| ralph-status: `Paused: projected 5h opus ~49M tokens (cap 50M)` | ralph-status: `Paused: block ends in 12m (buffer 30m)` |
+| ccusage command remains `ccusage blocks --active --token-limit max --json` (token-limit flag now irrelevant but harmless) | same — only the parsed fields change |
+| 5h window only | 5h window only (same — weekly remains out of scope) |
+
+### Implementation checklist
+
+- [ ] Edit TASK-135 title, description body, and all 10 ACs in place to match the time-based shape.
+- [ ] usage-check.sh signature collapses to `$1 = BUFFER_MIN`. Exit codes unchanged. Internal logic switches to `endTime - now` math via `jq` + `date`.
+- [ ] BUFFER_MIN=0 short-circuit verified in unit tests (PATH-mocked ccusage must NOT be invoked).
+- [ ] `--token-limit max` retained on the ccusage call for forward compatibility, even though no token threshold is consumed.
+- [ ] "No active block" (`isActive: false` or `isGap: true`) exits 0 (proceed) — Ralph is not currently in a 5h window, so the boundary doesn't apply.
+- [ ] Status fields renamed in `backlog/.ralph-status.json` schema and in ralph-status / ralph-status-watch renderers.
+- [ ] Add a one-line scope note: cumulative drain inside the block is **not** detected by this heuristic; future follow-up can add a token-based co-trigger if it bites in practice.
