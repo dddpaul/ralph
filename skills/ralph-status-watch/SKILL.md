@@ -41,7 +41,8 @@ Parse:
 - `now`: second section (epoch)
 
 Extract from the JSON (using grep/pattern matching, no jq):
-- `state` — `"running"`, `"completed"`, or `"failed"`
+- `state` — `"running"`, `"completed"`, `"failed"`, or `"paused"`
+- `paused_reason`, `paused_buffer_min`, `paused_remaining_min`, `paused_block_end_time`, `paused_at` (populated only when state=paused)
 - `pid`
 - `iteration`
 - `current_task`
@@ -97,7 +98,7 @@ Errors:
   - [iteration <N>] <message>
 ```
 
-When `state == "paused"`, append the block-end pause reason and the resume hint instead of (or in addition to) the standard exit_code/completed_at lines:
+When `state == "paused"`, append the block-end pause reason and the resume hint in addition to the standard exit_code/completed_at lines (which the ralph.sh paused branch populates with the pause timestamp / exit_code=0):
 
 ```
 Paused:       block ends in <paused_remaining_min>m (buffer <paused_buffer_min>m)
