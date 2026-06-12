@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Reject commits whose staged paths duplicate an existing tree path under a
 # different Unicode normalization (NFC vs NFD). macOS APFS auto-collapses both
 # forms into one working-tree file, but `git ls-tree` records the byte form
