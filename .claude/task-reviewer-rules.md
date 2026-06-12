@@ -102,12 +102,14 @@ The Ralph project ships a template tree at `skills/ralph-init/templates/` that i
 | `.claude/settings.json`                | `skills/ralph-init/templates/claude/settings.json`                   |
 | `.claude/settings.local.json`          | `skills/ralph-init/templates/claude/settings.local.json`             |
 | `.claude/hooks/<name>.sh`              | `skills/ralph-init/templates/claude/hooks/<name>.sh`                 |
-| `ralph.sh`                             | `skills/ralph-init/templates/root/ralph.sh`                          |
+| `ralph.sh` (thin shim)                 | `skills/ralph-init/templates/root/ralph.sh` (thin shim)              |
 | `CLAUDE.md` (generic section above `## Project-Specific`) | `skills/ralph-init/templates/root/CLAUDE.md` (same region) |
 | `.git/hooks/post-commit`               | `skills/ralph-init/templates/git-hooks/post-commit`                  |
 | `.git/hooks/commit-msg`                | `skills/ralph-init/templates/git-hooks/commit-msg`                   |
 | `.devcontainer/devcontainer.json`      | `skills/ralph-init/templates/devcontainer/devcontainer.json`         |
 | `.devcontainer/init-firewall.sh`       | `skills/ralph-init/templates/devcontainer/init-firewall.sh`          |
+
+Note on `ralph.sh`: the parity rule covers only the two thin shim copies above. The canonical full script at `skills/ralph-run/scripts/ralph.sh` is the single source of truth and is intentionally excluded from this mirror set — both shim copies must remain byte-identical to each other (a `diff` of the two MUST produce no output), but neither needs to match the canonical. The shim execs the canonical at runtime via `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/ralph-run/scripts/ralph.sh`, so a change to the canonical does NOT trigger a parity finding.
 
 Note on `CLAUDE.md`: the `## Project-Specific` section is intentionally project-local and is NOT part of the parity rule. Only the generic section above that heading is mirrored.
 

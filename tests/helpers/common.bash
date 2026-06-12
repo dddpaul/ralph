@@ -4,8 +4,10 @@
 # Get the project root directory
 PROJECT_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/../.." && pwd)"
 
-# Source the main script for testing functions
-RALPH_SCRIPT="$PROJECT_ROOT/ralph.sh"
+# Source the main script for testing functions.
+# Points at the canonical (not the root-level shim) so `source $RALPH_SCRIPT`
+# in unit tests does not get hijacked by the shim's `exec`.
+RALPH_SCRIPT="$PROJECT_ROOT/skills/ralph-run/scripts/ralph.sh"
 
 # Create a temporary test directory
 setup_test_dir() {
@@ -14,6 +16,11 @@ setup_test_dir() {
   export RALPH_STATUS_FILE="$TEST_DIR/.ralph-status.json"
   export RALPH_RUN_LOG="$TEST_DIR/.ralph-run.log"
   export RALPH_HEARTBEAT_FILE="$TEST_DIR/.ralph-heartbeat"
+  # Tests that invoke `bash ralph.sh` (relative) hit the shim, which execs
+  # ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/ralph-run/scripts/ralph.sh.
+  # Point at this repo so the tests exercise the in-tree canonical instead
+  # of whatever user-global copy happens to be installed.
+  export CLAUDE_CONFIG_DIR="$PROJECT_ROOT"
 }
 
 # Cleanup temporary test directory
