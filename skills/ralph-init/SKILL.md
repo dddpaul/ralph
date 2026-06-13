@@ -170,10 +170,11 @@ Assemble the Dockerfile from base + language snippets, then write three files:
 
 **Do not** commit the token value anywhere — only the env var name and the `${localEnv:...}` substitution belong in `devcontainer.json`.
 
-### 3.7a `.claude/settings.json`, `.claude/hooks/`, and `.claude/settings.local.json` (template write)
-Read `templates/claude/settings.json` → write to `.claude/settings.json` (project-wide hooks).
+### 3.7a `.claude/hooks/` and `.claude/settings.local.json` (template write)
 Read each `templates/claude/hooks/*-guard.sh` and `templates/claude/hooks/task-validator.sh` → write to `.claude/hooks/<name>.sh`. Make executable (`chmod +x`). Create `.claude/hooks/` directory if it does not exist.
 Read `templates/claude/settings.local.json` → write to `.claude/settings.local.json` (user permissions).
+
+`.claude/settings.json` (the project-wide file that *registers* the hooks with Claude Code) is deliberately **not** written here. The hook scripts on disk are inert until the registration file lands, so this step leaves them dormant. See Step 3.11 for the deferred activation rationale.
 
 ### 3.7b Merge narrow script rules into `settings.local.json` permissions
 
@@ -314,6 +315,11 @@ fi
 ```
 
 `grep -F` matches the literal string so paths containing regex-special characters (e.g. `.`, `+`, `$`) do not cause false negatives.
+
+### 3.11 `.claude/settings.json` (hook activation — last act of init)
+Read `templates/claude/settings.json` → write to `.claude/settings.json` (project-wide hooks).
+
+This is the file that *registers* the hook scripts written in Step 3.7a with Claude Code, so writing it activates `master-branch-guard.sh` and the other PreToolUse hooks mid-session. Deferring it until after every other Step 3.x template write means subsequent steps (including 3.9's `.obsidian/*` writes on `master`) cannot self-block on a hook this same `/ralph-init` invocation just installed. The invariant for future template-write steps is durable: **hook activation is the last act of init.** Rationale walked end-to-end in `design/ralph-init-hook-ordering-brainstorm.md` (Options A–E, Q1–Q5, addendum 2026-06-13).
 
 ---
 

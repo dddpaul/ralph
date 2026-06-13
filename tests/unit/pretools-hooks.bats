@@ -140,6 +140,48 @@ run_hook_in_repo() {
   [[ -z "$output" ]]
 }
 
+@test "master-branch-guard: allows .obsidian/ path on master" {
+  setup_git_repo
+  run run_hook_in_repo "master-branch-guard.sh" \
+    '{"tool_name":"Edit","tool_input":{"file_path":".obsidian/app.json"}}'
+  [[ -z "$output" ]]
+}
+
+@test "master-branch-guard: allows .vscode/ path on master" {
+  setup_git_repo
+  run run_hook_in_repo "master-branch-guard.sh" \
+    '{"tool_name":"Edit","tool_input":{"file_path":".vscode/settings.json"}}'
+  [[ -z "$output" ]]
+}
+
+@test "master-branch-guard: allows .idea/ path on master" {
+  setup_git_repo
+  run run_hook_in_repo "master-branch-guard.sh" \
+    '{"tool_name":"Edit","tool_input":{"file_path":".idea/workspace.xml"}}'
+  [[ -z "$output" ]]
+}
+
+@test "master-branch-guard: allows .cursor/ path on master" {
+  setup_git_repo
+  run run_hook_in_repo "master-branch-guard.sh" \
+    '{"tool_name":"Edit","tool_input":{"file_path":".cursor/settings.json"}}'
+  [[ -z "$output" ]]
+}
+
+@test "master-branch-guard: allows .zed/ path on master" {
+  setup_git_repo
+  run run_hook_in_repo "master-branch-guard.sh" \
+    '{"tool_name":"Edit","tool_input":{"file_path":".zed/settings.json"}}'
+  [[ -z "$output" ]]
+}
+
+@test "master-branch-guard: allows .fleet/ path on master" {
+  setup_git_repo
+  run run_hook_in_repo "master-branch-guard.sh" \
+    '{"tool_name":"Edit","tool_input":{"file_path":".fleet/settings.json"}}'
+  [[ -z "$output" ]]
+}
+
 @test "master-branch-guard: allows edit on task branch" {
   setup_git_repo
   git -C "$TEST_DIR/repo" checkout -b task-42-test >/dev/null 2>&1
