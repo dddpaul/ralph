@@ -4,7 +4,7 @@ title: Refuse ralph upgrade on master via branch-safety preflight
 status: In Progress
 assignee: []
 created_date: '2026-06-13 19:17'
-updated_date: '2026-06-13 19:20'
+updated_date: '2026-06-13 19:23'
 labels:
   - 'feature:ralph-init-hook-ordering'
 dependencies:
@@ -71,4 +71,6 @@ Reproducible invocation:
   done
 
 Regression check: tests/unit/pretools-hooks.bats — 31/31 pass. No R11 hook files touched in this task; parity intact (verified via diff).
+
+Commit: `68c4bf2` - task-140: Refuse ralph upgrade on master via branch-safety preflight
 <!-- SECTION:NOTES:END -->
