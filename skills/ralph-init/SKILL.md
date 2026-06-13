@@ -393,7 +393,36 @@ If neither exists, tell the user: "Ralph has not been initialized in this projec
 
 ---
 
-### U1.5: Legacy File Migration
+### U1.5: Branch Safety
+
+Refuse to proceed with the upgrade flow when the user is on `master` (or a detached HEAD). Upgrade-mode U4 overwrites root-level files — `ralph.sh`, `CLAUDE.md`, `.git/hooks/*`, `.devcontainer/*` — none of which are in the master-branch-guard exempt list. If the hook is already installed (which it will be after a prior init), every U4 write is denied. The fix is to require a task branch before upgrade can begin.
+
+Run:
+
+```bash
+branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+```
+
+- **If `branch` is `master` or `HEAD`** (the latter indicates detached HEAD): print the refusal message verbatim and **stop**. Do NOT read any files, do NOT proceed to U1.6 or U2.
+
+  ```
+  BLOCKED: ralph upgrade refuses to run on master (or detached HEAD).
+  Upgrade overwrites root-level files (ralph.sh, CLAUDE.md, .git/hooks/*,
+  .devcontainer/*) that master-branch-guard denies on master.
+  Create a task branch first, then re-invoke upgrade:
+
+    git checkout -b task-<id>-ralph-upgrade master
+
+  See design/ralph-init-hook-ordering-brainstorm.md (Q4) for rationale.
+  ```
+
+- **Otherwise** (any non-master, non-detached branch): proceed silently to U1.6.
+
+This step fires before any file reads, so a refusal has no side effects.
+
+---
+
+### U1.6: Legacy File Migration
 
 Detect PRD and brainstorm files created before the `design/` convention (TASK-102) and offer to relocate them.
 
