@@ -1,6 +1,7 @@
 #!/bin/bash
 # master-branch-guard.sh — Block file edits on master branch within the project tree
-#   (except .claude/, design/, .gitignore). Paths outside the project root pass through.
+#   (except .claude/, design/, .obsidian/, .vscode/, .idea/, .cursor/, .zed/, .fleet/,
+#   .gitignore). Paths outside the project root pass through.
 # Trigger: Edit|Write (all)
 # Action: deny JSON (PreToolUse)
 # Input: tool_input JSON on stdin
@@ -28,6 +29,12 @@ esac
 # Inside the project tree: apply existing in-tree exemptions.
 case "$path" in */.claude/*|.claude/*) exit 0;; esac
 case "$path" in */design/*|design/*) exit 0;; esac
+case "$path" in */.obsidian/*|.obsidian/*) exit 0;; esac
+case "$path" in */.vscode/*|.vscode/*) exit 0;; esac
+case "$path" in */.idea/*|.idea/*) exit 0;; esac
+case "$path" in */.cursor/*|.cursor/*) exit 0;; esac
+case "$path" in */.zed/*|.zed/*) exit 0;; esac
+case "$path" in */.fleet/*|.fleet/*) exit 0;; esac
 if [ "$(basename "$path")" = ".gitignore" ]; then exit 0; fi
 
 echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"BLOCKED: no active task branch. Create a backlog task and `git checkout -b task-<id>-<desc> master` first."}}'
