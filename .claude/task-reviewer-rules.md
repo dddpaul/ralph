@@ -179,3 +179,30 @@ Raw stdout text — including text wrapped in `<system-reminder>` tags — is si
 When a hook has multiple feedback sections (e.g. deterministic issues AND an LLM rubric), it MUST combine them into a single `additionalContext` string separated by blank lines — not emit multiple JSON objects. The harness parses exactly one JSON object per hook invocation.
 
 This rule exists because TASK-100 wrapped validator output in `<system-reminder>` tags (correct format) but emitted them as raw stdout (wrong protocol). The model never received the feedback, and the smoke test only verified the script's stdout — not model receipt.
+
+## R16 — Task descriptions must not reference brainstorm files
+
+Tasks whose `-d` (description body) contains a path matching `design/.*-brainstorm\.md` MUST be rejected. The producer/consumer contract for brainstorm hand-offs is:
+
+- **Producer** (`.claude/brainstorm-rules.md` Save Design Conclusions): writes a named "Distilled for ralph-task" block inside the brainstorm or its addendum, containing Direction, Locked decisions with rationale, Scope cuts, Acceptance criteria sketch, Implementation checklist.
+- **Consumer** (`skills/ralph-task/SKILL.md` MUST rule #4): copies that block verbatim into the new task's `-d` and self-checks that no `design/.*-brainstorm\.md` reference leaks in.
+
+A task body that points at the brainstorm instead of inlining the distillation collapses the contract. Three failure modes follow: token cost (the implementer re-reads ~10K tokens every iteration), evolution mismatch (early-doc options superseded by late-doc addenda mislead the implementer), and review-independence collapse (`ralph-review` and the implementer both read the same doc, so the review degenerates to "Ralph copied the doc faithfully").
+
+To verify a diff, scan the post-change task files (any `backlog/tasks/*.md` whose `description:` body the diff touches):
+
+```bash
+git diff master..HEAD --name-only -- 'backlog/tasks/*.md' | while IFS= read -r f; do
+  grep -nE 'design/.*-brainstorm\.md' "$f" \
+    && echo "R16 violation: $f references a brainstorm file in its description"
+done
+```
+
+Any match is a hard fail. The fix is to replace the reference with the verbatim "Distilled for ralph-task" block from the source brainstorm and re-run the scan.
+
+**Excluded from R16:**
+
+- **Fenced code blocks** that quote a forbidden path for illustration (e.g. a regex pattern documented inside a rule body or skill spec) are still matched by the grep; reviewer judgment applies — flag only when the reference is presented as a directive ("see this file") rather than as a quoted example.
+- **Pre-existing Done tasks** (e.g., TASK-139, TASK-140) filed before the convention landed are historical artifacts. R16 applies to tasks newly created or whose `-d` body the diff modifies.
+
+This rule is project-specific and is NOT mirrored to `skills/ralph-init/templates/claude/task-reviewer-rules.md` — per project convention (see project memory `feedback_rules_not_in_ralph_init.md`), `task-reviewer-rules.md` is project-local content; each ralph-init bootstrap writes its own rules from scratch (or starts without any). Only the loading mechanism in the task-reviewer agent is templated; the rules content is not.

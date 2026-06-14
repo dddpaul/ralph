@@ -206,6 +206,26 @@ Write the file using the Write tool.
 
 ## Step 6: Report to Chat
 
+### 6a: Distillation soft-warning scan
+
+Before extracting the verdict, scan each in-scope task description for brainstorm-file references. The producer/consumer contract (see `.claude/brainstorm-rules.md` "Distilled for ralph-task" + `skills/ralph-task/SKILL.md` MUST rule #4) is that task `-d` MUST NOT contain a path matching `design/.*-brainstorm\.md` — the locked decisions are distilled verbatim into the task instead. If that contract slipped, surface it here as a non-blocking warning.
+
+For each in-scope task ID, grep the task body for the forbidden pattern. Use the `Description:` body of `backlog task view <id> --plain`:
+
+```bash
+for id in <id1> <id2> ...; do
+  if backlog task view "$id" --plain | grep -qE 'design/.*-brainstorm\.md'; then
+    echo "Warning: TASK-$id references a brainstorm file in its description — distillation may have been skipped"
+  fi
+done
+```
+
+Collect every warning line. They are emitted **before** the verdict block in Step 6b. The scan MUST NOT alter the verdict or block the review — `ralph-reviewer` produced its judgment from intent docs (PRD/brainstorm) and the cumulative diff; the warning is a pipeline-hygiene signal for the human reader.
+
+If no tasks match, emit nothing for this subsection.
+
+### 6b: Verdict and drift
+
 Extract from the review output:
 - The **verdict line** (`Verdict: Aligned | Partial | Drifted`)
 - The **drift list** section (or "No drift detected")
@@ -214,6 +234,8 @@ Output to chat:
 
 ```
 ## Feature Review: <name>
+
+<warning lines from 6a, one per line, or nothing if no matches>
 
 **<verdict line>**
 

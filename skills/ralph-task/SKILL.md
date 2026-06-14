@@ -52,13 +52,15 @@ Before creating, classify the ask:
 
 ```bash
 backlog task create "<English title>" \
-  -d "<WHY: paragraph; may include code blocks for verbatim implementer use>" \
+  -d "<WHY paragraph; for brainstorm hand-offs, paste the verbatim 'Distilled for ralph-task' block from the source brainstorm; may include code blocks for verbatim implementer use>" \
   --ac "<atomic outcome 1>" \
   --ac "<atomic outcome 2>" \
   --priority <high|medium|low>
 ```
 
-### Three MUST rules
+When the task originates from a brainstorm Phase 4 hand-off, the `-d` body MUST be the verbatim "Distilled for ralph-task" block from the source brainstorm (`design/<slug>-brainstorm.md` or its addendum). Copy it as-is — Direction, Locked decisions with rationale, Scope cuts, Acceptance criteria sketch, Implementation checklist. Do NOT replace it with a sentence like *"see design/<slug>-brainstorm.md"*. The distillation is the contract; the brainstorm itself is human-design history.
+
+### Four MUST rules
 
 1. **MUST: repeat `--ac` per criterion.** The CLI does NOT split on commas. `--ac "a,b,c"` creates **one** AC literally containing the commas, not three. Repeat the flag once per criterion.
 
@@ -73,6 +75,8 @@ backlog task create "<English title>" \
    If neither exists, warn the user and ask whether to (a) skip the label, (b) create the design doc first via `ralph-prd`, or (c) attach anyway as a stub.
 
    **Brainstorm Phase 4 hand-off (default ON):** If the skill is invoked with a `feature=<slug>` arg, attach `-l "feature:<slug>"` automatically to every task created in this invocation. Skip the verify-prompt — the brainstorm-rules "Save Design Conclusions" rule already wrote and verified the design file (`design/<slug>-brainstorm.md` or its addendum) before the Phase 4 hand-off. Treat the slug as authoritative; do NOT re-run the `ls design/<slug>-*` check. The label is required downstream so `/ralph-review feature=<slug>` can find every task that belongs to the feature for cumulative consistency checks.
+
+4. **MUST: task `-d` MUST NOT reference brainstorm files.** Description body MUST NOT contain a path matching `design/.*-brainstorm\.md`. Brainstorm files are human-design history; tasks are the contract for the implementer (human or autonomous Ralph). When a task description points at a brainstorm file, three failure modes follow: (a) token cost — the implementer reads ~10K tokens of brainstorm every iteration; (b) evolution mismatch — early-doc options superseded by late-doc addenda mislead the implementer; (c) review-independence collapse — `ralph-review` reads the brainstorm as intent and the implementer reads it as the contract, so review degenerates to "Ralph copied the doc faithfully." Distill the locked decisions + rationale + scope cuts + AC sketch + implementation checklist verbatim into `-d` instead. The producer half of this contract lives in `.claude/brainstorm-rules.md` ("Distilled for ralph-task" block); this rule is the consumer half.
 
 ### Title language constraint
 
@@ -101,7 +105,11 @@ Autonomous Ralph loops favor smaller tasks (**5–7 ACs typical**). Human-led wo
 
 ## Mandatory self-check (after create)
 
-Immediately after `backlog task create` returns an ID, verify the ACs were actually split:
+Immediately after `backlog task create` returns an ID, run two checks.
+
+### Check 1 — AC splitting
+
+Verify the ACs were actually split:
 
 ```bash
 backlog task view <id> --plain | grep -A20 "Acceptance"
@@ -114,6 +122,24 @@ backlog task edit <id> --remove-ac N --ac "<split outcome 1>" --ac "<split outco
 ```
 
 This catches the historical defect where comma-joined `--ac "a,b,c"` collapsed multiple intended criteria into one literal AC.
+
+### Check 2 — no brainstorm-file references in `-d`
+
+Verify MUST rule #4. Grep the full task view for the forbidden pattern:
+
+```bash
+backlog task view <id> --plain | grep -nE 'design/.*-brainstorm\.md' \
+  && echo "WARN: TASK-<id> description references a brainstorm file — distillation may have been skipped. Replace the reference with the verbatim 'Distilled for ralph-task' block from the source brainstorm before merge." \
+  || echo "OK: no brainstorm-file refs in TASK-<id> -d"
+```
+
+If the grep matches, edit the task to remove the reference and inline the distilled block:
+
+```bash
+backlog task edit <id> -d "<verbatim Distilled for ralph-task block, no design/<slug>-brainstorm.md reference>"
+```
+
+Re-run the grep until it reports OK. The same rule is enforced post-merge as `task-reviewer` rule R16 and surfaced as a soft warning by `ralph-review`; catching it here keeps the contract clean from the start.
 
 ---
 
@@ -253,8 +279,10 @@ If same deliverable and within cap → recipe B (`backlog task edit 110 --ac "<o
 
 - [ ] Each `--ac` flag was repeated per criterion (no comma-joined lists)
 - [ ] Description includes code blocks where the implementer needs the exact snippet
+- [ ] For brainstorm hand-offs: `-d` is the verbatim "Distilled for ralph-task" block (no `design/<slug>-brainstorm.md` reference)
 - [ ] `feature:<name>` label only attached after design-doc sanity check passed (or user opted in)
-- [ ] Self-check ran: `backlog task view <id> --plain | grep -A20 Acceptance`
+- [ ] Self-check 1 ran: `backlog task view <id> --plain | grep -A20 Acceptance`
+- [ ] Self-check 2 ran: `backlog task view <id> --plain | grep -nE 'design/.*-brainstorm\.md'` returned no matches
 - [ ] Any collapsed AC was fixed with `--remove-ac N --ac "..." --ac "..."`
 - [ ] After create: AskUserQuestion fired unless skip-condition matched
 - [ ] Acted on the chosen option (1/2/3/4)

@@ -18,6 +18,8 @@ Create detailed Product Requirements Documents that are clear, actionable, and s
 
 **Important:** Do NOT start implementing. Just create the PRD.
 
+**When to invoke (vs. going straight to `ralph-task`):** Use `ralph-prd` when the feature is **multi-task** AND the brainstorm captures **cross-task invariants** (shared interface contract, ordering constraint, shared invariant the reviewer must check across tasks). Single-task or independent-sibling work skips the PRD layer — copy the "Distilled for ralph-task" block from the brainstorm straight into a `ralph-task` invocation.
+
 ---
 
 ## Step 1: Clarifying Questions

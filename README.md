@@ -88,6 +88,15 @@ The dialogue produces a clear architectural decision and a list of components/fl
 
 The `design/` folder is the canonical location for intent documents — brainstorms, PRDs, and reviews all live here.
 
+When saving the brainstorm, include the mandatory **"Distilled for ralph-task"** block (Direction, Locked decisions with rationale, Scope cuts, Acceptance criteria sketch, Implementation checklist). This block is the producer half of a producer/consumer contract: `ralph-task` copies it verbatim into each new task's `-d`, so the brainstorm itself never appears in any task body. The implementer (human or autonomous Ralph) reads only the task; `ralph-review` reads the brainstorm/PRD as intent. Independence between contract and intent is what makes the cross-task review meaningful.
+
+**Branching after Phase 3 — when do you need a PRD?** Once the brainstorm is saved, choose the next step by the Q4 heuristic:
+
+- **Single-task or independent-sibling work** — skip Step 2. Hand the "Distilled for ralph-task" block straight to `ralph-task` (see Workflow Step 4 / `ralph-task` skill). No PRD layer needed.
+- **Multi-task feature with cross-task invariants** — shared interface contract, ordering constraint, or any invariant the reviewer must check across tasks. Generate a PRD via `ralph-prd` (Step 2), then convert via `ralph-backlog` (Step 3).
+
+When in doubt: if the brainstorm has cross-task invariants the reviewer must check across more than one task, you want a PRD.
+
 ### 2. Create a PRD
 
 Use the PRD skill to generate a detailed requirements document:
@@ -199,6 +208,8 @@ After Ralph completes the in-scope tasks, run the review skill to score the bund
 ```
 
 The skill reads `design/<name>-prd.md` and `design/<name>-brainstorm.md`, evaluates the completed tasks against the original requirements, and writes a scored review to `design/<name>-review-<YYYY-MM-DD>.md`.
+
+Step 6 of the review also runs a distillation **soft warning** scan: it greps each in-scope task `-d` for `design/.*-brainstorm\.md` and emits one warning line per match in the chat output ("Warning: TASK-NNN references a brainstorm file in its description — distillation may have been skipped"). The warning is informational; it does NOT block or alter the verdict. If the producer/consumer contract held — `ralph-task` self-checked at create-time and `task-reviewer` rule R16 caught any leak pre-merge — the soft warning will not fire. It is post-hoc insurance against pipeline regressions.
 
 ## Dual Mode: Autonomous + Interactive
 
