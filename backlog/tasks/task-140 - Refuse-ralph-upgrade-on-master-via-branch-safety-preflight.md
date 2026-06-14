@@ -1,10 +1,10 @@
 ---
 id: TASK-140
 title: Refuse ralph upgrade on master via branch-safety preflight
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-06-13 19:17'
-updated_date: '2026-06-13 19:23'
+updated_date: '2026-06-14 06:17'
 labels:
   - 'feature:ralph-init-hook-ordering'
 dependencies:
