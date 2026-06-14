@@ -3,10 +3,10 @@ id: TASK-141
 title: >-
   Distill brainstorm conclusions into tasks; forbid brainstorm-file refs in task
   descriptions
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-06-14 07:22'
-updated_date: '2026-06-14 07:41'
+updated_date: '2026-06-14 07:47'
 labels:
   - 'feature:brainstorm-to-task-handoff'
 dependencies: []
@@ -153,4 +153,8 @@ All three enforcement points work as specified. After verification, `backlog tas
 ## Post-merge
 
 After merge to master, run `/ralph-sync` to propagate skill changes (ralph-task, ralph-review, ralph-prd) to user-global `~/.claude/skills/`.
+
+Commit: `c44fbd4` - task-141: Distill brainstorm conclusions into tasks; forbid brainstorm-file refs in -d
+
+task-reviewer: APPROVED. Reviewer flagged two non-blocking notes — (1) dangling memory citation to feedback_rules_not_in_ralph_init.md resolved by creating that memory file; (2) AC #5 wording 'per match' vs per-task implementation accepted as-is since the warning message format ('Warning: TASK-NNN references…') is naturally per-task and the brainstorm Q3 lock example uses the same per-task shape.
 <!-- SECTION:NOTES:END -->
