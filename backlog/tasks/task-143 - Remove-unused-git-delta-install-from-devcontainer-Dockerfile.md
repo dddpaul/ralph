@@ -1,10 +1,10 @@
 ---
 id: TASK-143
 title: Remove unused git-delta install from devcontainer Dockerfile
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-06-20 18:11'
-updated_date: '2026-06-20 18:34'
+updated_date: '2026-06-20 18:37'
 labels: []
 dependencies: []
 priority: medium
@@ -61,4 +61,8 @@ Verification (interactive run):
 - AC #5 supplement: devcontainer up --workspace-folder ... returned {outcome:success,containerId:cee68a59...}, firewall verification passed both inverse (example.com blocked) and positive (api.github.com via proxy reachable).
 
 AC #6 deferred to next natural Ralph launch (R2 explicit deferral). Reason: this task changed only Dockerfile content (removed an unused install block); the ralph.sh launch path and in-container heartbeat-emit logic are unchanged. AC #5 already proves the image builds + container starts, which is the only mechanism this task could break. Follow-up: next /ralph-run invocation (e.g., TASK-142 retry) will exercise the full ralph.sh -> container -> heartbeat path; if heartbeat appears, AC #6 is retroactively satisfied. No code path needs separate test.
+
+task-reviewer APPROVED. R2 deferral of AC #6 accepted (Dockerfile-only change; launch path unchanged; AC #5 covers build+up). R11 parity verified in both pairs.
+
+Commit: `c39a741` - task-143: Remove unused git-delta install from devcontainer
 <!-- SECTION:NOTES:END -->
