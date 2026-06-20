@@ -95,77 +95,12 @@ for dep_id in $DEPS; do
   fi
 done
 
-# 7. File-path references in backtick spans or markdown links exist
-IN_FENCE=false
-while IFS= read -r line; do
-  if echo "$line" | grep -qE '^```'; then
-    if [[ "$IN_FENCE" == true ]]; then
-      IN_FENCE=false
-    else
-      IN_FENCE=true
-    fi
-    continue
-  fi
-  [[ "$IN_FENCE" == true ]] && continue
-
-  # Extract backtick-quoted paths
-  BACKTICK_PATHS=$(echo "$line" | grep -oE '`[^`]+`' | sed 's/^`//;s/`$//' || true)
-  # Extract markdown link paths
-  LINK_PATHS=$(echo "$line" | grep -oE '\]\([^)]+\)' | sed 's/^\](//' | sed 's/)$//' || true)
-
-  PATHS_TO_CHECK=$(printf '%s\n%s\n' "$BACKTICK_PATHS" "$LINK_PATHS" | sed '/^[[:space:]]*$/d')
-  while IFS= read -r path; do
-    [[ -z "$path" ]] && continue
-    # Skip URLs
-    echo "$path" | grep -qE '^https?://|^www\.' && continue
-    # Skip wildcards/globs
-    echo "$path" | grep -qE '[*?]|\.\.\.' && continue
-    # Skip non-path-like strings (must contain / or end with known extension)
-    if ! echo "$path" | grep -qE '/|\.sh$|\.js$|\.ts$|\.py$|\.md$|\.json$|\.yaml$|\.yml$|\.toml$'; then
-      continue
-    fi
-    # Check existence
-    if [[ ! -e "$path" ]]; then
-      DET_ISSUES+=("Referenced path '$path' does not exist")
-    fi
-  done <<< "$PATHS_TO_CHECK"
-done <<< "$TASK_CONTENT"
-
-# === Build deterministic check message (defer output for single JSON emission) ===
-DET_TEXT=""
-if [[ ${#DET_ISSUES[@]} -gt 0 ]]; then
-  DET_TEXT="Task validator [det] issues for TASK-${TASK_ID}:"
-  for issue in "${DET_ISSUES[@]}"; do
-    DET_TEXT="${DET_TEXT}"$'\n'"  - ${issue}"
-  done
-fi
-
-emit_context() {
-  if [[ -n "$1" ]]; then
-    jq -n --arg ctx "$1" '{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":$ctx}}'
-  fi
-}
-
-# === LLM Nudge ===
-# Short-circuit if autonomous mode (zero output)
-if [[ "${RALPH_AUTONOMOUS:-}" == "1" ]]; then
-  exit 0
-fi
-
-# Substantive-edit predicate: check if description body or AC text changed
-DIFF_OUTPUT=$(git diff HEAD -- "backlog/tasks/task-${TASK_ID}"* 2>/dev/null || true)
-if [[ -z "$DIFF_OUTPUT" ]]; then
-  if ! echo "$CMD" | grep -qE '^backlog task create\b'; then
-    emit_context "$DET_TEXT"
-    exit 0
-  fi
-fi
-
-# Check if changes are substantive (affect description or AC lines)
+# === Compute SUBSTANTIVE (hoisted so check #7 and the LLM rubric can both gate on it) ===
 SUBSTANTIVE=false
+DIFF_OUTPUT=$(git diff HEAD -- "backlog/tasks/task-${TASK_ID}"* 2>/dev/null || true)
 if echo "$CMD" | grep -qE '^backlog task create\b'; then
   SUBSTANTIVE=true
-else
+elif [[ -n "$DIFF_OUTPUT" ]]; then
   # Find line range for description+AC sections in the task file
   DESC_START=$(grep -nE '<!-- SECTION:description -->|^## Description' "$TASK_FILE" | head -1 | cut -d: -f1)
   AC_END_LINE=$(grep -nE '<!-- AC:END -->|<!-- SECTION:dod -->|^## Definition of Done' "$TASK_FILE" | head -1 | cut -d: -f1)
@@ -224,6 +159,75 @@ else
   if [[ "$CHECKBOX_ONLY" == false ]] && { [[ -n "$SUBST_ADDED" ]] || [[ -n "$SUBST_REMOVED" ]]; }; then
     SUBSTANTIVE=true
   fi
+fi
+
+# 7. File-path references in backtick spans or markdown links exist (gated on SUBSTANTIVE)
+if [[ "$SUBSTANTIVE" == true ]]; then
+  IN_FENCE=false
+  while IFS= read -r line; do
+    if echo "$line" | grep -qE '^```'; then
+      if [[ "$IN_FENCE" == true ]]; then
+        IN_FENCE=false
+      else
+        IN_FENCE=true
+      fi
+      continue
+    fi
+    [[ "$IN_FENCE" == true ]] && continue
+
+    # Extract backtick-quoted paths
+    BACKTICK_PATHS=$(echo "$line" | grep -oE '`[^`]+`' | sed 's/^`//;s/`$//' || true)
+    # Extract markdown link paths
+    LINK_PATHS=$(echo "$line" | grep -oE '\]\([^)]+\)' | sed 's/^\](//' | sed 's/)$//' || true)
+
+    PATHS_TO_CHECK=$(printf '%s\n%s\n' "$BACKTICK_PATHS" "$LINK_PATHS" | sed '/^[[:space:]]*$/d')
+    while IFS= read -r path; do
+      [[ -z "$path" ]] && continue
+      # Skip URLs
+      echo "$path" | grep -qE '^https?://|^www\.' && continue
+      # Skip wildcards/globs
+      echo "$path" | grep -qE '[*?]|\.\.\.' && continue
+      # Skip command-line snippets (any whitespace)
+      echo "$path" | grep -qE '[[:space:]]' && continue
+      # Skip shell variable expansions
+      echo "$path" | grep -qF '$' && continue
+      # Skip HTML/XML tag literals and embedded <placeholder> syntax
+      echo "$path" | grep -qE '<[^>]+>' && continue
+      # Skip slash-commands and URL fragments (e.g. /ralph-init, /rest/plantuml/)
+      echo "$path" | grep -qE '^/[a-z][a-z0-9/-]*/?$' && continue
+      # Skip bare extensions (e.g. .js, .py, .md alone)
+      echo "$path" | grep -qE '^\.[a-z]+$' && continue
+      # Skip non-path-like strings (must contain / or end with known extension)
+      if ! echo "$path" | grep -qE '/|\.sh$|\.js$|\.ts$|\.py$|\.md$|\.json$|\.yaml$|\.yml$|\.toml$'; then
+        continue
+      fi
+      # Check existence
+      if [[ ! -e "$path" ]]; then
+        DET_ISSUES+=("Referenced path '$path' does not exist")
+      fi
+    done <<< "$PATHS_TO_CHECK"
+  done <<< "$TASK_CONTENT"
+fi
+
+# === Build deterministic check message (defer output for single JSON emission) ===
+DET_TEXT=""
+if [[ ${#DET_ISSUES[@]} -gt 0 ]]; then
+  DET_TEXT="Task validator [det] issues for TASK-${TASK_ID}:"
+  for issue in "${DET_ISSUES[@]}"; do
+    DET_TEXT="${DET_TEXT}"$'\n'"  - ${issue}"
+  done
+fi
+
+emit_context() {
+  if [[ -n "$1" ]]; then
+    jq -n --arg ctx "$1" '{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":$ctx}}'
+  fi
+}
+
+# === LLM Nudge ===
+# Short-circuit if autonomous mode (zero output)
+if [[ "${RALPH_AUTONOMOUS:-}" == "1" ]]; then
+  exit 0
 fi
 
 if [[ "$SUBSTANTIVE" == false ]]; then
