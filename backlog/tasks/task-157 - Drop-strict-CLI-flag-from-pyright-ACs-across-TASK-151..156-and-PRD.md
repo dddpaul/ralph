@@ -1,10 +1,10 @@
 ---
 id: TASK-157
 title: Drop --strict CLI flag from pyright ACs across TASK-151..156 and PRD
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-06-21 14:00'
-updated_date: '2026-06-21 14:04'
+updated_date: '2026-06-21 14:19'
 labels: []
 dependencies: []
 priority: high
@@ -53,4 +53,12 @@ Out-of-scope (intentionally NOT changed):
 - backlog/tasks/task-157 — this wrapper task intentionally quotes the literal in its description.
 - backlog/tasks/task-150 — Done and merged; touching its checked-off AC text would be revisionism; plan/notes already explain the discrepancy.
 - design/ralph-python-refactor-brainstorm.md — brainstorm is frozen human-design history per R16 spirit.
+
+Commit: `9cc29c5` - task-157: Drop --strict CLI flag from pyright ACs
+
+task-reviewer APPROVED after one round of CHANGES REQUESTED.
+
+Round 1 (agentId ac8f8e422e817143a): doc-2 line 27 botched substitution — I expanded `pyright --strict` to a parenthetical instead of trimming, breaking the in-backtick CLI literal on a line with two occurrences. Fixed in commit 90025ed by applying the trim-only rule.
+
+Round 2 (agentId a8fd735df00a404bd): confirmed clean. Doc-2 line 27 now mirrors the Lint line on line 26 in style. Scoped grep returns 0 across all 8 spec-surface files (6 task files + PRD + doc-2). No collateral, no Python code touched, AC line counts unchanged, pyright on HEAD reports 0 errors.
 <!-- SECTION:NOTES:END -->
