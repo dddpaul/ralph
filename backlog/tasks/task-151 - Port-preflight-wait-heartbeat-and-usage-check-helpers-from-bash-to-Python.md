@@ -34,7 +34,7 @@ Parallelizable with TASK-152 (US-003 core internals) — both depend only on TAS
 - [ ] #4 `ralph/usage_check.py` ports `usage-check.sh`: exit codes 0/1/2 preserved; on exit 1, stdout includes `block_end_in_<rem>min_below_<buffer>min_buffer`; on exit 2, writes sentinel flag file `backlog/.ralph-usage-check-disabled`
 - [ ] #5 Parity test per helper: feed identical inputs to bash helper and Python helper, assert identical stdout AND exit code for ≥5 scenarios per helper
 - [ ] #6 Unit tests for each helper covering success path, failure path, and one edge case
-- [ ] #7 `uv run pyright --strict skills/ralph-run/scripts` passes
+- [ ] #7 `uv run pyright skills/ralph-run/scripts` passes
 - [ ] #8 `uv run ruff check skills/ralph-run/scripts` passes
 - [ ] #9 `uv run pytest skills/ralph-run/tests/` passes
 <!-- AC:END -->

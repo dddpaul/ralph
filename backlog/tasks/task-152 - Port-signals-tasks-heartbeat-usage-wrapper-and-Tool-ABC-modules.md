@@ -37,7 +37,7 @@ Parallelizable with TASK-151 (US-002 helpers) — both depend only on TASK-150 s
 - [ ] #5 `ralph/tools/__init__.py`: defines `Tool` ABC with `run(prompt: str, timeout_sec: int) -> ToolResult` signature; `ToolResult` includes stdout-tee path, exit code, and an `IterationSignals` instance
 - [ ] #6 Unit tests for each module
 - [ ] #7 Golden-file tests for signal parsing using captured sample tool-output transcripts under `tests/fixtures/`
-- [ ] #8 `uv run pyright --strict skills/ralph-run/scripts` passes
+- [ ] #8 `uv run pyright skills/ralph-run/scripts` passes
 - [ ] #9 `uv run ruff check skills/ralph-run/scripts` passes
 - [ ] #10 `uv run pytest skills/ralph-run/tests/` passes
 <!-- AC:END -->

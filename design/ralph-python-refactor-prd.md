@@ -30,7 +30,7 @@ The port is explicitly **strict** — byte-identical status JSON, same CLI surfa
 - Preserve **exact** CLI flag set: `--tool`, `--model`, `--effort`, `--timeout`, `--on-error`, `--retry-count`, `--log-file`, `--prompt-file`, `--tasks`, `--block-end-buffer-min`, `--devcontainer`, positional `max_iterations`
 - Preserve the `MODE: autonomous (Ralph loop iteration <i> of <max>)` prompt prefix verbatim — load-bearing for CLAUDE.md autonomous-mode contract
 - Add real test coverage: pytest unit suite + one end-to-end test against a fake claude-code shim
-- Add type checking via `pyright --strict` as a pre-`task-reviewer` gate
+- Add type checking via `pyright` as a pre-`task-reviewer` gate
 - Reduce GNU/BSD portability tax for the orchestrator surface (R5 still applies to surviving bash: hooks, git hooks, `sync.sh`, `utc-to-moscow.sh`, `init-firewall.sh`)
 - Make follow-on §6 improvements (richer sentinel taxonomy, retry classification, external reviewer) trivial to land
 
@@ -59,7 +59,7 @@ The port is explicitly **strict** — byte-identical status JSON, same CLI surfa
 - [ ] `StatusFile.write_atomic(path)` writes via `tempfile.NamedTemporaryFile` + `os.replace()` — atomic from external readers' perspective
 - [ ] Golden-file round-trip test in `tests/test_status.py`: load a sample bash-written `backlog/.ralph-status.json`, parse via pydantic, re-serialize, assert byte-equal to original (modulo unset-field handling — document and lock the rule)
 - [ ] `pyproject.toml` at repo root with `[tool.ruff]` (line-length=88, target-version="py314", src=["skills/ralph-run/scripts"]) and `[tool.pyright]` (include + strict on the same path, `pythonVersion = "3.14"`)
-- [ ] `uv run pyright --strict skills/ralph-run/scripts` passes
+- [ ] `uv run pyright skills/ralph-run/scripts` passes
 - [ ] `uv run ruff check skills/ralph-run/scripts` passes
 - [ ] Spike verification: `import ralph` resolves from `ralph_orchestrator.py` (PEP 723 + sibling-package contract works)
 
@@ -73,7 +73,7 @@ The port is explicitly **strict** — byte-identical status JSON, same CLI surfa
 - [ ] For each helper, pytest unit test covers: success path, failure path, edge cases (e.g., heartbeat file missing, ccusage missing, backlog empty)
 - [ ] Parity test: feed identical inputs to bash helper and Python helper; assert identical stdout AND identical exit code for 5+ scenarios per helper
 - [ ] Bash helpers (`preflight.sh`, etc.) stay in place — Python helpers unused by orchestrator until US-006
-- [ ] `pyright --strict` passes on all new files
+- [ ] `pyright` passes on all new files
 
 ### US-003: Port core internals (signals, tasks, heartbeat, usage, tool protocol)
 **Description:** As the Python implementer, I need the orchestrator's internal building blocks ported: sentinel parsing, backlog CLI wrapper, heartbeat daemon thread, usage-cap wrapper, and the abstract Tool protocol that both claude and opencode will implement, so that US-004 and US-005 can drop in concrete executors without reinventing the surrounding plumbing.
@@ -85,7 +85,7 @@ The port is explicitly **strict** — byte-identical status JSON, same CLI surfa
 - [ ] `ralph/usage.py`: wraps `usage_check.py`, populates 5 `paused_*` fields on the StatusFile when pause is triggered, exposes `pause_state` named tuple for the orchestrator to write
 - [ ] `ralph/tools/__init__.py`: defines `Tool` ABC with `run(prompt: str, timeout_sec: int) -> ToolResult` signature; `ToolResult` carries `exit_code`, `output_text` (the captured stdout), `duration_sec`
 - [ ] Unit tests for each module; golden-file tests for signal parsing using captured sample outputs from real claude-code runs (committed under `tests/fixtures/`)
-- [ ] `pyright --strict` passes
+- [ ] `pyright` passes
 
 ### US-004: Port claude-code subprocess management
 **Description:** As the Python implementer, I need `tools/claude.py` to spawn the claude-code child process with the same I/O semantics as today's bash (`claude --print 2>&1 | tee <outfile>`), enforce per-iteration timeout (exit 124 = timeout, NOT a `--on-error` failure), and clean up the entire child process tree on signal, so that the orchestrator preserves the load-bearing streaming + capture + cleanup contract.
@@ -98,7 +98,7 @@ The port is explicitly **strict** — byte-identical status JSON, same CLI surfa
 - [ ] Devcontainer prefix support: when `--devcontainer` is passed, the argv list is `["devcontainer", "exec", "--workspace-folder", <path>, "claude", "--print"]` — assembled as a LIST, never joined to a string (TASK-37 invariant)
 - [ ] Unit test: spawn a sleeper child (`time.sleep(60)`) via `tools/claude.py`, send SIGTERM to the orchestrator process, assert child is gone within 5s (no zombie)
 - [ ] Unit test: spawn a child that exits 124, assert orchestrator treats it as timeout (not `--on-error` failure)
-- [ ] `pyright --strict` passes
+- [ ] `pyright` passes
 
 ### US-005: Port opencode + wire entry point
 **Description:** As the Python implementer, I need `tools/opencode.py` to mirror the claude-code subprocess pattern for the opencode CLI, plus the full orchestrator entry point (argparse → preflight → main loop → final status write) wired together, so that the Python implementation can run end-to-end against a fake claude-code shim.
@@ -112,7 +112,7 @@ The port is explicitly **strict** — byte-identical status JSON, same CLI surfa
 - [ ] `--prompt-file` REPLACES the hardcoded inner prompt body; `MODE:` prefix STILL prepended; missing/unreadable file is hard fail with exit 1 before loop starts
 - [ ] Run summary printed on every exit path: clean completion, max-iterations reached, `--on-error stop` abort, SIGINT/SIGTERM; closed set of exit reasons `{"all tasks done", "max iterations reached", "error", "interrupted"}`
 - [ ] E2E test in `tests/test_e2e_fake_claude.py`: orchestrator runs end-to-end against `tests/fixtures/fake_claude.py` (mode=success), asserts status JSON has `state=completed`, `exit_code=0`, `errors=[]`, `tasks_done` contains the task the fake marked Done
-- [ ] `pyright --strict` passes
+- [ ] `pyright` passes
 
 ### US-006: Strangler integration + ralph-init mirror
 **Description:** As the maintainer, I need the outer `ralph.sh` shim updated with `RALPH_IMPL` dispatch, the `/ralph-run` skill exposing an `impl=python|bash` parameter, the devcontainer Dockerfile installing uv + Python 3.14 unconditionally, and the corresponding ralph-init template mirrors, so that the dual-running window can begin and both implementations are available side-by-side.
@@ -161,7 +161,7 @@ The port is explicitly **strict** — byte-identical status JSON, same CLI surfa
 - **FR-12:** `RALPH_PROJECT_ROOT` env var MUST be honored for all project-relative path resolution; fallback to `Path(__file__).parent` for standalone invocation.
 - **FR-13:** Usage-cap pause MUST honor exit-code contract from `usage_check.py`: 0=ok, 1=pause (with `block_end_in_<rem>min_below_<buffer>min_buffer` stdout), 2=cannot-measure (with sentinel flag file `backlog/.ralph-usage-check-disabled` to fire warning once); pause writes 5 `paused_*` fields + sets `state=paused`.
 - **FR-14:** `--tasks` whitelist MUST replace the lowest-ID rule with whitelist-order iteration; each iteration MUST re-query backlog status (deps/states change); `tasks_remaining` counts whitelisted To Do IDs only; mutually exclusive with `--prompt-file`.
-- **FR-15:** All Python code MUST pass `uv run pyright --strict skills/ralph-run/scripts` and `uv run ruff check skills/ralph-run/scripts` before merge.
+- **FR-15:** All Python code MUST pass `uv run pyright skills/ralph-run/scripts` and `uv run ruff check skills/ralph-run/scripts` before merge.
 - **FR-16:** ralph-init templates `templates/root/ralph.sh` and `templates/devcontainer/Dockerfile.base` MUST be R11-mirrored from the live files in the same task that changes the live files.
 
 ---
@@ -409,7 +409,7 @@ What deliberately does NOT change in ralph-init templates: hooks (`templates/cla
 - **5 more consecutive clean runs post-default-flip** before deleting bash (US-007 burn-in)
 - **`check_run_clean.py --run-only` exit 0** on each of the 10 gating runs
 - **`check_run_clean.py --parity bash.json python.json`** schema parity passes for matched-input runs
-- **`pyright --strict` and `ruff check` pass** before every task-reviewer invocation
+- **`pyright` and `ruff check` pass** before every task-reviewer invocation
 - **All unit tests + the 1 E2E test pass** in CI-equivalent local runs (`uv run pytest`)
 - **Zero behavior regressions** caught by `ralph-reviewer` cumulative review (US-007 final gate before downstream comms)
 - **ralph-sync directory propagation works** end-to-end for the Python package (US-000 outcome documented)
@@ -430,7 +430,7 @@ These are PRD-level open questions that should be tracked and resolved during im
 
 5. **Does `ralph-sync` need an explicit version handshake for the new Python package?** Today's sync uses content-hash comparison. If sync handles directories correctly (US-000 outcome), no extra work. If sync needs fixing, consider whether to version the package format. Lean toward no version handshake — content hashing is sufficient.
 
-6. **Should `tests/fixtures/fake_claude.py` itself be type-checked?** Yes — it's part of the test surface and should pass `pyright --strict` to catch its own bugs early.
+6. **Should `tests/fixtures/fake_claude.py` itself be type-checked?** Yes — it's part of the test surface and should pass `pyright` to catch its own bugs early.
 
 7. **Post-cutover: when do we revisit the deferred §6 features?** Notes in the brainstorm list §6.1 (richer sentinels) and §6.4 (retry classification) as HIGH ROI. Suggest reviewing 2 weeks after cutover, after we have real Python-orchestrator runtime data.
 

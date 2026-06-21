@@ -24,7 +24,7 @@ Port `skills/ralph-run/scripts/ralph.sh` (~895 lines bash) and the three helpers
 - **Python deps:** `pydantic>=2.5` only. Stdlib for everything else (subprocess, signal, argparse, pathlib, json, threading, queue)
 - **Test:** pytest
 - **Lint:** ruff (`uv run ruff check skills/ralph-run/scripts`)
-- **Typecheck:** pyright --strict (`uv run pyright --strict skills/ralph-run/scripts`)
+- **Typecheck:** pyright (`uv run pyright skills/ralph-run/scripts`)
 - **Distribution:** Source IS the artifact. PEP 723 inline metadata is the dependency lock. No `pyproject.toml [project]`, no `uv.lock`, no CI. Propagated via `/ralph-sync` like today's bash.
 
 ## Architecture

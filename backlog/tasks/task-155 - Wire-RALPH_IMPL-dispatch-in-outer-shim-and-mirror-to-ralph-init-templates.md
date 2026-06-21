@@ -39,6 +39,6 @@ R11 scope: the canonical orchestrator (`skills/ralph-run/scripts/ralph.sh` and i
 - [ ] #6 `skills/ralph-init/SKILL.md` gains a "Prerequisites" paragraph describing host-mode uv install: `curl -LsSf https://astral.sh/uv/install.sh | sh`
 - [ ] #7 Manual smoke test 1: `RALPH_IMPL=python /ralph-run impl=python tasks=<noop-id> watch=false` launches Python orchestrator and runs to completion
 - [ ] #8 Manual smoke test 2: `/ralph-run` with no impl arg still launches the bash orchestrator (default unchanged at this stage)
-- [ ] #9 `uv run pyright --strict skills/ralph-run/scripts` passes
+- [ ] #9 `uv run pyright skills/ralph-run/scripts` passes
 - [ ] #10 `uv run pytest skills/ralph-run/tests/` passes
 <!-- AC:END -->
