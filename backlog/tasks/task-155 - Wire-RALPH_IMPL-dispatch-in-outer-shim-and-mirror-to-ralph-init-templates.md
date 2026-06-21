@@ -4,10 +4,11 @@ title: Wire RALPH_IMPL dispatch in outer shim and mirror to ralph-init templates
 status: To Do
 assignee: []
 created_date: '2026-06-21 13:09'
-updated_date: '2026-06-21 14:26'
+updated_date: '2026-06-21 14:45'
 labels:
   - 'feature:ralph-python-refactor'
 dependencies:
+  - TASK-154
   - TASK-158
 priority: medium
 ---

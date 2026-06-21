@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-06-21 14:21'
-updated_date: '2026-06-21 14:40'
+updated_date: '2026-06-21 14:46'
 labels:
   - 'feature:ralph-python-refactor'
 dependencies: []
@@ -50,4 +50,8 @@ AC #3: skills/ralph-init/SKILL.md gained a 'Prerequisites' section before Step 1
 AC #4: devcontainer build succeeded (exit 0, image vsc-ralph-94baa4c13af3d41fdf2eace4aa4cde752579681a5888cb751761afe5c4c77e1f); docker run uv --version reports 0.11.23; 'uv run --python 3.14 python -c "import sys; print(sys.version_info[:2])"' reports (3, 14).
 AC #5: TASK-155 ACs #3, #5, #6 removed (descending-order --remove-ac 6 5 3); new AC #8 backref added: 'Devcontainer uv + Python 3.14 toolchain is present (precondition from TASK-158)'. Description body rewritten to clarify the split + validator [llm] re-evaluation now OK.
 AC #6: TASK-155 frontmatter dependencies now lists TASK-158 (added via --dep task-158).
+
+Commit: `ad8fc54` - task-158: Add uv + Python 3.14 to devcontainer (TASK-155 precondition)
+
+Fix-up after task-reviewer round 1 (agentId a47e1d23412aeb730): single `--dep task-158` replaces (not appends) on backlog.md v1.x. Initial run dropped TASK-154 from TASK-155's deps. Restored both with `backlog task edit 155 --dep task-154 --dep task-158` (multi-flag form is additive within one command). Final state: TASK-155 dependencies = [TASK-154, TASK-158].
 <!-- SECTION:NOTES:END -->
