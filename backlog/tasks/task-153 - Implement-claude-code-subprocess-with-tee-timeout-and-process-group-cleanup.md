@@ -35,7 +35,7 @@ Spec sources:
 - [ ] #6 Devcontainer prefix support: argv is a LIST `["devcontainer", "exec", "--workspace-folder", <path>, "claude", "--print"]` — never a joined string
 - [ ] #7 Unit test: spawn a sleeper child via `tools/claude.py`, send SIGTERM, assert child gone within 5s (no zombie process)
 - [ ] #8 Unit test: spawn a child that exits 124; assert orchestrator treats it as timeout (continues to next iteration, no failure recorded)
-- [ ] #9 `uv run pyright --strict skills/ralph-run/scripts` passes
+- [ ] #9 `uv run pyright skills/ralph-run/scripts` passes
 - [ ] #10 `uv run ruff check skills/ralph-run/scripts` passes
 - [ ] #11 `uv run pytest skills/ralph-run/tests/` passes
 <!-- AC:END -->

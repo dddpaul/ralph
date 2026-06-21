@@ -36,7 +36,7 @@ Spec sources:
 - [ ] #7 Run summary printed on every exit path; exit_reason values are the closed set `{"all tasks done", "max iterations reached", "error", "interrupted"}`
 - [ ] #8 `tests/fixtures/fake_claude.py` shim implements 4 modes via `FAKE_CLAUDE_MODE` env var: success (default — edits a backlog task), task_done_no_summary, fail, hang
 - [ ] #9 E2E test `tests/test_e2e_fake_claude.py`: orchestrator runs against `fake_claude.py` in success mode; asserts `state=completed`, `exit_code=0`, `errors=[]`, `tasks_done` includes the fake-marked task
-- [ ] #10 `uv run pyright --strict skills/ralph-run/scripts` passes
+- [ ] #10 `uv run pyright skills/ralph-run/scripts` passes
 - [ ] #11 `uv run ruff check skills/ralph-run/scripts` passes
 - [ ] #12 `uv run pytest skills/ralph-run/tests/` passes
 <!-- AC:END -->

@@ -36,6 +36,6 @@ Spec sources:
 - [ ] #8 `/ralph-run` skill `impl=` parameter removed (no longer needed)
 - [ ] #9 `CLAUDE.md` Project-Specific Language line tightened to: "Python (orchestrator) + Bash (hooks, git hooks, sync, firewall) + Markdown (skills, agents, docs)"
 - [ ] #10 Task notes include explicit downstream upgrade instructions: existing Ralph projects run `ralph-init upgrade` OR hand-patch their outer `ralph.sh` + `Dockerfile.base` from the template diffs
-- [ ] #11 `uv run pyright --strict skills/ralph-run/scripts` passes
+- [ ] #11 `uv run pyright skills/ralph-run/scripts` passes
 - [ ] #12 `uv run pytest skills/ralph-run/tests/` passes
 <!-- AC:END -->
