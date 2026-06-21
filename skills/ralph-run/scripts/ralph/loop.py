@@ -305,7 +305,9 @@ def _finalize(
     args: ParsedArgs,
 ) -> None:
     elapsed = _now_epoch() - started_epoch
-    if state.exit_reason == "interrupted":
+    if status.state == "paused":
+        pass  # pause path already wrote its terminal state
+    elif state.exit_reason == "interrupted":
         status.state = "failed"
     elif state.exit_code == 0:
         status.state = "completed"

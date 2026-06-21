@@ -1,10 +1,10 @@
 ---
 id: TASK-154
 title: 'Wire orchestrator entry point, opencode subprocess, and fake-claude E2E test'
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-06-21 13:09'
-updated_date: '2026-06-21 20:15'
+updated_date: '2026-06-21 20:25'
 labels:
   - 'feature:ralph-python-refactor'
 dependencies:
@@ -42,32 +42,12 @@ Spec sources:
 - [x] #12 `uv run pytest skills/ralph-run/tests/` passes
 <!-- AC:END -->
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 Plan: (1) opencode.py mirrors claude.py but invokes 'opencode run <PROMPT>' (prompt is positional arg, not stdin). Reuse _execute() helper. (2) ralph_orchestrator.py grows into full entry: argparse w/ allow_abbrev=False + parse_intermixed_args, all 11 flags + max_iterations positional, RALPH_PROJECT_ROOT path resolver, validators (TOOL, EFFORT, ON_ERROR, TIMEOUT, RETRY_COUNT, BLOCK_END_BUFFER, TASKS), prompt builder (whitelist > prompt-file > default), main loop with usage check, task pick, MODE: prefix, tool invoke, signal parse, done diff, status update, 2s sleep, summary on every exit. (3) fake_claude.py with 4 modes via FAKE_CLAUDE_MODE. (4) test_e2e_fake_claude.py: bootstrap tmpdir backlog (mock backlog CLI on PATH), run orchestrator, assert status JSON has state=completed/exit_code=0/errors=[]/tasks_done populated. (5) Unit tests: opencode argv, parse_intermixed flag ordering combos, prompt-file behavior, RALPH_PROJECT_ROOT honor.
+
+Commit: `48a66f0` - task-154: Wire orchestrator entry point, opencode subprocess, E2E test
+
+task-reviewer APPROVED. All 12 AC checked; 178 tests pass; ruff/pyright clean. Pause-state preservation in _finalize hardened post-review (latent bug if --block-end-buffer-min trips). Reviewer flagged 2 deferred parity gaps to file as follow-up tasks before US-007: (a) max-iterations exit-code divergence from bash (always 0 vs. bash's 1 on FAILED_ITERATIONS>0); (b) signal-handler latency (current loop polls between iterations, doesn't kill active subprocess on SIGTERM).
 <!-- SECTION:NOTES:END -->
