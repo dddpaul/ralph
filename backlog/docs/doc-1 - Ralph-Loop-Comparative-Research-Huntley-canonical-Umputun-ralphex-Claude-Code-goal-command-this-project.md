@@ -33,54 +33,99 @@ The four approaches occupy distinct points on the same design axis: **how much s
 
 ## 1. Canonical Ralph (Geoffrey Huntley)
 
-> **Provenance caveat:** the research agent could not reach the live web. Direct quotes attributed to Huntley below are paraphrased from training-data recall, not freshly fetched. Cited URLs for verification: `https://ghuntley.com/ralph/`, `https://ghuntley.com/dotfiles/`, `https://ghuntley.com/specs/`, `https://x.com/GeoffreyHuntley`. The repo README at `README.md:7` and `:451` confirms the canonical URL.
+> **Verification status (2026-06-21):** §1.1–1.6 below were re-checked against the canonical post `https://ghuntley.com/ralph/` via WebFetch. Direct quotes are now verbatim from the fetched source. Companion posts (`/specs/`, etc.) are partially paywalled — visible excerpts are cited where used, and claims that depend on paywalled content are removed rather than paraphrased. Several items from the first draft of this section (containerization, `--dangerously-skip-permissions`, Claude Max $200/mo + "overnight" cost framing) were NOT found in the canonical /ralph/ post and have been removed. See §1.7 for what was removed and why.
 
 ### 1.1 Origin & motivation
 
-Mid-2025 post *Ralph Wiggum as a software engineer*. The name is self-deprecating: agent is dim, repetitive, earnest — but in a loop, that compounds. Two failure modes the loop sidesteps: **context rot inside long sessions** and **stalled judgment when planning and executing at once**. Huntley's framing (paraphrased): *the bash `while` loop is the agent framework you actually need; everything else is wrapping*.
+The canonical post is **"Ralph Wiggum as a 'software engineer'"** by Geoffrey Huntley, published **14 Jul 2025**, at `https://ghuntley.com/ralph/`. The name is a Simpsons reference — Ralph as a sweet but slow-witted engineer.
+
+Huntley's stated framing (verbatim):
+
+> *"That's the beauty of Ralph — the technique is deterministically bad in an undeterministic world."*
+
+> *"Ralph can replace the majority of outsourcing at most companies for greenfield projects."*
+
+> *"Ralph is very good at making playgrounds, but he comes home bruised because he fell off the slide, so one then tunes Ralph by adding a sign next to the slide saying 'SLIDE DOWN, DON'T JUMP, LOOK AROUND,' and Ralph is more likely to look and see the sign."*
+
+The motivation is not "context rot" or "stalled judgment" (those are common community framings but not in this post). The actual argument is **economic**: at the end of the post Huntley quotes a contract MVP delivery at $297 actual cost versus a $50,000 USD contract price — i.e., the loop is a labor-arbitrage / margin argument, not an architecture argument.
 
 ### 1.2 Loop mechanics
 
-The canonical shape, famously trivial:
+The canonical shape, verbatim from the post:
 
 ```bash
-while :; do
-  cat PROMPT.md | npx --yes @anthropic-ai/claude-code -p --dangerously-skip-permissions
-done
+while :; do cat PROMPT.md | claude-code ; done
 ```
 
-- **Outer:** `bash` `while true`. No iteration cap. Variants pipe `--output-format stream-json`. Codex CLI is the documented alternate.
-- **Inner:** one-shot non-interactive `claude -p` with `--dangerously-skip-permissions`.
-- **State between iterations:** entirely on disk — `PROMPT.md`, `specs/`, `AGENTS.md`/`CLAUDE.md`, git working tree. No session memory across iterations.
-- **Stop:** none built-in. Human kills with `Ctrl-C` or `pkill`. "We're done" sentinel strings are downstream convention.
+That is the entire loop. No `npx`, no `--print`, no `--dangerously-skip-permissions`, no `--output-format stream-json`. The inner tool is `claude-code`; codex/opencode/etc. are NOT mentioned in this post as alternates.
+
+- **Outer:** `bash` `while :`. No iteration cap, no built-in stop signal. Termination is manual.
+- **Inner:** standard `claude-code` invocation reading `PROMPT.md` on stdin.
+- **State between iterations:** lives on disk in the files §1.3 enumerates plus the git working tree.
+- **Stop signal:** none mentioned in the post. "We're done" sentinel strings are downstream community convention, not part of the canonical loop.
 
 ### 1.3 Task source
 
-`specs/` plus `PROMPT.md`. Standing instruction: *read `specs/`, pick the next unimplemented spec, implement, write a test, update `specs/STATUS.md`*. Agent both writes specs (early plan phase) and consumes them (build phase). No schema, no validation, no JSON parsing — markdown the agent reads and rewrites.
+The post names five files (verbatim names quoted from the fetched content):
 
-Ryan Carson's parallel variant uses `prd.json` + `jq` and a shared `progress.txt`; this project's README acknowledges Carson as the direct predecessor. Both converged on the same loop shape independently.
+- **`PROMPT.md`** — the core loop input; the same file is `cat`'d every iteration.
+- **`@fix_plan.md`** — *"prioritized todo list"*.
+- **`@AGENT.md`** — *"compilation and execution instructions"*. Note: singular `AGENT.md`, not the more common community spelling `AGENTS.md`.
+- **`specs/*`** — *"compiler specifications"* (the post is about a programming-language compiler project).
+- **`@specs/stdlib/*`** — *"standard library specifications"*.
 
-### 1.4 Guardrails
+The agent reads and rewrites these — markdown only, no schema, no JSON. The `@` prefix is the post's notation for "file the agent references"; the actual filenames in the worktree are without `@`.
 
-What Huntley advocates:
-- **Disposable environment** — devcontainer, VM, fresh worktree. Threat model: *agent will eventually do something destructive; make the blast radius cheap.*
-- **Commit aggressively** — ideally after every iteration. Git is the undo.
-- **`AGENTS.md`/`CLAUDE.md` as policy file.**
-- **`--dangerously-skip-permissions`** — solve sandboxing at the container layer, not via prompts.
+Ryan Carson's parallel variant (`prd.json` + `jq` + `progress.txt`) is cited in this project's README as a predecessor; the two lineages converged on the same loop shape independently.
 
-What's notably absent: no per-task branching, no reviewer agent, no hooks, no pre-commit gates.
+### 1.4 Guardrails (what IS in the post)
+
+What the post explicitly recommends:
+
+- **Aggressive git workflow** (verbatim): *"When the tests pass update the @fix_plan.md, then add changed code and @fix_plan.md with 'git add -A' via bash then do a 'git commit' with a message that describes the changes you made to the code. After the commit do a 'git push' to push the changes to the remote repository."*
+- **Semver tagging** (verbatim): *"As soon as there are no build or test errors create a git tag. If there are no git tags start at 0.0.0 and increment patch by 1 for example 0.0.1 if 0.0.0 does not exist."*
+
+What's notably **absent** from the post: no per-task branching, no reviewer agent, no hooks, no pre-commit gates, no mention of containers/devcontainers/VMs, no `--dangerously-skip-permissions`, no sandboxing discussion. The agent runs on the working branch and commits + pushes directly.
 
 ### 1.5 Cost / usage management
 
-Cultural rather than mechanical. Huntley runs on Claude Max ($200/mo), treats 5-hour usage blocks as the ceiling, recommends *buy the subscription, run overnight, don't meter*. No `ccusage`, no block-boundary detection. For pay-as-you-go users: codex CLI on a ChatGPT subscription. His pragmatic cost lever is **tighter specs**, not tighter shell — push control upstream into spec granularity.
+The post does **not** mention Claude Max, the $200/month subscription, the 5-hour Anthropic usage block, `ccusage`, block-boundary detection, or "running overnight." Those were paraphrased into the first draft of this section but are not present in the canonical /ralph/ post.
 
-### 1.6 Acknowledged failure modes
+What IS in the post is a single direct economic comparison (verbatim):
 
-- **Spec quality is the bottleneck.** Vague specs → endless mediocre code.
-- **Drift without a reviewer.** Agent deletes/weakens tests to make them pass; compounds.
-- **Context window exhaustion mid-turn** → half-finished commits. Mitigation: smaller specs.
-- **Reproducibility is poor.** Two runs of same `PROMPT.md` against same `specs/` produce different code. Huntley frames as feature ("evolution"); critics frame as disqualifying.
-- **"The loop IS the framework" is rhetorical.** Once you add stop conditions, retries, error handling, cost caps, and review — you've reinvented an agent framework in bash. This project's 900-line `ralph.sh` is empirical confirmation.
+> *"Cost of a $50k USD contract, delivered, MVP, tested + reviewed with @ampcode. $297 USD."*
+
+That is the only cost framing the canonical post offers — actual project economics rather than meta-discussion of cost ceilings or per-token rate limits.
+
+### 1.6 Acknowledged failure modes (verbatim)
+
+Real quotes from the post — these are the failure modes Huntley himself names, not paraphrases:
+
+- *"Ralph will test you. Every time Ralph has taken a wrong direction in making CURSED, I haven't blamed the tools; instead, I've looked inside."* — i.e., when the loop misbehaves, the problem is upstream in prompts/specs, not the loop itself.
+- *"you'll wake up to a broken codebase that doesn't compile from time to time"* — broken-state-on-resume is a known and accepted outcome.
+- *"Claude has the inherent bias to do minimal and placeholder implementations"* — model bias that bleeds through.
+- *"Ralph has three states. Under baked, baked, or baked with unspecified latent behaviours (which are sometimes quite nice!)"* — explicit acknowledgment that output is non-deterministic and may contain emergent behavior.
+
+Editorial commentary (NOT a Huntley quote; my analytic framing for this report): once you add stop conditions, retries, error classification, cost caps, and a review step, you've reinvented an agent framework in bash. This project's ~900-line `ralph.sh` is empirical confirmation of that observation, but Huntley himself does not concede the point in /ralph/.
+
+### 1.7 What was removed from the first draft and why
+
+For provenance integrity, calling these out explicitly. Each item below was in the original §1 paraphrased from training-data recall; WebFetch against the canonical /ralph/ post (and the visible excerpt of /specs/) did NOT confirm them.
+
+| Removed claim | Where the original draft put it | Status after WebFetch |
+|---|---|---|
+| `npx --yes @anthropic-ai/claude-code -p --dangerously-skip-permissions` as canonical inner invocation | §1.2 | NOT in /ralph/. The post shows `claude-code` only. |
+| "Codex CLI is the documented alternate" | §1.2 | NOT in /ralph/. Codex is not mentioned. |
+| Containerization / devcontainer / VM / "disposable environment" / "make blast radius cheap" | §1.4 | NOT in /ralph/. NOT in the visible /specs/ excerpt. May exist in paywalled material or other posts — cannot verify, so removed. |
+| `--dangerously-skip-permissions` as Huntley-endorsed | §1.4 | NOT in /ralph/. NOT in /specs/ excerpt. Removed. |
+| Claude Max $200/mo + "buy the subscription, run overnight, don't meter" | §1.5 | NOT in /ralph/. NOT in /specs/ excerpt. Cost framing in the post is per-project economics ($297 vs $50k), not subscription-tier advice. |
+| "5-hour usage blocks as the relevant ceiling" | §1.5 | NOT in /ralph/. Removed. |
+| "Spec quality is the bottleneck — vague specs → endless mediocre code" | §1.6 | The actual quote is *"Ralph will test you... I've looked inside"* — different framing, same general territory. Replaced with the verbatim quote. |
+| "Drift without a reviewer — agent deletes/weakens tests to make them pass" | §1.6 | NOT in /ralph/ as a Huntley claim. Removed from §1; the underlying concern is still load-bearing for §6.2 (cross-model reviewer recommendation), which now stands on its own merit. |
+| "Context window exhaustion mid-turn → half-finished commits" | §1.6 | NOT in /ralph/. Removed. The "broken codebase that doesn't compile" quote covers similar territory differently. |
+| "Reproducibility is poor — Huntley frames as feature ('evolution')" | §1.6 | NOT in /ralph/. The "three states" quote is the actual acknowledgment. Replaced. |
+
+Provenance note for §6 (Recommendations): the recommendation in §6.2 (external-reviewer pass with a different model) was originally motivated by a removed paraphrase. Re-reading the canonical post does not invalidate the recommendation — Huntley's own *"you'll wake up to a broken codebase"* is sufficient motivation for a cross-model review pass. §6.2 stands.
 
 ---
 
@@ -347,7 +392,7 @@ R1 review the diff not the worktree · R2 every AC checked or explicitly deferre
 | Dimension | Huntley canonical | ralphex (Umputun) | `/goal` (Anthropic) | This project |
 |---|---|---|---|---|
 | **Form factor** | ~5 lines bash | Go binary (~10k LOC) | Built-in slash command | Bash (~900) + skills + CLI integration |
-| **Task model** | `specs/` + `PROMPT.md` (markdown) | `### Task N:` + `[ ]` checkboxes in plan file | None — single condition | `backlog.md` CLI (file-per-task w/ frontmatter) |
+| **Task model** | `PROMPT.md` + `fix_plan.md` + `AGENT.md` + `specs/*` + `specs/stdlib/*` (markdown) | `### Task N:` + `[ ]` checkboxes in plan file | None — single condition | `backlog.md` CLI (file-per-task w/ frontmatter) |
 | **Loop bound** | None (`while :`) | `--max-iterations` (default 50) | User-defined via condition clause | `max_iterations` (default 10 via skill, 50 via CLI) |
 | **Iteration delay** | None | 2s | None | 2s |
 | **Fresh context per iteration** | Yes | Yes | No (single session) | Yes |
@@ -357,13 +402,13 @@ R1 review the diff not the worktree · R2 every AC checked or explicitly deferre
 | **Branch isolation** | No (long-lived feature branch) | `--worktree` per plan | No | Per-task `task-<id>` branch |
 | **Reviewer gate** | None | Multi-phase: Claude → external codex → Claude | None | Mandatory `task-reviewer` per task |
 | **Cumulative review** | None | Stalemate-detected on external | None | `ralph-reviewer` for cross-task feature review |
-| **Containerization** | Recommended, not built-in | Optional Docker wrapper | Inherits session | Built-in devcontainer w/ firewall |
-| **Sandboxing** | `--dangerously-skip-permissions` + container | Same | Parent session config | Same; firewall ipset for outbound |
+| **Containerization** | Not in canonical /ralph/ post | Optional Docker wrapper | Inherits session | Built-in devcontainer w/ firewall |
+| **Sandboxing** | Not discussed in /ralph/ | Strips `ANTHROPIC_API_KEY` from child env | Parent session config | Firewall ipset for outbound; devcontainer w/ NET_ADMIN |
 | **Heartbeat / liveness** | No | Process-group + idle-timeout | N/A | 5s touch file, 15s freshness |
 | **Status / observability** | None | Web dashboard (`--serve`), progress file, phase enum, multi-project `--watch` | Status panel in session | JSON status file, `ralph-status`/`ralph-status-watch`, structured `errors[]` |
 | **Watch / monitor pattern** | None | SSE web dashboard | In-session UI | `ScheduleWakeup`-driven chain w/ 24-tick safety cap |
 | **Notifications** | None | Telegram/email/Slack/webhook/script | None | None |
-| **Cost / usage** | Cultural ("Claude Max, overnight") | Rate-limit detection + `--wait`; no cap pause | Manual via turn-count clause | `--block-end-buffer-min` via `ccusage`; pause+resume |
+| **Cost / usage** | Economic only ($297 vs $50k contract) — no Max/overnight in /ralph/ | Rate-limit detection + `--wait`; no cap pause | Manual via turn-count clause | `--block-end-buffer-min` via `ccusage`; pause+resume |
 | **Pattern-based retry** | No | Rate-limit / transient 5xx / fatal classification | No | No (single `--on-error` policy) |
 | **Pluggable executor** | Hard-code in shell | `--codex` + 5 wrapper shims | No (single model + Haiku evaluator) | `--tool claude\|opencode` |
 | **Plan authoring inside loop** | No | `--plan "<desc>"` interactive draft | No (chat-driven) | `ralph-prd` + `ralph-brainstorm` (separate skills) |
@@ -525,14 +570,15 @@ Ranked by ROI (impact ÷ effort), with concrete task shapes. Each is a defensibl
 2. **Cross-model reviewer:** Haiku, codex, or opt-in operator choice? (Affects §6.2 scoping.)
 3. **Worktree feasibility spike:** is the backlog/tasks shared-state collision a blocker? (Need a quick test before committing to §6.3.)
 4. **Notification surface:** Telegram (broadest, requires bot setup) or generic webhook (simplest)? (Affects §6.6 scoping.)
-5. **Provenance verification:** the Huntley research agent couldn't reach the live web; direct quotes in §1 are paraphrased from training. Want a follow-up pass with web access enabled?
+5. ~~**Provenance verification:** the Huntley research agent couldn't reach the live web; direct quotes in §1 are paraphrased from training. Want a follow-up pass with web access enabled?~~ **Resolved** by TASK-146 — §1 re-fetched against `ghuntley.com/ralph/` on 2026-06-21; §1.7 enumerates what was removed. The visible portion of `/specs/` is paywalled; one residual unknown is whether claims about containerization/`--dangerously-skip-permissions` live in paywalled material elsewhere.
 
 ---
 
 ## 8. References & provenance
 
 ### External primary sources (cited)
-- Huntley canonical: `https://ghuntley.com/ralph/` (unread by research agent; verify before quoting)
+- Huntley canonical: `https://ghuntley.com/ralph/` (**fetched 2026-06-21 via WebFetch; §1 quotes are verbatim from this fetch**)
+- Huntley spec-driven companion: `https://ghuntley.com/specs/` (**fetched 2026-06-21; body is paywalled — only excerpt visible**)
 - ralphex: `https://github.com/umputun/ralphex` (read by research agent)
 - ralphex llms.txt: `https://raw.githubusercontent.com/umputun/ralphex/master/llms.txt`
 - ralphex source (cited inline in §2): `cmd/ralphex/main.go`, `pkg/processor/runner.go`, `pkg/processor/phase/task.go`, `pkg/plan/parse.go`, `pkg/executor/executor.go`, `pkg/status/status.go`, `pkg/config/defaults/prompts/task.txt`, `pkg/processor/phase/git_state.go`
@@ -549,7 +595,7 @@ Ranked by ROI (impact ÷ effort), with concrete task shapes. Each is a defensibl
 - `backlog/.ralph-status.json` (live status, 18 fields)
 
 ### Provenance caveats
-- **§1 (Huntley):** research agent had no live web access. Direct quotes paraphrased from training. The canonical URL is real (cited in this repo's README); the post body should be verified before any quote is shipped externally.
+- **§1 (Huntley):** §1.1–1.6 now sourced from a direct WebFetch of `https://ghuntley.com/ralph/` on 2026-06-21. Direct quotes are verbatim from that fetch. §1.7 explicitly enumerates the claims that were removed because they could not be verified against the canonical post or the visible portion of the /specs/ companion (paywalled). The matrix in §5 was adjusted in four rows (Task model, Containerization, Sandboxing, Cost/usage) to match the verified content.
 - **§2 (ralphex):** research agent read raw source via `raw.githubusercontent.com`. Function names, regexes, sentinel strings, and constants are accurate to the time of fetch (~`2026-06-15` push, fetched today `2026-06-21`).
 - **§3 (`/goal`):** research agent fetched official Anthropic docs. Release version (v2.1.139, May 11 2026) and changelog cited.
-- **§4 (this project):** research agent read the local repo at HEAD `305b296`.
+- **§4 (this project):** research agent read the local repo at HEAD `305b296` (pre-TASK-145); §1 verification work was performed on `task-146-verify-huntley` branched off HEAD `fb42229`.
