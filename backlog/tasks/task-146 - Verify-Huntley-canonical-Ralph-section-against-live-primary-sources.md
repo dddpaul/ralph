@@ -1,10 +1,10 @@
 ---
 id: TASK-146
 title: Verify Huntley canonical Ralph section against live primary sources
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-06-21 07:15'
-updated_date: '2026-06-21 07:19'
+updated_date: '2026-06-21 10:20'
 labels: []
 dependencies: []
 priority: medium
@@ -29,4 +29,6 @@ Section §1 of backlog/docs/doc-1 (Ralph Loop Comparative Research) was authored
 
 <!-- SECTION:NOTES:BEGIN -->
 WebFetch against https://ghuntley.com/ralph/ succeeded; canonical loop, task-file names, git workflow quotes, failure modes, and cost framing are now verbatim from the fetched post. WebFetch against https://ghuntley.com/specs/ confirmed it is paywalled (excerpt only). §1 rewritten with verbatim quotes; new §1.7 enumerates 10 removed claims and why (mostly containerization, --dangerously-skip-permissions, and Claude-Max/overnight cost framing — all unverifiable against the canonical post). §5 matrix updated in 4 rows (Task model, Containerization, Sandboxing, Cost/usage). §8 provenance block updated to reflect fetched-verified status. §7 question 5 marked resolved with residual unknown about paywalled material.
+
+task-reviewer: APPROVED with 2 trivial wording nits (caught by R12). Both fixed before merge: §1 verification-status header §1.1–1.4,1.6 → §1.1–1.6, and §8 'three rows' → 'four rows' (the implementation notes already said 4).
 <!-- SECTION:NOTES:END -->

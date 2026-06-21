@@ -33,7 +33,7 @@ The four approaches occupy distinct points on the same design axis: **how much s
 
 ## 1. Canonical Ralph (Geoffrey Huntley)
 
-> **Verification status (2026-06-21):** §1.1–1.4, 1.6 below were re-checked against the canonical post `https://ghuntley.com/ralph/` via WebFetch. Direct quotes are now verbatim from the fetched source. Companion posts (`/specs/`, etc.) are partially paywalled — visible excerpts are cited where used, and claims that depend on paywalled content are removed rather than paraphrased. Several items from the first draft of this section (containerization, `--dangerously-skip-permissions`, Claude Max $200/mo + "overnight" cost framing) were NOT found in the canonical /ralph/ post and have been removed. See §1.7 for what was removed and why.
+> **Verification status (2026-06-21):** §1.1–1.6 below were re-checked against the canonical post `https://ghuntley.com/ralph/` via WebFetch. Direct quotes are now verbatim from the fetched source. Companion posts (`/specs/`, etc.) are partially paywalled — visible excerpts are cited where used, and claims that depend on paywalled content are removed rather than paraphrased. Several items from the first draft of this section (containerization, `--dangerously-skip-permissions`, Claude Max $200/mo + "overnight" cost framing) were NOT found in the canonical /ralph/ post and have been removed. See §1.7 for what was removed and why.
 
 ### 1.1 Origin & motivation
 
@@ -595,7 +595,7 @@ Ranked by ROI (impact ÷ effort), with concrete task shapes. Each is a defensibl
 - `backlog/.ralph-status.json` (live status, 18 fields)
 
 ### Provenance caveats
-- **§1 (Huntley):** §1.1–1.6 now sourced from a direct WebFetch of `https://ghuntley.com/ralph/` on 2026-06-21. Direct quotes are verbatim from that fetch. §1.7 explicitly enumerates the claims that were removed because they could not be verified against the canonical post or the visible portion of the /specs/ companion (paywalled). The matrix in §5 was adjusted in three rows (Task model, Containerization, Sandboxing, Cost/usage) to match the verified content.
+- **§1 (Huntley):** §1.1–1.6 now sourced from a direct WebFetch of `https://ghuntley.com/ralph/` on 2026-06-21. Direct quotes are verbatim from that fetch. §1.7 explicitly enumerates the claims that were removed because they could not be verified against the canonical post or the visible portion of the /specs/ companion (paywalled). The matrix in §5 was adjusted in four rows (Task model, Containerization, Sandboxing, Cost/usage) to match the verified content.
 - **§2 (ralphex):** research agent read raw source via `raw.githubusercontent.com`. Function names, regexes, sentinel strings, and constants are accurate to the time of fetch (~`2026-06-15` push, fetched today `2026-06-21`).
 - **§3 (`/goal`):** research agent fetched official Anthropic docs. Release version (v2.1.139, May 11 2026) and changelog cited.
 - **§4 (this project):** research agent read the local repo at HEAD `305b296` (pre-TASK-145); §1 verification work was performed on `task-146-verify-huntley` branched off HEAD `fb42229`.
