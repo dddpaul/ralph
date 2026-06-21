@@ -4,7 +4,7 @@ title: 'Wire orchestrator entry point, opencode subprocess, and fake-claude E2E 
 status: Done
 assignee: []
 created_date: '2026-06-21 13:09'
-updated_date: '2026-06-21 20:25'
+updated_date: '2026-06-21 20:26'
 labels:
   - 'feature:ralph-python-refactor'
 dependencies:
@@ -50,4 +50,6 @@ Plan: (1) opencode.py mirrors claude.py but invokes 'opencode run <PROMPT>' (pro
 Commit: `48a66f0` - task-154: Wire orchestrator entry point, opencode subprocess, E2E test
 
 task-reviewer APPROVED. All 12 AC checked; 178 tests pass; ruff/pyright clean. Pause-state preservation in _finalize hardened post-review (latent bug if --block-end-buffer-min trips). Reviewer flagged 2 deferred parity gaps to file as follow-up tasks before US-007: (a) max-iterations exit-code divergence from bash (always 0 vs. bash's 1 on FAILED_ITERATIONS>0); (b) signal-handler latency (current loop polls between iterations, doesn't kill active subprocess on SIGTERM).
+
+Commit: `4d087cf` - task-154: Mark Done after task-reviewer APPROVED
 <!-- SECTION:NOTES:END -->
