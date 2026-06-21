@@ -1,10 +1,10 @@
 ---
 id: TASK-144
 title: Expose --block-end-buffer-min as a /ralph-run parameter
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-06-21 05:41'
-updated_date: '2026-06-21 05:49'
+updated_date: '2026-06-21 05:51'
 labels: []
 dependencies: []
 priority: low
@@ -70,4 +70,10 @@ AC #5 smoke validation: literal /ralph-run launch is incompatible with autonomou
 - Existing integration tests (tests/integration/usage-pause.bats) cover both preflight-refusal (test 71) and ralph.sh main-loop state=paused (test 74) — all 5 usage-pause tests (71-75) pass.
 
 Note on the AC wording: when buffer trips before launch, preflight exits 1 ('usage cap tripped') and ralph never writes state=paused — that file is only updated when the trip occurs mid-loop. Both outcomes prove the wiring works; this implementation hits the preflight-refusal path under the conditions in the AC text.
+
+Commit: `de83820` - task-144: Expose --block-end-buffer-min as /ralph-run parameter
+
+Commit: `bc02b1c` - task-144: Add --block-end-buffer-min to Step 3 flag template
+
+task-reviewer APPROVED. Polish nit (line 83 flag template) addressed in follow-up commit. All AC satisfied; integration tests (tests 71-75) green; doc-only change scoped to skills/ralph-run/SKILL.md.
 <!-- SECTION:NOTES:END -->
