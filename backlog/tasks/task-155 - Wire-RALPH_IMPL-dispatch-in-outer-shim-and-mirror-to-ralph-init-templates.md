@@ -19,12 +19,12 @@ US-006 from design/ralph-python-refactor-prd.md.
 Update the outer `ralph.sh` shim with `RALPH_IMPL=bash|python` dispatch, the `/ralph-run` skill with an `impl=python|bash` parameter, the devcontainer Dockerfile with an unconditional uv + Python 3.14 install, and the corresponding ralph-init template mirrors (R11).
 
 Spec sources:
-- `/Users/paul/Private/Projects/ai/ralph/ralph.sh` (outer shim — to be updated)
-- `/Users/paul/Private/Projects/ai/ralph/skills/ralph-run/SKILL.md` (skill — needs impl= parameter and propagation)
-- `/Users/paul/Private/Projects/ai/ralph/.devcontainer/Dockerfile` (live Dockerfile — adds uv + Python 3.14)
-- `/Users/paul/Private/Projects/ai/ralph/skills/ralph-init/templates/root/ralph.sh` (R11 template mirror — must match live shim)
-- `/Users/paul/Private/Projects/ai/ralph/skills/ralph-init/templates/devcontainer/Dockerfile.base` (R11 template mirror — must match live Dockerfile additions)
-- `/Users/paul/Private/Projects/ai/ralph/skills/ralph-init/SKILL.md` (Prerequisites note about host-mode uv install)
+- `ralph.sh` (outer shim — to be updated)
+- `skills/ralph-run/SKILL.md` (skill — needs impl= parameter and propagation)
+- `.devcontainer/Dockerfile` (live Dockerfile — adds uv + Python 3.14)
+- `skills/ralph-init/templates/root/ralph.sh` (R11 template mirror — must match live shim)
+- `skills/ralph-init/templates/devcontainer/Dockerfile.base` (R11 template mirror — must match live Dockerfile additions)
+- `skills/ralph-init/SKILL.md` (Prerequisites note about host-mode uv install)
 
 R11 scope: the canonical orchestrator (`skills/ralph-run/scripts/ralph.sh` and its Python successor) is explicitly NOT in the R11 mirror set per existing template parity rules. Only the OUTER `ralph.sh` shim and the devcontainer Dockerfile.base mirror.
 <!-- SECTION:DESCRIPTION:END -->
