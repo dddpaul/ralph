@@ -1,10 +1,10 @@
 ---
 id: TASK-147
 title: Fix CLAUDE.md Project-Specific section to match this repo's actual layout
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-06-21 10:35'
-updated_date: '2026-06-21 10:35'
+updated_date: '2026-06-21 10:36'
 labels: []
 dependencies: []
 priority: medium
@@ -28,4 +28,8 @@ CLAUDE.md line 91 claims 'Plugin layout: skills live under plugins/<domain>/skil
 
 <!-- SECTION:NOTES:BEGIN -->
 Replaced lines 86-91 of CLAUDE.md. Plugin-marketplace references removed; replaced with accurate description of this repo (skills at skills/<name>/, agents at agents/<name>.md, ralph-sync propagation, R11 template parity). Also broadened Language from 'Python (with Markdown for skill documentation)' to 'Bash + Markdown today; Python is the target for new orchestration code per the uv-only conventions below' since the orchestrator and hooks are still bash. Added shell-script R5 reference to the Lint line.
+
+Commit: `7ec10c6` - task-147: Fix CLAUDE.md Project-Specific section to match this repo
+
+task-reviewer: APPROVED. R11 reviewer confirmed Project-Specific section is intentionally project-local and not part of the template-parity rule, so no mirror under skills/ralph-init/templates/ is needed. Merging.
 <!-- SECTION:NOTES:END -->
