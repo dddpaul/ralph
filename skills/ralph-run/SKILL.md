@@ -25,7 +25,10 @@ The user may pass overrides as skill arguments. Parse them as space-separated ke
 | devcontainer | true | --devcontainer |
 | verbose | false | --verbose |
 | watch | (none) | — |
+| block_end_buffer_min | 0 | --block-end-buffer-min |
 | max_iterations | 10 | (positional, last arg) |
+
+Set `block_end_buffer_min` to N>0 to pause the run when the active 5h Anthropic usage block has <=N minutes remaining. 0 disables the check (default). Requires ccusage to be installed; preflight warns if missing.
 
 The `watch` parameter enables automatic progress monitoring after launch. Accepted values:
 - `true` — normalized to `5m`
@@ -77,12 +80,14 @@ Error: ralph.sh not found. Checked ./ralph.sh, scripts/ralph/ralph.sh, and ~/.cl
 Run the preflight script (`scripts/preflight.sh` in the directory next to this SKILL.md) with the ralph path from Step 2 and the devcontainer flag from Step 1:
 
 ```bash
-bash <absolute-path-to-scripts/preflight.sh> "$RALPH_PATH" <devcontainer:true|false> [--verbose] [--tasks <ids>]
+bash <absolute-path-to-scripts/preflight.sh> "$RALPH_PATH" <devcontainer:true|false> [--verbose] [--tasks <ids>] [--block-end-buffer-min <N>]
 ```
 
 When `verbose=true`, append `--verbose` to the preflight command. This prints one `check <name>: <result>` line per check before the final OK/ERROR line.
 
 When `tasks` is set, append `--tasks <ids>` to the preflight command.
+
+When `block_end_buffer_min > 0`, append `--block-end-buffer-min <N>` to the preflight command.
 
 If the output starts with `OK`, parse `RALPH_PATH` from the output (format: `OK RALPH_PATH=<path>`) and proceed to Step 4.
 
@@ -101,6 +106,8 @@ RALPH_CMD="<path-to-ralph.sh> --tool <tool> --model <model> --effort <effort> --
 Add `--devcontainer` flag only if devcontainer=true.
 
 When `tasks` is set, append `--tasks <ids>` to the command.
+
+When `block_end_buffer_min > 0`, append `--block-end-buffer-min <N>` to the command.
 
 Launch fully detached, capturing early output to a launch log. **You MUST set `dangerouslyDisableSandbox: true`** on this Bash tool call — ralph.sh needs full OS access (mktemp, /dev/fd, tee, docker) which the sandbox blocks.
 
