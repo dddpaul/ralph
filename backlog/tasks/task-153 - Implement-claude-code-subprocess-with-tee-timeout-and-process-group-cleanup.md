@@ -1,10 +1,10 @@
 ---
 id: TASK-153
 title: 'Implement claude-code subprocess with tee, timeout, and process-group cleanup'
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-06-21 13:08'
-updated_date: '2026-06-21 16:16'
+updated_date: '2026-06-21 16:18'
 labels:
   - 'feature:ralph-python-refactor'
 dependencies:
@@ -56,4 +56,6 @@ Plan:
 Commit: `af82d95` - task-153: Implement claude-code subprocess tool
 
 AC #5 deferred to US-005 (orchestrator entry point, TASK-154): this task delivers the `_terminate_tree` building block (kills child pgroup with SIGTERM→5s→SIGKILL); the orchestrator-side signal.signal(SIGTERM, ...) handler, RUN_LOG flush, and `state=failed` status write live in ralph_orchestrator.py which is created in US-005. PRD §3 US-004 vs US-005 confirms this split.
+
+task-reviewer: APPROVED (commit c8c79c8). Final gate: ruff/pyright clean, 133/133 pytest pass.
 <!-- SECTION:NOTES:END -->
