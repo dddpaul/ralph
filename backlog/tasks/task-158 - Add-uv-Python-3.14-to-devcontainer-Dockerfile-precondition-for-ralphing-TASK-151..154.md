@@ -3,10 +3,10 @@ id: TASK-158
 title: >-
   Add uv + Python 3.14 to devcontainer Dockerfile (precondition for ralphing
   TASK-151..154)
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-06-21 14:21'
-updated_date: '2026-06-21 14:46'
+updated_date: '2026-06-21 14:48'
 labels:
   - 'feature:ralph-python-refactor'
 dependencies: []
@@ -54,4 +54,6 @@ AC #6: TASK-155 frontmatter dependencies now lists TASK-158 (added via --dep tas
 Commit: `ad8fc54` - task-158: Add uv + Python 3.14 to devcontainer (TASK-155 precondition)
 
 Fix-up after task-reviewer round 1 (agentId a47e1d23412aeb730): single `--dep task-158` replaces (not appends) on backlog.md v1.x. Initial run dropped TASK-154 from TASK-155's deps. Restored both with `backlog task edit 155 --dep task-154 --dep task-158` (multi-flag form is additive within one command). Final state: TASK-155 dependencies = [TASK-154, TASK-158].
+
+task-reviewer APPROVED after one round of CHANGES REQUESTED (R2/R13 — single-arg --dep is replace, not append; multi-arg --dep is additive; final TASK-155 deps = [TASK-154, TASK-158]). Round 2 (agentId a904ad6206f39e5a8) confirmed all prior PASS findings hold.
 <!-- SECTION:NOTES:END -->
