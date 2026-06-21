@@ -83,12 +83,12 @@ This gate applies even if autonomous mode is otherwise active — a Source-carry
 
 ## Project-Specific
 
-- **Language:** Python (with Markdown for skill documentation)
+- **Language:** Bash (orchestrator + hooks today; Python is the target for new orchestration code per the `uv`-only conventions below) and Markdown (skill documentation + agent definitions)
 - **Build:** `N/A`
-- **Lint:** `uv run ruff check .`
+- **Lint:** `uv run ruff check .` (Python); shell scripts must satisfy R5 GNU/BSD portability per `.claude/task-reviewer-rules.md`
 - **Test:** `uv run pytest`
-- **Framework:** Claude Skills repository (skill definitions + scripts)
-- **Plugin layout:** skills live under `plugins/<domain>/skills/<name>/` — not at repo root. The repo is itself a Claude Code plugin marketplace (`.claude-plugin/marketplace.json`). When adding or modifying a skill, also bump the `version` in the owning plugin's `plugin.json` per SemVer: patch for content tweaks, minor for new skills or broadened triggers, major for renames/removals or breaking trigger narrowing.
+- **Framework:** Ralph workflow repo — autonomous Claude Code loop (`ralph.sh`) over Backlog.md tasks, with skills under `skills/<name>/` and agents under `agents/<name>.md`.
+- **Skill layout:** skills live at `skills/<name>/SKILL.md` (e.g., `skills/ralph-run/SKILL.md`); agents at `agents/<name>.md`. The `ralph-sync` skill propagates `skills/` and `agents/` to `~/.claude/skills/` and `~/.claude/agents/` so they are reachable from any project. R11 (`.claude/task-reviewer-rules.md`) additionally requires template parity between live `.claude/` files and `skills/ralph-init/templates/` for the bootstrap content. This repo is NOT a Claude Code plugin marketplace — there is no `.claude-plugin/marketplace.json` or `plugin.json`.
 
 ### Conventions
 
