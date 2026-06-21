@@ -1,10 +1,10 @@
 ---
 id: TASK-149
 title: Verify or fix ralph-sync handling of nested skill directories
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-06-21 13:07'
-updated_date: '2026-06-21 13:29'
+updated_date: '2026-06-21 13:32'
 labels:
   - 'feature:ralph-python-refactor'
 dependencies: []
@@ -56,4 +56,6 @@ Mechanism: classify uses 'diff -rq' (recursive, sync.sh:47), apply uses 'cp -r' 
 AC #4 is vacuously satisfied (no fix applied, so no fix to describe).
 
 Implication for TASK-150: when the Python scaffold lands, '/ralph-sync classify' will detect ralph-run as [updated]; '/ralph-sync apply' will propagate the full scaffold (ralph_orchestrator.py + ralph/ package + tests/) to ~/.claude/skills/ralph-run/scripts/ atomically via the rm -rf + cp -r path.
+
+task-reviewer APPROVED (agentId ab8bb7ee26be3ba94). Line-number claims (sync.sh:47, 115, 119-120) verified empirically. AC #5 confirmed via independent ls + find for spike/dummy artifacts in both source and destination — zero hits.
 <!-- SECTION:NOTES:END -->
