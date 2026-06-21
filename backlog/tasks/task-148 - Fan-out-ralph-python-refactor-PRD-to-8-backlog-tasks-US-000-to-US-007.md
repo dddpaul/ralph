@@ -1,10 +1,10 @@
 ---
 id: TASK-148
 title: Fan out ralph-python-refactor PRD to 8 backlog tasks (US-000 to US-007)
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-06-21 13:04'
-updated_date: '2026-06-21 13:12'
+updated_date: '2026-06-21 13:22'
 labels: []
 dependencies: []
 priority: high
@@ -47,4 +47,10 @@ PRD reference present in all 8: each task cites design/ralph-python-refactor-prd
 Bash source line ranges quoted per task (per PRD §10 reviewer cross-check).
 
 AC count per task: 6, 10, 9, 10, 11, 12, 10, 12 (typecheck/lint/pytest mechanical ACs included; product ACs land in 5–9 range each).
+
+task-reviewer APPROVED after one round of CHANGES REQUESTED.
+
+Round 1 finding (agentId a64decf484de984a3): TASK-155 used absolute /Users/paul/... paths in 6 spec-source bullets. Fixed in commit bab95c9 — repo-relative form now matches the convention used by the other 7 child tasks.
+
+Round 2 (agentId ac8969228c9d87189) confirmed: fix landed, no regressions, all prior findings (R16, PRD refs, dep DAG, AC counts, titles) still hold.
 <!-- SECTION:NOTES:END -->
