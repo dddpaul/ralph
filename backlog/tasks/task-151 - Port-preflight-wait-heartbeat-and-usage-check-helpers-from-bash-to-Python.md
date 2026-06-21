@@ -81,4 +81,6 @@ Implementation complete; task-reviewer APPROVED.
 - Sentinel-on-exit-2 is written by both the usage_check CLI and preflight._check_usage; touch is idempotent, so no double-write concern.
 
 Commit: see post-commit hook annotations.
+
+Commit: `b6deea7` - task-151: Mark Done — task-reviewer APPROVED, polish parity comment
 <!-- SECTION:NOTES:END -->
