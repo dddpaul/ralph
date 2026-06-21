@@ -95,6 +95,12 @@ RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/
 # ---- Claude ----
 RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION} backlog.md
 
+# ---- uv + Python 3.14 (required by Ralph orchestrator regardless of project language) ----
+USER root
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+USER node
+RUN uv python install 3.14
+
 # ---- Firewall script ----
 COPY init-firewall.sh /usr/local/bin/
 USER root

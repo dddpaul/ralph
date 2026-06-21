@@ -123,7 +123,7 @@ The port is explicitly **strict** — byte-identical status JSON, same CLI surfa
 - [ ] Live `.devcontainer/Dockerfile` updated: adds `COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv` and `RUN uv python install 3.14` (UNCONDITIONAL — not language-gated)
 - [ ] R11 mirror: `skills/ralph-init/templates/root/ralph.sh` matches the live outer shim byte-for-byte (modulo path differences)
 - [ ] R11 mirror: `skills/ralph-init/templates/devcontainer/Dockerfile.base` adds the same uv + Python 3.14 install (UNCONDITIONAL); include an inline comment explaining "required by Ralph orchestrator regardless of project language"
-- [ ] `skills/ralph-init/SKILL.md` gains a "Prerequisites" paragraph: host-mode bootstraps (`devcontainer=false`) require uv installed on the host (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
+- [ ] `skills/ralph-init/SKILL.md` gains a "Prerequisites" paragraph: host-mode bootstraps (`devcontainer=false`) require uv installed via the user's OS package manager (e.g. `brew install uv`, `pacman -S uv`, `dnf install uv`, `pipx install uv`) with `curl -LsSf https://astral.sh/uv/install.sh | sh` as a last-resort fallback
 - [ ] Verify `ralph-sync` still works end-to-end with the new shim + new Dockerfile (depends on US-000 outcome)
 - [ ] Manual smoke: `RALPH_IMPL=python /ralph-run impl=python tasks=<noop-id> watch=false` launches the Python orchestrator and runs to completion against a real backlog task in the devcontainer
 - [ ] Manual smoke: `/ralph-run` (no `impl` arg) still launches the bash orchestrator (default unchanged)
@@ -364,7 +364,7 @@ The following appendix lists historical backlog tasks that document **load-beari
 ### Dependency & runtime constraints
 
 - **Python:** `>=3.14`, pinned in PEP 723 inline metadata. uv handles `uv python install 3.14` automatically.
-- **uv:** required runtime dependency. Installed in devcontainer via `Dockerfile.base`. Host-mode bootstraps require user to install uv: `curl -LsSf https://astral.sh/uv/install.sh | sh`.
+- **uv:** required runtime dependency. Installed in devcontainer via `Dockerfile.base`. Host-mode bootstraps require user to install uv via OS package manager (`brew install uv`, `pacman -S uv`, `dnf install uv`, or `pipx install uv`); `curl -LsSf https://astral.sh/uv/install.sh | sh` is the last-resort fallback for distros without packaged uv.
 - **Third-party deps:** ONLY `pydantic>=2.5`. Nothing else. No rich, no typer, no click, no httpx, no structlog. Discipline lock.
 - **Stdlib:** `subprocess`, `json`, `signal`, `argparse`, `pathlib`, `dataclasses`, `re`, `os`, `sys`, `logging`, `tempfile`, `threading`, `queue`, `datetime`.
 - **No `pyproject.toml` `[project]` section.** Tool config only. No `uv.lock`. PEP 723 inline metadata is the dependency lock.

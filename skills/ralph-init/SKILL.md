@@ -13,6 +13,24 @@ All template files are in the `templates/` directory next to this SKILL.md. Read
 
 ---
 
+## Prerequisites
+
+Ralph's orchestrator is Python. It runs via `uv` with PEP 723 inline metadata that pins Python 3.14 + `pydantic>=2.5`.
+
+- **DevContainer projects** (Step 2 Q3 answer A): `uv` and Python 3.14 are baked into the container by Step 3.6 — no host install needed.
+- **Host-mode projects** (Step 2 Q3 answer B): install `uv` on the host using your OS package manager. Common forms:
+
+  - macOS: `brew install uv`
+  - Arch Linux: `pacman -S uv`
+  - Fedora: `dnf install uv`
+  - Cross-platform (already have Python + pipx): `pipx install uv`
+
+  Last-resort fallback, only if no package manager ships `uv` for your distro: `curl -LsSf https://astral.sh/uv/install.sh | sh` (review the script first).
+
+  Python 3.14 is fetched lazily on first `uv run`, or you can pre-install with `uv python install 3.14`.
+
+---
+
 ## Step 1: Preflight Checks
 
 ```bash
