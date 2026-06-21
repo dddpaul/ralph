@@ -84,6 +84,44 @@ def _list_todo_ids() -> list[str]:
     return [f"TASK-{n}" for n in unique]
 
 
+def done_task_ids() -> list[str]:
+    """Return all ``Done`` task IDs in ascending numeric order.
+
+    Used by the orchestrator's iteration loop to compute the DONE_BEFORE /
+    DONE_AFTER diff that populates ``StatusFile.tasks_done``. Bash uses
+    ``backlog task list -s "Done" --plain | grep -o 'TASK-[0-9]*' | sort -u``;
+    the Python port does the equivalent via :data:`_TASK_ID_RE`.
+    """
+    out = _backlog_stdout(["task", "list", "-s", "Done", "--plain"])
+    if not out or "No tasks found" in out:
+        return []
+    ids = _TASK_ID_RE.findall(out)
+    seen: set[str] = set()
+    unique: list[str] = []
+    for raw in ids:
+        if raw in seen:
+            continue
+        seen.add(raw)
+        unique.append(raw)
+    unique.sort(key=int)
+    return [f"TASK-{n}" for n in unique]
+
+
+def count_remaining(whitelist: list[str] | None = None) -> int:
+    """Return the count of ``To Do`` tasks; honors whitelist when provided.
+
+    Mirrors ``count_remaining_tasks()`` in ``ralph.sh:347-367``.
+    """
+    if whitelist:
+        count = 0
+        for raw in whitelist:
+            task = fetch_task(raw)
+            if task is not None and "To Do" in task.status:
+                count += 1
+        return count
+    return len(_list_todo_ids())
+
+
 def fetch_task(task_id: str) -> BacklogTask | None:
     """Resolve ``task_id`` to a ``BacklogTask`` via ``backlog task <id> --plain``.
 
