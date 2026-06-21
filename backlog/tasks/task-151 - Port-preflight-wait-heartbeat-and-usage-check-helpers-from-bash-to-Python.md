@@ -41,24 +41,6 @@ Parallelizable with TASK-152 (US-003 core internals) — both depend only on TAS
 - [x] #9 `uv run pytest skills/ralph-run/tests/` passes
 <!-- AC:END -->
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
@@ -69,4 +51,6 @@ Plan:
 4. Add parity test per helper: skills/ralph-run/tests/test_preflight_parity.py, test_wait_heartbeat_parity.py, test_usage_check_parity.py — each runs bash + python with same inputs/env, asserts identical stdout + exit code.
 5. Add unit tests covering success, failure, edge cases.
 6. Verify pyright (strict), ruff, pytest all green.
+
+Commit: `b794a84` - task-151: Port preflight/wait-heartbeat/usage-check to Python
 <!-- SECTION:NOTES:END -->
