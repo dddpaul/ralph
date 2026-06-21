@@ -1,0 +1,6 @@
+MODE: autonomous (Ralph loop iteration 4 of 8)
+
+Some confused output without any task summary block.
+
+ERROR: pyright type check failed
+The model gave up halfway and produced nothing structured.

@@ -1,0 +1,17 @@
+MODE: autonomous
+
+Discussing summaries — here are non-matches that the parser MUST ignore:
+
+  ## Task Summary
+The line above is indented by two spaces so it does NOT anchor at column 0.
+
+Inline reference: see the ## Task Summary header below (the rest of the
+line is normal prose, so no anchor).
+
+trailing text ## Task Summary
+
+## Task Summary
+- **Task:** TASK-300 — real summary at last (this one counts)
+- **What was implemented:** the demo
+- **Files changed:** demo.py
+- **Key decisions:** none

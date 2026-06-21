@@ -1,0 +1,10 @@
+MODE: autonomous (Ralph loop iteration 2 of 10)
+
+Working on TASK-100.
+
+## Task Summary
+
+- **Task:** TASK-100 — Implement something
+- **What was implemented:** part of it
+- **Files changed:** src/foo.py
+- **Key decisions:** none
