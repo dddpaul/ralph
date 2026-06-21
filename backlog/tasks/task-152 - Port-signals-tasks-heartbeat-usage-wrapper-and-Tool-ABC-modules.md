@@ -1,10 +1,10 @@
 ---
 id: TASK-152
 title: 'Port signals, tasks, heartbeat, usage wrapper, and Tool ABC modules'
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-06-21 13:08'
-updated_date: '2026-06-21 15:47'
+updated_date: '2026-06-21 15:52'
 labels:
   - 'feature:ralph-python-refactor'
 dependencies:
@@ -43,8 +43,6 @@ Parallelizable with TASK-151 (US-002 helpers) — both depend only on TASK-150 s
 - [x] #10 `uv run pytest skills/ralph-run/tests/` passes
 <!-- AC:END -->
 
-
-
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
@@ -56,4 +54,8 @@ Plan:
 - ralph/tools/__init__.py: ToolResult dataclass; Tool ABC with run() signature
 - Tests: per-module unit tests; signals fixture transcripts under tests/fixtures/signals/
 - Lint+pyright+pytest all green
+
+Commit: `c05fac2` - task-152: Port signals, tasks, heartbeat, usage wrapper, Tool ABC
+
+Done — task-reviewer APPROVED. ruff/pyright clean; 123 tests pass.
 <!-- SECTION:NOTES:END -->
