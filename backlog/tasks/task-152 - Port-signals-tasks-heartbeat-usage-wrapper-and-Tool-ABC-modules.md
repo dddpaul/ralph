@@ -1,9 +1,10 @@
 ---
 id: TASK-152
 title: 'Port signals, tasks, heartbeat, usage wrapper, and Tool ABC modules'
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-06-21 13:08'
+updated_date: '2026-06-21 15:47'
 labels:
   - 'feature:ralph-python-refactor'
 dependencies:
@@ -30,14 +31,29 @@ Parallelizable with TASK-151 (US-002 helpers) — both depend only on TASK-150 s
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 `ralph/signals.py`: parses `<promise>COMPLETE</promise>` AND anchored `^## Task Summary$` regex; returns `IterationSignals` dataclass with `task_summary_count`, `complete`, `error_text` fields
-- [ ] #2 `ralph/tasks.py`: `pick_next_task()` queries `backlog task list`, returns lowest-ID task whose dependencies are all Done; honors `--tasks` whitelist that REPLACES the lowest-ID rule
-- [ ] #3 `ralph/heartbeat.py`: daemon `threading.Thread` touches `backlog/.ralph-heartbeat` every 5s; `stop()` sets a `threading.Event` and joins thread (timeout 10s); orchestrator EXIT cleans up the heartbeat file
-- [ ] #4 `ralph/usage.py`: wraps `usage_check.py`; populates the 5 `paused_*` fields on StatusFile when a pause is triggered
-- [ ] #5 `ralph/tools/__init__.py`: defines `Tool` ABC with `run(prompt: str, timeout_sec: int) -> ToolResult` signature; `ToolResult` includes stdout-tee path, exit code, and an `IterationSignals` instance
-- [ ] #6 Unit tests for each module
-- [ ] #7 Golden-file tests for signal parsing using captured sample tool-output transcripts under `tests/fixtures/`
-- [ ] #8 `uv run pyright skills/ralph-run/scripts` passes
-- [ ] #9 `uv run ruff check skills/ralph-run/scripts` passes
-- [ ] #10 `uv run pytest skills/ralph-run/tests/` passes
+- [x] #1 `ralph/signals.py`: parses `<promise>COMPLETE</promise>` AND anchored `^## Task Summary$` regex; returns `IterationSignals` dataclass with `task_summary_count`, `complete`, `error_text` fields
+- [x] #2 `ralph/tasks.py`: `pick_next_task()` queries `backlog task list`, returns lowest-ID task whose dependencies are all Done; honors `--tasks` whitelist that REPLACES the lowest-ID rule
+- [x] #3 `ralph/heartbeat.py`: daemon `threading.Thread` touches `backlog/.ralph-heartbeat` every 5s; `stop()` sets a `threading.Event` and joins thread (timeout 10s); orchestrator EXIT cleans up the heartbeat file
+- [x] #4 `ralph/usage.py`: wraps `usage_check.py`; populates the 5 `paused_*` fields on StatusFile when a pause is triggered
+- [x] #5 `ralph/tools/__init__.py`: defines `Tool` ABC with `run(prompt: str, timeout_sec: int) -> ToolResult` signature; `ToolResult` includes stdout-tee path, exit code, and an `IterationSignals` instance
+- [x] #6 Unit tests for each module
+- [x] #7 Golden-file tests for signal parsing using captured sample tool-output transcripts under `tests/fixtures/`
+- [x] #8 `uv run pyright skills/ralph-run/scripts` passes
+- [x] #9 `uv run ruff check skills/ralph-run/scripts` passes
+- [x] #10 `uv run pytest skills/ralph-run/tests/` passes
 <!-- AC:END -->
+
+
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan:
+- ralph/signals.py: IterationSignals(task_summary_count, complete, error_text); scan_output() takes path or text
+- ralph/tasks.py: BacklogTask dataclass; pick_next_task(whitelist=None); checks dependencies for default mode
+- ralph/heartbeat.py: Heartbeat class with start()/stop(), daemon thread, threading.Event, file cleanup on stop
+- ralph/usage.py: pause_status_if_needed(status, buffer_min) returns bool; populates 5 paused_* fields
+- ralph/tools/__init__.py: ToolResult dataclass; Tool ABC with run() signature
+- Tests: per-module unit tests; signals fixture transcripts under tests/fixtures/signals/
+- Lint+pyright+pytest all green
+<!-- SECTION:NOTES:END -->

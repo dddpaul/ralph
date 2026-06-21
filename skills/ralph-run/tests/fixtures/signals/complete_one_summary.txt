@@ -1,0 +1,14 @@
+MODE: autonomous (Ralph loop iteration 3 of 5)
+
+I will execute the task following the lifecycle.
+
+[lots of tool output snipped]
+
+## Task Summary
+
+- **Task:** TASK-042 — Fix the thing
+- **What was implemented:** thing is now fixed
+- **Files changed:** src/thing.py
+- **Key decisions:** kept the same API
+
+<promise>COMPLETE</promise>

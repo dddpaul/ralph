@@ -1,0 +1,21 @@
+MODE: autonomous
+
+Worked on two tasks in one go (this is a warn condition for the loop).
+
+## Task Summary
+
+- **Task:** TASK-200 — first
+- **What was implemented:** thing A
+- **Files changed:** a.py
+- **Key decisions:** none
+
+[then proceeded to next task]
+
+## Task Summary
+
+- **Task:** TASK-201 — second
+- **What was implemented:** thing B
+- **Files changed:** b.py
+- **Key decisions:** none
+
+<promise>COMPLETE</promise>
