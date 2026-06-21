@@ -118,10 +118,10 @@ def test_parity_ccusage_missing(scenario: Scenario) -> None:
 
 
 def test_parity_active_block_within_buffer(scenario: Scenario) -> None:
-    # +3 minutes 30 seconds places the integer-minute count (3) safely inside
-    # the second's wide-margin from a wall-clock boundary so bash and Python
-    # both compute `REMAINING_MIN = 3` despite a few hundred milliseconds of
-    # subprocess startup jitter between the two samples.
+    # +3 minutes 30 seconds: the 30s cushion keeps the integer-minute count
+    # at 3 across ~100-300ms of subprocess startup jitter, so bash and Python
+    # both compute REMAINING_MIN = 3 and exercise the buffer-trigger path
+    # (3 < 5).
     end_time = (datetime.now(tz=UTC) + timedelta(minutes=3, seconds=30)).strftime(
         "%Y-%m-%dT%H:%M:%SZ"
     )
