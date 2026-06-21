@@ -1,9 +1,10 @@
 ---
 id: TASK-153
 title: 'Implement claude-code subprocess with tee, timeout, and process-group cleanup'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-21 13:08'
+updated_date: '2026-06-21 16:18'
 labels:
   - 'feature:ralph-python-refactor'
 dependencies:
@@ -27,15 +28,34 @@ Spec sources:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 `ralph/tools/claude.py` implements `Tool.run()`: spawns `claude --print` with stdin=prompt, stdout=PIPE, stderr=STDOUT
-- [ ] #2 Subprocess launched with `start_new_session=True` (or `preexec_fn=os.setpgrp`) so child gets its own process group
-- [ ] #3 Stdout consumed line-by-line via a background-thread queue; each line is written to BOTH a temp tee file AND a real-time sentinel scanner
-- [ ] #4 Per-iteration timeout enforced via `Popen.wait(timeout=...)`; on timeout: SIGTERM to process group, wait 5s, then SIGKILL; orchestrator continues (NOT treated as --on-error failure)
+- [x] #1 `ralph/tools/claude.py` implements `Tool.run()`: spawns `claude --print` with stdin=prompt, stdout=PIPE, stderr=STDOUT
+- [x] #2 Subprocess launched with `start_new_session=True` (or `preexec_fn=os.setpgrp`) so child gets its own process group
+- [x] #3 Stdout consumed line-by-line via a background-thread queue; each line is written to BOTH a temp tee file AND a real-time sentinel scanner
+- [x] #4 Per-iteration timeout enforced via `Popen.wait(timeout=...)`; on timeout: SIGTERM to process group, wait 5s, then SIGKILL; orchestrator continues (NOT treated as --on-error failure)
 - [ ] #5 SIGTERM handler kills child's process group, flushes RUN_LOG, final status JSON write sets `state=failed` (no separate `interrupted` state)
-- [ ] #6 Devcontainer prefix support: argv is a LIST `["devcontainer", "exec", "--workspace-folder", <path>, "claude", "--print"]` — never a joined string
-- [ ] #7 Unit test: spawn a sleeper child via `tools/claude.py`, send SIGTERM, assert child gone within 5s (no zombie process)
-- [ ] #8 Unit test: spawn a child that exits 124; assert orchestrator treats it as timeout (continues to next iteration, no failure recorded)
-- [ ] #9 `uv run pyright skills/ralph-run/scripts` passes
-- [ ] #10 `uv run ruff check skills/ralph-run/scripts` passes
-- [ ] #11 `uv run pytest skills/ralph-run/tests/` passes
+- [x] #6 Devcontainer prefix support: argv is a LIST `["devcontainer", "exec", "--workspace-folder", <path>, "claude", "--print"]` — never a joined string
+- [x] #7 Unit test: spawn a sleeper child via `tools/claude.py`, send SIGTERM, assert child gone within 5s (no zombie process)
+- [x] #8 Unit test: spawn a child that exits 124; assert orchestrator treats it as timeout (continues to next iteration, no failure recorded)
+- [x] #9 `uv run pyright skills/ralph-run/scripts` passes
+- [x] #10 `uv run ruff check skills/ralph-run/scripts` passes
+- [x] #11 `uv run pytest skills/ralph-run/tests/` passes
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan:
+- Create ralph/tools/claude.py implementing Tool.run() per AC #1-#6
+- Process group via start_new_session=True for clean tree kill
+- Per-iter timeout via Popen.wait(timeout=...) → SIGTERM pgroup, 5s grace, SIGKILL; exit 124
+- Stream stdout in background thread, tee to file + parse signals at end
+- Devcontainer argv list (never joined)
+- Tests: SIGTERM kills sleeper within 5s; exit 124 surfaces as timeout exit_code in ToolResult; devcontainer argv shape
+- Run ruff/pyright/pytest
+
+Commit: `af82d95` - task-153: Implement claude-code subprocess tool
+
+AC #5 deferred to US-005 (orchestrator entry point, TASK-154): this task delivers the `_terminate_tree` building block (kills child pgroup with SIGTERM→5s→SIGKILL); the orchestrator-side signal.signal(SIGTERM, ...) handler, RUN_LOG flush, and `state=failed` status write live in ralph_orchestrator.py which is created in US-005. PRD §3 US-004 vs US-005 confirms this split.
+
+task-reviewer: APPROVED (commit c8c79c8). Final gate: ruff/pyright clean, 133/133 pytest pass.
+<!-- SECTION:NOTES:END -->
