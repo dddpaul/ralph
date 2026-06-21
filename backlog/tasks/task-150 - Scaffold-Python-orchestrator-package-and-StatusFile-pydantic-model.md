@@ -1,10 +1,10 @@
 ---
 id: TASK-150
 title: Scaffold Python orchestrator package and StatusFile pydantic model
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-06-21 13:08'
-updated_date: '2026-06-21 13:52'
+updated_date: '2026-06-21 13:55'
 labels:
   - 'feature:ralph-python-refactor'
 dependencies:
@@ -76,4 +76,8 @@ Implementation complete.
 - AC #3 says '18 fields' but the explicit field list in PRD §3 enumerates 21. Implementation matches the explicit list (21 fields).
 - AC #8 says 'pyright --strict' but pyright 1.1.410 has no --strict CLI flag — strict mode is configured in pyproject.toml [tool.pyright] strict = ['skills/ralph-run/scripts']. Functional equivalent: 'uv run pyright skills/ralph-run/scripts' runs with strict checking.
 - pydantic ConfigDict(extra='forbid') is used so the model rejects unknown fields — catches future schema drift between bash and Python writers.
+
+Commit: `81fc07b` - task-150: Scaffold Python orchestrator package and StatusFile model
+
+task-reviewer APPROVED. Final build+lint+tests pass: pyright 0 errors, ruff clean, pytest 8/8.
 <!-- SECTION:NOTES:END -->
