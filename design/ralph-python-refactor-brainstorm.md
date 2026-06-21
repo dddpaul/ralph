@@ -99,6 +99,40 @@ PEP 723 inline metadata on `ralph_orchestrator.py`:
 
 The `ralph/` package is found via `sys.path[0]` (script's parent dir) — no `pyproject.toml`, no `uv.lock`, no `uv sync`. PEP 723 + sibling package is sufficient. Tests live under `skills/ralph-run/tests/` to keep the skill self-contained.
 
+## ralph-init impact (R11 mirror surface)
+
+The refactor's mirror set extends to ralph-init templates — but the surface is small because **R11 explicitly excludes the canonical ralph-run script from parity**. The orchestrator lives in `~/.claude/skills/ralph-run/scripts/` and is propagated by `ralph-sync`, NOT by `ralph-init`. New projects do not get a copy of `ralph_orchestrator.py` (or the `ralph/` package, or the `tests/` directory) in their own tree. This is the architectural decision that keeps the ralph-init impact bounded.
+
+### Template changes (2 files)
+
+1. **`skills/ralph-init/templates/root/ralph.sh`** — the 6-line outer shim grows to ~10 lines with the strangler dispatch (see Q6 "Strangler flag location"). During the dual-running period, defaults to bash and dispatches to Python via `RALPH_IMPL=python`. At cutover: drop the bash branch, keep only the Python exec.
+
+2. **`skills/ralph-init/templates/devcontainer/Dockerfile.base`** — add uv + Python 3.14 install **UNCONDITIONALLY** (not gated on the project's chosen language). The orchestrator's runtime becomes part of the base contract regardless of whether the project itself is Go, Node, docs, or anything else. Two lines:
+
+   ```dockerfile
+   COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+   RUN uv python install 3.14
+   ```
+
+   This crosses an abstraction layer in the existing template structure (today's `Dockerfile.base` is language-agnostic; language-specific stages live in `lang/Dockerfile.install.*`). Worth an inline comment in the template explaining WHY uv is unconditional ("required by Ralph orchestrator regardless of project language").
+
+### Things deliberately UNCHANGED
+
+- `templates/root/CLAUDE.conventions.python.md` — already documents the uv-only conventions for projects whose own language is Python. No edit.
+- `templates/devcontainer/lang/Dockerfile.install.python` — already copies uv via `COPY --from=ghcr.io/astral-sh/uv:latest`. No edit. Project-language-specific stages stay scoped.
+- All Claude hooks (`templates/claude/hooks/*.sh`) — stay bash per the lock.
+- All git hooks (`templates/git-hooks/*`) — stay bash.
+- `templates/devcontainer/init-firewall.sh` — stays bash (iptables/ipset belongs there).
+- `templates/devcontainer/devcontainer.json` — no change.
+- `templates/root/CLAUDE.md` Project-Specific section — placeholder for end users to fill in; unchanged by refactor.
+- 4 other `lang/Dockerfile.*` files (go, node, docs, plus the Python language stage) — irrelevant; they're project-runtime stages, not orchestrator runtime.
+
+### Side effects (handle in the implementation tasks)
+
+- **`ralph-sync` directory handling.** Today's sync handles files in `skills/ralph-run/scripts/`. The Python orchestrator adds a `ralph/` package subdirectory and a `tests/` subdirectory. Sync must propagate these correctly. This is risk register item #6 — verify via a 5-minute spike BEFORE Task 1. If sync needs fixing, that's a precondition task (Task 0).
+- **`skills/ralph-init/SKILL.md` Prerequisites note.** For host-mode (devcontainer=false) bootstraps, the user needs uv installed on the host before `/ralph-run` works. One paragraph in ralph-init's SKILL.md explaining `curl -LsSf https://astral.sh/uv/install.sh | sh`.
+- **Existing projects need re-bootstrap or hand-patch.** After cutover, every existing Ralph project (not just this one) needs `ralph-init upgrade` to re-apply the new templates, OR a manual patch of the two affected files. Document this explicitly in the Task 7 (cleanup) acceptance criteria so the cutover communication includes upgrade instructions.
+
 ## Migration plan (4 stages)
 
 ### Stage 1: scaffold (3–4 days)
@@ -117,15 +151,21 @@ The `ralph/` package is found via `sys.path[0]` (script's parent dir) — no `py
 - Wire entry point: arg parsing (argparse, exact flag names) → preflight → orchestrate.
 
 ### Stage 3: dual-running window (1–2 weeks)
-- Strangler shim: `ralph.sh` reads `RALPH_IMPL`; defaults to bash.
-- `/ralph-run` skill grows a `impl` parameter (default `bash`) that sets `RALPH_IMPL`.
+- Strangler shim: outer `/ralph.sh` reads `RALPH_IMPL`; defaults to bash. Inner `skills/ralph-run/scripts/ralph.sh` untouched.
+- `/ralph-run` skill grows an `impl` parameter (default `bash`) that sets `RALPH_IMPL`.
+- **R11 mirror to ralph-init template:** `skills/ralph-init/templates/root/ralph.sh` updated to match the live outer shim (the dispatch logic). Same task as the live shim change.
+- **Devcontainer Dockerfile.base mirror:** `skills/ralph-init/templates/devcontainer/Dockerfile.base` gets uv + Python 3.14 install (unconditional, not language-gated). Same task as the live Dockerfile change.
+- **`ralph-sync` directory handling spike** (Task 0 precondition): verify sync.sh propagates `ralph/` subdirectory and `tests/` subdirectory correctly. Fix sync.sh if not.
+- **`skills/ralph-init/SKILL.md` Prerequisites note:** add one-paragraph mention that host-mode bootstraps require uv on the host.
 - Run real tasks with `RALPH_IMPL=python` opt-in. Count clean runs.
 
 ### Stage 4: cutover (1 day + 2 weeks bash burn-in)
-- Flip default to `RALPH_IMPL=python` after 5 clean runs.
-- Keep `ralph.sh` bash version available for 5 more clean runs as rollback path.
-- Delete `ralph.sh` bash version after 10 total clean runs.
+- Flip default to `RALPH_IMPL=python` after 5 clean runs (both in the live outer shim AND in `skills/ralph-init/templates/root/ralph.sh`).
+- Keep inner `ralph.sh` bash version available for 5 more clean runs as rollback path.
+- Delete inner bash `ralph.sh` + bash helpers (`preflight.sh`, `wait-heartbeat.sh`, `usage-check.sh`) after 10 total clean runs.
+- Outer shim (live + template) simplifies back to 6 lines pointing only at Python.
 - Update `/ralph-run` skill to drop the `impl` parameter.
+- **Communicate to other Ralph projects:** anyone with an existing project must run `ralph-init upgrade` to re-apply the new shim + Dockerfile.base, OR hand-patch those two files. Document in the cutover task's notes section.
 
 ## Risk register (ranked by likelihood × blast radius)
 
@@ -300,6 +340,8 @@ Port `skills/ralph-run/scripts/ralph.sh` and three helpers (`preflight.sh`, `wai
 
 ### Implementation checklist (≥5 task shapes; PRD-worthy)
 
+0. **Precondition: `ralph-sync` directory-handling spike.** Verify `.claude/skills/ralph-sync/sync.sh` correctly propagates files in nested subdirectories under `skills/ralph-run/scripts/` (specifically: `ralph/` package and `tests/` directory). 5-minute spike: create a throwaway `skills/ralph-run/scripts/spike/dummy.txt`, run `ralph-sync classify` then `apply`, verify `~/.claude/skills/ralph-run/scripts/spike/dummy.txt` appears. If sync drops directories, fix sync.sh to recurse before Task 1. If sync handles them already, mark this task Done with a one-line note and proceed. Blocks Task 1.
+
 1. **Scaffold + StatusFile contract.** Add `ralph_orchestrator.py` with PEP 723, `ralph/__init__.py`, `tests/conftest.py`, `tests/test_status.py`. Pydantic `StatusFile` model with golden-file round-trip test (sample bash output JSON → parse → serialize → byte-equal). Add `pyrightconfig.json` strict, `.ruff.toml`. Verify PEP 723 + sibling package imports work via spike.
 
 2. **Port helpers.** Port `usage_check.py` (preserve exit codes 0/1/2 with same stdout). Port `preflight.py` (preconditions). Port `wait_heartbeat.py` (10×1s poll). Unit tests for each. Bash helpers stay in place; Python helpers are unused until Stage 3.
@@ -310,12 +352,13 @@ Port `skills/ralph-run/scripts/ralph.sh` and three helpers (`preflight.sh`, `wai
 
 5. **Port opencode + wire entry point.** `tools/opencode.py`. argparse with exact bash flag names. Entry point: parse args → preflight → orchestrate loop → final status write. Add E2E test against `tests/fixtures/fake_claude.py`.
 
-6. **Strangler integration.** Update `ralph.sh` shim to read `RALPH_IMPL`. Update `skills/ralph-run/SKILL.md` to accept `impl=python|bash` (default `bash`); export `RALPH_IMPL` before launching. Update devcontainer Dockerfile: `RUN curl -LsSf https://astral.sh/uv/install.sh | sh && uv python install 3.14`. Verify `/ralph-sync` handles `ralph/` directory.
+6. **Strangler integration + ralph-init mirror.** Update outer `ralph.sh` shim to read `RALPH_IMPL`. Update `skills/ralph-run/SKILL.md` to accept `impl=python|bash` (default `bash`); export `RALPH_IMPL` before launching. Update live devcontainer `Dockerfile.base` to add uv + Python 3.14 install unconditionally (NOT gated on project language). **R11 mirror at the same time:** `skills/ralph-init/templates/root/ralph.sh` mirrors the live outer shim's dispatch logic; `skills/ralph-init/templates/devcontainer/Dockerfile.base` mirrors the live unconditional uv install. Add one-paragraph Prerequisites note to `skills/ralph-init/SKILL.md` about host-mode uv requirement. Verify `/ralph-sync` correctly propagates `ralph/` subdirectory and `tests/` subdirectory under skill scripts; if not, fix sync.sh (precondition Task 0 may absorb this).
 
-7. **Cutover + cleanup.** Run 5 clean cycles on Python (operator-driven). Flip default in `/ralph-run` SKILL.md and `ralph.sh` shim. Run 5 more clean cycles. Delete bash `ralph.sh` + bash helpers (`preflight.sh`, `wait-heartbeat.sh`, `usage-check.sh`). Update CLAUDE.md Project-Specific section to note bash orchestrator is gone.
+7. **Cutover + cleanup + downstream upgrade.** Run 5 clean cycles on Python (operator-driven). Flip default `RALPH_IMPL=python` in `/ralph-run` SKILL.md, in the live outer `ralph.sh` shim, AND in `skills/ralph-init/templates/root/ralph.sh`. Run 5 more clean cycles. Delete inner bash `ralph.sh` + bash helpers (`preflight.sh`, `wait-heartbeat.sh`, `usage-check.sh`). Outer shim (live + template) simplifies back to 6 lines pointing only at Python. Update CLAUDE.md Project-Specific section to note bash orchestrator is gone. **Communicate downstream:** existing Ralph projects must run `ralph-init upgrade` to re-apply the new shim + Dockerfile.base, or hand-patch those two files. Include explicit upgrade instructions in the task notes.
 
 ### Acceptance criteria sketch (per task; not exhaustive)
 
+- Task 0: ralph-sync spike completed; either sync handles nested directories (Done with note) or sync.sh fixed to recurse with unit/manual test demonstrating directory propagation.
 - Task 1: `tests/test_status.py` passes; golden-file round-trip byte-equal.
 - Task 2: `usage_check.py --buffer 0` returns exit 0 with no output; `--buffer 9999` returns exit 1 with `block_end_in_*` line; bash and Python implementations produce identical exit codes and stdout for same inputs.
 - Task 3: Each helper has ≥1 unit test; pyright strict passes.
