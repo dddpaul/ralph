@@ -8,13 +8,17 @@ from ralph.summary import EXIT_REASONS, RunSummary, format_duration, print_summa
 
 
 def test_exit_reasons_are_the_closed_set() -> None:
-    """AC #7 — exit_reason vocabulary is exactly the five allowed strings.
+    """AC #7 — exit_reason vocabulary is exactly the six allowed strings.
 
     ``"paused"`` mirrors bash's ``EXIT_REASON="paused"`` at ``ralph.sh:724``
     (TASK-161 — block-end pause must read as distinct from clean completion).
+    ``"all specified tasks done"`` mirrors ``ralph.sh:743`` (TASK-162 — every
+    ``--tasks`` whitelist entry completed must read as distinct from the
+    general-queue-empty exit).
     """
     expected = {
         "all tasks done",
+        "all specified tasks done",
         "max iterations reached",
         "error",
         "interrupted",
