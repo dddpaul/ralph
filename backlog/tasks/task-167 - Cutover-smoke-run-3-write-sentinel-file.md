@@ -1,10 +1,10 @@
 ---
 id: TASK-167
 title: 'Cutover smoke run 3: write sentinel file'
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-06-22 16:29'
-updated_date: '2026-06-22 18:18'
+updated_date: '2026-06-22 18:20'
 labels:
   - cutover-smoke
 dependencies: []
@@ -29,4 +29,8 @@ Instructions for ralph: Write the file tests/scripts/cutover-sentinels/run-3.txt
 
 <!-- SECTION:NOTES:BEGIN -->
 Plan: create tests/scripts/cutover-sentinels/run-3.txt with literal 'Cutover smoke run 3'. Both ACs verified post-write via test -f and grep -Fxq.
+
+Commit: `b446a51` - task-167: Write cutover smoke sentinel file run-3.txt
+
+Sentinel written; ACs verified. Reviewer APPROVED (commit b446a51). Merging to master.
 <!-- SECTION:NOTES:END -->
