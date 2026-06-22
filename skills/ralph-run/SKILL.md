@@ -26,12 +26,12 @@ The user may pass overrides as skill arguments. Parse them as space-separated ke
 | verbose | false | --verbose |
 | watch | (none) | — |
 | block_end_buffer_min | 0 | --block-end-buffer-min |
-| impl | bash | (env: RALPH_IMPL) |
+| impl | python | (env: RALPH_IMPL) |
 | max_iterations | 10 | (positional, last arg) |
 
-The `impl` parameter selects the orchestrator implementation: `bash` (default, the canonical `ralph.sh`) or `python` (the in-progress Python port via `ralph_orchestrator.py`). Accepted values: `bash`, `python`. Reject anything else:
+The `impl` parameter selects the orchestrator implementation: `python` (default, the canonical `ralph_orchestrator.py`) or `bash` (the legacy `ralph.sh`, kept as a rollback fallback during the cutover window). Accepted values: `python`, `bash`. Reject anything else:
 ```
-BLOCKED: impl must be bash or python.
+BLOCKED: impl must be python or bash.
 ```
 
 Set `block_end_buffer_min` to N>0 to pause the run when the active 5h Anthropic usage block has <=N minutes remaining. 0 disables the check (default). Requires ccusage to be installed; preflight warns if missing.
@@ -118,7 +118,7 @@ When `block_end_buffer_min > 0`, append `--block-end-buffer-min <N>` to the comm
 
 Launch fully detached, capturing early output to a launch log. **You MUST set `dangerouslyDisableSandbox: true`** on this Bash tool call — ralph.sh needs full OS access (mktemp, /dev/fd, tee, docker) which the sandbox blocks.
 
-Export `RALPH_IMPL=<impl>` in the launch env before invoking `nohup` so the outer shim dispatches to the chosen orchestrator. When `impl=bash` (the default), exporting the value explicitly still works — the shim's `${RALPH_IMPL:-bash}` falls through to the bash branch.
+Export `RALPH_IMPL=<impl>` in the launch env before invoking `nohup` so the outer shim dispatches to the chosen orchestrator. When `impl=python` (the default), exporting the value explicitly still works — the shim's `${RALPH_IMPL:-python}` falls through to the python branch.
 
 ```bash
 LAUNCH_LOG='backlog/.ralph-launch.log'
