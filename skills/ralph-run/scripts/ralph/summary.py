@@ -60,12 +60,25 @@ def print_summary(summary: RunSummary, out: IO[str]) -> None:
     Output is byte-identical (modulo trailing newlines) to the bash
     ``print_summary`` function so log scrapers keyed on these labels keep
     working.
+
+    The ``"max iterations reached"`` exit_reason is rendered with a
+    ``" (N task(s) completed)"`` suffix templated from
+    ``summary.tasks_completed``. Bash equivalent at ``ralph.sh:890``
+    interpolates the count directly into ``EXIT_REASON``; Python keeps
+    :data:`EXIT_REASONS` as a flat closed set (exit-classification state)
+    and templates the count at the presentation boundary. The literal
+    ``"task(s)"`` is intentional — bash does not pluralize.
     """
+    exit_reason_text = summary.exit_reason
+    if summary.exit_reason == "max iterations reached":
+        exit_reason_text = (
+            f"max iterations reached ({summary.tasks_completed} task(s) completed)"
+        )
     print("", file=out)
     print("===============================", file=out)
     print("  Ralph Run Summary", file=out)
     print("===============================", file=out)
-    print(f"Exit reason:        {summary.exit_reason}", file=out)
+    print(f"Exit reason:        {exit_reason_text}", file=out)
     print(f"Tasks completed:    {summary.tasks_completed}", file=out)
     print(f"Tasks remaining:    {summary.tasks_remaining}", file=out)
     print(

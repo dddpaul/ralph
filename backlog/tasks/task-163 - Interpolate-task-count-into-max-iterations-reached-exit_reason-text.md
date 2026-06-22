@@ -1,10 +1,10 @@
 ---
 id: TASK-163
 title: Interpolate task count into 'max iterations reached' exit_reason text
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-22 10:14'
-updated_date: '2026-06-22 10:14'
+updated_date: '2026-06-22 10:32'
 labels:
   - 'feature:ralph-python-refactor'
 dependencies: []
@@ -23,12 +23,22 @@ Option (b) is cleaner because it keeps EXIT_REASONS as a flat closed set (matche
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Run summary prints 'Exit reason: max iterations reached (N task(s) completed)' with N from tasks_completed when state.exit_reason='max iterations reached'
-- [ ] #2 EXIT_REASONS in ralph/summary.py still contains the closed-set string 'max iterations reached' verbatim (no template inside the set)
-- [ ] #3 Test: synthetic max-iter run with tasks_completed=0 asserts summary contains 'max iterations reached (0 task(s) completed)'
-- [ ] #4 Test: synthetic max-iter run with tasks_completed=2 asserts summary contains 'max iterations reached (2 task(s) completed)'
-- [ ] #5 uv run pyright skills/ralph-run/scripts passes
-- [ ] #6 uv run ruff check skills/ralph-run/scripts passes
-- [ ] #7 uv run pytest skills/ralph-run/tests/ passes
-- [ ] #8 Summary text uses the literal 'task(s)' for any tasks_completed value (matching bash ralph.sh:890 which does not pluralize)
+- [x] #1 Run summary prints 'Exit reason: max iterations reached (N task(s) completed)' with N from tasks_completed when state.exit_reason='max iterations reached'
+- [x] #2 EXIT_REASONS in ralph/summary.py still contains the closed-set string 'max iterations reached' verbatim (no template inside the set)
+- [x] #3 Test: synthetic max-iter run with tasks_completed=0 asserts summary contains 'max iterations reached (0 task(s) completed)'
+- [x] #4 Test: synthetic max-iter run with tasks_completed=2 asserts summary contains 'max iterations reached (2 task(s) completed)'
+- [x] #5 uv run pyright skills/ralph-run/scripts passes
+- [x] #6 uv run ruff check skills/ralph-run/scripts passes
+- [x] #7 uv run pytest skills/ralph-run/tests/ passes
+- [x] #8 Summary text uses the literal 'task(s)' for any tasks_completed value (matching bash ralph.sh:890 which does not pluralize)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan: (1) summary.py — when exit_reason == 'max iterations reached', emit 'Exit reason: max iterations reached (N task(s) completed)' where N = summary.tasks_completed (literal 'task(s)', no pluralization, mirrors bash ralph.sh:890). (2) EXIT_REASONS frozenset stays unchanged. (3) Tests: new test_loop_max_iter_summary.py drives loop_module.run through tasks_completed=0 and tasks_completed=2 max-iter exits, captures stdout, asserts the templated summary line. (4) Unit-level coverage in test_summary.py: print_summary with exit_reason='max iterations reached' and tasks_completed=0 and 2.
+
+Commit: `5f366a1` - task-163: Template task count into 'max iterations reached' summary text
+
+Implemented Option (b): print_summary templates the '(N task(s) completed)' suffix when exit_reason='max iterations reached'; EXIT_REASONS closed set is unchanged. Six new tests (two loop-driven, four unit-level). pyright/ruff/pytest all clean (199 passed). task-reviewer: APPROVED.
+<!-- SECTION:NOTES:END -->
