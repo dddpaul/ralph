@@ -4,6 +4,7 @@ title: Cutover to Python orchestrator; delete bash; document downstream upgrade 
 status: To Do
 assignee: []
 created_date: '2026-06-21 13:09'
+updated_date: '2026-06-22 05:30'
 labels:
   - 'feature:ralph-python-refactor'
 dependencies:
@@ -38,4 +39,5 @@ Spec sources:
 - [ ] #10 Task notes include explicit downstream upgrade instructions: existing Ralph projects run `ralph-init upgrade` OR hand-patch their outer `ralph.sh` + `Dockerfile.base` from the template diffs
 - [ ] #11 `uv run pyright skills/ralph-run/scripts` passes
 - [ ] #12 `uv run pytest skills/ralph-run/tests/` passes
+- [ ] #13 Parity test suites (test_preflight_parity.py, test_wait_heartbeat_parity.py, test_usage_check_parity.py) deleted alongside the bash helpers — they cannot pass once the bash side is gone
 <!-- AC:END -->
