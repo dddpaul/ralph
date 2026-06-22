@@ -38,4 +38,6 @@ Plan:
 - Run uv run pytest and uv run ruff check .
 
 Implemented loop._run_loop fall-through: state.exit_code=1 when tasks_completed==0 OR failed_iterations>0 (matches ralph.sh:889-894). Added test_loop_exit_code.py covering AC #3-5. uv run pytest: 181 passed. uv run ruff check .: clean. task-reviewer: APPROVED (cosmetic docstring nit applied).
+
+Commit: `ad6f6ad` - task-159: Match bash exit code on max-iterations fall-through
 <!-- SECTION:NOTES:END -->
