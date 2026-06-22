@@ -2,7 +2,9 @@
 
 Mirrors ``print_summary()`` in ``ralph.sh:304-334``. The exit-reason vocabulary
 is the closed set ``{"all tasks done", "max iterations reached", "error",
-"interrupted"}`` (PRD §6 + TASK-5 historical-context appendix).
+"interrupted", "paused"}``. The ``"paused"`` entry mirrors bash's
+``EXIT_REASON="paused"`` at ``ralph.sh:724`` (block-end usage-cap pause) so
+the summary text distinguishes a clean completion from a forced pause.
 """
 
 from __future__ import annotations
@@ -12,7 +14,7 @@ from dataclasses import dataclass
 from typing import IO
 
 EXIT_REASONS: frozenset[str] = frozenset(
-    {"all tasks done", "max iterations reached", "error", "interrupted"}
+    {"all tasks done", "max iterations reached", "error", "interrupted", "paused"}
 )
 
 
