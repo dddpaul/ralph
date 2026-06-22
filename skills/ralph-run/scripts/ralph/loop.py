@@ -242,7 +242,7 @@ def _run_loop(
             )
             state.failed_iterations += 1
             _update_after_iteration(
-                status, status_path, started_epoch, state, iter_elapsed
+                status, status_path, started_epoch, state, iter_elapsed, whitelist
             )
             installer.raise_if_pending()
             time.sleep(ITER_SLEEP_SEC)
@@ -258,7 +258,7 @@ def _run_loop(
             )
             state.failed_iterations += 1
             _update_after_iteration(
-                status, status_path, started_epoch, state, iter_elapsed
+                status, status_path, started_epoch, state, iter_elapsed, whitelist
             )
             if args.on_error == "stop":
                 state.exit_reason = "error"
@@ -276,7 +276,7 @@ def _run_loop(
 
         state.tasks_completed += 1
         _update_after_iteration(
-            status, status_path, started_epoch, state, iter_elapsed
+            status, status_path, started_epoch, state, iter_elapsed, whitelist
         )
 
         if result.signals.complete:
@@ -313,12 +313,13 @@ def _update_after_iteration(
     started_epoch: int,
     state: _RunState,
     last_iter_dur: int,
+    whitelist: list[str] | None,
 ) -> None:
     status.tasks_done = list(state.tasks_done_ids)
     status.errors = list(state.errors)
     status.last_iteration_duration = last_iter_dur
     status.elapsed = _now_epoch() - started_epoch
-    status.tasks_remaining = tasks_module.count_remaining()
+    status.tasks_remaining = tasks_module.count_remaining(whitelist)
     status.write_atomic(status_path)
 
 
