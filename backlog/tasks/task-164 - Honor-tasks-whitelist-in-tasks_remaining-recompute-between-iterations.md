@@ -1,10 +1,10 @@
 ---
 id: TASK-164
 title: Honor --tasks whitelist in tasks_remaining recompute between iterations
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-06-22 10:14'
-updated_date: '2026-06-22 10:36'
+updated_date: '2026-06-22 10:39'
 labels:
   - 'feature:ralph-python-refactor'
 dependencies: []
@@ -32,10 +32,12 @@ Fix: pass the whitelist argument through to count_remaining() at loop.py:319, mi
 - [x] #7 uv run pytest skills/ralph-run/tests/ passes
 <!-- AC:END -->
 
-
-
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 Plan: 1) Add whitelist param to _update_after_iteration in loop.py and pass it through to count_remaining(); 2) Update all 3 callsites (timeout error, iteration failure, success) to pass whitelist; 3) Write test in test_loop_whitelist_tasks_remaining.py: synthetic 3-task whitelist where after iter 1 → 2 still To Do; assert JSON tasks_remaining=2 between iterations; 4) Add non-whitelist regression test; 5) Run pyright + ruff + pytest.
+
+Commit: `53a08c7` - task-164: Honor --tasks whitelist in tasks_remaining recompute between iterations
+
+Fix applied: _update_after_iteration accepts and forwards whitelist to count_remaining; 3 callsites updated. New test test_loop_whitelist_tasks_remaining.py spies write_atomic to assert every write carries the whitelisted count (2) vs full To Do (99) and pins summary parity. pyright/ruff/pytest all green (201 tests). task-reviewer agent: APPROVED.
 <!-- SECTION:NOTES:END -->
