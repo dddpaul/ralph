@@ -1,10 +1,10 @@
 ---
 id: TASK-169
 title: 'Cutover smoke run 5: write sentinel file'
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-06-22 16:29'
-updated_date: '2026-06-22 18:52'
+updated_date: '2026-06-22 18:53'
 labels:
   - cutover-smoke
 dependencies: []
@@ -25,10 +25,12 @@ Instructions for ralph: Write the file tests/scripts/cutover-sentinels/run-5.txt
 - [x] #2 tests/scripts/cutover-sentinels/run-5.txt contains the literal text 'Cutover smoke run 5'
 <!-- AC:END -->
 
-
-
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 Plan: Create branch task-169. Write tests/scripts/cutover-sentinels/run-5.txt with line 'Cutover smoke run 5'. Verify both ACs. Run task-reviewer agent. Mark Done. Merge.
+
+Commit: `1f5fede` - task-169: Write cutover smoke sentinel file run-5.txt
+
+task-reviewer: APPROVED. Sentinel file written and contents verified (od -c shows literal 'Cutover smoke run 5\n'). Both AC checked.
 <!-- SECTION:NOTES:END -->
