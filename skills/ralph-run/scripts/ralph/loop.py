@@ -200,7 +200,9 @@ def _run_loop(
 
         next_task = tasks_module.pick_next_task(whitelist=whitelist)
         if next_task is None:
-            state.exit_reason = "all tasks done"
+            state.exit_reason = (
+                "all specified tasks done" if whitelist else "all tasks done"
+            )
             state.exit_code = 0
             return
 
