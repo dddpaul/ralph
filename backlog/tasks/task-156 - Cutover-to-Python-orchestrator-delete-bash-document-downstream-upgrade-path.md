@@ -4,7 +4,7 @@ title: Cutover to Python orchestrator; delete bash; document downstream upgrade 
 status: In Progress
 assignee: []
 created_date: '2026-06-21 13:09'
-updated_date: '2026-06-22 16:38'
+updated_date: '2026-06-22 17:55'
 labels:
   - 'feature:ralph-python-refactor'
 dependencies:
@@ -91,4 +91,6 @@ Phase A complete.
 - 10 victim tasks TASK-165..174 created with label 'cutover-smoke' (not feature: so they don't pollute future reviews). Each writes tests/scripts/cutover-sentinels/run-N.txt with deterministic content.
 
 Ready for Phase B (5 runs RALPH_IMPL=python, bash still default).
+
+Commit: `8d7418c` - task-156: Phase A clean-run gate script + 10 smoke victim tasks
 <!-- SECTION:NOTES:END -->
