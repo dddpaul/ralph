@@ -1,10 +1,10 @@
 ---
 id: TASK-172
 title: 'Cutover smoke run 8: write sentinel file'
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-06-22 16:29'
-updated_date: '2026-06-22 20:05'
+updated_date: '2026-06-22 20:06'
 labels:
   - cutover-smoke
 dependencies: []
@@ -25,10 +25,12 @@ Instructions for ralph: Write the file tests/scripts/cutover-sentinels/run-8.txt
 - [x] #2 tests/scripts/cutover-sentinels/run-8.txt contains the literal text 'Cutover smoke run 8'
 <!-- AC:END -->
 
-
-
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 Plan: write tests/scripts/cutover-sentinels/run-8.txt with literal text 'Cutover smoke run 8' (mirrors TASK-171 pattern).
+
+Commit: `a854459` - task-172: Write cutover smoke sentinel file run-8.txt
+
+Task-reviewer: APPROVED. Sentinel file run-8.txt written and tracked. Both ACs pass.
 <!-- SECTION:NOTES:END -->
