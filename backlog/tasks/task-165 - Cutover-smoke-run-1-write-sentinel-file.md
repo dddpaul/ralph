@@ -31,4 +31,6 @@ Instructions for ralph: Write the file tests/scripts/cutover-sentinels/run-1.txt
 Plan: Create tests/scripts/cutover-sentinels/run-1.txt containing the literal line 'Cutover smoke run 1'. Two ACs: file exists; file content matches.
 
 task-reviewer APPROVED: both AC satisfied, diff scoped to exactly the two intended files (task md + sentinel), no R1-R16 violations. Sentinel file at tests/scripts/cutover-sentinels/run-1.txt contains literal 'Cutover smoke run 1' + newline.
+
+Commit: `dc8f5b6` - task-165: Write cutover smoke sentinel file run-1.txt
 <!-- SECTION:NOTES:END -->
