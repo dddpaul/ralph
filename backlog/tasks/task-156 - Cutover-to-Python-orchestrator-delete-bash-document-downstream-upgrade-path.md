@@ -113,4 +113,6 @@ Phase C COMPLETE: default flipped to python in 3 mirror sites.
 - Rollback escape hatch documented in shim header comment: `Set RALPH_IMPL=bash to fall back`
 
 Ready for Phase D (5 more runs with python as default, no RALPH_IMPL= env var).
+
+Commit: `531f130` - task-156: Phase C flip default RALPH_IMPL to python in 3 mirror sites
 <!-- SECTION:NOTES:END -->
