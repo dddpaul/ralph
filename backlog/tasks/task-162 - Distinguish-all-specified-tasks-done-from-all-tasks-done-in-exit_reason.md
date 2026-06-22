@@ -41,4 +41,6 @@ Implementation:
 Plan: extend EXIT_REASONS in ralph/summary.py to add 'all specified tasks done' (6 strings total); update closed-set test_summary.py test to expect the 6th string; branch ralph/loop.py:203 on whitelist truthiness — whitelist set → 'all specified tasks done', else → 'all tasks done' (unchanged); add test_loop_whitelist_summary.py covering AC #5 (whitelist completes → 'all specified tasks done') and AC #6 (no-whitelist regression). Bash parity: ralph.sh:743 (whitelist exhausted) vs ralph.sh:751 (general queue empty).
 
 Implemented: extended EXIT_REASONS to include 'all specified tasks done'; branched ralph/loop.py at pick_next_task=None on whitelist truthiness (whitelist → 'all specified tasks done', else → 'all tasks done' unchanged). Summary already prints raw exit_reason verbatim, so no separate display-mapping needed (mirrors TASK-161 shape). Added tests/test_loop_whitelist_summary.py covering AC #5 (whitelist exhausted) and AC #6 (no-whitelist regression). Updated test_summary.py closed-set test to expect 6 strings. Bash parity: ralph.sh:743 vs ralph.sh:751. uv run pytest tests/ → 193 passed; ruff clean; pyright clean. task-reviewer: APPROVED.
+
+Commit: `f53c6ea` - task-162: Distinguish 'all specified tasks done' from 'all tasks done' in exit_reason
 <!-- SECTION:NOTES:END -->
