@@ -277,6 +277,9 @@ def _run_loop(
         installer.raise_if_pending()
         time.sleep(ITER_SLEEP_SEC)
 
+    if state.tasks_completed == 0 or state.failed_iterations > 0:
+        state.exit_code = 1
+
 
 def _invoke_tool(tool: Tool, prompt: str, timeout_sec: int) -> ToolResult:
     return tool.run(prompt, timeout_sec)
