@@ -192,7 +192,7 @@ def _run_loop(
             status.exit_code = 0
             status.elapsed = _now_epoch() - started_epoch
             status.write_atomic(status_path)
-            state.exit_reason = "all tasks done"  # closed-set sentinel for "exit clean"
+            state.exit_reason = "paused"
             state.exit_code = 0
             return
 
