@@ -1,10 +1,10 @@
 ---
 id: TASK-171
 title: 'Cutover smoke run 7: write sentinel file'
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-06-22 16:29'
-updated_date: '2026-06-22 19:59'
+updated_date: '2026-06-22 20:02'
 labels:
   - cutover-smoke
 dependencies: []
@@ -25,10 +25,12 @@ Instructions for ralph: Write the file tests/scripts/cutover-sentinels/run-7.txt
 - [x] #2 tests/scripts/cutover-sentinels/run-7.txt contains the literal text 'Cutover smoke run 7'
 <!-- AC:END -->
 
-
-
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 Plan: Write the sentinel file tests/scripts/cutover-sentinels/run-7.txt with the single line 'Cutover smoke run 7'. Check off both AC items. This is part of the TASK-156 cutover gate (Phase D run 7).
+
+Commit: `390c594` - task-171: Write cutover smoke sentinel file run-7.txt
+
+Implemented: created tests/scripts/cutover-sentinels/run-7.txt with literal 'Cutover smoke run 7'. Ruff: clean. Pytest: 201 passed. task-reviewer: APPROVED. Commit: 390c594.
 <!-- SECTION:NOTES:END -->
