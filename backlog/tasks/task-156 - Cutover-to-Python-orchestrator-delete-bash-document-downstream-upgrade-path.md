@@ -1,10 +1,10 @@
 ---
 id: TASK-156
 title: Cutover to Python orchestrator; delete bash; document downstream upgrade path
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-06-21 13:09'
-updated_date: '2026-06-22 05:30'
+updated_date: '2026-06-22 17:55'
 labels:
   - 'feature:ralph-python-refactor'
 dependencies:
@@ -27,8 +27,8 @@ Spec sources:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 `tests/scripts/check_run_clean.py --run-only` exists; codifies the 6-check gate (state=completed, exit_code=0, empty errors[], ≥1 task moved To Do→Done, heartbeat fresh throughout sampled every 5s, no leftover child processes)
-- [ ] #2 `tests/scripts/check_run_clean.py --parity bash_status.json python_status.json` exists; performs schema-parity check (field set + types match)
+- [x] #1 `tests/scripts/check_run_clean.py --run-only` exists; codifies the 6-check gate (state=completed, exit_code=0, empty errors[], ≥1 task moved To Do→Done, heartbeat fresh throughout sampled every 5s, no leftover child processes)
+- [x] #2 `tests/scripts/check_run_clean.py --parity bash_status.json python_status.json` exists; performs schema-parity check (field set + types match)
 - [ ] #3 5 consecutive `RALPH_IMPL=python` runs (with default still `bash`) each pass `--run-only`; documented in task notes with run dates and status snapshots
 - [ ] #4 Default flipped to `python` in: live outer `ralph.sh`, `skills/ralph-run/SKILL.md`, `skills/ralph-init/templates/root/ralph.sh` (R11 parity preserved)
 - [ ] #5 5 MORE consecutive clean runs with `python` as default (rollback still possible during this window via `RALPH_IMPL=bash`)
@@ -41,3 +41,56 @@ Spec sources:
 - [ ] #12 `uv run pytest skills/ralph-run/tests/` passes
 - [ ] #13 Parity test suites (test_preflight_parity.py, test_wait_heartbeat_parity.py, test_usage_check_parity.py) deleted alongside the bash helpers — they cannot pass once the bash side is gone
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan:
+
+PHASE A (this session): Infrastructure
+1. Build tests/scripts/check_run_clean.py with --run-only (6-check gate) and --parity modes
+2. Create 10 throwaway gate-victim tasks TASK-165..174 (each: 'Touch tests/scripts/cutover-sentinel-N.txt'). Tiny enough for ralph to land deterministically; exercise full task-pick → MODE: prompt → claude → diff → status full path.
+
+PHASE B: 5 RALPH_IMPL=python runs (bash still default)
+- For each of TASK-165..169: RALPH_IMPL=python ./ralph.sh --tasks <id> 1 → check_run_clean.py --run-only → log result in this notes section
+- AC #3
+
+PHASE C: Flip default to python
+- Edit live outer ralph.sh, skills/ralph-init/templates/root/ralph.sh, skills/ralph-run/SKILL.md
+- AC #4
+
+PHASE D: 5 more runs (default=python)
+- For each of TASK-170..174: ./ralph.sh --tasks <id> 1 → check_run_clean.py --run-only → log result
+- AC #5
+
+PHASE E: Delete bash, cleanup
+- Delete skills/ralph-run/scripts/{ralph.sh,preflight.sh,wait-heartbeat.sh,usage-check.sh}
+- Outer shim back to ~6 lines (live + R11 template mirror)
+- Remove impl= from /ralph-run skill
+- Update CLAUDE.md project-language line
+- Delete 3 parity test suites
+- ACs #6, #7, #8, #9, #13
+
+PHASE F: Docs
+- Downstream upgrade instructions in task notes (ralph-init upgrade OR hand-patch from template diffs)
+- AC #10
+
+PHASE G: Verify + review + merge
+- uv run pyright + ruff + pytest
+- task-reviewer agent
+- Mark Done, merge to master
+- ACs #11, #12
+
+Will pause between phases for the 5+5 runs since each takes ~5-10 min wall clock.
+
+Phase A complete.
+
+- tests/scripts/check_run_clean.py created (stdlib only, PEP 723 inline metadata header).
+  --run-only smoke against backlog/.ralph-status.json from last python run: PASS all 6 checks.
+  --parity smoke against two copies of same file: PASS schema parity (21 fields).
+- 10 victim tasks TASK-165..174 created with label 'cutover-smoke' (not feature: so they don't pollute future reviews). Each writes tests/scripts/cutover-sentinels/run-N.txt with deterministic content.
+
+Ready for Phase B (5 runs RALPH_IMPL=python, bash still default).
+
+Commit: `8d7418c` - task-156: Phase A clean-run gate script + 10 smoke victim tasks
+<!-- SECTION:NOTES:END -->
