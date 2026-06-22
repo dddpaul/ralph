@@ -12,13 +12,20 @@ implementations land in US-004 (``ralph/tools/claude.py``) and US-005
 
 from __future__ import annotations
 
+import subprocess
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
 from ralph.signals import IterationSignals
 
-__all__ = ["Tool", "ToolResult", "IterationSignals"]
+__all__ = ["OnSpawn", "Tool", "ToolResult", "IterationSignals"]
+
+OnSpawn = Callable[[subprocess.Popen[bytes]], None]
+"""Callback invoked synchronously with the live ``Popen`` immediately after
+the tool spawns its subprocess. Used by the orchestrator's signal handler to
+forward SIGTERM/SIGINT to the active child's process group (TASK-160)."""
 
 
 @dataclass(frozen=True)
@@ -53,7 +60,13 @@ class Tool(ABC):
     """
 
     @abstractmethod
-    def run(self, prompt: str, timeout_sec: int) -> ToolResult:
+    def run(
+        self,
+        prompt: str,
+        timeout_sec: int,
+        *,
+        on_spawn: OnSpawn | None = None,
+    ) -> ToolResult:
         """Execute one iteration and return its result.
 
         Args:
@@ -64,6 +77,11 @@ class Tool(ABC):
             timeout_sec: Wall-clock budget for the iteration. Concrete
                 tools MUST kill the subprocess (and its process group) on
                 expiry and surface ``exit_code=124``.
+            on_spawn: Optional callback invoked synchronously with the live
+                ``Popen`` immediately after spawn. The orchestrator hands
+                it ``installer.set_active_subprocess`` so a SIGTERM/SIGINT
+                during ``run()`` can be forwarded to the child's process
+                group (TASK-160, bash parity for ``_kill_children``).
 
         Returns:
             A ``ToolResult`` with the transcript path, exit code, and

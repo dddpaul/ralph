@@ -24,12 +24,11 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from ralph.tools import Tool, ToolResult
+from ralph.tools import OnSpawn, Tool, ToolResult
 from ralph.tools._subprocess import (
     READER_JOIN_SEC,
     TERMINATE_GRACE_SEC,
     TIMEOUT_EXIT_CODE,
-    OnSpawn,
     execute,
     terminate_tree,
 )
@@ -115,8 +114,14 @@ class ClaudeTool(Tool):
         )
         return argv
 
-    def run(self, prompt: str, timeout_sec: int) -> ToolResult:
-        return _execute(self.build_argv(), prompt, timeout_sec)
+    def run(
+        self,
+        prompt: str,
+        timeout_sec: int,
+        *,
+        on_spawn: OnSpawn | None = None,
+    ) -> ToolResult:
+        return _execute(self.build_argv(), prompt, timeout_sec, on_spawn=on_spawn)
 
 
 def _execute(

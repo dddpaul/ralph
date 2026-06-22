@@ -16,7 +16,9 @@ from __future__ import annotations
 
 import os
 import signal
+import subprocess
 import sys
+import threading
 import time
 from contextlib import suppress
 from dataclasses import dataclass, field
@@ -220,10 +222,16 @@ def _run_loop(
         )
 
         done_before = set(tasks_module.done_task_ids())
-        result = _invoke_tool(tool, prompt, timeout_sec)
+        result = _invoke_tool(tool, prompt, timeout_sec, installer)
 
         iter_elapsed = _now_epoch() - iter_start
         state.iter_durations.append(iter_elapsed)
+
+        # A signal pending here means the tool was killed mid-run by the
+        # forwarded SIGTERM (handler at _SignalInstaller._handler). Raise
+        # before the failure accounting so this surfaces as "interrupted"
+        # rather than a generic iteration error.
+        installer.raise_if_pending()
 
         if result.exit_code == TIMEOUT_EXIT_CODE:
             msg = f"Iteration {i} timed out after {args.timeout}m"
@@ -281,8 +289,20 @@ def _run_loop(
         state.exit_code = 1
 
 
-def _invoke_tool(tool: Tool, prompt: str, timeout_sec: int) -> ToolResult:
-    return tool.run(prompt, timeout_sec)
+def _invoke_tool(
+    tool: Tool,
+    prompt: str,
+    timeout_sec: int,
+    installer: _SignalInstaller,
+) -> ToolResult:
+    try:
+        return tool.run(
+            prompt,
+            timeout_sec,
+            on_spawn=installer.set_active_subprocess,
+        )
+    finally:
+        installer.set_active_subprocess(None)
 
 
 def _update_after_iteration(
@@ -352,13 +372,19 @@ def _heartbeat_file_path(project_root: Path) -> Path:
 
 
 class _SignalInstaller:
-    """Install SIGINT/SIGTERM handlers that set a flag the loop polls.
+    """Install SIGINT/SIGTERM handlers that set a flag the loop polls AND
+    forward the signal to the active tool subprocess's process group.
 
-    Polling (instead of raising directly from the handler) keeps the
-    interruption boundary at well-defined points in the iteration —
-    avoids tearing the status file mid-write or stranding a subprocess
-    before the tee has flushed. Bash relied on the trap firing at the
-    next syscall boundary; Python's polling shape is the moral equivalent.
+    The flag-and-poll shape keeps the iteration accounting boundary at
+    well-defined points (``raise_if_pending`` between phases) — avoids
+    tearing the status file mid-write or stranding a subprocess before the
+    tee has flushed.
+
+    Forwarding the signal to the registered subprocess's process group is
+    the TASK-160 parity gap closer: bash's ``_kill_children`` trap
+    (ralph.sh:582-593) walked ``pgrep -P $$`` and SIGTERM'd each direct
+    child immediately. Without this, a SIGTERM mid-``tool.run()`` would
+    leave the child running until its own per-iteration timeout.
     """
 
     def __init__(self) -> None:
@@ -366,6 +392,13 @@ class _SignalInstaller:
         self._prev_int: object = None
         self._prev_term: object = None
         self._installed = False
+        self._active_pgid: int | None = None
+        # RLock (not Lock): Python signal handlers run synchronously on the
+        # main thread. If a signal arrives while the main thread is inside
+        # ``set_active_subprocess``'s ``with self._active_lock:`` block, the
+        # handler runs on top of the same stack and re-acquires the lock —
+        # a non-reentrant Lock would deadlock there.
+        self._active_lock = threading.RLock()
 
     def install(self) -> None:
         self._prev_int = signal.signal(signal.SIGINT, self._handler)
@@ -385,5 +418,46 @@ class _SignalInstaller:
             signum, self._pending = self._pending, 0
             raise _Interrupted(signum=signum)
 
+    def is_pending(self) -> bool:
+        return self._pending != 0
+
+    def set_active_subprocess(
+        self, proc: subprocess.Popen[bytes] | None
+    ) -> None:
+        """Register or clear the currently-active tool subprocess.
+
+        Called by ``_invoke_tool`` via the tool's ``on_spawn`` hook (after
+        the ``Popen``) and again with ``None`` after the tool returns. The
+        signal handler reads the registered pgid to forward SIGTERM.
+
+        Passing a ``Popen`` whose pid has already exited is a no-op — the
+        ``os.getpgid`` lookup raises ``ProcessLookupError`` and we leave
+        the slot empty so a stray late signal can't target a recycled pid.
+
+        Race close: if a SIGINT/SIGTERM arrived AFTER ``Popen`` returned
+        but BEFORE this register call ran, ``_handler`` set ``_pending``
+        with no pgid to forward to. We retry the forward here so the
+        just-registered child is killed promptly instead of running until
+        its per-iteration timeout.
+        """
+        with self._active_lock:
+            if proc is None:
+                self._active_pgid = None
+                return
+            try:
+                self._active_pgid = os.getpgid(proc.pid)
+            except ProcessLookupError:
+                self._active_pgid = None
+            pgid = self._active_pgid
+        if pgid is not None and self._pending:
+            with suppress(ProcessLookupError, PermissionError, OSError):
+                os.killpg(pgid, signal.SIGTERM)
+
     def _handler(self, signum: int, _frame: object) -> None:
         self._pending = signum
+        with self._active_lock:
+            pgid = self._active_pgid
+        if pgid is None:
+            return
+        with suppress(ProcessLookupError, PermissionError, OSError):
+            os.killpg(pgid, signal.SIGTERM)
