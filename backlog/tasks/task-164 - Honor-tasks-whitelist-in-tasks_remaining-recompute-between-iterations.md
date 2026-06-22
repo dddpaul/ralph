@@ -1,9 +1,10 @@
 ---
 id: TASK-164
 title: Honor --tasks whitelist in tasks_remaining recompute between iterations
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-22 10:14'
+updated_date: '2026-06-22 10:39'
 labels:
   - 'feature:ralph-python-refactor'
 dependencies: []
@@ -22,11 +23,21 @@ Fix: pass the whitelist argument through to count_remaining() at loop.py:319, mi
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 _update_after_iteration in ralph/loop.py calls tasks.count_remaining(whitelist=...) with the same whitelist passed to start-of-iteration write
-- [ ] #2 Test: synthetic whitelist run with 3 whitelisted tasks (2 still To Do after iteration 1) — JSON snapshot between iteration 1 and iteration 2 has tasks_remaining=2, NOT the whole To Do count
-- [ ] #3 Test: synthetic non-whitelist run — tasks_remaining behavior unchanged from current (reflects whole queue, no regression)
-- [ ] #4 Run summary's 'Remaining: N tasks' value matches the JSON tasks_remaining field after iteration completes
-- [ ] #5 uv run pyright skills/ralph-run/scripts passes
-- [ ] #6 uv run ruff check skills/ralph-run/scripts passes
-- [ ] #7 uv run pytest skills/ralph-run/tests/ passes
+- [x] #1 _update_after_iteration in ralph/loop.py calls tasks.count_remaining(whitelist=...) with the same whitelist passed to start-of-iteration write
+- [x] #2 Test: synthetic whitelist run with 3 whitelisted tasks (2 still To Do after iteration 1) — JSON snapshot between iteration 1 and iteration 2 has tasks_remaining=2, NOT the whole To Do count
+- [x] #3 Test: synthetic non-whitelist run — tasks_remaining behavior unchanged from current (reflects whole queue, no regression)
+- [x] #4 Run summary's 'Remaining: N tasks' value matches the JSON tasks_remaining field after iteration completes
+- [x] #5 uv run pyright skills/ralph-run/scripts passes
+- [x] #6 uv run ruff check skills/ralph-run/scripts passes
+- [x] #7 uv run pytest skills/ralph-run/tests/ passes
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan: 1) Add whitelist param to _update_after_iteration in loop.py and pass it through to count_remaining(); 2) Update all 3 callsites (timeout error, iteration failure, success) to pass whitelist; 3) Write test in test_loop_whitelist_tasks_remaining.py: synthetic 3-task whitelist where after iter 1 → 2 still To Do; assert JSON tasks_remaining=2 between iterations; 4) Add non-whitelist regression test; 5) Run pyright + ruff + pytest.
+
+Commit: `53a08c7` - task-164: Honor --tasks whitelist in tasks_remaining recompute between iterations
+
+Fix applied: _update_after_iteration accepts and forwards whitelist to count_remaining; 3 callsites updated. New test test_loop_whitelist_tasks_remaining.py spies write_atomic to assert every write carries the whitelisted count (2) vs full To Do (99) and pins summary parity. pyright/ruff/pytest all green (201 tests). task-reviewer agent: APPROVED.
+<!-- SECTION:NOTES:END -->
