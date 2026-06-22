@@ -1,9 +1,10 @@
 ---
 id: TASK-166
 title: 'Cutover smoke run 2: write sentinel file'
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-06-22 16:29'
+updated_date: '2026-06-22 18:03'
 labels:
   - cutover-smoke
 dependencies: []
@@ -20,6 +21,14 @@ Instructions for ralph: Write the file tests/scripts/cutover-sentinels/run-2.txt
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 tests/scripts/cutover-sentinels/run-2.txt exists
-- [ ] #2 tests/scripts/cutover-sentinels/run-2.txt contains the literal text 'Cutover smoke run 2'
+- [x] #1 tests/scripts/cutover-sentinels/run-2.txt exists
+- [x] #2 tests/scripts/cutover-sentinels/run-2.txt contains the literal text 'Cutover smoke run 2'
 <!-- AC:END -->
+
+
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan: Create tests/scripts/cutover-sentinels/run-2.txt with the single line 'Cutover smoke run 2'. Verify file exists and matches the literal content.
+<!-- SECTION:NOTES:END -->
