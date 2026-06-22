@@ -1,10 +1,10 @@
 ---
 id: TASK-155
 title: Wire RALPH_IMPL dispatch in outer shim and mirror to ralph-init templates
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-06-21 13:09'
-updated_date: '2026-06-21 14:45'
+updated_date: '2026-06-22 05:02'
 labels:
   - 'feature:ralph-python-refactor'
 dependencies:
@@ -32,12 +32,27 @@ R11 scope: the canonical orchestrator (`skills/ralph-run/scripts/ralph.sh` and i
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Live outer `ralph.sh` updated to ~10 lines: dispatch on `RALPH_IMPL` env var (default `bash`); python branch runs `uv run skills/ralph-run/scripts/ralph_orchestrator.py "$@"`; bash branch runs the existing inner script
-- [ ] #2 `skills/ralph-run/SKILL.md` accepts `impl=python|bash` arg (default `bash`); exports `RALPH_IMPL` before `nohup`
-- [ ] #3 R11 mirror: `skills/ralph-init/templates/root/ralph.sh` matches live outer shim byte-for-byte modulo path differences
-- [ ] #4 Manual smoke test 1: `RALPH_IMPL=python /ralph-run impl=python tasks=<noop-id> watch=false` launches Python orchestrator and runs to completion
-- [ ] #5 Manual smoke test 2: `/ralph-run` with no impl arg still launches the bash orchestrator (default unchanged at this stage)
-- [ ] #6 `uv run pyright skills/ralph-run/scripts` passes
-- [ ] #7 `uv run pytest skills/ralph-run/tests/` passes
-- [ ] #8 Devcontainer uv + Python 3.14 toolchain is present (precondition from TASK-158) — verified by `devcontainer exec --workspace-folder . uv --version` and `devcontainer exec --workspace-folder . uv run python -c 'import sys; print(sys.version_info[:2])'` reporting `(3, 14)`
+- [x] #1 Live outer `ralph.sh` updated to ~10 lines: dispatch on `RALPH_IMPL` env var (default `bash`); python branch runs `uv run skills/ralph-run/scripts/ralph_orchestrator.py "$@"`; bash branch runs the existing inner script
+- [x] #2 `skills/ralph-run/SKILL.md` accepts `impl=python|bash` arg (default `bash`); exports `RALPH_IMPL` before `nohup`
+- [x] #3 R11 mirror: `skills/ralph-init/templates/root/ralph.sh` matches live outer shim byte-for-byte modulo path differences
+- [x] #4 Manual smoke test 1: `RALPH_IMPL=python /ralph-run impl=python tasks=<noop-id> watch=false` launches Python orchestrator and runs to completion
+- [x] #5 Manual smoke test 2: `/ralph-run` with no impl arg still launches the bash orchestrator (default unchanged at this stage)
+- [x] #6 `uv run pyright skills/ralph-run/scripts` passes
+- [x] #7 `uv run pytest skills/ralph-run/tests/` passes
+- [x] #8 Devcontainer uv + Python 3.14 toolchain is present (precondition from TASK-158) — verified by `devcontainer exec --workspace-folder . uv --version` and `devcontainer exec --workspace-folder . uv run python -c 'import sys; print(sys.version_info[:2])'` reporting `(3, 14)`
 <!-- AC:END -->
+
+
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan:
+1. Update live outer ralph.sh (/workspace/ralph.sh) to ~10 lines: dispatch on RALPH_IMPL env var (default bash); python branch execs 'uv run skills/ralph-run/scripts/ralph_orchestrator.py'; bash branch execs the existing inner script.
+2. Mirror the same shim to skills/ralph-init/templates/root/ralph.sh (R11 parity; byte-identical).
+3. Update skills/ralph-run/SKILL.md Step 1 default table to add 'impl' parameter (default bash); update Step 4 Launch to export RALPH_IMPL=<impl> before nohup; add invocation examples.
+4. Run uv run pyright skills/ralph-run/scripts and uv run pytest skills/ralph-run/tests/.
+5. Smoke verify dispatch behavior locally (head-style: test that ralph.sh exec arg-list resolves to the python path when RALPH_IMPL=python, and to the inner bash path otherwise). Document smoke results in task notes.
+6. Verify devcontainer uv + Python 3.14 toolchain is present (AC #8).
+7. Check off ACs and request task-reviewer.
+<!-- SECTION:NOTES:END -->

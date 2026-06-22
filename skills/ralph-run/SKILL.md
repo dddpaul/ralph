@@ -26,7 +26,13 @@ The user may pass overrides as skill arguments. Parse them as space-separated ke
 | verbose | false | --verbose |
 | watch | (none) | — |
 | block_end_buffer_min | 0 | --block-end-buffer-min |
+| impl | bash | (env: RALPH_IMPL) |
 | max_iterations | 10 | (positional, last arg) |
+
+The `impl` parameter selects the orchestrator implementation: `bash` (default, the canonical `ralph.sh`) or `python` (the in-progress Python port via `ralph_orchestrator.py`). Accepted values: `bash`, `python`. Reject anything else:
+```
+BLOCKED: impl must be bash or python.
+```
 
 Set `block_end_buffer_min` to N>0 to pause the run when the active 5h Anthropic usage block has <=N minutes remaining. 0 disables the check (default). Requires ccusage to be installed; preflight warns if missing.
 
@@ -58,6 +64,7 @@ The `tasks` parameter accepts comma-separated numeric task IDs only (e.g. `62,64
 - `/ralph-run tasks=62,64,65 max_iterations=3`
 - `/ralph-run watch=5m` — launch with automatic 5-minute progress alerts
 - `/ralph-run tasks=70 watch=2m max_iterations=3` — watch with custom interval
+- `/ralph-run impl=python tasks=70 watch=false` — launch the Python orchestrator (strangler-fig dispatch via `RALPH_IMPL`)
 
 ---
 
@@ -111,9 +118,11 @@ When `block_end_buffer_min > 0`, append `--block-end-buffer-min <N>` to the comm
 
 Launch fully detached, capturing early output to a launch log. **You MUST set `dangerouslyDisableSandbox: true`** on this Bash tool call — ralph.sh needs full OS access (mktemp, /dev/fd, tee, docker) which the sandbox blocks.
 
+Export `RALPH_IMPL=<impl>` in the launch env before invoking `nohup` so the outer shim dispatches to the chosen orchestrator. When `impl=bash` (the default), exporting the value explicitly still works — the shim's `${RALPH_IMPL:-bash}` falls through to the bash branch.
+
 ```bash
 LAUNCH_LOG='backlog/.ralph-launch.log'
-nohup $RALPH_CMD > "$LAUNCH_LOG" 2>&1 & disown
+RALPH_IMPL=<impl> nohup $RALPH_CMD > "$LAUNCH_LOG" 2>&1 & disown
 RALPH_PID=$!
 ```
 
