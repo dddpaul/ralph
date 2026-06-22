@@ -17,12 +17,11 @@ import subprocess
 import sys
 import tempfile
 import threading
-from collections.abc import Callable
 from pathlib import Path
 from typing import IO, Final
 
 from ralph.signals import parse_file
-from ralph.tools import ToolResult
+from ralph.tools import OnSpawn, ToolResult
 
 TIMEOUT_EXIT_CODE: Final[int] = 124
 """Exit code GNU ``timeout`` uses; the orchestrator's main loop branches on
@@ -40,9 +39,6 @@ READER_JOIN_SEC: Final[int] = 2
 thread is a daemon so a hung pipe never strands the orchestrator; the join
 is a best-effort drain so the tee file is fully flushed before
 ``parse_file`` reads it."""
-
-OnSpawn = Callable[[subprocess.Popen[bytes]], None]
-
 
 def execute(
     argv: list[str],

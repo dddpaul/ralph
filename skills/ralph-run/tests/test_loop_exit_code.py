@@ -22,7 +22,7 @@ import pytest
 from ralph import loop as loop_module
 from ralph.args import ParsedArgs
 from ralph.signals import IterationSignals
-from ralph.tools import Tool, ToolResult
+from ralph.tools import OnSpawn, Tool, ToolResult
 
 
 def _args(max_iterations: int = 2) -> ParsedArgs:
@@ -49,8 +49,14 @@ class _ScriptedTool(Tool):
         self._results = results
         self._calls = 0
 
-    def run(self, prompt: str, timeout_sec: int) -> ToolResult:
-        _ = (prompt, timeout_sec)
+    def run(
+        self,
+        prompt: str,
+        timeout_sec: int,
+        *,
+        on_spawn: OnSpawn | None = None,
+    ) -> ToolResult:
+        _ = (prompt, timeout_sec, on_spawn)
         idx = min(self._calls, len(self._results) - 1)
         self._calls += 1
         return self._results[idx]

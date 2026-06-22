@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ralph.tools import Tool, ToolResult
+from ralph.tools import OnSpawn, Tool, ToolResult
 from ralph.tools._subprocess import execute
 
 __all__ = ["OpencodeTool"]
@@ -73,10 +73,17 @@ class OpencodeTool(Tool):
         argv.extend(["opencode", "run", prompt])
         return argv
 
-    def run(self, prompt: str, timeout_sec: int) -> ToolResult:
+    def run(
+        self,
+        prompt: str,
+        timeout_sec: int,
+        *,
+        on_spawn: OnSpawn | None = None,
+    ) -> ToolResult:
         return execute(
             self.build_argv(prompt),
             prompt="",
             timeout_sec=timeout_sec,
             tee_prefix=_TEE_PREFIX,
+            on_spawn=on_spawn,
         )

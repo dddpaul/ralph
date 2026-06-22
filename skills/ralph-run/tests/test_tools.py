@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from ralph.signals import IterationSignals
-from ralph.tools import Tool, ToolResult
+from ralph.tools import OnSpawn, Tool, ToolResult
 
 
 def test_tool_is_abstract() -> None:
@@ -23,10 +23,20 @@ def test_tool_is_abstract() -> None:
 def test_run_signature() -> None:
     sig = inspect.signature(Tool.run)
     params = list(sig.parameters.values())
-    # ``self``, ``prompt: str``, ``timeout_sec: int``
-    assert [p.name for p in params] == ["self", "prompt", "timeout_sec"]
+    # ``self``, ``prompt: str``, ``timeout_sec: int``, keyword-only ``on_spawn``
+    assert [p.name for p in params] == [
+        "self",
+        "prompt",
+        "timeout_sec",
+        "on_spawn",
+    ]
     # ``from __future__ import annotations`` keeps annotations as strings.
     assert sig.return_annotation == "ToolResult"
+    # ``on_spawn`` is keyword-only with a None default — the orchestrator
+    # passes ``installer.set_active_subprocess`` (TASK-160).
+    on_spawn = sig.parameters["on_spawn"]
+    assert on_spawn.kind == inspect.Parameter.KEYWORD_ONLY
+    assert on_spawn.default is None
 
 
 def test_tool_result_fields() -> None:
@@ -55,8 +65,14 @@ def test_tool_result_is_frozen() -> None:
 
 def test_concrete_subclass_runs() -> None:
     class _StubTool(Tool):
-        def run(self, prompt: str, timeout_sec: int) -> ToolResult:
-            _ = (prompt, timeout_sec)
+        def run(
+            self,
+            prompt: str,
+            timeout_sec: int,
+            *,
+            on_spawn: OnSpawn | None = None,
+        ) -> ToolResult:
+            _ = (prompt, timeout_sec, on_spawn)
             return ToolResult(
                 stdout_path=Path("/tmp/x"),
                 exit_code=0,
