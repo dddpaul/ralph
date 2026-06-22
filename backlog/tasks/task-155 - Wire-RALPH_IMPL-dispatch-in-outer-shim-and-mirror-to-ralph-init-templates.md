@@ -1,10 +1,10 @@
 ---
 id: TASK-155
 title: Wire RALPH_IMPL dispatch in outer shim and mirror to ralph-init templates
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-06-21 13:09'
-updated_date: '2026-06-22 05:02'
+updated_date: '2026-06-22 05:06'
 labels:
   - 'feature:ralph-python-refactor'
 dependencies:
@@ -42,8 +42,6 @@ R11 scope: the canonical orchestrator (`skills/ralph-run/scripts/ralph.sh` and i
 - [x] #8 Devcontainer uv + Python 3.14 toolchain is present (precondition from TASK-158) — verified by `devcontainer exec --workspace-folder . uv --version` and `devcontainer exec --workspace-folder . uv run python -c 'import sys; print(sys.version_info[:2])'` reporting `(3, 14)`
 <!-- AC:END -->
 
-
-
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
@@ -55,4 +53,22 @@ Plan:
 5. Smoke verify dispatch behavior locally (head-style: test that ralph.sh exec arg-list resolves to the python path when RALPH_IMPL=python, and to the inner bash path otherwise). Document smoke results in task notes.
 6. Verify devcontainer uv + Python 3.14 toolchain is present (AC #8).
 7. Check off ACs and request task-reviewer.
+
+Commit: `c1041aa` - task-155: Wire RALPH_IMPL strangler dispatch in outer shim and ralph-init mirror
+
+Implementation complete:
+- Live outer ralph.sh: 10 lines, dispatches on RALPH_IMPL env var (default bash). Python branch execs 'uv run skills/ralph-run/scripts/ralph_orchestrator.py'; bash branch execs canonical inner ralph.sh.
+- R11 mirror: skills/ralph-init/templates/root/ralph.sh is byte-identical (verified via diff = empty).
+- skills/ralph-run/SKILL.md: added impl parameter to defaults table (default bash) with validation rule, added invocation example, and added 'RALPH_IMPL=<impl> nohup ...' to Step 4 Launch.
+
+Smoke verification:
+- AC #5 (default → bash): CLAUDE_CONFIG_DIR=/workspace /workspace/ralph.sh --help → reaches canonical bash ralph.sh (prints bash --help text). exit=0.
+- AC #4 (RALPH_IMPL=python → python): CLAUDE_CONFIG_DIR=/workspace RALPH_IMPL=python /workspace/ralph.sh --help → reaches ralph_orchestrator.py (prints argparse usage). exit=0.
+- Stub smoke also exercised RALPH_IMPL=bash explicitly and confirmed it falls through to the bash branch.
+
+AC #6: uv run pyright skills/ralph-run/scripts → 0 errors, 0 warnings.
+AC #7: uv run pytest skills/ralph-run/tests/ → 178 passed in 52.26s.
+AC #8: uv --version → 0.11.23; uv run python -c 'import sys; print(sys.version_info[:2])' → (3, 14). Precondition from TASK-158 confirmed in devcontainer.
+
+task-reviewer: APPROVED.
 <!-- SECTION:NOTES:END -->
