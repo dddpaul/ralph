@@ -1,10 +1,10 @@
 ---
 id: TASK-174
 title: 'Cutover smoke run 10: write sentinel file'
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-06-22 16:29'
-updated_date: '2026-06-23 05:16'
+updated_date: '2026-06-23 05:17'
 labels:
   - cutover-smoke
 dependencies: []
@@ -25,10 +25,12 @@ Instructions for ralph: Write the file tests/scripts/cutover-sentinels/run-10.tx
 - [x] #2 tests/scripts/cutover-sentinels/run-10.txt contains the literal text 'Cutover smoke run 10'
 <!-- AC:END -->
 
-
-
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 Plan: create tests/scripts/cutover-sentinels/run-10.txt with the single line 'Cutover smoke run 10' matching the pattern of run-1..9.txt.
+
+Commit: `d6d68c6` - task-174: Write cutover smoke sentinel file run-10.txt
+
+Reviewer: APPROVED. Both ACs satisfied byte-perfectly; sentinel matches run-1..9 pattern exactly (21 bytes, single line + trailing newline). Diff scope: task markdown + new sentinel file only.
 <!-- SECTION:NOTES:END -->
