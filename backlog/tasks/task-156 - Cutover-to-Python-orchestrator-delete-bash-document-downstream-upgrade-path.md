@@ -4,7 +4,7 @@ title: Cutover to Python orchestrator; delete bash; document downstream upgrade 
 status: In Progress
 assignee: []
 created_date: '2026-06-21 13:09'
-updated_date: '2026-06-22 19:02'
+updated_date: '2026-06-23 05:55'
 labels:
   - 'feature:ralph-python-refactor'
 dependencies:
@@ -31,7 +31,7 @@ Spec sources:
 - [x] #2 `tests/scripts/check_run_clean.py --parity bash_status.json python_status.json` exists; performs schema-parity check (field set + types match)
 - [x] #3 5 consecutive `RALPH_IMPL=python` runs (with default still `bash`) each pass `--run-only`; documented in task notes with run dates and status snapshots
 - [x] #4 Default flipped to `python` in: live outer `ralph.sh`, `skills/ralph-run/SKILL.md`, `skills/ralph-init/templates/root/ralph.sh` (R11 parity preserved)
-- [ ] #5 5 MORE consecutive clean runs with `python` as default (rollback still possible during this window via `RALPH_IMPL=bash`)
+- [x] #5 5 MORE consecutive clean runs with `python` as default (rollback still possible during this window via `RALPH_IMPL=bash`)
 - [ ] #6 Delete inner bash: `skills/ralph-run/scripts/ralph.sh`, `preflight.sh`, `wait-heartbeat.sh`, `usage-check.sh`
 - [ ] #7 Outer shim simplifies back to ~6 lines pointing only at the Python orchestrator (live + R11 template mirror)
 - [ ] #8 `/ralph-run` skill `impl=` parameter removed (no longer needed)
@@ -115,4 +115,16 @@ Phase C COMPLETE: default flipped to python in 3 mirror sites.
 Ready for Phase D (5 more runs with python as default, no RALPH_IMPL= env var).
 
 Commit: `531f130` - task-156: Phase C flip default RALPH_IMPL to python in 3 mirror sites
+
+Phase D run 6 (TASK-170): PASS all 6 checks. Elapsed=114s, tasks_done=['TASK-170']. python is now the implicit default — confirmed by absence of RALPH_IMPL= env var.
+
+Phase D run 7 (TASK-171): PASS all 6 gate checks. Elapsed 225s, exit_code=0, tasks_done=[TASK-171].
+
+Phase D run 8 (TASK-172): PASS all 6 gate checks. Elapsed 186s, exit_code=0, tasks_done=[TASK-172].
+
+Phase D run 9 (TASK-173): PASS all 6 gate checks. Elapsed 142s, exit_code=0, tasks_done=[TASK-173].
+
+Phase D run 10 (TASK-174): PASS all 6 gate checks. Elapsed 150s, exit_code=0, tasks_done=[TASK-174]. Phase D complete — 10/10 smoke runs PASS (5 pre-flip with RALPH_IMPL=python explicit, 5 post-flip with python as the implicit default).
+
+Phase E follow-up identified (not blocking today's downstream test): (1) /ralph-run SKILL.md drops 'bash <absolute-path-to-scripts/preflight.sh>' and 'bash <absolute-path-to-scripts/wait-heartbeat.sh>' direct invocations once orchestrator handles them; (2) skills/ralph-init/SKILL.md drops the preflight.sh and wait-heartbeat.sh narrow-rule jq merge (utc-to-moscow.sh stays — still used by /ralph-status). Orphan rules in existing settings.local.json are harmless deadweight. Today's settings.local.json template is sufficient for downstream upgrade-mode test because Bash(nohup ./ralph.sh:*) covers the launch path; permission check is at the Bash tool layer, not the exec'd process.
 <!-- SECTION:NOTES:END -->
