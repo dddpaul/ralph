@@ -27,6 +27,7 @@ from pathlib import Path
 
 from ralph import tasks as tasks_module
 from ralph.args import ParsedArgs, timeout_to_seconds
+from ralph.devcontainer import start_devcontainer
 from ralph.heartbeat import Heartbeat
 from ralph.prompts import build_prompt
 from ralph.status import ErrorEntry, StatusFile
@@ -109,6 +110,11 @@ def run(args: ParsedArgs, project_root: Path) -> int:
             are anchored here.
     """
     prompt_file_body = load_prompt_file(args.prompt_file) if args.prompt_file else None
+
+    if args.devcontainer:
+        rc = start_devcontainer(project_root)
+        if rc != 0:
+            return rc
 
     status_path = _status_file_path(project_root)
     heartbeat_path = _heartbeat_file_path(project_root)
