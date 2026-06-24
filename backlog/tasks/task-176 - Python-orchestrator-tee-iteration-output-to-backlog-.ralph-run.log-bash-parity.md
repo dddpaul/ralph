@@ -3,10 +3,10 @@ id: TASK-176
 title: >-
   Python orchestrator: tee iteration output to backlog/.ralph-run.log (bash
   parity)
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-06-24 10:49'
-updated_date: '2026-06-24 11:43'
+updated_date: '2026-06-24 11:47'
 labels:
   - bug
 dependencies: []
@@ -79,8 +79,6 @@ If anything is unclear or any check fails: STOP and ask the user.
 - [x] #8 Python orchestrator honors RALPH_RUN_LOG env override; falls back to <project_root>/backlog/.ralph-run.log when unset (mirrors ralph.sh:461 \${RALPH_RUN_LOG:-...} default). Verifiable by test that sets RALPH_RUN_LOG=<tmp_path>/custom.log and asserts that path receives the appended output.
 <!-- AC:END -->
 
-
-
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
@@ -89,4 +87,17 @@ Plan:
 2. tools/claude.py + tools/opencode.py: constructors accept run_log_path; forward to execute().
 3. tools/_subprocess.py: execute() opens run_log_path append-binary alongside the tempfile; _spawn_and_stream / _stream_to_tee write each line to BOTH the tempfile AND the run log (tempfile preserved per AC #4); writes are best-effort, OSError suppressed.
 4. tests/test_loop_run_log.py: 2-iter fake_claude run → assert backlog/.ralph-run.log exists, non-empty, grew between iterations (AC #5, #6); RALPH_RUN_LOG override test (AC #8).
+
+Commit: `74b290c` - task-176: Python orchestrator tees iteration output to backlog/.ralph-run.log
+
+Implementation:
+- loop.py: _run_log_file_path() honors RALPH_RUN_LOG env (parity ralph.sh:461); _truncate_run_log() ': > $RUN_LOG' parity (ralph.sh:692); plumbs run_log_path through build_tool().
+- tools/{claude,opencode}.py: constructors accept run_log_path; forward to execute().
+- tools/_subprocess.py: execute() opens run_log_path 'ab' alongside the tempfile via ExitStack; _stream_to_tee writes each line to BOTH targets; tempfile.mkstemp call preserved per AC #4.
+- tests/test_loop_run_log.py: 2-iter fake_claude run (task_done_no_summary mode) → banner-count==2 proves file grew (AC #3/#5/#6); RALPH_RUN_LOG override test (AC #8).
+
+Verification:
+- Full suite: 209/209 passed (uv run pytest)
+- Lint: ruff clean on all 5 changed files
+- task-reviewer: APPROVED (8/8 ACs verified, scope narrow, no parity-mirror collateral)
 <!-- SECTION:NOTES:END -->
