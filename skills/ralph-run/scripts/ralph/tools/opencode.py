@@ -40,6 +40,7 @@ class OpencodeTool(Tool):
         *,
         devcontainer: bool = False,
         workspace_folder: Path | None = None,
+        run_log_path: Path | None = None,
     ) -> None:
         if devcontainer and workspace_folder is None:
             raise ValueError(
@@ -47,6 +48,7 @@ class OpencodeTool(Tool):
             )
         self._devcontainer = devcontainer
         self._workspace_folder = workspace_folder
+        self._run_log_path = run_log_path
 
     def build_argv(self, prompt: str) -> list[str]:
         """Assemble the argv list for this iteration's subprocess.
@@ -86,4 +88,5 @@ class OpencodeTool(Tool):
             timeout_sec=timeout_sec,
             tee_prefix=_TEE_PREFIX,
             on_spawn=on_spawn,
+            run_log_path=self._run_log_path,
         )

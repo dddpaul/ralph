@@ -47,6 +47,7 @@ def execute(
     *,
     tee_prefix: str,
     on_spawn: OnSpawn | None = None,
+    run_log_path: Path | None = None,
 ) -> ToolResult:
     """Spawn ``argv``, tee its combined stdout/stderr, return a ``ToolResult``.
 
@@ -62,6 +63,12 @@ def execute(
             (e.g. ``"ralph-claude-"`` or ``"ralph-opencode-"``).
         on_spawn: Test hook invoked synchronously with the live ``Popen``
             immediately after launch.
+        run_log_path: Project-rooted run log to append to in addition to the
+            per-iteration tempfile. Parity with ``ralph.sh:692``'s
+            ``exec > >(tee -a "$RUN_LOG")`` so downstream consumers (e.g.
+            ``wait_heartbeat.py``) can ``tail`` a single canonical file
+            across iterations. Per-iteration tempfile is still produced for
+            sentinel parsing (TASK-176 AC #4).
 
     Returns:
         A :class:`ralph.tools.ToolResult` with the tee path, the resolved
@@ -70,9 +77,13 @@ def execute(
     tee_fd, tee_path_str = tempfile.mkstemp(prefix=tee_prefix, suffix=".out")
     tee_path = Path(tee_path_str)
 
-    with os.fdopen(tee_fd, "wb") as tee_file:
+    with contextlib.ExitStack() as stack:
+        tee_file = stack.enter_context(os.fdopen(tee_fd, "wb"))
+        run_log_file: IO[bytes] | None = None
+        if run_log_path is not None:
+            run_log_file = stack.enter_context(run_log_path.open("ab"))
         exit_code = _spawn_and_stream(
-            argv, prompt, timeout_sec, tee_file, on_spawn
+            argv, prompt, timeout_sec, tee_file, on_spawn, run_log_file
         )
 
     signals = parse_file(tee_path)
@@ -85,6 +96,7 @@ def _spawn_and_stream(
     timeout_sec: int,
     tee_file: IO[bytes],
     on_spawn: OnSpawn | None,
+    run_log_file: IO[bytes] | None = None,
 ) -> int:
     proc = subprocess.Popen(
         argv,
@@ -108,7 +120,7 @@ def _spawn_and_stream(
 
     reader = threading.Thread(
         target=_stream_to_tee,
-        args=(proc.stdout, tee_file),
+        args=(proc.stdout, tee_file, run_log_file),
         name="ralph-tool-stdout",
         daemon=True,
     )
@@ -123,13 +135,20 @@ def _spawn_and_stream(
         reader.join(timeout=READER_JOIN_SEC)
         with contextlib.suppress(OSError):
             tee_file.flush()
+        if run_log_file is not None:
+            with contextlib.suppress(OSError):
+                run_log_file.flush()
 
     return exit_code
 
 
-def _stream_to_tee(stdout: IO[bytes] | None, tee_file: IO[bytes]) -> None:
-    """Drain ``stdout`` line-by-line, mirroring each line into ``tee_file`` AND
-    ``sys.stdout``.
+def _stream_to_tee(
+    stdout: IO[bytes] | None,
+    tee_file: IO[bytes],
+    run_log_file: IO[bytes] | None = None,
+) -> None:
+    """Drain ``stdout`` line-by-line, mirroring each line into ``tee_file``,
+    ``sys.stdout``, and (when set) the project-rooted ``run_log_file``.
 
     Line-iteration (``iter(readline, b"")``) is the real-time sentinel-
     scanner contract: each line reaches the tee file immediately, so a post-
@@ -145,6 +164,12 @@ def _stream_to_tee(stdout: IO[bytes] | None, tee_file: IO[bytes]) -> None:
             tee_file.flush()
         except OSError:
             pass
+        if run_log_file is not None:
+            try:
+                run_log_file.write(line)
+                run_log_file.flush()
+            except OSError:
+                pass
         if out_bytes is not None:
             try:
                 out_bytes.write(line)

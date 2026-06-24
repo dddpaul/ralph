@@ -70,18 +70,25 @@ class _RunState:
     exit_code: int = 0
 
 
-def build_tool(args: ParsedArgs, project_root: Path) -> Tool:
+def build_tool(
+    args: ParsedArgs,
+    project_root: Path,
+    *,
+    run_log_path: Path | None = None,
+) -> Tool:
     """Construct the concrete :class:`Tool` for ``args.tool``."""
     if args.tool == "opencode":
         return OpencodeTool(
             devcontainer=args.devcontainer,
             workspace_folder=project_root if args.devcontainer else None,
+            run_log_path=run_log_path,
         )
     return ClaudeTool(
         model=args.model,
         effort=args.effort,
         devcontainer=args.devcontainer,
         workspace_folder=project_root if args.devcontainer else None,
+        run_log_path=run_log_path,
     )
 
 
@@ -118,6 +125,8 @@ def run(args: ParsedArgs, project_root: Path) -> int:
 
     status_path = _status_file_path(project_root)
     heartbeat_path = _heartbeat_file_path(project_root)
+    run_log_path = _run_log_file_path(project_root)
+    _truncate_run_log(run_log_path)
     timeout_sec = timeout_to_seconds(args.timeout)
 
     state = _RunState()
@@ -143,7 +152,7 @@ def run(args: ParsedArgs, project_root: Path) -> int:
     )
     status.write_atomic(status_path)
 
-    tool = build_tool(args, project_root)
+    tool = build_tool(args, project_root, run_log_path=run_log_path)
     installer = _SignalInstaller()
     installer.install()
     try:
@@ -378,6 +387,29 @@ def _heartbeat_file_path(project_root: Path) -> Path:
     if env:
         return Path(env)
     return project_root / "backlog" / ".ralph-heartbeat"
+
+
+def _run_log_file_path(project_root: Path) -> Path:
+    """Resolve the project-rooted run log path; honor ``RALPH_RUN_LOG`` env.
+
+    Parity with ``ralph.sh:461``:
+    ``RUN_LOG="${RALPH_RUN_LOG:-${RALPH_PROJECT_ROOT:-$SCRIPT_DIR}/backlog/.ralph-run.log}"``.
+    """
+    env = os.environ.get("RALPH_RUN_LOG")
+    if env:
+        return Path(env)
+    return project_root / "backlog" / ".ralph-run.log"
+
+
+def _truncate_run_log(run_log_path: Path) -> None:
+    """Truncate the run log to zero bytes at orchestrator startup.
+
+    Parity with ``ralph.sh:692``: ``: > "$RUN_LOG"``. Parent directory is
+    created if missing (bash does ``mkdir -p`` immediately before).
+    """
+    run_log_path.parent.mkdir(parents=True, exist_ok=True)
+    with run_log_path.open("wb"):
+        pass
 
 
 class _SignalInstaller:
