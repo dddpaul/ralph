@@ -4,9 +4,10 @@ title: Fix Python orchestrator missing devcontainer up before exec (bash parity 
 status: Done
 assignee: []
 created_date: '2026-06-24 08:47'
-updated_date: '2026-06-24 09:47'
+updated_date: '2026-06-24 13:32'
 labels:
   - bug
+  - 'feature:ralph-python-refactor'
 dependencies: []
 priority: high
 ---
