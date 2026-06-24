@@ -72,6 +72,7 @@ class ClaudeTool(Tool):
         effort: str,
         devcontainer: bool = False,
         workspace_folder: Path | None = None,
+        run_log_path: Path | None = None,
     ) -> None:
         if devcontainer and workspace_folder is None:
             raise ValueError(
@@ -81,6 +82,7 @@ class ClaudeTool(Tool):
         self._effort = effort
         self._devcontainer = devcontainer
         self._workspace_folder = workspace_folder
+        self._run_log_path = run_log_path
 
     def build_argv(self) -> list[str]:
         """Assemble the argv list for this iteration's subprocess.
@@ -121,7 +123,13 @@ class ClaudeTool(Tool):
         *,
         on_spawn: OnSpawn | None = None,
     ) -> ToolResult:
-        return _execute(self.build_argv(), prompt, timeout_sec, on_spawn=on_spawn)
+        return _execute(
+            self.build_argv(),
+            prompt,
+            timeout_sec,
+            on_spawn=on_spawn,
+            run_log_path=self._run_log_path,
+        )
 
 
 def _execute(
@@ -130,6 +138,7 @@ def _execute(
     timeout_sec: int,
     *,
     on_spawn: OnSpawn | None = None,
+    run_log_path: Path | None = None,
 ) -> ToolResult:
     """Compatibility wrapper around ``_subprocess.execute`` for claude.
 
@@ -143,6 +152,7 @@ def _execute(
         timeout_sec,
         tee_prefix=_TEE_PREFIX,
         on_spawn=on_spawn,
+        run_log_path=run_log_path,
     )
 
 
