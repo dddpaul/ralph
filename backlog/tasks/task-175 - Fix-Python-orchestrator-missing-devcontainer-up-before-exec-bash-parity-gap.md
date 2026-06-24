@@ -1,10 +1,10 @@
 ---
 id: TASK-175
 title: Fix Python orchestrator missing devcontainer up before exec (bash parity gap)
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-06-24 08:47'
-updated_date: '2026-06-24 09:03'
+updated_date: '2026-06-24 09:47'
 labels:
   - bug
 dependencies: []
@@ -90,7 +90,7 @@ If anything is unclear or any check fails: STOP and ask the user. Do NOT start w
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 grep -rn 'devcontainer up' skills/ralph-run/scripts/ralph/ returns at least one match (the new call site in pre-loop setup)
-- [ ] #2 Reproducer command (RALPH_IMPL=python ... --devcontainer ... 1) no longer fails on devcontainer-not-found; if iteration 1 fails it is for task-content reasons, not for missing pre-loop devcontainer up
+- [x] #2 Reproducer command (RALPH_IMPL=python ... --devcontainer ... 1) no longer fails on devcontainer-not-found; if iteration 1 fails it is for task-content reasons, not for missing pre-loop devcontainer up
 - [x] #3 Stdout from python orchestrator with --devcontainer contains the strings 'Starting devcontainer...' and 'Devcontainer is ready.' in that order, matching bash output verbatim
 - [x] #4 When devcontainer up itself fails (e.g., docker not running), orchestrator exits non-zero with devcontainer CLI stderr surfaced; iteration loop is NOT entered
 - [x] #5 A new test in skills/ralph-run/scripts/ (bash or pytest, matching project convention) asserts devcontainer up is called exactly once before the first devcontainer exec; test runs as part of the existing suite (preflight_test.sh / ralph_status_test.sh / pytest) and passes
@@ -103,4 +103,12 @@ If anything is unclear or any check fails: STOP and ask the user. Do NOT start w
 Plan: (1) Create skills/ralph-run/scripts/ralph/devcontainer.py with start_devcontainer(workspace_folder) -> int that mirrors bash ralph.sh:602-611: shutil.which check, 'Starting devcontainer...' print, 'devcontainer up --workspace-folder <path>' subprocess.run, 'Devcontainer is ready.' print, surface stderr on failure. (2) loop.py run(): import start_devcontainer; after prompt_file_body load and BEFORE StatusFile init, if args.devcontainer: rc = start_devcontainer(project_root); if rc \!= 0: return rc. Matches bash semantics: no status file written on up failure. (3) New tests/test_devcontainer.py covering CLI-missing, up-success-prints-strings, up-failure-surfaces-stderr. (4) New tests/test_loop_devcontainer_up.py asserting up called exactly once before any tool invocation (call-order spy). (5) Run: uv run pytest tests/ tests/scripts/check_run_clean.py && uv run ruff check . && bash skills/ralph-run/scripts/preflight_test.sh && bash skills/ralph-run/scripts/ralph_status_test.sh.
 
 Implementation complete: skills/ralph-run/scripts/ralph/devcontainer.py exposes start_devcontainer(workspace_folder, *, stdout, stderr); loop.py imports it and calls before status init when args.devcontainer. Test coverage: tests/test_devcontainer.py (3 unit) + tests/test_loop_devcontainer_up.py (3 integration including call-once-before-exec ordering and up-failure-skips-tool). All 207 pytest tests pass, ruff clean, ralph_status_test.sh 14/14 pass. preflight_test.sh shows 12/13 pass — the 1 failure ('--tasks missing task — expected substring TASK-999 not found') is PRE-EXISTING (verified by stashing TASK-175 changes and re-running). AC #2 requires the live reproducer in a downstream project (the host repo's devcontainer is already up from earlier bash runs); will be verified during the claude-skills smoke test.
+
+Commit: `d6a1488` - task-175: Add devcontainer up before iteration loop in Python orchestrator
+
+task-reviewer APPROVED. Non-blocking UX observation: capture_output=True buffers devcontainer up progress until completion (vs. bash inline streaming); strings 'Starting...' and 'Ready.' bracket a silent pause during image builds. Acceptable for parity per AC #3 (string order, not streaming). Future follow-up if strict streaming parity needed: switch to subprocess.Popen with real-time stdout pump or inherit stdout/stderr.
+
+AC #2 verified live: stopped existing container, ran 'uv run skills/ralph-run/scripts/ralph_orchestrator.py --tool claude --devcontainer --tasks 171 1' from repo source — output begins with 'Starting devcontainer...', up succeeds (containerId returned), 'Devcontainer is ready.' prints, orchestrator enters loop and exits cleanly with exit_code=0 and state=completed. Container went from 'Exited (0)' to 'Up 9 seconds'. No 'Dev container not found.' error. Canonical install at ~/.claude/skills/ralph-run/scripts/ will pick up the fix on next /ralph-sync (post-merge to master).
+
+All 6 ACs ticked. task-reviewer APPROVED. Marking Done.
 <!-- SECTION:NOTES:END -->
