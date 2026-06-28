@@ -158,7 +158,7 @@ Existing Ralph projects that still carry the old strangler-fig shim (or pre-stra
 
 Prereq either way: uv + Python 3.14 available on host/devcontainer (Dockerfile.base already installs them), and canonical skills synced via /ralph-sync. RALPH_IMPL=bash is no longer honored — the bash orchestrator and its preflight/wait-heartbeat/usage-check helpers are deleted.
 
-Commit: `7076b06` - task-156: Remove bash orchestrator, cut over to Python (Phase E)
+Commit: `1cd3720` - task-156: Remove bash orchestrator, cut over to Python (Phase E)
 
 Phase E complete. task-reviewer APPROVED (R5/R6/R11/R16 clean; two thin shims byte-identical; pyright 0 errors, pytest 185 passed, ruff clean). Bash orchestrator fully removed; canonical is ralph_orchestrator.py via uv run. RALPH_IMPL no longer honored. ralph-python-refactor cutover done.
 <!-- SECTION:NOTES:END -->
