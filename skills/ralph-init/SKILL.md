@@ -196,36 +196,31 @@ Read `templates/claude/settings.local.json` → write to `.claude/settings.local
 
 ### 3.7b Merge narrow script rules into `settings.local.json` permissions
 
-This sub-step is **required** — the template-written `settings.local.json` does not yet contain narrow rules for the ralph-run and ralph-status helper scripts, and this merge is what avoids over-broad `Bash(bash:*)` permissions. Step 3.10 verifies the merge landed; skipping 3.7b will trip that check.
+This sub-step is **required** — the template-written `settings.local.json` does not yet contain narrow rules for the ralph-status helper script, and this merge is what avoids over-broad `Bash(bash:*)` permissions. Step 3.10 verifies the merge landed; skipping 3.7b will trip that check.
 
-**Literal-match gotcha — both forms required.** Claude Code's permission matcher compares command strings *literally*. `$HOME` is not expanded before matching. Skill bodies invoke these scripts in two distinct shapes:
+The ralph-run skill invokes its preflight and heartbeat-wait helpers as Python modules (`uv run --no-project python -m ralph.preflight` / `ralph.wait_heartbeat`), which the template's blanket `Bash(uv run:*)` rule already covers. The narrow-rule merge below only has to handle the remaining bash-path invocation: `utc-to-moscow.sh`, called by `ralph-status` and `ralph-status-watch`.
 
-- `bash /Users/<you>/.claude/skills/…` — used where the skill SKILL.md inserts an absolute path (e.g. `<absolute-path-to-scripts/preflight.sh>` placeholder in ralph-run).
-- `bash $HOME/.claude/skills/…` — used as a literal `$HOME`-prefixed string (e.g. ralph-status / ralph-status-watch's `utc-to-moscow.sh` resolver block).
+**Literal-match gotcha — both forms required for bash-path invocations.** Claude Code's permission matcher compares command strings *literally*. `$HOME` is not expanded before matching. The `utc-to-moscow.sh` resolver block in `ralph-status` / `ralph-status-watch` invokes the script in two distinct shapes:
 
-Both forms reach the matcher, so we must write **both** rule shapes for every script — otherwise a `$HOME`-form call triggers a permission prompt despite a "narrow" absolute rule existing.
+- `bash /Users/<you>/.claude/skills/ralph-status/scripts/utc-to-moscow.sh` — the absolute-path branch the resolver falls through to.
+- `bash $HOME/.claude/skills/ralph-status/scripts/utc-to-moscow.sh` — the literal `$HOME`-prefixed branch that runs first when the resolved-HOME copy is executable.
 
-Add these rules if not already present (6 total — 3 absolute-path + 3 literal-`$HOME`):
+Both forms reach the matcher, so we must write **both** rule shapes for `utc-to-moscow.sh` — otherwise a `$HOME`-form call triggers a permission prompt despite a "narrow" absolute rule existing. The `Bash(uv run:*)` rule does not need this dual form: `uv run` is the literal command in every ralph-run invocation, with no `$HOME`/absolute split.
 
-- `Bash(bash <RESOLVED_HOME>/.claude/skills/ralph-run/scripts/preflight.sh:*)`
-- `Bash(bash $HOME/.claude/skills/ralph-run/scripts/preflight.sh:*)`
-- `Bash(bash <RESOLVED_HOME>/.claude/skills/ralph-run/scripts/wait-heartbeat.sh:*)`
-- `Bash(bash $HOME/.claude/skills/ralph-run/scripts/wait-heartbeat.sh:*)`
+Add these rules if not already present (3 total — 1 `uv run` + 2 `utc-to-moscow.sh` forms):
+
+- `Bash(uv run:*)`
 - `Bash(bash <RESOLVED_HOME>/.claude/skills/ralph-status/scripts/utc-to-moscow.sh:*)`
 - `Bash(bash $HOME/.claude/skills/ralph-status/scripts/utc-to-moscow.sh:*)`
 
 Use `jq` for the idempotent merge. Note the deliberate quoting: **double-quoted** strings expand `$HOME` to the absolute path; **single-quoted** strings keep the literal `$HOME` characters intact.
 ```bash
-RULE1A="Bash(bash $HOME/.claude/skills/ralph-run/scripts/preflight.sh:*)"
-RULE1B='Bash(bash $HOME/.claude/skills/ralph-run/scripts/preflight.sh:*)'
-RULE2A="Bash(bash $HOME/.claude/skills/ralph-run/scripts/wait-heartbeat.sh:*)"
-RULE2B='Bash(bash $HOME/.claude/skills/ralph-run/scripts/wait-heartbeat.sh:*)'
-RULE3A="Bash(bash $HOME/.claude/skills/ralph-status/scripts/utc-to-moscow.sh:*)"
-RULE3B='Bash(bash $HOME/.claude/skills/ralph-status/scripts/utc-to-moscow.sh:*)'
-jq --arg r1a "$RULE1A" --arg r1b "$RULE1B" \
-   --arg r2a "$RULE2A" --arg r2b "$RULE2B" \
-   --arg r3a "$RULE3A" --arg r3b "$RULE3B" \
-  '.permissions.allow = ((.permissions.allow // []) + [$r1a, $r1b, $r2a, $r2b, $r3a, $r3b] | unique)' \
+RULE_UV='Bash(uv run:*)'
+RULE_UTC_A="Bash(bash $HOME/.claude/skills/ralph-status/scripts/utc-to-moscow.sh:*)"
+RULE_UTC_B='Bash(bash $HOME/.claude/skills/ralph-status/scripts/utc-to-moscow.sh:*)'
+jq --arg ruv "$RULE_UV" \
+   --arg ra "$RULE_UTC_A" --arg rb "$RULE_UTC_B" \
+  '.permissions.allow = ((.permissions.allow // []) + [$ruv, $ra, $rb] | unique)' \
   .claude/settings.local.json > .claude/settings.local.json.tmp \
   && mv .claude/settings.local.json.tmp .claude/settings.local.json
 ```
@@ -279,7 +274,7 @@ Also append these entries to `.gitignore` (don't duplicate existing lines):
 
 ### 3.10 Verify `settings.local.json` narrow rules landed
 
-After all Step 3.x writes complete, verify the six narrow script rules from Step 3.7b are present — two forms per script (absolute path and literal `$HOME`). This catches silent omissions of the merge sub-step (e.g. if Step 3.7b was accidentally skipped, or `jq` was missing on the host and the pipeline failed without surfacing). Both forms must land; missing either one causes a permission prompt when the corresponding skill invocation shape is used.
+After all Step 3.x writes complete, verify the three narrow rules from Step 3.7b are present — the single `Bash(uv run:*)` rule plus both forms (absolute path and literal `$HOME`) of `utc-to-moscow.sh`. This catches silent omissions of the merge sub-step (e.g. if Step 3.7b was accidentally skipped, or `jq` was missing on the host and the pipeline failed without surfacing). For `utc-to-moscow.sh`, both forms must land; missing either one causes a permission prompt when the corresponding skill invocation shape is used.
 
 For **Documentation / Mixed** projects, the verification additionally checks the two pptx helper rules from Step 3.7c and surfaces a `WARN` naming each missing one. This block is skipped for Code-only projects (where Step 3.7c does not run and the rules are intentionally absent).
 
@@ -288,16 +283,13 @@ For **Documentation / Mixed** projects, the verification additionally checks the
 # Single-quoted entries keep the literal $HOME characters; double-quoted ones
 # expand $HOME to the absolute path.
 expected_abs=(
-  "$HOME/.claude/skills/ralph-run/scripts/preflight.sh"
-  "$HOME/.claude/skills/ralph-run/scripts/wait-heartbeat.sh"
   "$HOME/.claude/skills/ralph-status/scripts/utc-to-moscow.sh"
 )
 expected_home=(
-  '$HOME/.claude/skills/ralph-run/scripts/preflight.sh'
-  '$HOME/.claude/skills/ralph-run/scripts/wait-heartbeat.sh'
   '$HOME/.claude/skills/ralph-status/scripts/utc-to-moscow.sh'
 )
 missing=()
+grep -q -F 'Bash(uv run:*)' .claude/settings.local.json || missing+=("rule: Bash(uv run:*)")
 for p in "${expected_abs[@]}"; do
   grep -q -F "$p" .claude/settings.local.json || missing+=("absolute: $p")
 done
@@ -309,7 +301,7 @@ if (( ${#missing[@]} > 0 )); then
   printf '  - %s\n' "${missing[@]}"
   echo "Re-run the jq merge from Step 3.7b to fix."
 else
-  echo "PASS: all 6 narrow rules (3 absolute + 3 \$HOME-form) present in settings.local.json"
+  echo "PASS: all 3 narrow rules (Bash(uv run:*) + utc-to-moscow.sh absolute + \$HOME-form) present in settings.local.json"
 fi
 
 # Documentation / Mixed projects only: also verify the two pptx helper rules
@@ -549,7 +541,7 @@ For each file the user approved:
 - **`.git/hooks/pre-commit`**: overwrite from `templates/git-hooks/pre-commit`, then `chmod +x`. Also re-assert `git config --local core.precomposeunicode true` (idempotent — no-op if already set) so the macOS NFD-on-write defense ships alongside the hook.
 - **`.claude/settings.json`**: overwrite from `templates/claude/settings.json`.
 - **`.claude/hooks/`**: for each `templates/claude/hooks/*-guard.sh` and `templates/claude/hooks/task-validator.sh`, overwrite `.claude/hooks/<name>.sh`, then `chmod +x`. Create directory if needed.
-- **`.claude/settings.local.json`**: overwrite from `templates/claude/settings.local.json`. Then run the same narrow-rule merge as Step 3.7b (writes **both** the absolute-path and literal-`$HOME` forms of the `preflight.sh`, `wait-heartbeat.sh`, and `utc-to-moscow.sh` rules — 6 rules total — via `jq`, idempotent through `unique`). **If the project is Documentation or Mixed** (detect via existing `.obsidian/` directory), also run the Step 3.7c pptx merge so the overwrite does not strip the `Bash(python scripts/office/soffice.py:*)` and `Bash(pdftoppm:*)` rules. User-added custom permissions in the existing `allow` array are preserved by the `+ unique` merge. After the merge(s), run the Step 3.10 verification block to confirm all rules landed; surface any `WARN` to the user before completing the upgrade.
+- **`.claude/settings.local.json`**: overwrite from `templates/claude/settings.local.json`. Then run the same narrow-rule merge as Step 3.7b (writes the single `Bash(uv run:*)` rule plus **both** the absolute-path and literal-`$HOME` forms of the `utc-to-moscow.sh` rule — 3 rules total — via `jq`, idempotent through `unique`). **If the project is Documentation or Mixed** (detect via existing `.obsidian/` directory), also run the Step 3.7c pptx merge so the overwrite does not strip the `Bash(python scripts/office/soffice.py:*)` and `Bash(pdftoppm:*)` rules. User-added custom permissions in the existing `allow` array are preserved by the `+ unique` merge. After the merge(s), run the Step 3.10 verification block to confirm all rules landed; surface any `WARN` to the user before completing the upgrade.
 - **`.devcontainer/devcontainer.json`**: overwrite from `templates/devcontainer/devcontainer.json`.
 - **`.devcontainer/init-firewall.sh`**: overwrite from `templates/devcontainer/init-firewall.sh`, then `chmod +x`.
 - **`CLAUDE.md` (special merge)**:
