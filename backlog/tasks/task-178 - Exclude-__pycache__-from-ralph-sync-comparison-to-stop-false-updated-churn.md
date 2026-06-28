@@ -1,10 +1,10 @@
 ---
 id: TASK-178
 title: 'Exclude __pycache__ from ralph-sync comparison to stop false [updated] churn'
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-06-28 12:53'
-updated_date: '2026-06-28 12:56'
+updated_date: '2026-06-28 12:59'
 labels: []
 dependencies: []
 priority: low
@@ -32,10 +32,12 @@ Scope: .claude/skills/ralph-sync/sync.sh ONLY. This skill is project-local (NOT 
 - [x] #4 bash -n .claude/skills/ralph-sync/sync.sh passes (no syntax error introduced)
 <!-- AC:END -->
 
-
-
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 Plan: Add -x '__pycache__' -x '*.pyc' to all four recursive diff calls in .claude/skills/ralph-sync/sync.sh (classify_skills L47, apply-path L118 guard, do_diff agent L154, do_diff skill L167). Verify bytecode regeneration no longer triggers [updated] for ralph-run.
+
+Commit: `820a8dd` - task-178: Exclude __pycache__/*.pyc from ralph-sync diff comparisons
+
+task-reviewer APPROVED. Added portable '-x __pycache__ -x *.pyc' to all four recursive diff calls in .claude/skills/ralph-sync/sync.sh (L47 classify_skills, L118 apply-path guard, L154/L167 do_diff). Verified bash -n, ruff, pytest (185 pass), and live reproduction: divergent .pyc files no longer trigger [updated] for ralph-run.
 <!-- SECTION:NOTES:END -->
