@@ -1,11 +1,11 @@
 ---
 id: TASK-177
 title: Repoint ralph-init permission rules from deleted bash helpers to uv run
-status: In Progress
+status: Done
 assignee:
   - Claude
 created_date: '2026-06-28 11:52'
-updated_date: '2026-06-28 11:58'
+updated_date: '2026-06-28 12:00'
 labels: []
 dependencies: []
 priority: low
@@ -40,8 +40,6 @@ Verification: after edits, 'grep -nE "preflight.sh|wait-heartbeat.sh" skills/ral
 - [x] #6 All jq/bash code fences in the edited sections remain balanced and valid; uv run ruff check . passes
 <!-- AC:END -->
 
-
-
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
@@ -52,4 +50,14 @@ Plan:
 4. Step 3.10 verification (lines ~280-313): drop preflight.sh/wait-heartbeat.sh from expected_abs/expected_home arrays; add Bash(uv run:*) presence check; update PASS message count.
 5. Upgrade step at line 552: update script list to (uv run + utc-to-moscow.sh) and count to 3.
 6. Verify: grep -nE 'preflight.sh|wait-heartbeat.sh' skills/ralph-init/SKILL.md returns no matches; uv run ruff check . passes.
+
+Commit: `1d02451` - task-177: Repoint ralph-init permission rules from deleted bash helpers to uv run
+
+Reviewer APPROVED. Implemented:
+- Step 3.7b jq merge collapsed from 6 rules to 3 (Bash(uv run:*) + 2 utc-to-moscow.sh forms).
+- Narrative scoped dual-form gotcha to utc-to-moscow.sh only; uv run noted as single literal.
+- Step 3.10 verification: dropped preflight/wait-heartbeat arrays, added Bash(uv run:*) presence check, PASS message now reports 3 rules.
+- Upgrade U4 bullet: rule list + count updated.
+- AC#5 verified: grep -nE 'preflight.sh|wait-heartbeat.sh' returns no matches.
+- AC#6 verified: 34 fences balanced; uv run ruff check . passes; 185 pytest tests pass.
 <!-- SECTION:NOTES:END -->
