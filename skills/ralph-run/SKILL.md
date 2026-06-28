@@ -26,13 +26,7 @@ The user may pass overrides as skill arguments. Parse them as space-separated ke
 | verbose | false | --verbose |
 | watch | (none) | — |
 | block_end_buffer_min | 0 | --block-end-buffer-min |
-| impl | python | (env: RALPH_IMPL) |
 | max_iterations | 10 | (positional, last arg) |
-
-The `impl` parameter selects the orchestrator implementation: `python` (default, the canonical `ralph_orchestrator.py`) or `bash` (the legacy `ralph.sh`, kept as a rollback fallback during the cutover window). Accepted values: `python`, `bash`. Reject anything else:
-```
-BLOCKED: impl must be python or bash.
-```
 
 Set `block_end_buffer_min` to N>0 to pause the run when the active 5h Anthropic usage block has <=N minutes remaining. 0 disables the check (default). Requires ccusage to be installed; preflight warns if missing.
 
@@ -52,7 +46,7 @@ BLOCKED: watch must be true, false, or a duration like 5m, 30s, 1h.
 > - **timeout** (skill: `60`, CLI: `15`) — max-effort iterations take longer; 15 minutes would time out most complex tasks.
 > - **devcontainer** (skill: `true`, CLI: `false`) — interactive users expect sandboxed runs by default; the CLI leaves this opt-in for scripted/CI use.
 >
-> The `model` and `effort` defaults match `ralph.sh`'s own defaults (`claude-opus-4-7` and `max`); the skill pins them explicitly so the launch command logs them and per-invocation overrides remain easy.
+> The `model` and `effort` defaults match the orchestrator's own defaults (`claude-opus-4-7` and `max`); the skill pins them explicitly so the launch command logs them and per-invocation overrides remain easy.
 
 The `tasks` parameter accepts comma-separated numeric task IDs only (e.g. `62,64,65`). Reject `TASK-` prefix or non-numeric values. Mutually exclusive with `--prompt-file`.
 
@@ -64,30 +58,28 @@ The `tasks` parameter accepts comma-separated numeric task IDs only (e.g. `62,64
 - `/ralph-run tasks=62,64,65 max_iterations=3`
 - `/ralph-run watch=5m` — launch with automatic 5-minute progress alerts
 - `/ralph-run tasks=70 watch=2m max_iterations=3` — watch with custom interval
-- `/ralph-run impl=python tasks=70 watch=false` — launch the Python orchestrator (strangler-fig dispatch via `RALPH_IMPL`)
 
 ---
 
 ## Step 2: Locate ralph.sh
 
-Check in order:
+`ralph.sh` is the thin project shim that execs the canonical Python orchestrator (`~/.claude/skills/ralph-run/scripts/ralph_orchestrator.py`). Check in order:
 1. `./ralph.sh`
 2. `scripts/ralph/ralph.sh`
-3. `~/.claude/skills/ralph-run/scripts/ralph.sh`
 
 If none exists, report error and stop:
 ```
-Error: ralph.sh not found. Checked ./ralph.sh, scripts/ralph/ralph.sh, and ~/.claude/skills/ralph-run/scripts/ralph.sh
+Error: ralph.sh not found. Checked ./ralph.sh and scripts/ralph/ralph.sh. Run /ralph-init to bootstrap the project shim.
 ```
 
 ---
 
 ## Step 3: Validate Preconditions
 
-Run the preflight script (`scripts/preflight.sh` in the directory next to this SKILL.md) with the ralph path from Step 2 and the devcontainer flag from Step 1:
+Run the preflight check (the `ralph.preflight` module in the `scripts/` directory next to this SKILL.md — i.e. `~/.claude/skills/ralph-run/scripts`) with the ralph path from Step 2 and the devcontainer flag from Step 1. Set `PYTHONPATH` to that scripts directory so `python -m ralph.preflight` resolves the package:
 
 ```bash
-bash <absolute-path-to-scripts/preflight.sh> "$RALPH_PATH" <devcontainer:true|false> [--verbose] [--tasks <ids>] [--block-end-buffer-min <N>]
+PYTHONPATH=<absolute-path-to-scripts-dir> uv run --no-project python -m ralph.preflight "$RALPH_PATH" <devcontainer:true|false> [--verbose] [--tasks <ids>] [--block-end-buffer-min <N>]
 ```
 
 When `verbose=true`, append `--verbose` to the preflight command. This prints one `check <name>: <result>` line per check before the final OK/ERROR line.
@@ -116,25 +108,23 @@ When `tasks` is set, append `--tasks <ids>` to the command.
 
 When `block_end_buffer_min > 0`, append `--block-end-buffer-min <N>` to the command.
 
-Launch fully detached, capturing early output to a launch log. **You MUST set `dangerouslyDisableSandbox: true`** on this Bash tool call — ralph.sh needs full OS access (mktemp, /dev/fd, tee, docker) which the sandbox blocks.
-
-Export `RALPH_IMPL=<impl>` in the launch env before invoking `nohup` so the outer shim dispatches to the chosen orchestrator. When `impl=python` (the default), exporting the value explicitly still works — the shim's `${RALPH_IMPL:-python}` falls through to the python branch.
+Launch fully detached, capturing early output to a launch log. **You MUST set `dangerouslyDisableSandbox: true`** on this Bash tool call — the orchestrator needs full OS access (mktemp, /dev/fd, tee, docker) which the sandbox blocks.
 
 ```bash
 LAUNCH_LOG='backlog/.ralph-launch.log'
-RALPH_IMPL=<impl> nohup $RALPH_CMD > "$LAUNCH_LOG" 2>&1 & disown
+nohup $RALPH_CMD > "$LAUNCH_LOG" 2>&1 & disown
 RALPH_PID=$!
 ```
 
-Wait for the heartbeat file to appear using the `wait-heartbeat.sh` script (`scripts/wait-heartbeat.sh` in the directory next to this SKILL.md):
+Wait for the heartbeat file to appear using the `ralph.wait_heartbeat` module (in the `scripts/` directory next to this SKILL.md). Set `PYTHONPATH` to that scripts directory as in Step 3:
 
 ```bash
-bash <absolute-path-to-scripts/wait-heartbeat.sh>
+PYTHONPATH=<absolute-path-to-scripts-dir> uv run --no-project python -m ralph.wait_heartbeat
 ```
 
-The script polls 10×1s for a fresh heartbeat (age < 15s). On success it prints `OK heartbeat age=...`, removes the launch log, and exits 0. On failure it prints `FAIL` with tails of both logs and exits 1.
+It polls 10×1s for a fresh heartbeat (age < 15s). On success it prints `OK heartbeat age=...`, removes the launch log, and exits 0. On failure it prints `FAIL` with tails of both logs and exits 1.
 
-Relay the script's stdout verbatim. Use the exit code: 0 → proceed to Step 5 success report; 1 → proceed to Step 5 failure report; 2 → script invocation error (e.g. not run from project root).
+Relay the command's stdout verbatim. Use the exit code: 0 → proceed to Step 5 success report; 1 → proceed to Step 5 failure report; 2 → invocation error (e.g. not run from project root).
 
 ---
 

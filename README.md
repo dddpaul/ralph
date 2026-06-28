@@ -309,15 +309,14 @@ When all tasks have status "Done" (no "To Do" tasks remaining), Ralph outputs `<
 
 Ralph writes a heartbeat file (`backlog/.ralph-heartbeat`) every 5 seconds while running. The `ralph-status` and `ralph-run` skills use this file to determine whether Ralph is actually alive — if the heartbeat hasn't been updated within 15 seconds, Ralph is considered dead regardless of what the status file says. This replaces `kill -0` PID checks, which can give false positives when PIDs are reused or the process runs in a container.
 
-### Bundled ralph.sh
+### Shim and Canonical Orchestrator
 
-The `ralph-run` skill bundles its own copy of `ralph.sh` at `~/.claude/skills/ralph-run/scripts/ralph.sh`. When launching Ralph, the skill searches for the script in priority order:
+Each project carries a thin `ralph.sh` shim that execs the canonical Python orchestrator bundled by the `ralph-run` skill at `~/.claude/skills/ralph-run/scripts/ralph_orchestrator.py` (run via `uv run`). When launching Ralph, the skill searches for the project shim in priority order:
 
-1. `./ralph.sh` — local override in the project root
+1. `./ralph.sh` — project root (created by `ralph-init`)
 2. `scripts/ralph/ralph.sh` — structured project location
-3. `~/.claude/skills/ralph-run/scripts/ralph.sh` — bundled default
 
-This lets you customize ralph.sh per-project while still having a working default from the skill installation.
+The shim sets `RALPH_PROJECT_ROOT` and delegates to the canonical orchestrator, so all projects share one implementation while keeping project-relative paths correct. Run `/ralph-init` to bootstrap the shim in a new project.
 
 ### Double-Run Guard
 

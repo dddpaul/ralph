@@ -1,10 +1,10 @@
 ---
 id: TASK-156
 title: Cutover to Python orchestrator; delete bash; document downstream upgrade path
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-06-21 13:09'
-updated_date: '2026-06-23 05:55'
+updated_date: '2026-06-28 10:07'
 labels:
   - 'feature:ralph-python-refactor'
 dependencies:
@@ -32,14 +32,14 @@ Spec sources:
 - [x] #3 5 consecutive `RALPH_IMPL=python` runs (with default still `bash`) each pass `--run-only`; documented in task notes with run dates and status snapshots
 - [x] #4 Default flipped to `python` in: live outer `ralph.sh`, `skills/ralph-run/SKILL.md`, `skills/ralph-init/templates/root/ralph.sh` (R11 parity preserved)
 - [x] #5 5 MORE consecutive clean runs with `python` as default (rollback still possible during this window via `RALPH_IMPL=bash`)
-- [ ] #6 Delete inner bash: `skills/ralph-run/scripts/ralph.sh`, `preflight.sh`, `wait-heartbeat.sh`, `usage-check.sh`
-- [ ] #7 Outer shim simplifies back to ~6 lines pointing only at the Python orchestrator (live + R11 template mirror)
-- [ ] #8 `/ralph-run` skill `impl=` parameter removed (no longer needed)
-- [ ] #9 `CLAUDE.md` Project-Specific Language line tightened to: "Python (orchestrator) + Bash (hooks, git hooks, sync, firewall) + Markdown (skills, agents, docs)"
-- [ ] #10 Task notes include explicit downstream upgrade instructions: existing Ralph projects run `ralph-init upgrade` OR hand-patch their outer `ralph.sh` + `Dockerfile.base` from the template diffs
-- [ ] #11 `uv run pyright skills/ralph-run/scripts` passes
-- [ ] #12 `uv run pytest skills/ralph-run/tests/` passes
-- [ ] #13 Parity test suites (test_preflight_parity.py, test_wait_heartbeat_parity.py, test_usage_check_parity.py) deleted alongside the bash helpers — they cannot pass once the bash side is gone
+- [x] #6 Delete inner bash: `skills/ralph-run/scripts/ralph.sh`, `preflight.sh`, `wait-heartbeat.sh`, `usage-check.sh`
+- [x] #7 Outer shim simplifies back to ~6 lines pointing only at the Python orchestrator (live + R11 template mirror)
+- [x] #8 `/ralph-run` skill `impl=` parameter removed (no longer needed)
+- [x] #9 `CLAUDE.md` Project-Specific Language line tightened to: "Python (orchestrator) + Bash (hooks, git hooks, sync, firewall) + Markdown (skills, agents, docs)"
+- [x] #10 Task notes include explicit downstream upgrade instructions: existing Ralph projects run `ralph-init upgrade` OR hand-patch their outer `ralph.sh` + `Dockerfile.base` from the template diffs
+- [x] #11 `uv run pyright skills/ralph-run/scripts` passes
+- [x] #12 `uv run pytest skills/ralph-run/tests/` passes
+- [x] #13 Parity test suites (test_preflight_parity.py, test_wait_heartbeat_parity.py, test_usage_check_parity.py) deleted alongside the bash helpers — they cannot pass once the bash side is gone
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -127,4 +127,38 @@ Phase D run 9 (TASK-173): PASS all 6 gate checks. Elapsed 142s, exit_code=0, tas
 Phase D run 10 (TASK-174): PASS all 6 gate checks. Elapsed 150s, exit_code=0, tasks_done=[TASK-174]. Phase D complete — 10/10 smoke runs PASS (5 pre-flip with RALPH_IMPL=python explicit, 5 post-flip with python as the implicit default).
 
 Phase E follow-up identified (not blocking today's downstream test): (1) /ralph-run SKILL.md drops 'bash <absolute-path-to-scripts/preflight.sh>' and 'bash <absolute-path-to-scripts/wait-heartbeat.sh>' direct invocations once orchestrator handles them; (2) skills/ralph-init/SKILL.md drops the preflight.sh and wait-heartbeat.sh narrow-rule jq merge (utc-to-moscow.sh stays — still used by /ralph-status). Orphan rules in existing settings.local.json are harmless deadweight. Today's settings.local.json template is sufficient for downstream upgrade-mode test because Bash(nohup ./ralph.sh:*) covers the launch path; permission check is at the Bash tool layer, not the exec'd process.
+
+Plan (Phase E–G, branch task-156):
+- AC#6: rm inner bash skills/ralph-run/scripts/{ralph.sh,preflight.sh,wait-heartbeat.sh,usage-check.sh}. usage-check.sh is internal-only (ralph_orchestrator uses ralph/usage_check.py) — clean delete. preflight.sh + wait-heartbeat.sh are invoked by ralph-run SKILL.md Steps 3/4 → must repoint to Python entry first.
+- SKILL.md Step3/4: replace 'bash <path>/preflight.sh' and 'bash <path>/wait-heartbeat.sh' with 'PYTHONPATH=<scripts-dir> uv run --no-project python -m ralph.preflight|wait_heartbeat'. Verified both invocations work from project root (stdlib-only modules; parity tests already target python -m ralph.*).
+- AC#7: outer shim ralph.sh drop the RALPH_IMPL=bash branch → exec uv run ralph_orchestrator.py only (live + template mirror, R11).
+- AC#8: remove impl= param from SKILL.md (rows 29/32/34/67/121/125) + RALPH_IMPL export in launch.
+- AC#9: CLAUDE.md Language line → 'Python (orchestrator) + Bash (hooks, git hooks, sync, firewall) + Markdown (skills, agents, docs)'.
+- AC#10: downstream upgrade note in task notes.
+- AC#13: rm test_{preflight,wait_heartbeat,usage_check}_parity.py.
+- AC#11/12: pyright + pytest, then task-reviewer, Done, merge.
+
+Downstream upgrade instructions (AC#10):
+Existing Ralph projects that still carry the old strangler-fig shim (or pre-strangler shim) must refresh their project shim once the bash orchestrator is gone. Two paths:
+
+(A) Recommended — re-bootstrap via ralph-init upgrade:
+  cd <project> && git checkout -b task-upgrade-ralph
+  /ralph-init   (upgrade mode overwrites root ralph.sh + .claude/settings.local.json from templates)
+  Then launch a small task: /ralph-run tasks=<id> watch=5m
+
+(B) Manual hand-patch — replace the project's ./ralph.sh with the 7-line shim:
+  #\!/usr/bin/env bash
+  # Thin shim — the real orchestrator lives under ~/.claude/skills/ralph-run/scripts/
+  # Install/update via /ralph-sync.
+  RALPH_PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+  CANONICAL_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/ralph-run/scripts"
+  export RALPH_PROJECT_ROOT
+  exec uv run "$CANONICAL_DIR/ralph_orchestrator.py" "$@"
+  And add "Bash(uv run:*)" to .claude/settings.local.json allow list; drop any stale Bash(...preflight.sh|wait-heartbeat.sh|usage-check.sh...) rules.
+
+Prereq either way: uv + Python 3.14 available on host/devcontainer (Dockerfile.base already installs them), and canonical skills synced via /ralph-sync. RALPH_IMPL=bash is no longer honored — the bash orchestrator and its preflight/wait-heartbeat/usage-check helpers are deleted.
+
+Commit: `1cd3720` - task-156: Remove bash orchestrator, cut over to Python (Phase E)
+
+Phase E complete. task-reviewer APPROVED (R5/R6/R11/R16 clean; two thin shims byte-identical; pyright 0 errors, pytest 185 passed, ruff clean). Bash orchestrator fully removed; canonical is ralph_orchestrator.py via uv run. RALPH_IMPL no longer honored. ralph-python-refactor cutover done.
 <!-- SECTION:NOTES:END -->
