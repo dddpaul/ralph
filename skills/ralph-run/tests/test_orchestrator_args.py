@@ -75,7 +75,7 @@ def test_parse_intermixed_supports_positional_anywhere(
 def test_parse_defaults_match_bash() -> None:
     parsed = parse([])
     assert parsed.tool == "claude"
-    assert parsed.model == "claude-opus-4-7"
+    assert parsed.model == "claude-opus-4-8"
     assert parsed.effort == "max"
     assert parsed.timeout == "15"
     assert parsed.on_error == "stop"

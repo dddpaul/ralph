@@ -29,7 +29,7 @@ from ralph.tools import OnSpawn, Tool, ToolResult
 def _args() -> ParsedArgs:
     return ParsedArgs(
         tool="claude",
-        model="claude-opus-4-7",
+        model="claude-opus-4-8",
         effort="max",
         timeout="15",
         on_error="continue",
