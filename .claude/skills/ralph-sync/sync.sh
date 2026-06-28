@@ -44,7 +44,7 @@ classify_skills() {
     dst_dir="$SKILLS_DST/$name"
     if [ ! -d "$dst_dir" ]; then
       echo "[new] skill $name"
-    elif diff -rq "$src_dir" "$dst_dir" >/dev/null 2>&1; then
+    elif diff -rq -x '__pycache__' -x '*.pyc' "$src_dir" "$dst_dir" >/dev/null 2>&1; then
       echo "[unchanged] skill $name"
     else
       echo "[updated] skill $name"
@@ -115,7 +115,7 @@ do_apply() {
         cp -r "$src_dir" "$dst_dir"
         echo "[applied] skill $name (new)"
         applied=$((applied + 1))
-      elif ! diff -rq "$src_dir" "$dst_dir" >/dev/null 2>&1; then
+      elif ! diff -rq -x '__pycache__' -x '*.pyc' "$src_dir" "$dst_dir" >/dev/null 2>&1; then
         rm -rf "$dst_dir"
         cp -r "$src_dir" "$dst_dir"
         echo "[applied] skill $name (updated)"
@@ -151,7 +151,7 @@ do_diff() {
         echo "$item_name is [new] -- no destination file to diff against."
         exit 0
       fi
-      diff -ru "$dst" "$src" || true
+      diff -ru -x '__pycache__' -x '*.pyc' "$dst" "$src" || true
       ;;
     skill)
       local src="$SKILLS_SRC/$item_name"
@@ -164,7 +164,7 @@ do_diff() {
         echo "$item_name is [new] -- no destination directory to diff against."
         exit 0
       fi
-      diff -ru "$dst" "$src" || true
+      diff -ru -x '__pycache__' -x '*.pyc' "$dst" "$src" || true
       ;;
     *)
       echo "Unknown type: $item_type (expected 'agent' or 'skill')"
