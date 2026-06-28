@@ -18,7 +18,7 @@ The user may pass overrides as skill arguments. Parse them as space-separated ke
 | Parameter | Default | Flag |
 |-----------|---------|------|
 | tool | claude | --tool |
-| model | claude-opus-4-7 | --model |
+| model | claude-opus-4-8 | --model |
 | effort | max | --effort |
 | timeout | 60 | --timeout |
 | tasks | (none) | --tasks |
@@ -46,7 +46,7 @@ BLOCKED: watch must be true, false, or a duration like 5m, 30s, 1h.
 > - **timeout** (skill: `60`, CLI: `15`) — max-effort iterations take longer; 15 minutes would time out most complex tasks.
 > - **devcontainer** (skill: `true`, CLI: `false`) — interactive users expect sandboxed runs by default; the CLI leaves this opt-in for scripted/CI use.
 >
-> The `model` and `effort` defaults match the orchestrator's own defaults (`claude-opus-4-7` and `max`); the skill pins them explicitly so the launch command logs them and per-invocation overrides remain easy.
+> The `model` and `effort` defaults match the orchestrator's own defaults (`claude-opus-4-8` and `max`); the skill pins them explicitly so the launch command logs them and per-invocation overrides remain easy.
 
 The `tasks` parameter accepts comma-separated numeric task IDs only (e.g. `62,64,65`). Reject `TASK-` prefix or non-numeric values. Mutually exclusive with `--prompt-file`.
 

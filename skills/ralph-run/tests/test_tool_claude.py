@@ -16,11 +16,11 @@ from ralph.tools import claude as claude_tool
 
 
 def test_argv_without_devcontainer_starts_with_claude() -> None:
-    tool = claude_tool.ClaudeTool(model="claude-opus-4-7", effort="max")
+    tool = claude_tool.ClaudeTool(model="claude-opus-4-8", effort="max")
     argv = tool.build_argv()
     assert argv[0] == "claude"
     assert "--model" in argv
-    assert "claude-opus-4-7" in argv
+    assert "claude-opus-4-8" in argv
     assert "--effort" in argv
     assert "max" in argv
     assert "--dangerously-skip-permissions" in argv
@@ -34,7 +34,7 @@ def test_argv_with_devcontainer_is_a_list_with_spaces_intact() -> None:
     which is the regression TASK-37 caught in the bash port.
     """
     tool = claude_tool.ClaudeTool(
-        model="claude-opus-4-7",
+        model="claude-opus-4-8",
         effort="max",
         devcontainer=True,
         workspace_folder=Path("/workspace with spaces"),

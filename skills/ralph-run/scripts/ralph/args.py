@@ -78,7 +78,7 @@ def build_parser() -> argparse.ArgumentParser:
         allow_abbrev=False,
     )
     parser.add_argument("--tool", default="claude")
-    parser.add_argument("--model", default="claude-opus-4-7")
+    parser.add_argument("--model", default="claude-opus-4-8")
     parser.add_argument("--effort", default="max")
     parser.add_argument("--timeout", default="15")
     parser.add_argument("--on-error", dest="on_error", default="stop")
