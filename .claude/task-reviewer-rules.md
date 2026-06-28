@@ -109,7 +109,7 @@ The Ralph project ships a template tree at `skills/ralph-init/templates/` that i
 | `.devcontainer/devcontainer.json`      | `skills/ralph-init/templates/devcontainer/devcontainer.json`         |
 | `.devcontainer/init-firewall.sh`       | `skills/ralph-init/templates/devcontainer/init-firewall.sh`          |
 
-Note on `ralph.sh`: the parity rule covers only the two thin shim copies above. The canonical full script at `skills/ralph-run/scripts/ralph.sh` is the single source of truth and is intentionally excluded from this mirror set — both shim copies must remain byte-identical to each other (a `diff` of the two MUST produce no output), but neither needs to match the canonical. The shim execs the canonical at runtime via `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/ralph-run/scripts/ralph.sh`, so a change to the canonical does NOT trigger a parity finding.
+Note on `ralph.sh`: the parity rule covers only the two thin shim copies above. The canonical orchestrator at `skills/ralph-run/scripts/ralph_orchestrator.py` (plus the `ralph/` package) is the single source of truth and is intentionally excluded from this mirror set — both shim copies must remain byte-identical to each other (a `diff` of the two MUST produce no output), but neither needs to match the canonical. The shim execs the canonical at runtime via `uv run ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/ralph-run/scripts/ralph_orchestrator.py`, so a change to the canonical does NOT trigger a parity finding.
 
 Note on `CLAUDE.md`: the `## Project-Specific` section is intentionally project-local and is NOT part of the parity rule. Only the generic section above that heading is mirrored.
 

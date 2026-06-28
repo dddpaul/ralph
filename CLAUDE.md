@@ -83,7 +83,7 @@ This gate applies even if autonomous mode is otherwise active — a Source-carry
 
 ## Project-Specific
 
-- **Language:** Bash (orchestrator + hooks today; Python is the target for new orchestration code per the `uv`-only conventions below) and Markdown (skill documentation + agent definitions)
+- **Language:** Python (orchestrator) + Bash (hooks, git hooks, sync, firewall) + Markdown (skills, agents, docs)
 - **Build:** `N/A`
 - **Lint:** `uv run ruff check .` (Python); shell scripts must satisfy R5 GNU/BSD portability per `.claude/task-reviewer-rules.md`
 - **Test:** `uv run pytest`
