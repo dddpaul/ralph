@@ -70,11 +70,7 @@ Apply these rules in order. The first rule that matches determines the output. O
 
 ```bash
 utc_iso="<completed_at value>"
-if [ -x "./skills/ralph-status/scripts/utc-to-moscow.sh" ]; then
-  moscow_time=$(bash ./skills/ralph-status/scripts/utc-to-moscow.sh "$utc_iso")
-elif [ -x "$HOME/.claude/skills/ralph-status/scripts/utc-to-moscow.sh" ]; then
-  moscow_time=$(bash $HOME/.claude/skills/ralph-status/scripts/utc-to-moscow.sh "$utc_iso")
-fi
+moscow_time=$(bash $HOME/.claude/skills/ralph-status/scripts/utc-to-moscow.sh "$utc_iso")
 ```
 
 **Output:** Full status block (same format as `/ralph-status`):

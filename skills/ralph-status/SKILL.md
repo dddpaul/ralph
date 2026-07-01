@@ -60,12 +60,7 @@ Before displaying any UTC timestamp from the JSON (e.g. `completed_at`), convert
 
 ```bash
 utc_iso="<the UTC ISO 8601 value, e.g. 2026-05-01T08:50:16Z>"
-# Resolve helper: try ./skills/ first (project-local), then $HOME/.claude/skills/ (user-global)
-if [ -x "./skills/ralph-status/scripts/utc-to-moscow.sh" ]; then
-  moscow_time=$(bash ./skills/ralph-status/scripts/utc-to-moscow.sh "$utc_iso")
-elif [ -x "$HOME/.claude/skills/ralph-status/scripts/utc-to-moscow.sh" ]; then
-  moscow_time=$(bash $HOME/.claude/skills/ralph-status/scripts/utc-to-moscow.sh "$utc_iso")
-fi
+moscow_time=$(bash $HOME/.claude/skills/ralph-status/scripts/utc-to-moscow.sh "$utc_iso")
 ```
 
 The helper tries GNU `date -d` first, then falls back to macOS BSD `date -j -u -f` with explicit UTC parsing. The result is a string like `2026-05-01 11:50:16 MSK`.

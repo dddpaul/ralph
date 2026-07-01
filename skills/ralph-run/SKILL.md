@@ -76,10 +76,10 @@ Error: ralph.sh not found. Checked ./ralph.sh and scripts/ralph/ralph.sh. Run /r
 
 ## Step 3: Validate Preconditions
 
-Run the preflight check (the `ralph.preflight` module in the `scripts/` directory next to this SKILL.md — i.e. `~/.claude/skills/ralph-run/scripts`) with the ralph path from Step 2 and the devcontainer flag from Step 1. Set `PYTHONPATH` to that scripts directory so `python -m ralph.preflight` resolves the package:
+Run the preflight check (the `ralph.preflight` module in the `scripts/` directory next to this SKILL.md — i.e. `$HOME/.claude/skills/ralph-run/scripts`) with the ralph path from Step 2 and the devcontainer flag from Step 1. Type the command below **verbatim**, with the literal, unquoted `$HOME` PYTHONPATH, so `python -m ralph.preflight` resolves the package AND the emitted string matches the narrow permission rule `ralph-init` seeds — Claude Code matches command strings literally and does not expand `$HOME`:
 
 ```bash
-PYTHONPATH=<absolute-path-to-scripts-dir> uv run --no-project python -m ralph.preflight "$RALPH_PATH" <devcontainer:true|false> [--verbose] [--tasks <ids>] [--block-end-buffer-min <N>]
+PYTHONPATH=$HOME/.claude/skills/ralph-run/scripts uv run --no-project python -m ralph.preflight "$RALPH_PATH" <devcontainer:true|false> [--verbose] [--tasks <ids>] [--block-end-buffer-min <N>]
 ```
 
 When `verbose=true`, append `--verbose` to the preflight command. This prints one `check <name>: <result>` line per check before the final OK/ERROR line.
@@ -116,10 +116,10 @@ nohup $RALPH_CMD > "$LAUNCH_LOG" 2>&1 & disown
 RALPH_PID=$!
 ```
 
-Wait for the heartbeat file to appear using the `ralph.wait_heartbeat` module (in the `scripts/` directory next to this SKILL.md). Set `PYTHONPATH` to that scripts directory as in Step 3:
+Wait for the heartbeat file to appear using the `ralph.wait_heartbeat` module (in the `scripts/` directory next to this SKILL.md). Use the same literal, unquoted `$HOME` PYTHONPATH form as Step 3, typed verbatim so the emitted string matches the seeded rule:
 
 ```bash
-PYTHONPATH=<absolute-path-to-scripts-dir> uv run --no-project python -m ralph.wait_heartbeat
+PYTHONPATH=$HOME/.claude/skills/ralph-run/scripts uv run --no-project python -m ralph.wait_heartbeat
 ```
 
 It polls 10×1s for a fresh heartbeat (age < 15s). On success it prints `OK heartbeat age=...`, removes the launch log, and exits 0. On failure it prints `FAIL` with tails of both logs and exits 1.

@@ -198,31 +198,28 @@ Read `templates/claude/settings.local.json` → write to `.claude/settings.local
 
 This sub-step is **required** — the template-written `settings.local.json` does not yet contain narrow rules for the ralph-status helper script, and this merge is what avoids over-broad `Bash(bash:*)` permissions. Step 3.10 verifies the merge landed; skipping 3.7b will trip that check.
 
-The ralph-run skill invokes its preflight and heartbeat-wait helpers as Python modules, but **not** as a bare `uv run` command: each invocation (ralph-run Steps 3–4) is prefixed with a `PYTHONPATH=<scripts-dir>` env-assignment — `PYTHONPATH=<abs> uv run --no-project python -m ralph.preflight` / `ralph.wait_heartbeat`. Claude Code's permission matcher compares literal command *prefixes*, so a command that starts with `PYTHONPATH=` never matches a broad `uv run` allow-rule — the leading env-assignment defeats the `uv run` prefix. `preflight` is read-only, so `autoAllowBashIfSandboxed` usually hides it; but `wait_heartbeat` mutates the filesystem (it removes the launch log) and is therefore **not** auto-sandbox-allowed — it falls through to the allow-list, where the env-prefix defeats any broad `uv run` prefix match and a prompt fires. We therefore seed two **narrow, env-prefixed** rules with the resolved absolute scripts dir (one per module), rather than a broad `uv run` rule — which both fails here (env-prefix) and would grant arbitrary `uv run` execution (rejected downstream on security grounds). The merge below also handles the remaining bash-path invocation: `utc-to-moscow.sh`, called by `ralph-status` and `ralph-status-watch`.
+The ralph-run skill invokes its preflight and heartbeat-wait helpers as Python modules, but **not** as a bare `uv run` command: each invocation (ralph-run Steps 3–4) is prefixed with a `PYTHONPATH=<scripts-dir>` env-assignment — `PYTHONPATH=$HOME/.claude/skills/ralph-run/scripts uv run --no-project python -m ralph.preflight` / `ralph.wait_heartbeat`. Claude Code's permission matcher compares literal command *prefixes*, so a command that starts with `PYTHONPATH=` never matches a broad `uv run` allow-rule — the leading env-assignment defeats the `uv run` prefix. `preflight` is read-only, so `autoAllowBashIfSandboxed` usually hides it; but `wait_heartbeat` mutates the filesystem (it removes the launch log) and is therefore **not** auto-sandbox-allowed — it falls through to the allow-list, where the env-prefix defeats any broad `uv run` prefix match and a prompt fires. We therefore seed two **narrow, env-prefixed** rules with the literal `$HOME` scripts dir (one per module), rather than a broad `uv run` rule — which both fails here (env-prefix) and would grant arbitrary `uv run` execution (rejected downstream on security grounds). The merge below also handles the remaining bash-path invocation: `utc-to-moscow.sh`, called by `ralph-status` and `ralph-status-watch`.
 
-**Literal-match gotcha — both forms required for bash-path invocations.** Claude Code's permission matcher compares command strings *literally*. `$HOME` is not expanded before matching. The `utc-to-moscow.sh` resolver block in `ralph-status` / `ralph-status-watch` invokes the script in two distinct shapes:
+**Literal-match gotcha — each rule must match the emitted command verbatim.** Claude Code's permission matcher compares command strings *literally*: `$HOME` is **not** expanded before matching. Each skill is canonicalized to emit exactly **one** literal-`$HOME` form per command, so each narrow rule must verbatim-match that single form:
 
-- `bash /Users/<you>/.claude/skills/ralph-status/scripts/utc-to-moscow.sh` — the absolute-path branch the resolver falls through to.
-- `bash $HOME/.claude/skills/ralph-status/scripts/utc-to-moscow.sh` — the literal `$HOME`-prefixed branch that runs first when the resolved-HOME copy is executable.
+- `ralph-run` Steps 3–4 emit `PYTHONPATH=$HOME/.claude/skills/ralph-run/scripts uv run --no-project python -m ralph.preflight` / `ralph.wait_heartbeat`.
+- `ralph-status` / `ralph-status-watch` emit `bash $HOME/.claude/skills/ralph-status/scripts/utc-to-moscow.sh "$utc_iso"`.
 
-Both forms reach the matcher, so we must write **both** rule shapes for `utc-to-moscow.sh` — otherwise a `$HOME`-form call triggers a permission prompt despite a "narrow" absolute rule existing. The two preflight/heartbeat module rules do **not** need this dual form: ralph-run always invokes them with the *resolved absolute* scripts dir in `PYTHONPATH=` (there is no `$HOME`-literal branch, unlike the utc-to-moscow resolver), so a single absolute-form rule per module suffices.
+Because every emitted string carries a literal `$HOME`, each seeded rule must **also** carry a literal `$HOME` — never a machine-specific absolute path (the expanded value of `$HOME`), which would be non-portable across machines AND would never match the literal-`$HOME` command the skill types.
 
-Add these rules if not already present (4 total — 2 narrow env-prefixed Python-module rules + 2 `utc-to-moscow.sh` forms):
+Add these rules if not already present (3 total — one per command form, all literal `$HOME`):
 
-- `Bash(PYTHONPATH=<RESOLVED_HOME>/.claude/skills/ralph-run/scripts uv run --no-project python -m ralph.preflight:*)`
-- `Bash(PYTHONPATH=<RESOLVED_HOME>/.claude/skills/ralph-run/scripts uv run --no-project python -m ralph.wait_heartbeat:*)`
-- `Bash(bash <RESOLVED_HOME>/.claude/skills/ralph-status/scripts/utc-to-moscow.sh:*)`
+- `Bash(PYTHONPATH=$HOME/.claude/skills/ralph-run/scripts uv run --no-project python -m ralph.preflight:*)`
+- `Bash(PYTHONPATH=$HOME/.claude/skills/ralph-run/scripts uv run --no-project python -m ralph.wait_heartbeat:*)`
 - `Bash(bash $HOME/.claude/skills/ralph-status/scripts/utc-to-moscow.sh:*)`
 
-Use `jq` for the idempotent merge. Note the deliberate quoting: **double-quoted** strings expand `$HOME` to the absolute path; **single-quoted** strings keep the literal `$HOME` characters intact.
+Use `jq` for the idempotent merge. All three rule strings are **single-quoted** so the shell preserves the literal `$HOME` characters (a double-quoted string would expand `$HOME` to a machine-specific absolute path and break the literal match against the command each skill emits).
 ```bash
-RULE_PRE="Bash(PYTHONPATH=$HOME/.claude/skills/ralph-run/scripts uv run --no-project python -m ralph.preflight:*)"
-RULE_HB="Bash(PYTHONPATH=$HOME/.claude/skills/ralph-run/scripts uv run --no-project python -m ralph.wait_heartbeat:*)"
-RULE_UTC_A="Bash(bash $HOME/.claude/skills/ralph-status/scripts/utc-to-moscow.sh:*)"
-RULE_UTC_B='Bash(bash $HOME/.claude/skills/ralph-status/scripts/utc-to-moscow.sh:*)'
-jq --arg rpre "$RULE_PRE" --arg rhb "$RULE_HB" \
-   --arg ra "$RULE_UTC_A" --arg rb "$RULE_UTC_B" \
-  '.permissions.allow = ((.permissions.allow // []) + [$rpre, $rhb, $ra, $rb] | unique)' \
+RULE_PRE='Bash(PYTHONPATH=$HOME/.claude/skills/ralph-run/scripts uv run --no-project python -m ralph.preflight:*)'
+RULE_HB='Bash(PYTHONPATH=$HOME/.claude/skills/ralph-run/scripts uv run --no-project python -m ralph.wait_heartbeat:*)'
+RULE_UTC='Bash(bash $HOME/.claude/skills/ralph-status/scripts/utc-to-moscow.sh:*)'
+jq --arg rpre "$RULE_PRE" --arg rhb "$RULE_HB" --arg rutc "$RULE_UTC" \
+  '.permissions.allow = ((.permissions.allow // []) + [$rpre, $rhb, $rutc] | unique)' \
   .claude/settings.local.json > .claude/settings.local.json.tmp \
   && mv .claude/settings.local.json.tmp .claude/settings.local.json
 ```
@@ -276,40 +273,29 @@ Also append these entries to `.gitignore` (don't duplicate existing lines):
 
 ### 3.10 Verify `settings.local.json` narrow rules landed
 
-After all Step 3.x writes complete, verify the four narrow rules from Step 3.7b are present — the two env-prefixed Python-module rules (`ralph.preflight` and `ralph.wait_heartbeat`, each with the resolved absolute PYTHONPATH) plus both forms (absolute path and literal `$HOME`) of `utc-to-moscow.sh`. This catches silent omissions of the merge sub-step (e.g. if Step 3.7b was accidentally skipped, or `jq` was missing on the host and the pipeline failed without surfacing). For `utc-to-moscow.sh`, both forms must land; missing either one causes a permission prompt when the corresponding skill invocation shape is used.
+After all Step 3.x writes complete, verify the three narrow rules from Step 3.7b are present — the two env-prefixed Python-module rules (`ralph.preflight` and `ralph.wait_heartbeat`, each with the literal `$HOME` PYTHONPATH) plus the literal-`$HOME` `utc-to-moscow.sh` rule. This catches silent omissions of the merge sub-step (e.g. if Step 3.7b was accidentally skipped, or `jq` was missing on the host and the pipeline failed without surfacing). Each rule carries a literal `$HOME`; a missing rule causes a permission prompt when the corresponding skill invocation is used.
 
 For **Documentation / Mixed** projects, the verification additionally checks the two pptx helper rules from Step 3.7c and surfaces a `WARN` naming each missing one. This block is skipped for Code-only projects (where Step 3.7c does not run and the rules are intentionally absent).
 
 ```bash
-# Each entry pairs a human-readable label with its expected literal string.
-# Single-quoted entries keep the literal $HOME characters; double-quoted ones
-# expand $HOME to the absolute path.
-expected_module=(
-  "PYTHONPATH=$HOME/.claude/skills/ralph-run/scripts uv run --no-project python -m ralph.preflight"
-  "PYTHONPATH=$HOME/.claude/skills/ralph-run/scripts uv run --no-project python -m ralph.wait_heartbeat"
-)
-expected_abs=(
-  "$HOME/.claude/skills/ralph-status/scripts/utc-to-moscow.sh"
-)
-expected_home=(
-  '$HOME/.claude/skills/ralph-status/scripts/utc-to-moscow.sh'
+# All three narrow rules carry a literal $HOME. Single-quote each expected
+# string so the grep looks for the literal $HOME characters, not an expanded
+# absolute path.
+expected_rules=(
+  'PYTHONPATH=$HOME/.claude/skills/ralph-run/scripts uv run --no-project python -m ralph.preflight'
+  'PYTHONPATH=$HOME/.claude/skills/ralph-run/scripts uv run --no-project python -m ralph.wait_heartbeat'
+  'bash $HOME/.claude/skills/ralph-status/scripts/utc-to-moscow.sh'
 )
 missing=()
-for p in "${expected_module[@]}"; do
-  grep -q -F "$p" .claude/settings.local.json || missing+=("module: $p")
-done
-for p in "${expected_abs[@]}"; do
-  grep -q -F "$p" .claude/settings.local.json || missing+=("absolute: $p")
-done
-for p in "${expected_home[@]}"; do
-  grep -q -F "$p" .claude/settings.local.json || missing+=("\$HOME-form: $p")
+for p in "${expected_rules[@]}"; do
+  grep -q -F "$p" .claude/settings.local.json || missing+=("$p")
 done
 if (( ${#missing[@]} > 0 )); then
   echo "WARN: settings.local.json missing narrow rules:"
   printf '  - %s\n' "${missing[@]}"
   echo "Re-run the jq merge from Step 3.7b to fix."
 else
-  echo "PASS: all 4 narrow rules (ralph.preflight + ralph.wait_heartbeat module rules + utc-to-moscow.sh absolute + \$HOME-form) present in settings.local.json"
+  echo "PASS: all 3 narrow rules (ralph.preflight + ralph.wait_heartbeat module rules + utc-to-moscow.sh, all literal \$HOME) present in settings.local.json"
 fi
 
 # Documentation / Mixed projects only: also verify the two pptx helper rules
@@ -549,7 +535,7 @@ For each file the user approved:
 - **`.git/hooks/pre-commit`**: overwrite from `templates/git-hooks/pre-commit`, then `chmod +x`. Also re-assert `git config --local core.precomposeunicode true` (idempotent — no-op if already set) so the macOS NFD-on-write defense ships alongside the hook.
 - **`.claude/settings.json`**: overwrite from `templates/claude/settings.json`.
 - **`.claude/hooks/`**: for each `templates/claude/hooks/*-guard.sh` and `templates/claude/hooks/task-validator.sh`, overwrite `.claude/hooks/<name>.sh`, then `chmod +x`. Create directory if needed.
-- **`.claude/settings.local.json`**: overwrite from `templates/claude/settings.local.json`. Then run the same narrow-rule merge as Step 3.7b (writes the two env-prefixed `ralph.preflight` / `ralph.wait_heartbeat` Python-module rules plus **both** the absolute-path and literal-`$HOME` forms of the `utc-to-moscow.sh` rule — 4 rules total — via `jq`, idempotent through `unique`). **If the project is Documentation or Mixed** (detect via existing `.obsidian/` directory), also run the Step 3.7c pptx merge so the overwrite does not strip the `Bash(python scripts/office/soffice.py:*)` and `Bash(pdftoppm:*)` rules. User-added custom permissions in the existing `allow` array are preserved by the `+ unique` merge. After the merge(s), run the Step 3.10 verification block to confirm all rules landed; surface any `WARN` to the user before completing the upgrade.
+- **`.claude/settings.local.json`**: overwrite from `templates/claude/settings.local.json`. Then run the same narrow-rule merge as Step 3.7b (writes the three literal-`$HOME` narrow rules — the `ralph.preflight` / `ralph.wait_heartbeat` Python-module rules plus the `utc-to-moscow.sh` rule — 3 rules total, all literal `$HOME`, via `jq`, idempotent through `unique`). **If the project is Documentation or Mixed** (detect via existing `.obsidian/` directory), also run the Step 3.7c pptx merge so the overwrite does not strip the `Bash(python scripts/office/soffice.py:*)` and `Bash(pdftoppm:*)` rules. User-added custom permissions in the existing `allow` array are preserved by the `+ unique` merge. After the merge(s), run the Step 3.10 verification block to confirm all rules landed; surface any `WARN` to the user before completing the upgrade.
 - **`.devcontainer/devcontainer.json`**: overwrite from `templates/devcontainer/devcontainer.json`.
 - **`.devcontainer/init-firewall.sh`**: overwrite from `templates/devcontainer/init-firewall.sh`, then `chmod +x`.
 - **`CLAUDE.md` (special merge)**:
