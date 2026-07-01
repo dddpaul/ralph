@@ -73,7 +73,7 @@ utc_iso="<completed_at value>"
 if [ -x "./skills/ralph-status/scripts/utc-to-moscow.sh" ]; then
   moscow_time=$(bash ./skills/ralph-status/scripts/utc-to-moscow.sh "$utc_iso")
 elif [ -x "$HOME/.claude/skills/ralph-status/scripts/utc-to-moscow.sh" ]; then
-  moscow_time=$(bash "$HOME/.claude/skills/ralph-status/scripts/utc-to-moscow.sh" "$utc_iso")
+  moscow_time=$(bash $HOME/.claude/skills/ralph-status/scripts/utc-to-moscow.sh "$utc_iso")
 fi
 ```
 
