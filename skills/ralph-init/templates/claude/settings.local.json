@@ -28,7 +28,6 @@
       "Bash(git rm:*)",
       "Bash(./ralph.sh:*)",
       "Bash(nohup ./ralph.sh:*)",
-      "Bash(uv run:*)",
       "Bash(ccusage:*)",
       "Bash(grep:*)",
       "Bash(stat:*)",
