@@ -145,7 +145,7 @@ Re-run the grep until it reports OK. The same rule is enforced post-merge as `ta
 
 ## What next? (after create)
 
-Immediately after the mandatory self-check passes — and **before** any branch creation, implementation, or skill-stop — surface a structured choice to the user instead of silently proceeding into interactive implementation. Use the `AskUserQuestion` tool.
+Immediately after the mandatory self-check passes — and **before** any branch creation, implementation, or skill-stop — surface a structured choice to the user instead of silently proceeding into interactive implementation. Use the `AskUserQuestion` tool. This is the create-lane instance of the universal **Implementation Mode Gate** in CLAUDE.md; both default to **Ralph** (option 1, Recommended).
 
 ### The 4-option block (single task)
 
@@ -154,8 +154,8 @@ Immediately after the mandatory self-check passes — and **before** any branch 
 
 | # | Label | Description | Action on selection |
 |---|---|---|---|
-| 1 | Interactive now | "I branch, implement, review, merge in this session." | `backlog task edit <id> -s "In Progress"` → `git checkout -b task-<id>` → CLAUDE.md Task Lifecycle steps 2–6 |
-| 2 | Ralph now | "I launch /ralph-run tasks=<id> watch=5m in the devcontainer." | Invoke `/ralph-run tasks=<id> watch=5m devcontainer=true`. Do NOT pre-set status — Ralph manages it |
+| 1 | Ralph now (Recommended) | "I launch /ralph-run tasks=<id> watch=5m in the devcontainer." | Invoke `/ralph-run tasks=<id> watch=5m devcontainer=true`. Do NOT pre-set status — Ralph manages it |
+| 2 | Interactive now | "I branch, implement, review, merge in this session." | `backlog task edit <id> -s "In Progress"` → `git checkout -b task-<id>` → CLAUDE.md Task Lifecycle steps 2–6 |
 | 3 | Continue chatting | "Task waits in To Do; you decide later." | One-line acknowledgment. No state change |
 | 4 | Other | "Type your own — e.g., 'ralph 1,2 not 3 without watch', 'interactive but skip review'." | Ask one clarifying question, then act. If still ambiguous after the clarification → fall back to option 3 |
 
@@ -165,18 +165,18 @@ When the same trigger turn produced multiple tasks (a batch dictated in one brea
 
 - **Question stem:** `Tasks TASK-<id1>, TASK-<id2>, ... created. What next?`
 - **Header:** `What next?`
-- **Option 2 description switches to:** `/ralph-run tasks=<id1>,<id2>,... watch=5m`
+- **Option 1 description switches to:** `/ralph-run tasks=<id1>,<id2>,... watch=5m`
 
-The four labels stay the same. Action mapping for option 2 passes the comma-joined task list to `/ralph-run` (still with `devcontainer=true`).
+The four labels stay the same. Action mapping for option 1 passes the comma-joined task list to `/ralph-run` (still with `devcontainer=true`).
 
 ### Skip condition (no prompt fires)
 
-If the trigger turn already contained an unambiguous execution-mode verb, skip the prompt and act directly. Bar for skip is high: a verb that names the execution mode. Vague tails ("...and we'll see") do NOT skip — they fire the prompt.
+If the trigger turn already contained an unambiguous execution-mode verb, skip the prompt and act directly. Bar for skip is high: a verb that **names the execution mode**. Bare implementation verbs ("...and start it", "implement X", "fix it now") do NOT name a mode — they fire the prompt (which defaults to Ralph), matching the universal Implementation Mode Gate in CLAUDE.md. Vague tails ("...and we'll see") also fire the prompt.
 
 | Intent in trigger turn | Action without prompting |
 |---|---|
-| "...and start it" / "implement X" / "fix it now" | Option 1 path |
-| "...and ralph it" / "run it with ralph" / "автономно" | Option 2 path |
+| "...and ralph it" / "run it with ralph" / "автономно" | Option 1 (Ralph) path |
+| "...implement it interactively" / "do it here in this session" | Option 2 (Interactive) path |
 | "...for later" / "just log it" / "на потом" | Option 3 path |
 
 ### Defensive defaults
