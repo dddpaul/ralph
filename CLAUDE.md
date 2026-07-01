@@ -19,6 +19,22 @@ After completing the task, output:
 
 Then run `backlog task list -s "To Do" --plain`: if none remain → reply `<promise>COMPLETE</promise>`; if tasks remain → end your response.
 
+## Implementation Mode Gate
+
+In an **interactive session**, before implementing ANY backlog task — whether named by the user, selected from the backlog, freshly created, or an accepted handoff — and **before** creating a `task-*` branch or writing any code, ask the user how to run it via the `AskUserQuestion` tool:
+
+- **Question stem:** `How to run TASK-<id>?` · **Header:** `Run mode`
+- **Option 1 — Ralph (Recommended):** launch `/ralph-run tasks=<id> watch=5m devcontainer=true`; Ralph branches, implements, reviews, and merges autonomously. Do NOT pre-set task status — Ralph manages it.
+- **Option 2 — Interactive:** branch (`git checkout -b task-<id>`) and run the Task Lifecycle steps below in this session.
+
+**Skip the prompt only when the user's message already names the mode.** "ralph it" / "run it with ralph" / "автономно" → Ralph path; "do it interactively" / "implement it here in this session" → Interactive path. A bare **"implement TASK-N" / "start it" / "go" / "fix it" / "do it"** does NOT name a mode → the prompt MUST fire (defaulting to Ralph).
+
+**Carve-outs — never ask:**
+- **`MODE: autonomous` runs** — the Ralph loop is already the execution mode; proceed straight into the Task Lifecycle.
+- **Mechanical & edit-deliberation ops** — status changes, `--check-ac` / `--uncheck-ac`, `--append-notes`, label / priority / dependency edits, and task creation / splitting / AC rework are not implementation and never fire the gate.
+
+**Defensive default:** on `AskUserQuestion` failure or an unparseable answer, do NOT silently branch or launch — stop and ask in plain text. This universal gate is the single source of truth for run-mode selection; any narrower create-time or handoff-acceptance prompt defers to it, and all agree Ralph is the default / first option.
+
 ## Task Lifecycle
 
 1. **Gate:** verify a backlog task exists and is "In Progress" — create or update status first.
