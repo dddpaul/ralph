@@ -76,10 +76,10 @@ Error: ralph.sh not found. Checked ./ralph.sh and scripts/ralph/ralph.sh. Run /r
 
 ## Step 3: Validate Preconditions
 
-Run the preflight check (the `ralph.preflight` module in the `scripts/` directory next to this SKILL.md — i.e. `$HOME/.claude/skills/ralph-run/scripts`) with the ralph path from Step 2 and the devcontainer flag from Step 1. Type the command below **verbatim**, with the literal, unquoted `$HOME` PYTHONPATH, so `python -m ralph.preflight` resolves the package AND the emitted string matches the narrow permission rule `ralph-init` seeds — Claude Code matches command strings literally and does not expand `$HOME`:
+Run the preflight check via its bash launcher shim (`preflight.sh` in the `scripts/` directory next to this SKILL.md — i.e. `$HOME/.claude/skills/ralph-run/scripts`) with the ralph path from Step 2 and the devcontainer flag from Step 1. The shim resolves its own directory as `PYTHONPATH` and execs `python -m ralph.preflight`, so the command Claude Code sees leads with `bash` — not an inline env-var assignment — and matches the narrow `Bash(bash <abs-path>:*)` rule `ralph-init` seeds. Type the command below **verbatim**, with the literal, unquoted `$HOME`, because Claude Code matches command strings literally and does not expand `$HOME`:
 
 ```bash
-PYTHONPATH=$HOME/.claude/skills/ralph-run/scripts uv run --no-project python -m ralph.preflight "$RALPH_PATH" <devcontainer:true|false> [--verbose] [--tasks <ids>] [--block-end-buffer-min <N>]
+bash $HOME/.claude/skills/ralph-run/scripts/preflight.sh "$RALPH_PATH" <devcontainer:true|false> [--verbose] [--tasks <ids>] [--block-end-buffer-min <N>]
 ```
 
 When `verbose=true`, append `--verbose` to the preflight command. This prints one `check <name>: <result>` line per check before the final OK/ERROR line.
@@ -116,10 +116,10 @@ nohup $RALPH_CMD > "$LAUNCH_LOG" 2>&1 & disown
 RALPH_PID=$!
 ```
 
-Wait for the heartbeat file to appear using the `ralph.wait_heartbeat` module (in the `scripts/` directory next to this SKILL.md). Use the same literal, unquoted `$HOME` PYTHONPATH form as Step 3, typed verbatim so the emitted string matches the seeded rule:
+Wait for the heartbeat file to appear using the `wait-heartbeat.sh` launcher shim (in the `scripts/` directory next to this SKILL.md). Invoke it as `bash <abs-path>` — the same shim pattern as Step 3 (the shim sets its own `PYTHONPATH` and execs `python -m ralph.wait_heartbeat`). Use the literal, unquoted `$HOME` form, typed verbatim so the command matches the seeded `Bash(bash <abs-path>:*)` rule:
 
 ```bash
-PYTHONPATH=$HOME/.claude/skills/ralph-run/scripts uv run --no-project python -m ralph.wait_heartbeat
+bash $HOME/.claude/skills/ralph-run/scripts/wait-heartbeat.sh
 ```
 
 It polls 10×1s for a fresh heartbeat (age < 15s). On success it prints `OK heartbeat age=...`, removes the launch log, and exits 0. On failure it prints `FAIL` with tails of both logs and exits 1.
