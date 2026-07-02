@@ -2,7 +2,7 @@
 
 ![Ralph](ralph.webp)
 
-Ralph is an autonomous AI agent loop that runs AI coding tools ([Claude Code](https://docs.anthropic.com/en/docs/claude-code) or [opencode](https://opencode.ai)) repeatedly until all backlog tasks are complete. Each iteration is a fresh instance with clean context. Memory persists via git history, backlog task notes, and CLAUDE.md/AGENTS.md files.
+Ralph is an autonomous AI agent loop that runs AI coding tools ([Claude Code](https://docs.anthropic.com/en/docs/claude-code) or [opencode](https://opencode.ai)) repeatedly until all backlog tasks are complete. The loop itself is a Python orchestrator; each project keeps a thin `ralph.sh` shim that execs it via [uv](https://docs.astral.sh/uv/). Each iteration is a fresh instance with clean context. Memory persists via git history, backlog task notes, and CLAUDE.md/AGENTS.md files.
 
 Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/) and [Ryan Carson's original Ralph implementation](https://x.com/ryancarson/status/2008548371712135632).
 
@@ -15,9 +15,10 @@ The original Ralph uses a single `prd.json` file with `jq` parsing, a shared `pr
 - One of the following AI coding tools installed and authenticated:
   - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`npm install -g @anthropic-ai/claude-code`) (default)
   - [opencode](https://opencode.ai) (`npm install -g @opencode/cli`)
+- [uv](https://docs.astral.sh/uv/) with Python 3.14 — the Ralph loop runs a Python orchestrator (`ralph.sh` execs `ralph_orchestrator.py` via `uv run`), so both are required regardless of your project's own language
 - [Backlog.md CLI](https://github.com/MrLesk/Backlog.md) installed
 - A git repository for your project
-- For running tests: [bats-core](https://github.com/bats-core/bats-core) (`npm install` or see [bats-core installation](https://github.com/bats-core/bats-core#installation))
+- For running tests: [bats-core](https://github.com/bats-core/bats-core) (`npm install` or see [bats-core installation](https://github.com/bats-core/bats-core#installation)) for the bash tests; the Python orchestrator tests run under `uv run pytest`
 
 ## First-time setup
 
@@ -143,7 +144,7 @@ Default is 10 iterations. Use `--tool claude` (default) or `--tool opencode` to 
 | Option | Description | Default |
 |--------|-------------|---------|
 | `--tool <claude\|opencode>` | AI tool to use | `claude` |
-| `--model <model_id>` | Model ID for Claude Code | `claude-opus-4-6` |
+| `--model <model_id>` | Model ID for Claude Code | `claude-opus-4-8` |
 | `--effort <level>` | Thinking effort for Claude Code: `low`, `medium`, `high`, or `max` | `medium` |
 | `--timeout <minutes>` | Per-iteration timeout in minutes | `15` |
 | `--on-error <strategy>` | How to handle AI tool errors: `stop`, `continue`, or `retry` | `stop` |
@@ -216,7 +217,7 @@ Step 6 of the review also runs a distillation **soft warning** scan: it greps ea
 CLAUDE.md serves both autonomous (Ralph loop) and interactive (human-driven) development:
 
 - **Autonomous mode**: Ralph loop prepends `MODE: autonomous` to the prompt. The agent picks tasks from the backlog and works through them.
-- **Interactive mode**: No mode prefix. The agent creates a backlog task for every code change request before implementing.
+- **Interactive mode**: No mode prefix. The agent creates a backlog task for every code change request before implementing. Before implementing any task, it hits the **Implementation Mode Gate** — an `AskUserQuestion` prompt asking how to run it: **Ralph** (default/recommended — launch `/ralph-run` so Ralph branches, implements, reviews, and merges autonomously) or **Interactive** (branch and run the Task Lifecycle in the current session). Autonomous runs skip the gate; the loop is already the execution mode.
 
 The same workflow (branch, implement, review, merge) applies in both modes.
 
@@ -224,7 +225,7 @@ The same workflow (branch, implement, review, merge) applies in both modes.
 
 | File | Purpose |
 |------|---------|
-| `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool claude\|opencode` and `--devcontainer`) |
+| `ralph.sh` | Thin shim that execs the canonical Python orchestrator via `uv run` (supports `--tool claude\|opencode` and `--devcontainer`) |
 | `CLAUDE.md` | Agent instructions for Claude Code (autonomous + interactive) |
 | `agents/` | User-global agents (copy to `~/.claude/agents/`) |
 | `backlog/` | Task files managed by backlog.md CLI |
@@ -282,7 +283,7 @@ Each task gets its own branch (`task-<id>-description`) created from master. Aft
 
 ### Mandatory Code Review
 
-Every task branch is reviewed before merging. The agent spawns an Explore agent to check acceptance criteria, functionality, security, code style, and test coverage. Only approved branches get merged.
+Every task branch is reviewed before merging. The agent spawns the `task-reviewer` agent to check acceptance criteria, functionality, security, code style, and test coverage. Only approved branches get merged.
 
 ### Git Hooks
 
@@ -380,9 +381,14 @@ git log --oneline -10
 
 ## Testing
 
-Ralph uses [bats-core](https://github.com/bats-core/bats-core) for bash script testing. Tests verify argument validation, dependency checks, prompt generation, timeout handling, completion signals, and end-to-end workflows.
+Ralph has two test suites, split by language:
 
-### Install bats-core
+- **Bash tests ([bats-core](https://github.com/bats-core/bats-core))** cover the bash surface — the `ralph.sh` shim, git hooks (pre-commit, commit-msg), PreToolUse guard hooks, argument/dependency checks, and the end-to-end backlog workflow. Run via `npm test`, which invokes `bats tests/unit tests/integration tests/e2e`.
+- **Python tests ([pytest](https://docs.pytest.org/))** cover the orchestrator (`skills/ralph-run/scripts/ralph/*.py`) — argument parsing, the iteration loop, heartbeat, status file, preflight, usage checks, tool wrappers (claude/opencode), summary, and signal handling. Run via `uv run pytest`.
+
+### Bash tests (bats)
+
+Install bats-core:
 
 **Option 1: npm (recommended)**
 
@@ -394,10 +400,10 @@ npm install
 
 See [bats-core installation guide](https://github.com/bats-core/bats-core#installation) for your platform.
 
-### Run tests
+Run them:
 
 ```bash
-# Run all tests
+# Run all bash tests (bats over tests/unit, tests/integration, tests/e2e)
 npm test
 
 # Run unit tests only
@@ -410,33 +416,55 @@ npm run test:integration
 npm run test:e2e
 ```
 
-### Test structure
+### Python tests (pytest)
 
-- `tests/unit/` - Unit tests for individual functions (argument validation, dependency checks)
-- `tests/integration/` - Integration tests for component interactions (prompt generation, timeout handling, completion signal)
+The orchestrator suite lives at `skills/ralph-run/tests/test_*.py`; test paths and `pythonpath` are configured in `pyproject.toml`. Run it with uv:
+
+```bash
+# Run the full orchestrator suite
+uv run pytest
+
+# Run a single test file
+uv run pytest skills/ralph-run/tests/test_loop_exit_code.py
+```
+
+### Test layout
+
+**Bash (`tests/`)** — run by `npm test`:
+
+- `tests/unit/` - Unit tests for individual bash functions and hooks
+  - `argument-validation.bats` - Validates CLI arguments (--tool, --devcontainer, max_iterations)
+  - `commit-msg-hook.bats` - Tests the commit-msg hook (forbidden-trailer / scissor-line handling)
+  - `dependency-checks.bats` - Tests dependency verification (git, backlog CLI, AI tools)
+  - `pre-commit-hook.bats` - Tests the pre-commit hook (NFC/NFD filename normalization)
+  - `pretools-hooks.bats` - Tests PreToolUse guard hooks (blocks forbidden commit trailers)
+  - `run-summary.bats` - Tests run summary generation
+  - `status-file.bats` - Tests status file creation and updates
+  - `usage-check.bats` - Tests the usage/quota check (ccusage block-end buffer)
+- `tests/integration/` - Integration tests for component interactions
+  - `completion-signal.bats` - Tests `<promise>COMPLETE</promise>` detection and loop termination
+  - `interrupt-trap.bats` - Tests signal handling and graceful shutdown on interrupt
+  - `on-error-continue.bats` - Tests the `--on-error continue` strategy across failed iterations
+  - `one-task-enforcement.bats` - Tests that each iteration completes exactly one task
+  - `prompt-generation.bats` - Tests prompt template loading and MODE: autonomous prefix injection
+  - `run-summary-integration.bats` - Tests run summary across multiple iterations
+  - `shim.bats` - Tests that the `ralph.sh` shim matches the canonical orchestrator
+  - `status-file-integration.bats` - Tests status file updates across iterations
+  - `tee-buffering.bats` - Tests output buffering with tee
+  - `timeout-handling.bats` - Tests iteration timeout and graceful shutdown
+  - `usage-pause.bats` - Tests preflight pausing the launch when usage limits are near
 - `tests/e2e/` - End-to-end tests for full workflows with real backlog tasks
+  - `backlog_workflow.bats` - End-to-end test of the full backlog task workflow
 - `tests/helpers/` - Shared test utilities and mocks (`common.bash`)
 
-### Test files
+**Python (`skills/ralph-run/tests/`)** — run by `uv run pytest`:
 
-**Unit tests** (`tests/unit/`):
-- `argument-validation.bats` - Validates CLI arguments (--tool, --devcontainer, max_iterations)
-- `dependency-checks.bats` - Tests dependency verification (git, backlog CLI, AI tools)
-- `run-summary.bats` - Tests run summary generation
-- `status-file.bats` - Tests status file creation and updates
-
-**Integration tests** (`tests/integration/`):
-- `completion-signal.bats` - Tests `<promise>COMPLETE</promise>` detection and loop termination
-- `interrupt-trap.bats` - Tests signal handling and graceful shutdown on interrupt
-- `one-task-enforcement.bats` - Tests that each iteration completes exactly one task
-- `prompt-generation.bats` - Tests prompt template loading and MODE: autonomous prefix injection
-- `run-summary-integration.bats` - Tests run summary across multiple iterations
-- `status-file-integration.bats` - Tests status file updates across iterations
-- `tee-buffering.bats` - Tests output buffering with tee
-- `timeout-handling.bats` - Tests iteration timeout and graceful shutdown
-
-**E2E tests** (`tests/e2e/`):
-- `backlog_workflow.bats` - End-to-end test of the full backlog task workflow
+- Argument & prompt handling - `test_orchestrator_args.py`, `test_prompts.py`
+- Iteration loop - `test_loop_*.py` (exit codes, summaries, task whitelist, run log, devcontainer launch, signal interrupts)
+- Heartbeat & status file - `test_heartbeat.py`, `test_wait_heartbeat.py`, `test_status.py`
+- Preflight & usage checks - `test_preflight.py`, `test_usage_check.py`, `test_usage_wrapper.py`
+- Tool wrappers - `test_tool_claude.py`, `test_tool_opencode.py`, `test_tools.py`
+- Devcontainer, signals, summary, task selection, end-to-end - `test_devcontainer.py`, `test_signals.py`, `test_summary.py`, `test_tasks.py`, `test_e2e_fake_claude.py`
 
 ## Customizing
 
