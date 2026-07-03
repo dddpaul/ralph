@@ -41,11 +41,16 @@ def test_fresh_heartbeat_returns_0(
     assert captured.out.endswith("\n")
 
 
-def test_fresh_heartbeat_deletes_launch_log(
+def test_fresh_heartbeat_leaves_launch_log(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """wait_heartbeat is read-only: a successful poll must NOT touch the launch log.
+
+    Launch-log cleanup was relocated to the ralph-run skill's Step 4
+    (``… && rm -f backlog/.ralph-launch.log``); the module only reads.
+    """
     monkeypatch.chdir(tmp_path)
     (tmp_path / "backlog").mkdir()
     hb = tmp_path / "backlog" / ".ralph-heartbeat"
@@ -55,7 +60,8 @@ def test_fresh_heartbeat_deletes_launch_log(
     rc = wait_heartbeat.main()
     _ = capsys.readouterr()
     assert rc == 0
-    assert not launch_log.exists()
+    assert launch_log.exists()
+    assert launch_log.read_text() == "noise\n"
 
 
 def test_stale_heartbeat_returns_1(

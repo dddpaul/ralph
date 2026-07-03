@@ -3,8 +3,8 @@
 Polls ``backlog/.ralph-heartbeat`` once per second for up to ten seconds.
 Returns:
 
-* ``0`` — a heartbeat younger than 15 seconds was observed (and the
-  ``backlog/.ralph-launch.log`` is then unlinked, matching bash).
+* ``0`` — a heartbeat younger than 15 seconds was observed. This module is
+  read-only; the caller (ralph-run Step 4) removes the launch log.
 * ``1`` — no fresh heartbeat after ten polls; the last 20 lines of
   ``backlog/.ralph-launch.log`` and ``backlog/.ralph-run.log`` are emitted.
 * ``2`` — invocation directory has no ``backlog/`` child.
@@ -58,12 +58,6 @@ def main(argv: list[str] | None = None) -> int:
         age = now - hb_mtime
         if age < 15:
             print(f"OK heartbeat age={age}s after {i}s")
-            try:
-                Path("backlog/.ralph-launch.log").unlink()
-            except FileNotFoundError:
-                pass
-            except OSError:
-                pass
             return 0
 
     print("FAIL no fresh heartbeat after 10s")
