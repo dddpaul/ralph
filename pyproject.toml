@@ -12,16 +12,16 @@ dev = [
 [tool.ruff]
 line-length = 88
 target-version = "py314"
-src = ["skills/ralph-run/scripts"]
+src = ["plugins/ralph/skills/ralph-run/scripts"]
 
 [tool.ruff.lint]
 extend-select = ["I", "B", "UP", "SIM"]
 
 [tool.pyright]
-include = ["skills/ralph-run/scripts"]
-strict = ["skills/ralph-run/scripts"]
+include = ["plugins/ralph/skills/ralph-run/scripts"]
+strict = ["plugins/ralph/skills/ralph-run/scripts"]
 pythonVersion = "3.14"
 
 [tool.pytest.ini_options]
-testpaths = ["skills/ralph-run/tests"]
-pythonpath = ["skills/ralph-run/scripts"]
+testpaths = ["plugins/ralph/skills/ralph-run/tests"]
+pythonpath = ["plugins/ralph/skills/ralph-run/scripts"]

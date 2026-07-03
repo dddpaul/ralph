@@ -1,9 +1,9 @@
 #!/usr/bin/env bats
-# Unit tests for skills/ralph-run/scripts/usage-check.sh
+# Unit tests for plugins/ralph/skills/ralph-run/scripts/usage-check.sh
 
 load '../helpers/common'
 
-USAGE_CHECK="$PROJECT_ROOT/skills/ralph-run/scripts/usage-check.sh"
+USAGE_CHECK="$PROJECT_ROOT/plugins/ralph/skills/ralph-run/scripts/usage-check.sh"
 
 setup() {
   setup_test_dir

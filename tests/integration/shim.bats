@@ -6,7 +6,7 @@
 load '../helpers/common'
 
 SHIM="$(cd "$(dirname "$BATS_TEST_FILENAME")/../.." && pwd)/ralph.sh"
-CANONICAL="$(cd "$(dirname "$BATS_TEST_FILENAME")/../.." && pwd)/skills/ralph-run/scripts/ralph.sh"
+CANONICAL="$(cd "$(dirname "$BATS_TEST_FILENAME")/../.." && pwd)/plugins/ralph/skills/ralph-run/scripts/ralph.sh"
 
 setup() {
   setup_test_dir

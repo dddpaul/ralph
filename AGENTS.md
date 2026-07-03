@@ -29,9 +29,9 @@ backlog task list --plain
 - `CLAUDE.md` - Instructions given to each Claude Code instance
 - `backlog/` - Task files managed by backlog.md CLI
 - `.claude/settings.json` - PreToolUse hooks (all hook logic is inlined here, not in separate scripts)
-- `skills/ralph-init/` - Skill for bootstrapping Ralph in a new project
-- `skills/ralph-prd/` - Skill for generating PRDs
-- `skills/ralph-backlog/` - Skill for converting PRDs to backlog tasks
+- `plugins/ralph/skills/ralph-init/` - Skill for bootstrapping Ralph in a new project
+- `plugins/ralph/skills/ralph-prd/` - Skill for generating PRDs
+- `plugins/ralph/skills/ralph-backlog/` - Skill for converting PRDs to backlog tasks
 - `flowchart/` - Interactive React Flow diagram explaining how Ralph works
 
 ## Flowchart
