@@ -1,0 +1,18 @@
+{
+  "name": "dddpaul-ralph",
+  "owner": {
+    "name": "dddpaul",
+    "url": "https://github.com/dddpaul"
+  },
+  "metadata": {
+    "description": "Ralph autonomous agent workflow for Claude Code, distributed as a plugin.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "ralph",
+      "source": "./plugins/ralph",
+      "description": "Autonomous Claude Code loop over Backlog.md tasks — bundles all ralph-* skills and the task-reviewer and ralph-reviewer agents."
+    }
+  ]
+}
