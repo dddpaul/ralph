@@ -95,29 +95,27 @@ The correct workflow is `git checkout -b task-N` BEFORE the first edit. Sandbox 
 
 ## R11 — Template parity
 
-The Ralph project ships a template tree at `skills/ralph-init/templates/` that is intended to mirror the live project's bootstrap state. Drift between live files and templates is a defect. The reviewer MUST flag any diff that touches one side of these pairs without a corresponding change on the other side (unless the task description explicitly calls out a one-sided change with a justification):
+The Ralph project ships a template tree at `plugins/ralph/skills/ralph-init/templates/` that is intended to mirror the live project's bootstrap state. Drift between live files and templates is a defect. The reviewer MUST flag any diff that touches one side of these pairs without a corresponding change on the other side (unless the task description explicitly calls out a one-sided change with a justification):
 
 | Live path                              | Template path                                                       |
 |----------------------------------------|----------------------------------------------------------------------|
-| `.claude/settings.json`                | `skills/ralph-init/templates/claude/settings.json`                   |
-| `.claude/settings.local.json`          | `skills/ralph-init/templates/claude/settings.local.json`             |
-| `.claude/hooks/<name>.sh`              | `skills/ralph-init/templates/claude/hooks/<name>.sh`                 |
-| `ralph.sh` (thin shim)                 | `skills/ralph-init/templates/root/ralph.sh` (thin shim)              |
-| `CLAUDE.md` (generic section above `## Project-Specific`) | `skills/ralph-init/templates/root/CLAUDE.md` (same region) |
-| `.git/hooks/post-commit`               | `skills/ralph-init/templates/git-hooks/post-commit`                  |
-| `.git/hooks/commit-msg`                | `skills/ralph-init/templates/git-hooks/commit-msg`                   |
-| `.devcontainer/devcontainer.json`      | `skills/ralph-init/templates/devcontainer/devcontainer.json`         |
-| `.devcontainer/init-firewall.sh`       | `skills/ralph-init/templates/devcontainer/init-firewall.sh`          |
+| `.claude/settings.json`                | `plugins/ralph/skills/ralph-init/templates/claude/settings.json`                   |
+| `.claude/settings.local.json`          | `plugins/ralph/skills/ralph-init/templates/claude/settings.local.json`             |
+| `.claude/hooks/<name>.sh`              | `plugins/ralph/skills/ralph-init/templates/claude/hooks/<name>.sh`                 |
+| `ralph.sh` (thin shim)                 | `plugins/ralph/skills/ralph-init/templates/root/ralph.sh` (thin shim)              |
+| `CLAUDE.md` (generic section above `## Project-Specific`) | `plugins/ralph/skills/ralph-init/templates/root/CLAUDE.md` (same region) |
+| `.git/hooks/post-commit`               | `plugins/ralph/skills/ralph-init/templates/git-hooks/post-commit`                  |
+| `.git/hooks/commit-msg`                | `plugins/ralph/skills/ralph-init/templates/git-hooks/commit-msg`                   |
+| `.devcontainer/devcontainer.json`      | `plugins/ralph/skills/ralph-init/templates/devcontainer/devcontainer.json`         |
+| `.devcontainer/init-firewall.sh`       | `plugins/ralph/skills/ralph-init/templates/devcontainer/init-firewall.sh`          |
 
-Note on `ralph.sh`: the parity rule covers only the two thin shim copies above. The canonical orchestrator at `skills/ralph-run/scripts/ralph_orchestrator.py` (plus the `ralph/` package) is the single source of truth and is intentionally excluded from this mirror set — both shim copies must remain byte-identical to each other (a `diff` of the two MUST produce no output), but neither needs to match the canonical. The shim execs the canonical at runtime via `uv run ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/ralph-run/scripts/ralph_orchestrator.py`, so a change to the canonical does NOT trigger a parity finding.
+Note on `ralph.sh`: the parity rule covers only the two thin shim copies above, which now carry a 5-tier orchestrator resolver (see `design/ralph-marketplace-prd.md` US-004) and exec the resolved orchestrator via `uv run "$ORCHESTRATOR"`. The canonical orchestrator at `plugins/ralph/skills/ralph-run/scripts/ralph_orchestrator.py` (plus the `ralph/` package) is the single source of truth and is intentionally excluded from this mirror set — both shim copies must remain byte-identical to each other (a `diff` of the two MUST produce no output), but neither needs to match the canonical. Because the resolver logic lives in the shim itself, any change to it MUST land in both copies (keeping them byte-identical); a change to the canonical does NOT trigger a parity finding.
 
 Note on `CLAUDE.md`: the `## Project-Specific` section is intentionally project-local and is NOT part of the parity rule. Only the generic section above that heading is mirrored.
 
 **Excluded from parity (project-specific):** `.claude/task-reviewer-rules.md` is project-specific content — each project bootstrapped via ralph-init writes its own rules from scratch (or starts without any). The loading mechanism in the task-reviewer agent is templated; the rules content is not. Do NOT flag the absence of a template mirror for this file.
 
-**Excluded from parity (project-local skill):** `.claude/skills/ralph-sync/` is a project-local skill that only loads when Claude Code opens the Ralph repo. It syncs `agents/` and `skills/` to `~/.claude/` and is intrinsically Ralph-repo-specific — other projects don't have `agents/` or `skills/` to sync FROM. ralph-init does NOT template or mirror this skill. Do NOT flag the absence of a template for ralph-sync files.
-
-**Excluded from parity (user-global distribution):** files under `agents/` are user-global content distributed manually; the user copies them to `~/.claude/agents/`, the same way they copy `skills/*` to `~/.claude/skills/`. ralph-init does NOT mirror these into project-local `.claude/agents/` and there is NO template under `skills/ralph-init/templates/claude/agents/`. Do NOT flag the absence of a template mirror for agent files.
+**Excluded from parity (plugin-bundled distribution):** the two agents under `plugins/ralph/agents/` ship inside the `ralph` plugin and are distributed via `/plugin install`, not copied into a project. ralph-init does NOT mirror them into project-local `.claude/agents/` and there is NO template under `plugins/ralph/skills/ralph-init/templates/claude/agents/`. Do NOT flag the absence of a template mirror for agent files.
 
 ## R12 — Markdown deliverables must be logically consistent
 
