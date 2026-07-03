@@ -103,8 +103,8 @@ This gate applies even if autonomous mode is otherwise active — a Source-carry
 - **Build:** `N/A`
 - **Lint:** `uv run ruff check .` (Python); shell scripts must satisfy R5 GNU/BSD portability per `.claude/task-reviewer-rules.md`
 - **Test:** `uv run pytest`
-- **Framework:** Ralph workflow repo — autonomous Claude Code loop (`ralph.sh`) over Backlog.md tasks, with skills under `skills/<name>/` and agents under `agents/<name>.md`.
-- **Skill layout:** skills live at `skills/<name>/SKILL.md` (e.g., `skills/ralph-run/SKILL.md`); agents at `agents/<name>.md`. R11 (`.claude/task-reviewer-rules.md`) additionally requires template parity between live `.claude/` files and `skills/ralph-init/templates/` for the bootstrap content. This repo is NOT a Claude Code plugin marketplace — there is no `.claude-plugin/marketplace.json` or `plugin.json`.
+- **Framework:** Ralph workflow repo — autonomous Claude Code loop (`ralph.sh`) over Backlog.md tasks, with skills under `plugins/ralph/skills/<name>/` and agents under `plugins/ralph/agents/<name>.md`.
+- **Skill layout:** skills live at `plugins/ralph/skills/<name>/SKILL.md` (e.g., `plugins/ralph/skills/ralph-run/SKILL.md`); agents at `plugins/ralph/agents/<name>.md`. R11 (`.claude/task-reviewer-rules.md`) additionally requires template parity between live `.claude/` files and `plugins/ralph/skills/ralph-init/templates/` for the bootstrap content. This repo IS its own Claude Code plugin marketplace — `.claude-plugin/marketplace.json` defines the `dddpaul-ralph` marketplace and `plugins/ralph/.claude-plugin/plugin.json` the single `ralph` plugin (all `ralph-*` skills + both agents). Install with `/plugin marketplace add dddpaul/ralph` then `/plugin install ralph@dddpaul-ralph`.
 
 ### Conventions
 

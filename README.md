@@ -22,16 +22,14 @@ The original Ralph uses a single `prd.json` file with `jq` parsing, a shared `pr
 
 ## First-time setup
 
-Copy agents and skills to your Claude Code user-global config:
+Ralph ships as a single Claude Code plugin (`ralph`) in the `dddpaul-ralph` marketplace, bundling every `ralph-*` skill plus the `task-reviewer` and `ralph-reviewer` agents. Install it once and they become available in every project:
 
-```bash
-cp -r agents/* ~/.claude/agents/
-cp -r skills/* ~/.claude/skills/
+```
+/plugin marketplace add dddpaul/ralph
+/plugin install ralph@dddpaul-ralph
 ```
 
-Both are required. `ralph-init` aborts if `~/.claude/agents/task-reviewer.md` is missing.
-
-**Updating:** after `git pull`, re-run the copy commands above manually. `ralph-init` does not manage `~/.claude/` — the user owns that directory.
+**Updating:** re-run `/plugin marketplace add dddpaul/ralph` (or `/plugin update ralph@dddpaul-ralph`) to pull the latest version. `ralph-init` does not manage `~/.claude/` — the user owns that directory.
 
 ## Setup
 
@@ -49,16 +47,17 @@ chmod +x scripts/ralph/ralph.sh
 
 ### Option 2: Install skills globally
 
-Copy the skills to your AI tool's config for use across all projects:
+Make the skills available across all projects.
 
-For Claude Code
-```bash
-cp -r skills/ralph-* ~/.claude/skills/
+For Claude Code, install the plugin (same as [First-time setup](#first-time-setup)):
+```
+/plugin marketplace add dddpaul/ralph
+/plugin install ralph@dddpaul-ralph
 ```
 
-For opencode
+opencode has no plugin marketplace, so copy the skills manually from the plugin tree:
 ```bash
-cp -r skills/ralph-* ~/.opencode/skills/
+cp -r plugins/ralph/skills/ralph-* ~/.opencode/skills/
 ```
 
 ### Option 3: Run in DevContainer (sandboxed)
@@ -227,16 +226,18 @@ The same workflow (branch, implement, review, merge) applies in both modes.
 |------|---------|
 | `ralph.sh` | Thin shim that execs the canonical Python orchestrator via `uv run` (supports `--tool claude\|opencode` and `--devcontainer`) |
 | `CLAUDE.md` | Agent instructions for Claude Code (autonomous + interactive) |
-| `agents/` | User-global agents (copy to `~/.claude/agents/`) |
+| `.claude-plugin/marketplace.json` | Marketplace manifest — defines the `dddpaul-ralph` marketplace and its one `ralph` plugin |
+| `plugins/ralph/` | The `ralph` plugin (`.claude-plugin/plugin.json` manifest) — bundles all `ralph-*` skills and both agents |
+| `plugins/ralph/agents/` | Plugin-bundled agents: `task-reviewer` and `ralph-reviewer` |
 | `backlog/` | Task files managed by backlog.md CLI |
 | `.devcontainer/` | DevContainer configuration with firewall for sandboxed execution |
-| `skills/ralph-init/` | Skill for bootstrapping Ralph in a new project |
-| `skills/ralph-prd/` | Skill for generating PRDs |
-| `skills/ralph-backlog/` | Skill for converting PRDs to backlog tasks |
-| `skills/ralph-run/` | Skill for launching Ralph in the background from an interactive session |
-| `skills/ralph-status/` | Skill for checking Ralph agent progress |
-| `skills/ralph-status-watch/` | Internal skill for auto-monitoring Ralph via `ScheduleWakeup` (used by `watch` parameter) |
-| `skills/ralph-stop/` | Skill for stopping a running Ralph agent |
+| `plugins/ralph/skills/ralph-init/` | Skill for bootstrapping Ralph in a new project |
+| `plugins/ralph/skills/ralph-prd/` | Skill for generating PRDs |
+| `plugins/ralph/skills/ralph-backlog/` | Skill for converting PRDs to backlog tasks |
+| `plugins/ralph/skills/ralph-run/` | Skill for launching Ralph in the background from an interactive session |
+| `plugins/ralph/skills/ralph-status/` | Skill for checking Ralph agent progress |
+| `plugins/ralph/skills/ralph-status-watch/` | Internal skill for auto-monitoring Ralph via `ScheduleWakeup` (used by `watch` parameter) |
+| `plugins/ralph/skills/ralph-stop/` | Skill for stopping a running Ralph agent |
 | `flowchart/` | Interactive visualization of how Ralph works |
 
 ## Flowchart
@@ -312,7 +313,7 @@ Ralph writes a heartbeat file (`backlog/.ralph-heartbeat`) every 5 seconds while
 
 ### Shim and Canonical Orchestrator
 
-Each project carries a thin `ralph.sh` shim that execs the canonical Python orchestrator bundled by the `ralph-run` skill at `~/.claude/skills/ralph-run/scripts/ralph_orchestrator.py` (run via `uv run`). When launching Ralph, the skill searches for the project shim in priority order:
+Each project carries a thin `ralph.sh` shim that execs the canonical Python orchestrator bundled by the `ralph` plugin at `plugins/ralph/skills/ralph-run/scripts/ralph_orchestrator.py` (run via `uv run`). The shim resolves the orchestrator by precedence (`$RALPH_ORCHESTRATOR`, the in-repo `plugins/ralph/` copy, the legacy `~/.claude/skills/` path, then the newest plugin-cache install), so it works whether Ralph runs from this repo or an installed plugin. When launching Ralph, the `ralph-run` skill searches for the project shim in priority order:
 
 1. `./ralph.sh` — project root (created by `ralph-init`)
 2. `scripts/ralph/ralph.sh` — structured project location
@@ -384,7 +385,7 @@ git log --oneline -10
 Ralph has two test suites, split by language:
 
 - **Bash tests ([bats-core](https://github.com/bats-core/bats-core))** cover the bash surface — the `ralph.sh` shim, git hooks (pre-commit, commit-msg), PreToolUse guard hooks, argument/dependency checks, and the end-to-end backlog workflow. Run via `npm test`, which invokes `bats tests/unit tests/integration tests/e2e`.
-- **Python tests ([pytest](https://docs.pytest.org/))** cover the orchestrator (`skills/ralph-run/scripts/ralph/*.py`) — argument parsing, the iteration loop, heartbeat, status file, preflight, usage checks, tool wrappers (claude/opencode), summary, and signal handling. Run via `uv run pytest`.
+- **Python tests ([pytest](https://docs.pytest.org/))** cover the orchestrator (`plugins/ralph/skills/ralph-run/scripts/ralph/*.py`) — argument parsing, the iteration loop, heartbeat, status file, preflight, usage checks, tool wrappers (claude/opencode), summary, and signal handling. Run via `uv run pytest`.
 
 ### Bash tests (bats)
 
@@ -418,14 +419,14 @@ npm run test:e2e
 
 ### Python tests (pytest)
 
-The orchestrator suite lives at `skills/ralph-run/tests/test_*.py`; test paths and `pythonpath` are configured in `pyproject.toml`. Run it with uv:
+The orchestrator suite lives at `plugins/ralph/skills/ralph-run/tests/test_*.py`; test paths and `pythonpath` are configured in `pyproject.toml`. Run it with uv:
 
 ```bash
 # Run the full orchestrator suite
 uv run pytest
 
 # Run a single test file
-uv run pytest skills/ralph-run/tests/test_loop_exit_code.py
+uv run pytest plugins/ralph/skills/ralph-run/tests/test_loop_exit_code.py
 ```
 
 ### Test layout
@@ -457,7 +458,7 @@ uv run pytest skills/ralph-run/tests/test_loop_exit_code.py
   - `backlog_workflow.bats` - End-to-end test of the full backlog task workflow
 - `tests/helpers/` - Shared test utilities and mocks (`common.bash`)
 
-**Python (`skills/ralph-run/tests/`)** — run by `uv run pytest`:
+**Python (`plugins/ralph/skills/ralph-run/tests/`)** — run by `uv run pytest`:
 
 - Argument & prompt handling - `test_orchestrator_args.py`, `test_prompts.py`
 - Iteration loop - `test_loop_*.py` (exit codes, summaries, task whitelist, run log, devcontainer launch, signal interrupts)
