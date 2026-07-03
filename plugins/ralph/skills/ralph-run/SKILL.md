@@ -76,10 +76,10 @@ Error: ralph.sh not found. Checked ./ralph.sh and scripts/ralph/ralph.sh. Run /r
 
 ## Step 3: Validate Preconditions
 
-Run the preflight check via its bash launcher shim (`preflight.sh` in the `scripts/` directory next to this SKILL.md — i.e. `$HOME/.claude/skills/ralph-run/scripts`) with the ralph path from Step 2 and the devcontainer flag from Step 1. The shim resolves its own directory as `PYTHONPATH` and execs `python -m ralph.preflight`, so the command Claude Code sees leads with `bash` — not an inline env-var assignment — and matches the narrow `Bash(bash <abs-path>:*)` rule `ralph-init` seeds. Type the command below **verbatim**, with the literal, unquoted `$HOME`, because Claude Code matches command strings literally and does not expand `$HOME`:
+Run the preflight check via its bash launcher shim (`preflight.sh` in the `scripts/` directory next to this SKILL.md — i.e. `${CLAUDE_PLUGIN_ROOT}/skills/ralph-run/scripts`) with the ralph path from Step 2 and the devcontainer flag from Step 1. The shim resolves its own directory as `PYTHONPATH` and execs `python -m ralph.preflight`. The harness renders `${CLAUDE_PLUGIN_ROOT}` to the installed plugin directory; preflight is read-only, so sandbox auto-allow covers it and no allow-rule is needed:
 
 ```bash
-bash $HOME/.claude/skills/ralph-run/scripts/preflight.sh "$RALPH_PATH" <devcontainer:true|false> [--verbose] [--tasks <ids>] [--block-end-buffer-min <N>]
+bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-run/scripts/preflight.sh "$RALPH_PATH" <devcontainer:true|false> [--verbose] [--tasks <ids>] [--block-end-buffer-min <N>]
 ```
 
 When `verbose=true`, append `--verbose` to the preflight command. This prints one `check <name>: <result>` line per check before the final OK/ERROR line.
@@ -116,10 +116,10 @@ nohup $RALPH_CMD > "$LAUNCH_LOG" 2>&1 & disown
 RALPH_PID=$!
 ```
 
-Wait for the heartbeat file to appear using the `wait-heartbeat.sh` launcher shim (in the `scripts/` directory next to this SKILL.md). Invoke it as `bash <abs-path>` — the same shim pattern as Step 3 (the shim sets its own `PYTHONPATH` and execs `python -m ralph.wait_heartbeat`). Use the literal, unquoted `$HOME` form, typed verbatim so the command matches the seeded `Bash(bash <abs-path>:*)` rule:
+Wait for the heartbeat file to appear using the `wait-heartbeat.sh` launcher shim (in the `scripts/` directory next to this SKILL.md). Invoke it the same way as the Step 3 preflight — the shim sets its own `PYTHONPATH` and execs `python -m ralph.wait_heartbeat`, and the harness renders `${CLAUDE_PLUGIN_ROOT}` to the installed plugin directory:
 
 ```bash
-bash $HOME/.claude/skills/ralph-run/scripts/wait-heartbeat.sh
+bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-run/scripts/wait-heartbeat.sh
 ```
 
 It polls 10×1s for a fresh heartbeat (age < 15s). On success it prints `OK heartbeat age=...`, removes the launch log, and exits 0. On failure it prints `FAIL` with tails of both logs and exits 1.
