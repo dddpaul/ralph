@@ -5,7 +5,7 @@
 
 load '../helpers/common'
 
-PREFLIGHT="$PROJECT_ROOT/skills/ralph-run/scripts/preflight.sh"
+PREFLIGHT="$PROJECT_ROOT/plugins/ralph/skills/ralph-run/scripts/preflight.sh"
 
 setup() {
   setup_test_dir
@@ -107,7 +107,7 @@ EOF
   mock_backlog_multi "TASK-1 - test" "No tasks found" "TASK-1 - test"
   mock_tool opencode "done"
 
-  export RALPH_USAGE_CHECK_SCRIPT="$PROJECT_ROOT/skills/ralph-run/scripts/usage-check.sh"
+  export RALPH_USAGE_CHECK_SCRIPT="$PROJECT_ROOT/plugins/ralph/skills/ralph-run/scripts/usage-check.sh"
   export RALPH_USAGE_DISABLED_FLAG="$TEST_DIR/.ralph-usage-check-disabled"
 
   cd "$PROJECT_ROOT"
@@ -133,7 +133,7 @@ EOF
 TASK-2 - b" "No tasks found" "TASK-1 - a"
   mock_tool opencode "done"
 
-  export RALPH_USAGE_CHECK_SCRIPT="$PROJECT_ROOT/skills/ralph-run/scripts/usage-check.sh"
+  export RALPH_USAGE_CHECK_SCRIPT="$PROJECT_ROOT/plugins/ralph/skills/ralph-run/scripts/usage-check.sh"
   export RALPH_USAGE_DISABLED_FLAG="$TEST_DIR/.ralph-usage-check-disabled"
 
   cd "$PROJECT_ROOT"

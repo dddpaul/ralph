@@ -1,12 +1,12 @@
 #!/usr/bin/env bats
-# Unit tests for skills/ralph-init/templates/git-hooks/pre-commit
+# Unit tests for plugins/ralph/skills/ralph-init/templates/git-hooks/pre-commit
 #
 # The hook rejects a commit when a staged path's Unicode-normalized (NFC) form
 # collides with an existing tree path that differs only by normalization (NFD vs
 # NFC). See TASK-136 for the downstream incident.
 
 PROJECT_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/../.." && pwd)"
-HOOK="$PROJECT_ROOT/skills/ralph-init/templates/git-hooks/pre-commit"
+HOOK="$PROJECT_ROOT/plugins/ralph/skills/ralph-init/templates/git-hooks/pre-commit"
 
 # Russian й in NFC (U+0439, bytes d0 b9) and NFD (U+0438 U+0306, bytes d0 b8 cc 86).
 NFC_NAME=$(python3 -c 'import unicodedata, sys; sys.stdout.write(unicodedata.normalize("NFC", "й.md"))')
