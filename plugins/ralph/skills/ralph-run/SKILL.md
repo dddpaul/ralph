@@ -119,10 +119,10 @@ RALPH_PID=$!
 Wait for the heartbeat file to appear using the `wait-heartbeat.sh` launcher shim (in the `scripts/` directory next to this SKILL.md). Invoke it the same way as the Step 3 preflight — the shim sets its own `PYTHONPATH` and execs `python -m ralph.wait_heartbeat`, and the harness renders `${CLAUDE_PLUGIN_ROOT}` to the installed plugin directory:
 
 ```bash
-bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-run/scripts/wait-heartbeat.sh
+bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-run/scripts/wait-heartbeat.sh && rm -f backlog/.ralph-launch.log
 ```
 
-It polls 10×1s for a fresh heartbeat (age < 15s). On success it prints `OK heartbeat age=...`, removes the launch log, and exits 0. On failure it prints `FAIL` with tails of both logs and exits 1.
+The shim itself is read-only. It polls 10×1s for a fresh heartbeat (age < 15s). On success it prints `OK heartbeat age=...` and exits 0; the trailing `rm -f` then removes the now-superfluous launch log. On failure it prints `FAIL` with tails of both logs and exits 1 — the `&&` short-circuits, so the launch log survives for the Step 5 failure report.
 
 Relay the command's stdout verbatim. Use the exit code: 0 → proceed to Step 5 success report; 1 → proceed to Step 5 failure report; 2 → invocation error (e.g. not run from project root).
 
