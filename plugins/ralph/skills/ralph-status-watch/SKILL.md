@@ -70,7 +70,7 @@ Apply these rules in order. The first rule that matches determines the output. O
 
 ```bash
 utc_iso="<completed_at value>"
-moscow_time=$(bash $HOME/.claude/skills/ralph-status/scripts/utc-to-moscow.sh "$utc_iso")
+moscow_time=$(bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-status/scripts/utc-to-moscow.sh "$utc_iso")
 ```
 
 **Output:** Full status block (same format as `/ralph-status`):
