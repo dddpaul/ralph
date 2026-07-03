@@ -52,13 +52,18 @@ If not a git repo: `git init -b master`
 If the user-global agent file is missing, print the error and **abort** — do NOT proceed to Step 2 or write any project files.
 
 ```bash
-[ -s "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/ralph-run/scripts/ralph.sh" ] || {
-  echo "ERROR: install user-global skills first via /ralph-sync, then re-run ralph-init"
+CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+find "$CLAUDE_DIR/plugins/cache" -type f \
+  -path '*/ralph/*/skills/ralph-run/scripts/ralph_orchestrator.py' 2>/dev/null \
+  | grep -q . || {
+  echo "ERROR: the ralph plugin is not installed. Install it first, then re-run ralph-init:"
+  echo "  /plugin marketplace add dddpaul/ralph"
+  echo "  /plugin install ralph@dddpaul-ralph"
   exit 1
 }
 ```
 
-The project-root `ralph.sh` written in Step 3.1 is a thin shim that `exec`s the canonical script at `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/ralph-run/scripts/ralph.sh`. If that canonical is missing, the shim points at nothing and the bootstrap is broken. Hard-stop here and instruct the user to install user-global skills first.
+The project-root `ralph.sh` written in Step 3.1 is a thin shim that resolves the Ralph orchestrator wherever the plugin is installed — via a 5-tier precedence (`$RALPH_ORCHESTRATOR`, in-repo source, legacy `~/.claude/skills`, newest plugin-cache install, else error) — and `exec`s it via `uv run`. A freshly scaffolded project has no in-repo source, so its orchestrator comes from the installed plugin cache; if the ralph plugin is not installed the shim has nothing to exec and the bootstrap is broken. Hard-stop here and instruct the user to install the plugin first.
 
 ---
 
