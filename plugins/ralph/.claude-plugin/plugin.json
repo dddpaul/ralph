@@ -1,0 +1,19 @@
+{
+  "name": "ralph",
+  "version": "0.1.0",
+  "description": "Autonomous Claude Code agent loop over Backlog.md tasks. Bundles all ralph-* skills (init, prd, backlog, run, status, review, task, handoff) plus the task-reviewer and ralph-reviewer agents.",
+  "author": {
+    "name": "dddpaul",
+    "url": "https://github.com/dddpaul"
+  },
+  "homepage": "https://github.com/dddpaul/ralph",
+  "repository": "https://github.com/dddpaul/ralph",
+  "license": "MIT",
+  "keywords": [
+    "ralph",
+    "autonomous",
+    "agent",
+    "backlog",
+    "workflow"
+  ]
+}
