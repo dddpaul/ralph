@@ -199,39 +199,9 @@ Read `templates/claude/settings.local.json` → write to `.claude/settings.local
 
 `.claude/settings.json` (the project-wide file that *registers* the hooks with Claude Code) is deliberately **not** written here. The hook scripts on disk are inert until the registration file lands, so this step leaves them dormant. See Step 3.11 for the deferred activation rationale.
 
-### 3.7b Merge narrow script rules into `settings.local.json` permissions
+### 3.7b Merge pptx helper rules into `settings.local.json` (Documentation / Mixed only)
 
-This sub-step is **required** — the template-written `settings.local.json` does not yet contain narrow rules for the ralph-run launcher shims or the ralph-status helper script, and this merge is what avoids over-broad `Bash(bash:*)` permissions. Step 3.10 verifies the merge landed; skipping 3.7b will trip that check.
-
-The ralph-run skill runs its preflight and heartbeat-wait helpers as Python modules. Claude Code parses a Bash command and keys the allow rule on the executable — it strips a fixed set of wrappers (`timeout`, `nice`, `nohup`, etc.) but **not** inline env-var assignments. So a command that leads with an inline env-var assignment — such as a `PYTHONPATH` prefix ahead of `uv run …` — cannot be matched by **any** allow rule, not even one whose literal text repeats that same env-var prefix. To make the invocations allow-listable, each module is wrapped in a thin bash launcher shim (`preflight.sh` / `wait-heartbeat.sh` under `skills/ralph-run/scripts/`) that resolves its own directory as `PYTHONPATH` and execs the module; ralph-run Steps 3–4 then invoke `bash $HOME/.claude/skills/ralph-run/scripts/<name>.sh …`. Because the command now leads with `bash <abs-path>`, it matches a narrow `Bash(bash <abs-path>:*)` rule — the exact pattern the `utc-to-moscow.sh` invocation uses (`ralph-status` / `ralph-status-watch`), which never prompts. (`preflight` is read-only, so `autoAllowBashIfSandboxed` usually hides it anyway; but `wait_heartbeat` mutates the filesystem — it removes the launch log — so it is **not** auto-sandbox-allowed and falls through to the allow-list, where only the `bash <abs-path>` form matches.) A broad `Bash(uv run:*)` rule is rejected on security grounds regardless, so the shim plus narrow-path rule is the only workable approach.
-
-**Literal-match gotcha — each rule must match the emitted command verbatim.** Claude Code's permission matcher compares command strings *literally*: `$HOME` is **not** expanded before matching. Each skill is canonicalized to emit exactly **one** literal-`$HOME` form per command, so each narrow rule must verbatim-match that single form:
-
-- `ralph-run` Steps 3–4 emit `bash $HOME/.claude/skills/ralph-run/scripts/preflight.sh` / `bash $HOME/.claude/skills/ralph-run/scripts/wait-heartbeat.sh`.
-- `ralph-status` / `ralph-status-watch` emit `bash $HOME/.claude/skills/ralph-status/scripts/utc-to-moscow.sh "$utc_iso"`.
-
-Because every emitted string carries a literal `$HOME`, each seeded rule must **also** carry a literal `$HOME` — never a machine-specific absolute path (the expanded value of `$HOME`), which would be non-portable across machines AND would never match the literal-`$HOME` command the skill types.
-
-Add these rules if not already present (3 total — one per command form, all literal `$HOME`):
-
-- `Bash(bash $HOME/.claude/skills/ralph-run/scripts/preflight.sh:*)`
-- `Bash(bash $HOME/.claude/skills/ralph-run/scripts/wait-heartbeat.sh:*)`
-- `Bash(bash $HOME/.claude/skills/ralph-status/scripts/utc-to-moscow.sh:*)`
-
-Use `jq` for the idempotent merge. All three rule strings are **single-quoted** so the shell preserves the literal `$HOME` characters (a double-quoted string would expand `$HOME` to a machine-specific absolute path and break the literal match against the command each skill emits).
-```bash
-RULE_PRE='Bash(bash $HOME/.claude/skills/ralph-run/scripts/preflight.sh:*)'
-RULE_HB='Bash(bash $HOME/.claude/skills/ralph-run/scripts/wait-heartbeat.sh:*)'
-RULE_UTC='Bash(bash $HOME/.claude/skills/ralph-status/scripts/utc-to-moscow.sh:*)'
-jq --arg rpre "$RULE_PRE" --arg rhb "$RULE_HB" --arg rutc "$RULE_UTC" \
-  '.permissions.allow = ((.permissions.allow // []) + [$rpre, $rhb, $rutc] | unique)' \
-  .claude/settings.local.json > .claude/settings.local.json.tmp \
-  && mv .claude/settings.local.json.tmp .claude/settings.local.json
-```
-
-### 3.7c Merge pptx helper rules into `settings.local.json` (Documentation / Mixed only)
-
-**Gate:** run this sub-step **only when `project_type ∈ {Documentation, Mixed}`** (Q0 answer B or C). For **Code-only** projects (Q0 answer A), skip entirely — print `[skip] 3.7c pptx helper rules (Code-only project)` and proceed to Step 3.8. This gate is what keeps Code-only `settings.local.json` free of pptx rules.
+**Gate:** run this sub-step **only when `project_type ∈ {Documentation, Mixed}`** (Q0 answer B or C). For **Code-only** projects (Q0 answer A), skip entirely — print `[skip] 3.7b pptx helper rules (Code-only project)` and proceed to Step 3.8. This gate is what keeps Code-only `settings.local.json` free of pptx rules.
 
 Documentation / Mixed projects provision Obsidian + devcontainer support for presentation work (Step 3.9). The `example-skills:pptx` skill body shells out to two commands not covered by the template allowlist:
 
@@ -243,7 +213,7 @@ Without these rules, every pptx conversion in a Documentation/Mixed project trip
 - `Bash(python scripts/office/soffice.py:*)`
 - `Bash(pdftoppm:*)`
 
-Use `jq` for the idempotent merge (same `+ unique` pattern as Step 3.7b, so re-running init never duplicates rules):
+Use `jq` for the idempotent merge (the `+ unique` pattern means re-running init never duplicates rules):
 ```bash
 PPTX1='Bash(python scripts/office/soffice.py:*)'
 PPTX2='Bash(pdftoppm:*)'
@@ -253,7 +223,7 @@ jq --arg p1 "$PPTX1" --arg p2 "$PPTX2" \
   && mv .claude/settings.local.json.tmp .claude/settings.local.json
 ```
 
-Both rules use single-quoted bash strings: there is no `$HOME` to expand here (unlike Step 3.7b), so the literal characters must be preserved verbatim.
+Both rules use single-quoted bash strings: there is no `$HOME` to expand, so the literal characters must be preserved verbatim.
 
 ### 3.8 `.claude/brainstorm-rules.md`
 Read `templates/claude/brainstorm-rules.md` → write to `.claude/brainstorm-rules.md`. Skip if file already exists (same skip-if-exists policy as other init files in Step 3).
@@ -276,36 +246,15 @@ Also append these entries to `.gitignore` (don't duplicate existing lines):
 .obsidian/community-plugins.json
 ```
 
-### 3.10 Verify `settings.local.json` narrow rules landed
+### 3.10 Verify `settings.local.json` pptx helper rules landed (Documentation / Mixed only)
 
-After all Step 3.x writes complete, verify the three narrow rules from Step 3.7b are present — the two bash launcher-shim rules (`preflight.sh` and `wait-heartbeat.sh` under `skills/ralph-run/scripts/`, each a literal-`$HOME` `bash <abs-path>` form) plus the literal-`$HOME` `utc-to-moscow.sh` rule. This catches silent omissions of the merge sub-step (e.g. if Step 3.7b was accidentally skipped, or `jq` was missing on the host and the pipeline failed without surfacing). Each rule carries a literal `$HOME`; a missing rule causes a permission prompt when the corresponding skill invocation is used.
+The ralph-run preflight / heartbeat-wait helpers and the ralph-status `utc-to-moscow.sh` helper are all read-only and invoked as `bash ${CLAUDE_PLUGIN_ROOT}/...`, so `autoAllowBashIfSandboxed` (set in the template `settings.local.json`) authorizes them at run time by what they touch — no seeded allow-rule is required, and there is nothing to verify for them here.
 
-For **Documentation / Mixed** projects, the verification additionally checks the two pptx helper rules from Step 3.7c and surfaces a `WARN` naming each missing one. This block is skipped for Code-only projects (where Step 3.7c does not run and the rules are intentionally absent).
+The only rules this step checks are the two **pptx helper** rules from Step 3.7b, which apply to **Documentation / Mixed** projects. Verify they are present and surface a `WARN` naming each missing one — this catches a silently-skipped 3.7b merge (e.g. if `jq` was missing on the host and the pipeline failed without surfacing). For **Code-only** projects the rules are intentionally absent (Step 3.7b does not run), so skip this step entirely.
 
 ```bash
-# All three narrow rules carry a literal $HOME. Single-quote each expected
-# string so the grep looks for the literal $HOME characters, not an expanded
-# absolute path.
-expected_rules=(
-  'bash $HOME/.claude/skills/ralph-run/scripts/preflight.sh'
-  'bash $HOME/.claude/skills/ralph-run/scripts/wait-heartbeat.sh'
-  'bash $HOME/.claude/skills/ralph-status/scripts/utc-to-moscow.sh'
-)
-missing=()
-for p in "${expected_rules[@]}"; do
-  grep -q -F "$p" .claude/settings.local.json || missing+=("$p")
-done
-if (( ${#missing[@]} > 0 )); then
-  echo "WARN: settings.local.json missing narrow rules:"
-  printf '  - %s\n' "${missing[@]}"
-  echo "Re-run the jq merge from Step 3.7b to fix."
-else
-  echo "PASS: all 3 narrow rules (preflight.sh + wait-heartbeat.sh launcher shims + utc-to-moscow.sh, all bash <abs-path> literal \$HOME) present in settings.local.json"
-fi
-
-# Documentation / Mixed projects only: also verify the two pptx helper rules
-# from Step 3.7c. Skip this entire block for Code-only projects — those rules
-# are intentionally absent there (Step 3.7c does not run).
+# Documentation / Mixed projects only. Code-only projects skip this step —
+# the pptx rules are intentionally absent there (Step 3.7b does not run).
 pptx_expected=(
   'Bash(python scripts/office/soffice.py:*)'
   'Bash(pdftoppm:*)'
@@ -317,7 +266,7 @@ done
 if (( ${#pptx_missing[@]} > 0 )); then
   echo "WARN: settings.local.json missing pptx helper rules (Documentation/Mixed):"
   printf '  - %s\n' "${pptx_missing[@]}"
-  echo "Re-run the jq merge from Step 3.7c to fix."
+  echo "Re-run the jq merge from Step 3.7b to fix."
 else
   echo "PASS: both pptx helper rules present in settings.local.json"
 fi
@@ -374,6 +323,42 @@ Next steps:
      accept, type in this session: "check new task TASK-NNN — do you
      understand, can you run it?"
 ```
+
+---
+
+## Verification: zero-prompt smoke test
+
+Run this manual smoke test once after any change to the init permission flow. It confirms a fresh scaffold launches Ralph with **zero permission prompts except the single devcontainer sandbox bypass** — the property this init flow exists to guarantee. It exercises the real Claude Code permission matcher, which the Python unit tests cannot.
+
+**Why zero seeded rules suffice:** the scaffolded `.claude/settings.local.json` sets `sandbox.enabled: true` and `autoAllowBashIfSandboxed: true`. Under a devcontainer run, sandbox auto-allow authorizes a command by **what it touches, not the script path** — so the ralph-run / ralph-status helpers need no seeded allow-rule. There are no `Bash(bash $HOME/.claude/skills/...:*)` narrow rules to seed or verify; that subsystem was removed.
+
+**Setup — scaffold a throwaway project:**
+
+1. In an empty git repo (`git init`), install the ralph plugin, then run `/ralph-init` and answer **Code-only** (Q0 → A) with the devcontainer **enabled**. Code-only skips Step 3.7b, so the scaffold carries **no** pptx rules and **no** `.claude/skills` narrow rules — only the template allowlist plus the two sandbox keys.
+2. Confirm the scaffold is clean:
+   ```bash
+   # Expect NO output: no seeded narrow skills rules should exist.
+   grep -n '\.claude/skills/ralph' .claude/settings.local.json
+   # Expect { "enabled": true, "autoAllowBashIfSandboxed": true }.
+   jq -c '.sandbox' .claude/settings.local.json
+   ```
+3. Create one trivial task so `/ralph-run` has something to launch: `backlog task create "smoke" -d "noop"`.
+
+**Exercise — from an interactive Claude Code session in that project, run:**
+
+```
+/ralph-run tasks=1 watch=5m devcontainer=true
+```
+
+**Expected result — exactly one prompt:**
+
+- ✅ **Preflight** (`bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-run/scripts/preflight.sh …`) — no prompt. Read-only, so sandbox auto-allow covers it.
+- ✅ **Heartbeat wait** (`bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-run/scripts/wait-heartbeat.sh && rm -f backlog/.ralph-launch.log`) — no prompt. The shim is read-only (TASK-192) and the trailing `rm` only touches `backlog/.ralph-launch.log` inside the workspace, so the whole command stays sandbox-covered.
+- ✅ **ralph-status `utc-to-moscow.sh`** (fired by `watch`) — no prompt. Read-only helper, sandbox-covered.
+- ✅ **backlog / git / jq** helpers — no prompt. Covered by the template allowlist.
+- ⚠️ **Launch** (`nohup $RALPH_CMD > backlog/.ralph-launch.log 2>&1 & disown`) — **one** prompt. ralph-run Step 4 sets `dangerouslyDisableSandbox: true` on this call so the orchestrator gets full OS access (mktemp, /dev/fd, tee, docker); disabling the sandbox always prompts. This is the expected devcontainer bypass and the only prompt allowed to appear.
+
+If any command other than the launch prompts, a seeded-rule regression has crept back in — a helper is no longer read-only or workspace-confined, or its invocation no longer leads with `bash ${CLAUDE_PLUGIN_ROOT}/…`. Fix the helper or skill, not the allowlist: re-adding a narrow rule is exactly the regression this flow removed.
 
 ---
 
@@ -540,7 +525,7 @@ For each file the user approved:
 - **`.git/hooks/pre-commit`**: overwrite from `templates/git-hooks/pre-commit`, then `chmod +x`. Also re-assert `git config --local core.precomposeunicode true` (idempotent — no-op if already set) so the macOS NFD-on-write defense ships alongside the hook.
 - **`.claude/settings.json`**: overwrite from `templates/claude/settings.json`.
 - **`.claude/hooks/`**: for each `templates/claude/hooks/*-guard.sh` and `templates/claude/hooks/task-validator.sh`, overwrite `.claude/hooks/<name>.sh`, then `chmod +x`. Create directory if needed.
-- **`.claude/settings.local.json`**: overwrite from `templates/claude/settings.local.json`. Then run the same narrow-rule merge as Step 3.7b (writes the three literal-`$HOME` narrow rules — the `preflight.sh` / `wait-heartbeat.sh` bash launcher-shim rules plus the `utc-to-moscow.sh` rule — 3 rules total, all `bash <abs-path>` literal `$HOME`, via `jq`, idempotent through `unique`). **If the project is Documentation or Mixed** (detect via existing `.obsidian/` directory), also run the Step 3.7c pptx merge so the overwrite does not strip the `Bash(python scripts/office/soffice.py:*)` and `Bash(pdftoppm:*)` rules. User-added custom permissions in the existing `allow` array are preserved by the `+ unique` merge. After the merge(s), run the Step 3.10 verification block to confirm all rules landed; surface any `WARN` to the user before completing the upgrade.
+- **`.claude/settings.local.json`**: overwrite from `templates/claude/settings.local.json`. **If the project is Documentation or Mixed** (detect via existing `.obsidian/` directory), run the Step 3.7b pptx merge so the overwrite does not strip the `Bash(python scripts/office/soffice.py:*)` and `Bash(pdftoppm:*)` rules. **Code-only** projects need no post-overwrite merge — the ralph-run and ralph-status helpers are read-only and authorized at run time by `autoAllowBashIfSandboxed`, so no seeded allow-rule is required. User-added custom permissions in the existing `allow` array are preserved by the `+ unique` merge. After any merge, run the Step 3.10 verification block (pptx rules, Documentation / Mixed only) and surface any `WARN` to the user before completing the upgrade.
 - **`.devcontainer/devcontainer.json`**: overwrite from `templates/devcontainer/devcontainer.json`.
 - **`.devcontainer/init-firewall.sh`**: overwrite from `templates/devcontainer/init-firewall.sh`, then `chmod +x`.
 - **`CLAUDE.md` (special merge)**:
