@@ -92,6 +92,9 @@ def stubbed_loop(
         lambda whitelist=None: _stub_count_remaining(whitelist),
     )
     monkeypatch.setattr(loop_module.tasks_module, "done_task_ids", lambda: [])
+    monkeypatch.setattr(
+        loop_module.tasks_module, "current_in_progress_task", lambda: None
+    )
     monkeypatch.setattr(loop_module, "check_and_pause", lambda *_a, **_kw: False)
     monkeypatch.setattr(loop_module, "build_tool", lambda *_a, **_kw: _ScriptedTool())
     monkeypatch.setattr(loop_module, "ITER_SLEEP_SEC", 0)

@@ -82,6 +82,9 @@ def stubbed_loop(
     monkeypatch.setattr(loop_module.tasks_module, "pick_next_task", lambda **_: "TASK-1")
     monkeypatch.setattr(loop_module.tasks_module, "count_remaining", lambda *_a, **_kw: 1)
     monkeypatch.setattr(loop_module.tasks_module, "done_task_ids", lambda: [])
+    monkeypatch.setattr(
+        loop_module.tasks_module, "current_in_progress_task", lambda: None
+    )
     monkeypatch.setattr(loop_module, "ITER_SLEEP_SEC", 0)
     monkeypatch.setenv("RALPH_STATUS_FILE", str(tmp_path / "status.json"))
     monkeypatch.setenv("RALPH_HEARTBEAT_FILE", str(tmp_path / "heartbeat"))

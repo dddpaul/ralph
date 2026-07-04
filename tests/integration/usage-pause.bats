@@ -107,9 +107,10 @@ EOF
   mock_backlog_multi "TASK-1 - test" "No tasks found" "TASK-1 - test"
   mock_tool opencode "done"
 
-  export RALPH_USAGE_CHECK_SCRIPT="$PROJECT_ROOT/plugins/ralph/skills/ralph-run/scripts/usage-check.sh"
-  export RALPH_USAGE_DISABLED_FLAG="$TEST_DIR/.ralph-usage-check-disabled"
-
+  # The mid-loop usage check is owned by the Python orchestrator
+  # (ralph/usage_check.py, ported in task-151). It resolves ccusage from PATH —
+  # driven here by the mock — and consults no external script or env override,
+  # so the trip is asserted purely through the ccusage mock above.
   cd "$PROJECT_ROOT"
   run timeout 15 bash ralph.sh --tool opencode --block-end-buffer-min 30 3
   [ "$status" -eq 0 ]
