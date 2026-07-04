@@ -11,7 +11,11 @@ RALPH_SCRIPT="$PROJECT_ROOT/plugins/ralph/skills/ralph-run/scripts/ralph.sh"
 
 # Create a temporary test directory
 setup_test_dir() {
-  TEST_DIR=$(mktemp -d)
+  # Canonicalize the temp dir (pwd -P) so it matches the shim's canonicalized
+  # RALPH_PROJECT_ROOT (also pwd -P). On macOS mktemp -d returns a /var/folders
+  # path that symlinks to /private/var/...; without this the shim.bats tier-2
+  # expected-vs-actual path comparison false-fails. No-op on Linux.
+  TEST_DIR="$(cd "$(mktemp -d)" && pwd -P)"
   export TEST_DIR
   export RALPH_STATUS_FILE="$TEST_DIR/.ralph-status.json"
   export RALPH_RUN_LOG="$TEST_DIR/.ralph-run.log"
