@@ -4,7 +4,7 @@ title: Repoint stale task-reviewer-rules references and harden shim.bats on macO
 status: Done
 assignee: []
 created_date: '2026-07-04 06:23'
-updated_date: '2026-07-04 07:58'
+updated_date: '2026-07-04 08:01'
 labels:
   - 'feature:ralph-marketplace'
 dependencies: []
@@ -56,4 +56,6 @@ Results (commit 0a7420f): AC#1 DONE (lines 3/186/206 repointed to plugins/ralph/
 AC#4 DEFERRED (cannot verify full-suite green — pre-existing, out-of-scope breakage). shim.bats (the file this task fixes) passes 4/4 incl. resolver tier-2. BUT the full bats suite has 71 pre-existing failures IDENTICAL on clean master (stash-and-rerun baseline: 108 ok / 71 not ok both with and without this diff), so this change causes ZERO regression. Root cause: common.bash line 10 RALPH_SCRIPT='$PROJECT_ROOT/plugins/ralph/skills/ralph-run/scripts/ralph.sh' points at a file that is NOT tracked in git (git log for it is empty; only tracked ralph.sh are the two thin shims). task-188 (4c89342, ralph-marketplace relocation) repointed RALPH_SCRIPT there without a sourceable bash ralph.sh existing — the arg-parsing logic moved to the Python orchestrator (ralph_orchestrator.py, 185 pytest tests green) but the bash unit/integration .bats still 'source $RALPH_SCRIPT' and fail 'No such file or directory'. Fixing that is a separate task (restore/port the sourced surface or repoint+rewrite the bash tests) — outside TASK-198's non-blocking-hygiene scope and the autonomous one-task rule. Follow-up task to be filed. My setup_test_dir fix is a Linux no-op (mktemp -d not symlinked here; verified raw==pwd -P) and correctly canonicalizes /var->/private/var on macOS.
 
 Done: task-reviewer APPROVED. Reviewer independently reproduced the 108 ok / 71 not ok baseline on BOTH the branch and clean master (identical failing-test sets → zero regression), confirmed R5 portability (cd/mktemp -d/pwd -P), R14 line-165 historical preservation (git-verified), R12 line-206 intentional-absence, and validated the AC#4 deferral. AC#1/2/3/5/6 met; AC#4 deferred (pre-existing, out-of-scope RALPH_SCRIPT breakage from task-188 — a follow-up task should restore/port the sourced bash surface or repoint+rewrite the bash tests). shim.bats 4/4, pytest 185 passed, ruff clean.
+
+AC#4 deferral follow-up filed: TASK-199 (Fix orphaned RALPH_SCRIPT — 71 bash tests source an untracked ralph.sh). Tracks the pre-existing full-bats-suite breakage that blocks AC#4; out of scope for this task.
 <!-- SECTION:NOTES:END -->
