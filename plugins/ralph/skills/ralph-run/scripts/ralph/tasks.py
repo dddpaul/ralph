@@ -107,6 +107,27 @@ def done_task_ids() -> list[str]:
     return [f"TASK-{n}" for n in unique]
 
 
+def current_in_progress_task() -> str | None:
+    """Return the first ``In Progress`` task ID, or ``None`` if none exist.
+
+    Mirrors ``ralph.sh:849``::
+
+        CURRENT_TASK=$(backlog task list -s 'In Progress' --plain \
+            | grep -o 'TASK-[0-9]*' | head -1)
+
+    The bash orchestrator re-derived ``current_task`` from the live In
+    Progress list after every iteration, so the status file nulled it once
+    the picked task moved to Done. The Python port had left ``current_task``
+    stuck at the last-picked task; this restores the null-clearing contract
+    the ``ralph-status`` / ``ralph-status-watch`` skills read (TASK-200).
+    """
+    out = _backlog_stdout(["task", "list", "-s", "In Progress", "--plain"])
+    if not out or "No tasks found" in out:
+        return None
+    match = _TASK_ID_RE.search(out)
+    return match.group(0) if match else None
+
+
 def count_remaining(whitelist: list[str] | None = None) -> int:
     """Return the count of ``To Do`` tasks; honors whitelist when provided.
 

@@ -32,7 +32,7 @@ from ralph.heartbeat import Heartbeat
 from ralph.prompts import build_prompt
 from ralph.status import ErrorEntry, StatusFile
 from ralph.summary import EXIT_REASONS, RunSummary, print_summary
-from ralph.tools import Tool, ToolResult
+from ralph.tools import IterationSignals, Tool, ToolResult
 from ralph.tools._subprocess import TIMEOUT_EXIT_CODE
 from ralph.tools.claude import ClaudeTool
 from ralph.tools.opencode import OpencodeTool
@@ -239,7 +239,9 @@ def _run_loop(
         )
 
         done_before = set(tasks_module.done_task_ids())
-        result = _invoke_tool(tool, prompt, timeout_sec, installer)
+        result = _invoke_tool_with_retry(
+            tool, prompt, timeout_sec, installer, args, iteration=i
+        )
 
         iter_elapsed = _now_epoch() - iter_start
         state.iter_durations.append(iter_elapsed)
@@ -249,6 +251,18 @@ def _run_loop(
         # before the failure accounting so this surfaces as "interrupted"
         # rather than a generic iteration error.
         installer.raise_if_pending()
+
+        # Bash ralph.sh:838-849 — the one-task-per-iteration summary warning
+        # and the current_task re-derivation both run AFTER the retry loop on
+        # every NON-stopping exit (success, timeout, on-error=continue). On a
+        # stopping exit (--on-error stop, or retry exhausted) bash calls
+        # cleanup_and_exit inside handle_error and never reaches them, so
+        # current_task stays the picked task and no warning prints.
+        terminal_error = result.exit_code not in (0, TIMEOUT_EXIT_CODE)
+        stopping = terminal_error and args.on_error in ("stop", "retry")
+        if not stopping:
+            _warn_task_summary_count(i, result.signals)
+            status.current_task = tasks_module.current_in_progress_task()
 
         if result.exit_code == TIMEOUT_EXIT_CODE:
             msg = f"Iteration {i} timed out after {args.timeout}m"
@@ -276,6 +290,19 @@ def _run_loop(
                 status, status_path, started_epoch, state, iter_elapsed, whitelist
             )
             if args.on_error == "stop":
+                state.exit_reason = "error"
+                state.exit_code = result.exit_code
+                return
+            if args.on_error == "retry":
+                # Retries are exhausted here — _invoke_tool_with_retry would
+                # have looped instead of returning a failure while attempts
+                # remained. Bash printed this and stopped (ralph.sh:652);
+                # on-error=continue falls through to the next iteration.
+                print(
+                    f"ERROR: AI tool failed after {args.retry_count} retries. "
+                    "Stopping.",
+                    file=sys.stderr,
+                )
                 state.exit_reason = "error"
                 state.exit_code = result.exit_code
                 return
@@ -320,6 +347,93 @@ def _invoke_tool(
         )
     finally:
         installer.set_active_subprocess(None)
+
+
+def _invoke_tool_with_retry(
+    tool: Tool,
+    prompt: str,
+    timeout_sec: int,
+    installer: _SignalInstaller,
+    args: ParsedArgs,
+    *,
+    iteration: int,
+) -> ToolResult:
+    """Invoke the tool, re-running on failure when ``--on-error=retry``.
+
+    Mirrors the bash retry loop (``ralph.sh:796-836``). A timed-out attempt
+    (exit :data:`TIMEOUT_EXIT_CODE`) never retries — bash breaks straight out
+    of the retry loop and continues to the next iteration regardless of
+    ``--on-error``. A non-timeout failure with ``--on-error=retry`` re-invokes
+    the tool up to ``--retry-count`` times; a later success is returned as-is
+    so the failure is neither counted nor recorded. Every failed attempt (for
+    all strategies, matching bash ``handle_error`` → ``log_error``) appends an
+    ERROR line to ``--log-file``, independent of the once-per-iteration status
+    error entry the caller records.
+    """
+    retry_attempt = 0
+    while True:
+        result = _invoke_tool(tool, prompt, timeout_sec, installer)
+        installer.raise_if_pending()
+        if result.exit_code in (0, TIMEOUT_EXIT_CODE):
+            return result
+        _append_error_log(
+            args.log_file, iteration, result.exit_code, args.tool, retry_attempt
+        )
+        if args.on_error == "retry" and retry_attempt < args.retry_count:
+            retry_attempt += 1
+            print(
+                f"WARNING: AI tool failed with exit code {result.exit_code}. "
+                f"Retrying (attempt {retry_attempt} of {args.retry_count})...",
+                file=sys.stderr,
+            )
+            installer.raise_if_pending()
+            time.sleep(ITER_SLEEP_SEC)
+            continue
+        return result
+
+
+def _append_error_log(
+    log_file: str,
+    iteration: int,
+    exit_code: int,
+    tool: str,
+    retry_attempt: int,
+) -> None:
+    """Append a bash-parity ERROR line to ``--log-file`` when one is set.
+
+    Mirrors ``log_error`` in ``ralph.sh:614-624`` — a no-op when ``--log-file``
+    is empty. The message body matches the ``handle_error`` payload
+    (``ralph.sh:631``) so an external log parser sees identical text. Write
+    failures are swallowed: a broken log path must not abort the run.
+    """
+    if not log_file:
+        return
+    timestamp = datetime.now(tz=UTC).strftime("%Y-%m-%d %H:%M:%S")
+    line = (
+        f"[{timestamp}] ERROR: Iteration {iteration} failed with exit code "
+        f"{exit_code} (tool: {tool}, retry: {retry_attempt})\n"
+    )
+    with suppress(OSError), Path(log_file).open("a", encoding="utf-8") as handle:
+        handle.write(line)
+
+
+def _warn_task_summary_count(iteration: int, signals: IterationSignals) -> None:
+    """Emit the one-task-per-iteration warning to stderr (bash parity).
+
+    Mirrors ``ralph.sh:838-843``: when the iteration transcript does NOT carry
+    ``<promise>COMPLETE</promise>`` and the ``## Task Summary`` block count is
+    not exactly 1, warn. Fires on timeout and ``--on-error=continue`` exits
+    too — the transcript is parsed from whatever the tool emitted before it
+    died, so a timed-out iteration with 0 blocks still warns.
+    """
+    if signals.complete or signals.task_summary_count == 1:
+        return
+    print(
+        f"WARNING: Iteration {iteration} produced {signals.task_summary_count} "
+        "'## Task Summary' blocks (expected 1). This may indicate the agent "
+        "processed multiple tasks or none.",
+        file=sys.stderr,
+    )
 
 
 def _update_after_iteration(

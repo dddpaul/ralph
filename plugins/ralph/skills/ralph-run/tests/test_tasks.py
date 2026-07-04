@@ -221,3 +221,23 @@ def test_fetch_task_parses_multi_dependency(
     task = tasks.fetch_task("152")
     assert task is not None
     assert task.dependencies == ("TASK-150", "TASK-149")
+
+
+def test_current_in_progress_task_returns_first_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """TASK-200: re-derive current_task from the In Progress list (bash:849);
+    the first listed TASK id wins, matching ``head -1``."""
+    monkeypatch.setattr(
+        tasks,
+        "_backlog_stdout",
+        lambda args: "In Progress:\n  [HIGH] TASK-9 - a\n  [LOW] TASK-12 - b\n",
+    )
+    assert tasks.current_in_progress_task() == "TASK-9"
+
+
+def test_current_in_progress_task_none_when_empty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(tasks, "_backlog_stdout", lambda args: "No tasks found\n")
+    assert tasks.current_in_progress_task() is None
