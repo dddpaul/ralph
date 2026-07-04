@@ -1,9 +1,10 @@
 ---
 id: TASK-199
 title: 'Fix orphaned RALPH_SCRIPT: 71 bash tests source an untracked ralph.sh'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-04 08:00'
+updated_date: '2026-07-04 09:48'
 labels:
   - tech-debt
   - tests
@@ -19,9 +20,21 @@ Discovered during TASK-198. tests/helpers/common.bash line 10 sets RALPH_SCRIPT=
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Root cause chosen and documented: RALPH_SCRIPT either points at a tracked, sourceable ralph.sh, or the affected bash tests are ported/retired to the Python orchestrator
-- [ ] #2 No .bats test fails with 'No such file or directory' sourcing RALPH_SCRIPT
-- [ ] #3 Full bats suite (bats tests/unit tests/integration tests/e2e) passes: 0 failures
-- [ ] #4 uv run pytest still passes (no regression to the 185 Python tests)
-- [ ] #5 uv run ruff check . passes
+- [x] #1 Root cause chosen and documented: RALPH_SCRIPT either points at a tracked, sourceable ralph.sh, or the affected bash tests are ported/retired to the Python orchestrator
+- [x] #2 No .bats test fails with 'No such file or directory' sourcing RALPH_SCRIPT
+- [x] #3 Full bats suite (bats tests/unit tests/integration tests/e2e) passes: 0 failures
+- [x] #4 uv run pytest still passes (no regression to the 185 Python tests)
+- [x] #5 uv run ruff check . passes
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan / Root cause (AC#1): The bash orchestrator was removed in task-156 (cutover to Python) and relocated in task-188; RALPH_SCRIPT="$PROJECT_ROOT/plugins/ralph/skills/ralph-run/scripts/ralph.sh" points at a path that has never existed in git. Chosen remediation = direction (b): repoint/retire the orphaned bash tests to match the Python orchestrator. Option (a) rejected — resurrecting the deleted ~800-line bash orchestrator would regress the entire Python migration. The orchestrator behavior is now owned by 185 pytest tests (test_orchestrator_args, test_summary, test_status, test_preflight, test_signals, test_usage_check, test_loop_*). Baseline: bats 108 ok / 71 not ok. Plan: (1) delete fully-obsolete bats files that source the dead ralph.sh or a deleted .sh (argument-validation, run-summary, status-file, dependency-checks, usage-check, interrupt-trap, timeout-handling, one-task-enforcement); (2) surgically drop only the failing tests in still-useful shim->Python integration files (run-summary-integration, status-file-integration, on-error-continue, usage-pause), keeping their passing smoke tests; (3) remove the orphaned RALPH_SCRIPT pointer from tests/helpers/common.bash. Follow-up task to be filed for Python behavior deltas the retired tests covered (--on-error retry, --log-file, task-summary-count warning, current_task null-clearing).
+
+Follow-up filed: TASK-200 tracks the 4 Python orchestrator behavior deltas (--on-error retry no-op, --log-file no-op, task-summary-count warning not emitted, current_task sticky vs null-cleared) that the retired bats tests previously pinned.
+
+Commit: `a090c1c` - task-199: Retire orphaned bash-orchestrator bats tests (dead RALPH_SCRIPT); orchestrator coverage now owned by the 185-test pytest suite
+
+Done: task-reviewer APPROVED. bats 108/71 -> 102 ok / 0 failures; uv run pytest 185 passed; uv run ruff clean. Deleted 8 obsolete bats files, surgically trimmed 4 shim->Python integration files (kept passing smoke tests), removed orphaned RALPH_SCRIPT from tests/helpers/common.bash. No pytest coverage lost; behavior deltas tracked in TASK-200.
+<!-- SECTION:NOTES:END -->
