@@ -10,31 +10,6 @@ teardown() {
   cleanup_test_dir
 }
 
-@test "on-error continue: ralph executes all iterations after tool failures" {
-  mock_backlog "TASK-1 - Test task"
-  mkdir -p "$TEST_DIR/bin"
-  local call_log="$TEST_DIR/call_log"
-  : > "$call_log"
-  cat > "$TEST_DIR/bin/opencode" <<MOCK
-#!/bin/bash
-echo "called" >> "$call_log"
-exit 1
-MOCK
-  chmod +x "$TEST_DIR/bin/opencode"
-  export PATH="$TEST_DIR/bin:$PATH"
-
-  cd "$PROJECT_ROOT"
-  run timeout 15 bash ralph.sh --tool opencode --on-error continue 3
-
-  local call_count
-  call_count=$(wc -l < "$call_log")
-  [ "$call_count" -eq 3 ]
-
-  [[ "$output" == *"Ralph Iteration 1 of 3"* ]]
-  [[ "$output" == *"Ralph Iteration 2 of 3"* ]]
-  [[ "$output" == *"Ralph Iteration 3 of 3"* ]]
-}
-
 @test "on-error continue: TASKS_COMPLETED excludes failed iterations" {
   mock_backlog "TASK-1 - Test task"
   mkdir -p "$TEST_DIR/bin"
@@ -64,40 +39,4 @@ MOCK
   tasks_done=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(len(d['tasks_done']))" "$RALPH_STATUS_FILE")
   errors=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(len(d['errors']))" "$RALPH_STATUS_FILE")
   [ "$errors" -eq 1 ]
-}
-
-@test "on-error continue: FAILED_ITERATIONS count matches actual failures in summary and status" {
-  mock_backlog "TASK-1 - Test task"
-  mkdir -p "$TEST_DIR/bin"
-  local call_count_file="$TEST_DIR/call_count"
-  echo "0" > "$call_count_file"
-  cat > "$TEST_DIR/bin/opencode" <<MOCK
-#!/bin/bash
-count=\$(cat "$call_count_file")
-count=\$((count + 1))
-echo "\$count" > "$call_count_file"
-if [ "\$count" -eq 1 ] || [ "\$count" -eq 3 ]; then
-  exit 1
-fi
-echo "iteration done"
-exit 0
-MOCK
-  chmod +x "$TEST_DIR/bin/opencode"
-  export PATH="$TEST_DIR/bin:$PATH"
-
-  cd "$PROJECT_ROOT"
-  run timeout 15 bash ralph.sh --tool opencode --on-error continue 4
-  [ "$status" -eq 1 ]
-  [[ "$output" == *"Failed iterations:  2"* ]]
-  [[ "$output" == *"Tasks completed:    2"* ]]
-  [[ "$output" == *"Iterations used:    4 of 4"* ]]
-
-  local error_count
-  error_count=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(len(d['errors']))" "$RALPH_STATUS_FILE")
-  [ "$error_count" -eq 2 ]
-
-  local errors_text
-  errors_text=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print('\\n'.join(d['errors']))" "$RALPH_STATUS_FILE")
-  [[ "$errors_text" == *"Iteration 1 failed"* ]]
-  [[ "$errors_text" == *"Iteration 3 failed"* ]]
 }

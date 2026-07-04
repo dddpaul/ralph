@@ -180,44 +180,6 @@ print(len(d['errors']))
   [[ "$current_task" == "TASK-2" ]]
 }
 
-@test "run log file created with output" {
-  mock_backlog "No tasks found"
-  mock_tool opencode "done"
-
-  cd "$PROJECT_ROOT"
-  run timeout 10 bash ralph.sh --tool opencode 3
-  [ "$status" -eq 0 ]
-  [ -f "$RUN_LOG" ]
-  local log_content
-  log_content=$(cat "$RUN_LOG")
-  [[ "$log_content" == *"Starting Ralph"* ]]
-}
-
-@test "run log contains iteration output" {
-  mock_tool opencode '<promise>COMPLETE</promise>'
-  mock_backlog_multi "TASK-1 - Test task" "No tasks found" "No tasks found"
-
-  cd "$PROJECT_ROOT"
-  run timeout 10 bash ralph.sh --tool opencode 3
-  [ "$status" -eq 0 ]
-  [ -f "$RUN_LOG" ]
-  local log_content
-  log_content=$(cat "$RUN_LOG")
-  [[ "$log_content" == *"Ralph Iteration 1"* ]]
-}
-
-@test "run log contains summary" {
-  mock_backlog "No tasks found"
-  mock_tool opencode "done"
-
-  cd "$PROJECT_ROOT"
-  run timeout 10 bash ralph.sh --tool opencode 3
-  [ "$status" -eq 0 ]
-  local log_content
-  log_content=$(cat "$RUN_LOG")
-  [[ "$log_content" == *"Ralph Run Summary"* ]]
-}
-
 @test "status file tracks tasks_done when tasks transition to Done" {
   mkdir -p "$TEST_DIR/bin"
   local call_count_file="$TEST_DIR/call_count"
@@ -272,34 +234,6 @@ MOCK
   local tasks_done
   tasks_done=$(python3 -c "import json,sys; print(','.join(json.load(open(sys.argv[1]))['tasks_done']))" "$STATUS_FILE")
   [[ "$tasks_done" == *"TASK-1"* ]]
-}
-
-@test "existing log-file flag still works independently" {
-  local error_log="$TEST_DIR/errors.log"
-  mock_backlog_multi "TASK-1 - Test task" "No tasks found" "No tasks found"
-  mkdir -p "$TEST_DIR/bin"
-  cat > "$TEST_DIR/bin/opencode" <<'MOCK'
-#!/bin/bash
-exit 1
-MOCK
-  chmod +x "$TEST_DIR/bin/opencode"
-  export PATH="$TEST_DIR/bin:$PATH"
-
-  cd "$PROJECT_ROOT"
-  run timeout 10 bash ralph.sh --tool opencode --on-error stop --log-file "$error_log" 3
-  [ -f "$error_log" ]
-  [[ "$(cat "$error_log")" == *"ERROR"* ]]
-  [ -f "$RUN_LOG" ]
-}
-
-@test "status file current_task is null after iteration if no In Progress task remains" {
-  mock_backlog_multi "TASK-5 - Test task" "No tasks found" "No tasks found"
-  mock_tool opencode '<promise>COMPLETE</promise>'
-
-  cd "$PROJECT_ROOT"
-  run timeout 10 bash ralph.sh --tool opencode 1
-  [ "$status" -eq 0 ]
-  python3 -c "import json,sys; d=json.load(open(sys.argv[1])); assert d['current_task'] in (None, ''), f'expected null, got {d[\"current_task\"]}'" "$STATUS_FILE"
 }
 
 @test "status file current_task reflects In Progress task after iteration" {

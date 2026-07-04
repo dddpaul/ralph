@@ -4,10 +4,12 @@
 # Get the project root directory
 PROJECT_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/../.." && pwd)"
 
-# Source the main script for testing functions.
-# Points at the canonical (not the root-level shim) so `source $RALPH_SCRIPT`
-# in unit tests does not get hijacked by the shim's `exec`.
-RALPH_SCRIPT="$PROJECT_ROOT/plugins/ralph/skills/ralph-run/scripts/ralph.sh"
+# NOTE: There is intentionally no shared RALPH_SCRIPT here. The bash
+# orchestrator was removed in task-156 (cutover to the Python orchestrator);
+# its behavior is now covered by the pytest suite under
+# plugins/ralph/skills/ralph-run/tests/. Integration tests that still exercise
+# the launch path invoke `bash ralph.sh` (the thin shim) relative to
+# $PROJECT_ROOT after `cd "$PROJECT_ROOT"`.
 
 # Create a temporary test directory
 setup_test_dir() {
