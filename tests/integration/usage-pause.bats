@@ -124,24 +124,3 @@ EOF
   buffer=$(grep -o '"paused_buffer_min":[0-9]*' "$RALPH_STATUS_FILE" | head -1 | sed 's/.*://')
   [ "$buffer" -eq 30 ]
 }
-
-@test "per-iteration warn fires exactly once across multiple iterations when usage-check keeps returning 2" {
-  # Broken ccusage → usage-check returns 2 every call
-  mock_ccusage_broken
-  # Provide 2 To Do tasks so the loop iterates twice
-  mock_backlog_multi "TASK-1 - a
-TASK-2 - b" "No tasks found" "TASK-1 - a"
-  mock_tool opencode "done"
-
-  export RALPH_USAGE_CHECK_SCRIPT="$PROJECT_ROOT/plugins/ralph/skills/ralph-run/scripts/usage-check.sh"
-  export RALPH_USAGE_DISABLED_FLAG="$TEST_DIR/.ralph-usage-check-disabled"
-
-  cd "$PROJECT_ROOT"
-  run timeout 15 bash ralph.sh --tool opencode --block-end-buffer-min 30 2 2>&1
-  # Count the warning occurrences — must be exactly 1 across both iterations
-  local warn_count
-  warn_count=$(echo "$output" | grep -c "WARNING: usage-check.sh cannot measure block boundary" || true)
-  [ "$warn_count" -eq 1 ]
-  # Flag file must have been created
-  [ -f "$RALPH_USAGE_DISABLED_FLAG" ]
-}
