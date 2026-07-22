@@ -4,6 +4,7 @@ title: 'Port refine example role sets (article, drawio, plantuml)'
 status: To Do
 assignee: []
 created_date: '2026-07-22 16:29'
+updated_date: '2026-07-22 16:35'
 labels:
   - 'feature:ralph-refine'
 dependencies:
@@ -348,10 +349,13 @@ Show all synchronous calls with request-response pairs. Use activate/deactivate 
 <\!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
+<!-- AC:BEGIN -->
 <\!-- AC:BEGIN -->
+<\!-- AC:END -->
+
 - [ ] #1 skills/ralph-refine/examples/article/{author,reviewer,prompt}.md present
 - [ ] #2 skills/ralph-refine/examples/drawio/{author,reviewer,prompt}.md present (drawio author/reviewer reference the arch-draw skill)
 - [ ] #3 skills/ralph-refine/examples/plantuml/{author,reviewer,prompt}.md present
 - [ ] #4 Each reviewer role contains the SCORE: N (1-10) output instruction and the <summary> protocol; each author role documents the <artifact> protocol
 - [ ] #5 Content of all nine files matches the verbatim role sets embedded in this task description
-<\!-- AC:END -->
+<!-- AC:END -->
