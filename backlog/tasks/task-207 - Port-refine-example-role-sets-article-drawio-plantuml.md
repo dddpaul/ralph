@@ -1,10 +1,10 @@
 ---
 id: TASK-207
 title: 'Port refine example role sets (article, drawio, plantuml)'
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-07-22 16:29'
-updated_date: '2026-07-23 08:36'
+updated_date: '2026-07-23 08:39'
 labels:
   - 'feature:ralph-refine'
 dependencies:
@@ -362,10 +362,12 @@ Show all synchronous calls with request-response pairs. Use activate/deactivate 
 - [x] #5 Content of all nine files matches the verbatim role sets embedded in this task description
 <!-- AC:END -->
 
-
-
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 Plan (US-007): Create 9 example role files under plugins/ralph/skills/ralph-refine/examples/{article,drawio,plantuml}/{author,reviewer,prompt}.md. Content extracted VERBATIM from the task description's ~~~markdown fenced blocks via a Python parser (byte-for-byte, no retyping) to satisfy AC#5. Location resolves US-007 shorthand 'skills/ralph-refine/' to the repo convention 'plugins/ralph/skills/ralph-refine/' (confirmed by US-008 SKILL.md path). These example files are NOT in the R11 parity table (only refine.sh shim + settings/hooks are) so NO template mirror is required. Honors doc-4 invariant 2 tag protocol: author=<artifact>, reviewer=^SCORE: N (1-10)+<summary>. Refine code does not hardcode the examples/ path (loop.py:512 is only a usage docstring), so no code changes needed.
+
+Commit: `e12138d` - task-207: add ralph-refine example role sets (article, drawio, plantuml)
+
+Done (US-007). Created 9 verbatim example role files under plugins/ralph/skills/ralph-refine/examples/{article,drawio,plantuml}/{author,reviewer,prompt}.md. Content extracted BYTE-FOR-BYTE from the TASK-207 description's ~~~markdown fenced blocks and verified by TWO independent extractors (Python parser + awk state machine) — both byte-identical to the on-disk files (AC#5). AC#4 verified: each reviewer has line-anchored ^SCORE: N (1-10) + <summary>; each author documents <artifact>. Honors doc-4 invariant 2 tag protocol. Location: US-007 shorthand 'skills/ralph-refine/' resolves to repo convention 'plugins/ralph/skills/ralph-refine/' (per PRD US-008 SKILL.md path). NOTE on AC#2 parenthetical: the embedded verbatim content places the arch-draw reference in drawio/AUTHOR.md only (reviewer has none); reproduced exactly as embedded because the task's explicit primary instruction ('exactly the content shown') and AC#5 override the looser AC#2/PRD-line-164 parenthetical hint — injecting arch-draw into the reviewer would violate AC#5. These example files are NOT in the R11 parity table, so no ralph-init/templates mirror required (verified). No refine code changes needed (loop.py:512 examples/ mention is a docstring only). Gate: ruff clean, pytest 314 passed. task-reviewer agent: APPROVED (verbatim fidelity confirmed, arch-draw adjudication resolved in favor of AC#5 per R13, R11 non-applicable).
 <!-- SECTION:NOTES:END -->
