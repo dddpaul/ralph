@@ -208,7 +208,8 @@ def _run_loop(
         _maybe_verbose(args, f"reviewer (iteration {n})", reviewer_p)
         try:
             review_text, score, summ = _reviewer_call(
-                tool, reviewer_p, timeout_sec, forwarder, args, f"reviewer (iteration {n})"
+                tool, reviewer_p, timeout_sec, forwarder, args,
+                f"reviewer (iteration {n})",
             )
         except _CallFailure as exc:
             if _skip_after_failure(args, n, "reviewer", exc):
@@ -220,7 +221,9 @@ def _run_loop(
         prev_artifact, prev_review, prev_summary = artifact_text, review_text, summ
 
         if score >= args.threshold:
-            _finalize(output_dir, ext, artifact_path, history, args.threshold, reached=True)
+            _finalize(
+                output_dir, ext, artifact_path, history, args.threshold, reached=True
+            )
             print(
                 f"Threshold {args.threshold} reached at iteration {n} "
                 f"(score {score}). Wrote {output_dir / f'final.{ext}'}"
@@ -394,7 +397,9 @@ def _finalize_max_iter(
         f"threshold {args.threshold} (best score {max(history)}).",
         file=sys.stderr,
     )
-    _finalize(output_dir, ext, last_artifact_path, history, args.threshold, reached=False)
+    _finalize(
+        output_dir, ext, last_artifact_path, history, args.threshold, reached=False
+    )
     print(f"Wrote {output_dir / f'final.{ext}'}")
     return 1
 
@@ -440,16 +445,22 @@ def _prepare_resume(args: RefineArgs, output_dir: Path) -> _ResumeState:
             f"Nothing to do: threshold {args.threshold} already met at "
             f"iteration {last} (score {last_score})."
         )
-        return _ResumeState(last + 1, history, prev_artifact, prev_review, prev_summary, 0)
+        return _ResumeState(
+            last + 1, history, prev_artifact, prev_review, prev_summary, 0
+        )
 
     if last >= args.max_iterations:
-        _finalize(output_dir, ext, last_artifact, history, args.threshold, reached=False)
+        _finalize(
+            output_dir, ext, last_artifact, history, args.threshold, reached=False
+        )
         print(
             f"Nothing to do: all {args.max_iterations} iterations complete; "
             f"best score {max(history)} < threshold {args.threshold}.",
             file=sys.stderr,
         )
-        return _ResumeState(last + 1, history, prev_artifact, prev_review, prev_summary, 1)
+        return _ResumeState(
+            last + 1, history, prev_artifact, prev_review, prev_summary, 1
+        )
 
     print(f"Resuming from iteration {last + 1} (last score {last_score}).")
     return _ResumeState(last + 1, history, prev_artifact, prev_review, prev_summary)
@@ -522,7 +533,9 @@ def _read_required(path: str, label: str) -> str:
     try:
         return Path(path).read_text(encoding="utf-8")
     except OSError as exc:
-        raise _InputError(f"Error: failed to read {label} file '{path}': {exc}") from exc
+        raise _InputError(
+            f"Error: failed to read {label} file '{path}': {exc}"
+        ) from exc
 
 
 def _read_text(path: Path) -> str:
