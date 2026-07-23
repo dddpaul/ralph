@@ -361,5 +361,8 @@ def test_cli_main_propagates_argparse_exit_on_bad_int(tmp_path: Path) -> None:
 
 
 def test_cli_main_returns_0_on_valid_args(tmp_path: Path) -> None:
-    rc = cli.main(_valid_argv(tmp_path))
+    # US-005: cli.main now dispatches the refinement loop after validation, so
+    # a valid-args run reaches the tool. --dry-run exercises the valid-args
+    # path with no LLM call and the 0 exit the stub used to return directly.
+    rc = cli.main(_valid_argv(tmp_path, "--dry-run"))
     assert rc == 0
