@@ -9,6 +9,24 @@ Gracefully stop a running Ralph autonomous agent.
 
 ---
 
+## Behavior: graceful drain, not mid-iteration kill
+
+`ralph-stop` signals the **host-side orchestrator** (`ralph.sh` — the PID in the status file). It does NOT reach the AI agent (`claude -p` / `opencode`) running the current iteration: for `--devcontainer` runs that agent is a Docker-isolated process the host's `pkill -P <pid>` / `kill` cannot see.
+
+This is intentional. The effect is a **graceful drain**:
+
+- SIGTERM to the orchestrator stops it from spawning the *next* iteration.
+- The in-flight iteration's agent keeps running to completion and merges its task cleanly.
+- The loop then halts because no orchestrator remains to start the following task.
+
+So "stop" lands on a **clean task boundary**: the current task finishes and merges (no half-written diff), then Ralph stops. Net semantics: *"stop after task N"* drains to *"after N plus whatever task is already in flight."*
+
+Do NOT "fix" this by force-killing the in-container agent (e.g. `devcontainer exec ... pkill claude`). Killing `claude -p` mid-iteration leaves a partial, uncommitted diff on the task branch that needs `git reset` + manual cleanup — the opposite of a graceful stop.
+
+Note: ralph-stop is a plugin skill, not a bootstrap-seeded template, so there is NO R11 template-parity pair to also edit — single file change. The installed plugin-cache copy updates on next plugin reinstall; only the repo source is edited here.
+
+---
+
 ## Step 1: Read Status File
 
 Read `backlog/.ralph-status.json`. If the file does not exist, output the following and stop:
