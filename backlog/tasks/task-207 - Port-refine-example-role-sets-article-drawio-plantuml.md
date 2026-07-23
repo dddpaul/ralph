@@ -1,10 +1,10 @@
 ---
 id: TASK-207
 title: 'Port refine example role sets (article, drawio, plantuml)'
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-07-22 16:29'
-updated_date: '2026-07-22 16:35'
+updated_date: '2026-07-23 08:36'
 labels:
   - 'feature:ralph-refine'
 dependencies:
@@ -14,6 +14,7 @@ priority: medium
 
 ## Description
 
+<!-- SECTION:DESCRIPTION:BEGIN -->
 <\!-- SECTION:DESCRIPTION:BEGIN -->
 US-007 of ralph-refine. Create the three example author/reviewer/prompt role sets under skills/ralph-refine/examples/ (article, drawio, plantuml) so refine runs out of the box.
 
@@ -347,15 +348,24 @@ Create a sequence diagram for a user placing an order in an e-commerce system wi
 Show all synchronous calls with request-response pairs. Use activate/deactivate blocks for processing. Distinguish synchronous calls from asynchronous messages to the queue.
 ~~~
 <\!-- SECTION:DESCRIPTION:END -->
+<!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 <\!-- AC:BEGIN -->
 <\!-- AC:END -->
 
-- [ ] #1 skills/ralph-refine/examples/article/{author,reviewer,prompt}.md present
-- [ ] #2 skills/ralph-refine/examples/drawio/{author,reviewer,prompt}.md present (drawio author/reviewer reference the arch-draw skill)
-- [ ] #3 skills/ralph-refine/examples/plantuml/{author,reviewer,prompt}.md present
-- [ ] #4 Each reviewer role contains the SCORE: N (1-10) output instruction and the <summary> protocol; each author role documents the <artifact> protocol
-- [ ] #5 Content of all nine files matches the verbatim role sets embedded in this task description
+- [x] #1 skills/ralph-refine/examples/article/{author,reviewer,prompt}.md present
+- [x] #2 skills/ralph-refine/examples/drawio/{author,reviewer,prompt}.md present (drawio author/reviewer reference the arch-draw skill)
+- [x] #3 skills/ralph-refine/examples/plantuml/{author,reviewer,prompt}.md present
+- [x] #4 Each reviewer role contains the SCORE: N (1-10) output instruction and the <summary> protocol; each author role documents the <artifact> protocol
+- [x] #5 Content of all nine files matches the verbatim role sets embedded in this task description
 <!-- AC:END -->
+
+
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan (US-007): Create 9 example role files under plugins/ralph/skills/ralph-refine/examples/{article,drawio,plantuml}/{author,reviewer,prompt}.md. Content extracted VERBATIM from the task description's ~~~markdown fenced blocks via a Python parser (byte-for-byte, no retyping) to satisfy AC#5. Location resolves US-007 shorthand 'skills/ralph-refine/' to the repo convention 'plugins/ralph/skills/ralph-refine/' (confirmed by US-008 SKILL.md path). These example files are NOT in the R11 parity table (only refine.sh shim + settings/hooks are) so NO template mirror is required. Honors doc-4 invariant 2 tag protocol: author=<artifact>, reviewer=^SCORE: N (1-10)+<summary>. Refine code does not hardcode the examples/ path (loop.py:512 is only a usage docstring), so no code changes needed.
+<!-- SECTION:NOTES:END -->
