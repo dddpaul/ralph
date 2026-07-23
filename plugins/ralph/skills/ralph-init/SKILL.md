@@ -109,8 +109,10 @@ Ask with lettered options for quick answers (e.g. "0A, 1A, 2C, 3B, 4A"):
 
 **Skip any file that already exists** unless the user says `--force`. For skipped files, print `[skip] <file> already exists`.
 
-### 3.1 `ralph.sh`
+### 3.1 `ralph.sh` and `refine.sh`
 Read `templates/root/ralph.sh` → write to project root. Make executable (`chmod +x`).
+
+Read `templates/root/refine.sh` → write to project root. Make executable (`chmod +x`). Seed it unconditionally, alongside `ralph.sh`: both are thin shims resolving their orchestrator (`ralph_orchestrator.py` / `refine_orchestrator.py`) via the same 5-tier precedence, so the same plugin-not-installed hard-stop below applies to `refine.sh`.
 
 ### 3.2 `CLAUDE.md`
 Read `templates/root/CLAUDE.md` → replace ALL `<FILL IN ...>` placeholders in `## Project-Specific` with actual values from the user's answers. Parse quality commands (Q2) into separate build, lint, and test entries.
@@ -288,6 +290,7 @@ Ralph initialized successfully!
 
 Files created:
   ralph.sh              - Main autonomous loop script (supports claude, opencode)
+  refine.sh             - Adversarial author-reviewer refinement loop (ralph-refine)
   CLAUDE.md             - Agent instructions for Claude Code
   .git/hooks/post-commit - Commit hash tracking for tasks
   .git/hooks/commit-msg  - Forbidden trailer/heading guard
@@ -457,18 +460,19 @@ Compare each managed file against its current template. Assign one status per fi
 **Files to check:**
 
 1. **`ralph.sh`** — exact content match against `templates/root/ralph.sh`
-2. **`CLAUDE.md`** — compare only lines **above** the `## Project-Specific` heading against the same region in `templates/root/CLAUDE.md`. Everything from `## Project-Specific` down (including conventions) is the project block and must never be touched.
-3. **`.git/hooks/post-commit`** — exact content match against `templates/git-hooks/post-commit`
-4. **`.git/hooks/commit-msg`** — exact content match against `templates/git-hooks/commit-msg`
-5. **`.git/hooks/pre-commit`** — exact content match against `templates/git-hooks/pre-commit` (Unicode NFC/NFD duplicate guard, see TASK-136)
-6. **`.claude/settings.json`** — exact content match against `templates/claude/settings.json`
-7. **`.claude/hooks/`** — each script in `templates/claude/hooks/*-guard.sh` and `templates/claude/hooks/task-validator.sh` must match `.claude/hooks/<name>.sh`
-8. **`.claude/settings.local.json`** — exact content match against `templates/claude/settings.local.json`
-9. **`.devcontainer/devcontainer.json`** — exact content match against `templates/devcontainer/devcontainer.json`. If `.devcontainer/` directory does not exist, status is **skipped**.
-10. **`.devcontainer/init-firewall.sh`** — exact content match against `templates/devcontainer/init-firewall.sh`. If `.devcontainer/` directory does not exist, status is **skipped**.
-11. **`.devcontainer/Dockerfile`** — always **skipped** (assembled from fragments, cannot diff meaningfully)
-12. **`.gitignore`** — always **skipped** (append-only logic in init flow)
-13. **`.claude/brainstorm-rules.md`** — managed via section-aware merge: pre-heading content is regenerated from `templates/claude/brainstorm-rules.md`; the `## Project additions` heading and everything below it are preserved verbatim. Status is **current** when the pre-heading region matches the template byte-for-byte; **outdated** when it differs; **missing** when the file does not exist (would be created from template).
+2. **`refine.sh`** — exact content match against `templates/root/refine.sh`
+3. **`CLAUDE.md`** — compare only lines **above** the `## Project-Specific` heading against the same region in `templates/root/CLAUDE.md`. Everything from `## Project-Specific` down (including conventions) is the project block and must never be touched.
+4. **`.git/hooks/post-commit`** — exact content match against `templates/git-hooks/post-commit`
+5. **`.git/hooks/commit-msg`** — exact content match against `templates/git-hooks/commit-msg`
+6. **`.git/hooks/pre-commit`** — exact content match against `templates/git-hooks/pre-commit` (Unicode NFC/NFD duplicate guard, see TASK-136)
+7. **`.claude/settings.json`** — exact content match against `templates/claude/settings.json`
+8. **`.claude/hooks/`** — each script in `templates/claude/hooks/*-guard.sh` and `templates/claude/hooks/task-validator.sh` must match `.claude/hooks/<name>.sh`
+9. **`.claude/settings.local.json`** — exact content match against `templates/claude/settings.local.json`
+10. **`.devcontainer/devcontainer.json`** — exact content match against `templates/devcontainer/devcontainer.json`. If `.devcontainer/` directory does not exist, status is **skipped**.
+11. **`.devcontainer/init-firewall.sh`** — exact content match against `templates/devcontainer/init-firewall.sh`. If `.devcontainer/` directory does not exist, status is **skipped**.
+12. **`.devcontainer/Dockerfile`** — always **skipped** (assembled from fragments, cannot diff meaningfully)
+13. **`.gitignore`** — always **skipped** (append-only logic in init flow)
+14. **`.claude/brainstorm-rules.md`** — managed via section-aware merge: pre-heading content is regenerated from `templates/claude/brainstorm-rules.md`; the `## Project additions` heading and everything below it are preserved verbatim. Status is **current** when the pre-heading region matches the template byte-for-byte; **outdated** when it differs; **missing** when the file does not exist (would be created from template).
 
 ---
 
@@ -480,6 +484,7 @@ Display the status table to the user:
 File                              Status
 ─────────────────────────────────────────
 ralph.sh                          outdated
+refine.sh                         outdated
 CLAUDE.md (generic section)       current
 .git/hooks/post-commit            outdated
 .git/hooks/commit-msg             outdated
@@ -496,7 +501,7 @@ CLAUDE.md (generic section)       current
 
 **For outdated files, show details:**
 
-- **`ralph.sh`**, **`.git/hooks/post-commit`**, **`.git/hooks/commit-msg`**, and **`.git/hooks/pre-commit`**: show a plain language summary of what changed (e.g. "Template adds --model flag support and fixes timeout handling"). Read both versions and describe the meaningful differences — do not dump raw diffs for these files.
+- **`ralph.sh`**, **`refine.sh`**, **`.git/hooks/post-commit`**, **`.git/hooks/commit-msg`**, and **`.git/hooks/pre-commit`**: show a plain language summary of what changed (e.g. "Template adds --model flag support and fixes timeout handling"). Read both versions and describe the meaningful differences — do not dump raw diffs for these files.
 - **`.claude/settings.json`**: show the unified diff (`diff -u`) because the project may have custom hooks the user wants to preserve.
 - **`.claude/settings.local.json`**: show the unified diff (`diff -u`) because the project may have custom permissions the user wants to preserve.
 - **`CLAUDE.md`**: show a plain language summary of what changed in the generic section (above `## Project-Specific`).
@@ -520,6 +525,7 @@ Update all outdated files? Or name files to skip.
 For each file the user approved:
 
 - **`ralph.sh`**: overwrite from `templates/root/ralph.sh`, then `chmod +x`.
+- **`refine.sh`**: overwrite from `templates/root/refine.sh`, then `chmod +x`.
 - **`.git/hooks/post-commit`**: overwrite from `templates/git-hooks/post-commit`, then `chmod +x`.
 - **`.git/hooks/commit-msg`**: overwrite from `templates/git-hooks/commit-msg`, then `chmod +x`.
 - **`.git/hooks/pre-commit`**: overwrite from `templates/git-hooks/pre-commit`, then `chmod +x`. Also re-assert `git config --local core.precomposeunicode true` (idempotent — no-op if already set) so the macOS NFD-on-write defense ships alongside the hook.
@@ -554,6 +560,7 @@ Print which files were updated and their final status:
 Ralph upgrade complete!
 
   ralph.sh                          updated
+  refine.sh                         updated
   CLAUDE.md (generic section)       current
   .git/hooks/post-commit            updated
   .git/hooks/commit-msg             updated
