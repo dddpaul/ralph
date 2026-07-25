@@ -15,18 +15,20 @@ PROJECT_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/../.." && pwd)"
 setup_test_dir() {
   # Canonicalize the temp dir (pwd -P) so it matches the shim's canonicalized
   # RALPH_PROJECT_ROOT (also pwd -P). On macOS mktemp -d returns a /var/folders
-  # path that symlinks to /private/var/...; without this the shim.bats tier-2
-  # expected-vs-actual path comparison false-fails. No-op on Linux.
+  # path that symlinks to /private/var/...; without this shim.bats's
+  # resolved-path comparisons (override / plugin-cache tiers) false-fail. No-op
+  # on Linux.
   TEST_DIR="$(cd "$(mktemp -d)" && pwd -P)"
   export TEST_DIR
   export RALPH_STATUS_FILE="$TEST_DIR/.ralph-status.json"
   export RALPH_RUN_LOG="$TEST_DIR/.ralph-run.log"
   export RALPH_HEARTBEAT_FILE="$TEST_DIR/.ralph-heartbeat"
-  # Tests that invoke `bash ralph.sh` (relative) hit the shim, which execs
-  # ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/ralph-run/scripts/ralph_orchestrator.py.
-  # Point CLAUDE_CONFIG_DIR at the in-repo plugin so the shim resolves the
-  # in-tree orchestrator instead of whatever user-global copy is installed.
-  export CLAUDE_CONFIG_DIR="$PROJECT_ROOT/plugins/ralph"
+  # Tests that invoke `bash ralph.sh` (relative) hit the thin shim, which resolves
+  # ralph_orchestrator.py via $RALPH_ORCHESTRATOR (tier 1) or the newest installed
+  # plugin-cache copy (tier 2). Point the tier-1 override at the in-tree
+  # orchestrator so the shim runs it instead of whatever plugin-cache copy is
+  # installed (shim.bats unsets this to exercise the other tiers in isolation).
+  export RALPH_ORCHESTRATOR="$PROJECT_ROOT/plugins/ralph/skills/ralph-run/scripts/ralph_orchestrator.py"
 }
 
 # Cleanup temporary test directory

@@ -342,7 +342,7 @@ Ralph writes a heartbeat file (`backlog/.ralph-heartbeat`) every 5 seconds while
 
 ### Shim and Canonical Orchestrator
 
-Each project carries a thin `ralph.sh` shim that execs the canonical Python orchestrator bundled by the `ralph` plugin at `plugins/ralph/skills/ralph-run/scripts/ralph_orchestrator.py` (run via `uv run`). The shim resolves the orchestrator by precedence (`$RALPH_ORCHESTRATOR`, the in-repo `plugins/ralph/` copy, the legacy `~/.claude/skills/` path, then the newest plugin-cache install), so it works whether Ralph runs from this repo or an installed plugin. When launching Ralph, the `ralph-run` skill searches for the project shim in priority order:
+Each project carries a thin `ralph.sh` shim that execs the canonical Python orchestrator bundled by the `ralph` plugin at `plugins/ralph/skills/ralph-run/scripts/ralph_orchestrator.py` (run via `uv run`). The shim resolves the orchestrator by precedence (`$RALPH_ORCHESTRATOR` explicit override, then the newest installed plugin-cache copy, else a clear install-the-plugin error), so a detached `nohup ./ralph.sh` finds the orchestrator from the installed plugin without `${CLAUDE_PLUGIN_ROOT}`. When launching Ralph, the `ralph-run` skill searches for the project shim in priority order:
 
 1. `./ralph.sh` — project root (created by `ralph-init`)
 2. `scripts/ralph/ralph.sh` — structured project location
@@ -351,7 +351,7 @@ The shim sets `RALPH_PROJECT_ROOT` and delegates to the canonical orchestrator, 
 
 ### Devcontainer plugin-cache reachability
 
-Resolver tier 4 (the newest `/plugin install` under `$CLAUDE_CONFIG_DIR/plugins/cache`) also works inside the DevContainer. The `.devcontainer/devcontainer.json` mount `source=${localEnv:HOME}/.claude,target=/home/node/.claude,type=bind` bind-mounts the **entire** host `~/.claude` — including `plugins/cache/` — onto `CLAUDE_CONFIG_DIR=/home/node/.claude`. So a plugin the host installs with `/plugin install ralph@dddpaul-ralph` is reachable inside the container, and the shim's tier-4 glob (`$CLAUDE_CONFIG_DIR/plugins/cache/*/ralph/*/skills/ralph-run/scripts/ralph_orchestrator.py`) finds it. No extra mount is required — the existing whole-directory bind covers the `plugins/` subtree.
+The plugin-cache resolver tier (the newest `/plugin install` under `$CLAUDE_CONFIG_DIR/plugins/cache`) also works inside the DevContainer. The `.devcontainer/devcontainer.json` mount `source=${localEnv:HOME}/.claude,target=/home/node/.claude,type=bind` bind-mounts the **entire** host `~/.claude` — including `plugins/cache/` — onto `CLAUDE_CONFIG_DIR=/home/node/.claude`. So a plugin the host installs with `/plugin install ralph@dddpaul-ralph` is reachable inside the container, and the shim's plugin-cache glob (`$CLAUDE_CONFIG_DIR/plugins/cache/*/ralph/*/skills/ralph-run/scripts/ralph_orchestrator.py`) finds it. No extra mount is required — the existing whole-directory bind covers the `plugins/` subtree.
 
 To smoke-test this from a shell **inside the container**:
 
@@ -360,10 +360,10 @@ To smoke-test this from a shell **inside the container**:
 ls -d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/cache"
 # -> /home/node/.claude/plugins/cache
 
-# 2. Resolver check — tier 4 resolves the orchestrator from a plugin-cache layout.
-#    A scratch config dir + scratch shim copy (no in-repo source beneath it, so
-#    tier 2 is skipped) plus a stub `uv` that echoes the resolved path instead of
-#    launching the loop. This mirrors what `/plugin install` lays down in the cache.
+# 2. Resolver check — the plugin-cache tier resolves the orchestrator from a
+#    plugin-cache layout. A scratch config dir + scratch shim copy (no
+#    $RALPH_ORCHESTRATOR override) plus a stub `uv` that echoes the resolved path
+#    instead of launching the loop. This mirrors what `/plugin install` lays down.
 tmp="$(mktemp -d)"
 cp ./ralph.sh "$tmp/ralph.sh"
 orch="$tmp/cfg/plugins/cache/dddpaul-ralph/ralph/v1.0.0/skills/ralph-run/scripts/ralph_orchestrator.py"
@@ -376,7 +376,7 @@ PATH="$tmp/bin:$PATH" CLAUDE_CONFIG_DIR="$tmp/cfg" bash "$tmp/ralph.sh" --help
 rm -rf "$tmp"
 ```
 
-Both lines confirm tier 4 is reachable in the container: step 1 proves the mount exposes the cache, step 2 proves the resolver traverses that exact layout. If the `ralph` plugin is actually installed on the host, you can confirm the real mounted install resolves too — run from any directory that is **not** this marketplace checkout, so tier 2 does not shadow it:
+Both lines confirm the plugin-cache tier is reachable in the container: step 1 proves the mount exposes the cache, step 2 proves the resolver traverses that exact layout. If the `ralph` plugin is actually installed on the host, you can confirm the real mounted install resolves too:
 
 ```bash
 ls "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/*/ralph/*/skills/ralph-run/scripts/ralph_orchestrator.py

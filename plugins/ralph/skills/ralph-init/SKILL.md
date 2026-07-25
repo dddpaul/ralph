@@ -63,7 +63,7 @@ find "$CLAUDE_DIR/plugins/cache" -type f \
 }
 ```
 
-The project-root `ralph.sh` written in Step 3.1 is a thin shim that resolves the Ralph orchestrator wherever the plugin is installed — via a 5-tier precedence (`$RALPH_ORCHESTRATOR`, in-repo source, legacy `~/.claude/skills`, newest plugin-cache install, else error) — and `exec`s it via `uv run`. A freshly scaffolded project has no in-repo source, so its orchestrator comes from the installed plugin cache; if the ralph plugin is not installed the shim has nothing to exec and the bootstrap is broken. Hard-stop here and instruct the user to install the plugin first.
+The project-root `ralph.sh` written in Step 3.1 is a thin shim that resolves the Ralph orchestrator wherever the plugin is installed — by precedence (`$RALPH_ORCHESTRATOR` explicit override, then the newest plugin-cache install, else error) — and `exec`s it via `uv run`. Absent an override, the orchestrator comes from the installed plugin cache; if the ralph plugin is not installed the shim has nothing to exec and the bootstrap is broken. Hard-stop here and instruct the user to install the plugin first.
 
 ---
 
@@ -112,7 +112,7 @@ Ask with lettered options for quick answers (e.g. "0A, 1A, 2C, 3B, 4A"):
 ### 3.1 `ralph.sh` and `refine.sh`
 Read `templates/root/ralph.sh` → write to project root. Make executable (`chmod +x`).
 
-Read `templates/root/refine.sh` → write to project root. Make executable (`chmod +x`). Seed it unconditionally, alongside `ralph.sh`: both are thin shims resolving their orchestrator (`ralph_orchestrator.py` / `refine_orchestrator.py`) via the same 5-tier precedence, so the same plugin-not-installed hard-stop below applies to `refine.sh`.
+Read `templates/root/refine.sh` → write to project root. Make executable (`chmod +x`). Seed it unconditionally, alongside `ralph.sh`: both are thin shims that resolve their orchestrator (`ralph_orchestrator.py` / `refine_orchestrator.py`) from the installed plugin cache when no explicit override is set, so the same plugin-not-installed hard-stop below applies to `refine.sh`.
 
 ### 3.2 `CLAUDE.md`
 Read `templates/root/CLAUDE.md` → replace ALL `<FILL IN ...>` placeholders in `## Project-Specific` with actual values from the user's answers. Parse quality commands (Q2) into separate build, lint, and test entries.
