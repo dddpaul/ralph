@@ -25,6 +25,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
+from ralph import push as push_module
 from ralph import tasks as tasks_module
 from ralph.args import ParsedArgs, timeout_to_seconds
 from ralph.devcontainer import start_devcontainer
@@ -152,6 +153,17 @@ def run(args: ParsedArgs, project_root: Path) -> int:
     )
     status.write_atomic(status_path)
 
+    # TASK-211: snapshot the master ref BEFORE the loop so we can detect
+    # whether this run advanced it. The agent merges task branches to master
+    # during the loop (loop.py itself never merges); an advanced ref is the
+    # signal that there is new canon to publish to origin once the loop ends.
+    push_is_enabled = push_module.push_enabled(args.push)
+    rev_before = (
+        push_module.current_rev(project_root, push_module.DEFAULT_MASTER_REF)
+        if push_is_enabled
+        else None
+    )
+
     tool = build_tool(args, project_root, run_log_path=run_log_path)
     installer = _SignalInstaller()
     installer.install()
@@ -175,6 +187,19 @@ def run(args: ParsedArgs, project_root: Path) -> int:
     finally:
         installer.restore()
         _finalize(status, status_path, started_epoch, state, args)
+
+    # TASK-211: after the loop has fully finished (and the summary printed),
+    # publish the advanced master ref to origin. Skips cleanly when opted out,
+    # when no origin remote exists, or when master did not advance. A push
+    # failure is surfaced by carrying its non-zero code into the run's exit
+    # code (without masking an already-failing loop).
+    outcome = push_module.maybe_push_after_loop(
+        project_root=project_root,
+        enabled=push_is_enabled,
+        rev_before=rev_before,
+    )
+    if outcome.exit_code != 0 and state.exit_code == 0:
+        state.exit_code = outcome.exit_code
 
     assert state.exit_reason in EXIT_REASONS, (
         f"exit_reason {state.exit_reason!r} not in closed set {EXIT_REASONS!r}"

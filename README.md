@@ -158,6 +158,7 @@ Default is 10 iterations. Use `--tool claude` (default) or `--tool opencode` to 
 | `--prompt-file <path>` | File to load prompt template from | (none) |
 | `--tasks <ids>` | Comma-separated numeric task IDs to run (e.g. `62,64,65`). Mutually exclusive with `--prompt-file` | (none) |
 | `--devcontainer` | Run inside a devcontainer | off |
+| `--no-push` | Opt out of pushing `master` to `origin` after the loop finishes (see [Publishing to origin](#publishing-to-origin)) | push on |
 | `--help` | Show help message and exit | |
 | `--version` | Show version and exit | |
 
@@ -172,6 +173,28 @@ Default is 10 iterations. Use `--tool claude` (default) or `--tool opencode` to 
 - **stop** (default): Immediately exit on any error. Best for production runs where you want to investigate failures manually.
 - **continue**: Log the error and proceed to the next iteration. Useful for long overnight runs where you want to maximize progress.
 - **retry**: Retry failed iterations up to N times before giving up. Good for transient network issues or rate limits.
+
+### Publishing to origin
+
+Each iteration merges its task branch to **local** `master`. So that those merges become visible to anything reading the GitHub remote (e.g. a downstream consumer that treats `origin/master` as canon), the orchestrator publishes `master` to `origin` **by default** once the loop finishes.
+
+The push is attempted only when **all** of these hold:
+
+- push is not opted out (neither `--no-push` nor a truthy `RALPH_NO_PUSH` env var), **and**
+- an `origin` remote is registered, **and**
+- the loop actually advanced `master` — the `git rev-parse master` SHA taken before the loop differs from the one after it.
+
+If no `origin` remote exists, or `master` did not move, the run skips the push cleanly (no push, no error). When a push **is** attempted and fails, the failure is surfaced loudly — logged to stderr and reflected in a non-zero exit code — never silently swallowed.
+
+To disable the push for a single run, pass `--no-push` or set `RALPH_NO_PUSH=1`:
+
+```bash
+# Run without publishing to origin
+./ralph.sh --no-push
+
+# Same, via environment
+RALPH_NO_PUSH=1 ./ralph.sh
+```
 
 **Examples:**
 
