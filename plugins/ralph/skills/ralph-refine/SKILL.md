@@ -65,7 +65,7 @@ fails on it.
 ## Step 2: Locate refine.sh
 
 `refine.sh` is the thin project shim that resolves and execs the installed
-plugin's `refine_orchestrator.py` (5-tier resolver, mirroring `ralph.sh`). This
+plugin's `refine_orchestrator.py` (5-tier resolver). This
 is a **read-only** check — the sandbox auto-allows it, so it never prompts.
 Check for `./refine.sh` at the project root.
 
