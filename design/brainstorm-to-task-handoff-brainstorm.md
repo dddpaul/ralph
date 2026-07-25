@@ -1,3 +1,9 @@
+---
+export: true
+title: 'Brainstorm-to-task hand-off: distill, don''t reference'
+type: design
+---
+
 # Brainstorm-to-task hand-off: distill, don't reference
 
 ## Context / trigger

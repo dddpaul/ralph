@@ -1,3 +1,9 @@
+---
+export: true
+title: Ralph Usage Cap
+type: design
+---
+
 # Ralph Usage Cap
 
 Pause the Ralph autonomous loop when Claude Code subscription usage hits a configurable cap (default 80% used) so Ralph never starts a task it cannot finish before the quota resets.

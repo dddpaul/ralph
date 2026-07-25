@@ -1,3 +1,9 @@
+---
+export: true
+title: Ralph-init hook ordering + master-branch-guard scope
+type: design
+---
+
 # Ralph-init hook ordering + master-branch-guard scope
 
 ## Context / trigger

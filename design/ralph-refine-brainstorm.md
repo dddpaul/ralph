@@ -1,3 +1,9 @@
+---
+export: true
+title: Embed `refine` into the Ralph plugin as `ralph-refine`
+type: design
+---
+
 # Embed `refine` into the Ralph plugin as `ralph-refine`
 
 Rewrite the standalone `refine` adversarial author↔reviewer refinement loop

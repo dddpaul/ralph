@@ -1,3 +1,9 @@
+---
+export: true
+title: 'Ralph: bash → Python 3.14 + uv refactor'
+type: design
+---
+
 # Ralph: bash → Python 3.14 + uv refactor
 
 ## Context / trigger

@@ -1,6 +1,6 @@
 ---
 name: ralph-reviewer
-description: Cumulative cross-task feature review agent. Reads PRD and brainstorm docs, backlog tasks, and git diff to evaluate alignment across a feature branch. Returns Aligned / Partial / Drifted verdict with intent-to-implementation matrix. Triggers on: ralph review, feature review, review feature alignment, cross-task review.
+description: "Cumulative cross-task feature review agent. Reads PRD and brainstorm docs, backlog tasks, and git diff to evaluate alignment across a feature branch. Returns Aligned / Partial / Drifted verdict with intent-to-implementation matrix. Triggers on: ralph review, feature review, review feature alignment, cross-task review."
 color: purple
 ---
 

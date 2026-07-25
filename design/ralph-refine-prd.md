@@ -1,3 +1,9 @@
+---
+export: true
+title: 'PRD: ralph-refine — Embed the Adversarial Refinement Loop into the Ralph Plugin'
+type: design
+---
+
 # PRD: ralph-refine — Embed the Adversarial Refinement Loop into the Ralph Plugin
 
 ## Introduction

@@ -1,3 +1,9 @@
+---
+export: true
+title: 'Brainstorm: ralph-review'
+type: design
+---
+
 # Brainstorm: ralph-review
 
 Cumulative cross-task review skill and agent. Distinct lens from the existing per-task task-reviewer.

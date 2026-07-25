@@ -1,3 +1,9 @@
+---
+export: true
+title: 'PRD: Ralph Bash → Python 3.14 + uv Refactor'
+type: design
+---
+
 # PRD: Ralph Bash → Python 3.14 + uv Refactor
 
 **Feature label:** `feature:ralph-python-refactor`

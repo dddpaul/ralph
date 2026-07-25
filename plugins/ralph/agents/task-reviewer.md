@@ -1,6 +1,6 @@
 ---
 name: task-reviewer
-description: Use this agent to review changes on a task branch before merging to master. Reads the task's acceptance criteria, runs git diff master..HEAD, evaluates against an 8-item checklist plus optional custom rules from .claude/task-reviewer-rules.md (project) or ~/.claude/task-reviewer-rules.md (user-global), and returns APPROVED or CHANGES REQUESTED with line-level feedback. Triggers on: review task, review changes, review my changes, review the diff, code review for task, review before merge.
+description: "Use this agent to review changes on a task branch before merging to master. Reads the task's acceptance criteria, runs git diff master..HEAD, evaluates against an 8-item checklist plus optional custom rules from .claude/task-reviewer-rules.md (project) or ~/.claude/task-reviewer-rules.md (user-global), and returns APPROVED or CHANGES REQUESTED with line-level feedback. Triggers on: review task, review changes, review my changes, review the diff, code review for task, review before merge."
 color: green
 ---
 

@@ -1,3 +1,9 @@
+---
+export: true
+title: 'Brainstorm: ralph-sh-shim'
+type: design
+---
+
 # Brainstorm: ralph-sh-shim
 
 Collapse the three-way `ralph.sh` mirror to a single canonical copy under `~/.claude/skills/ralph-run/scripts/ralph.sh`. The two remaining copies (`./ralph.sh` in the canonical repo, `skills/ralph-init/templates/root/ralph.sh` shipped to ralphed projects) become thin shims that `exec` the canonical one.

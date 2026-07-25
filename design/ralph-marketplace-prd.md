@@ -1,3 +1,9 @@
+---
+export: true
+title: 'PRD: Ralph → Claude Code Plugin Marketplace'
+type: design
+---
+
 # PRD: Ralph → Claude Code Plugin Marketplace
 
 ## Introduction

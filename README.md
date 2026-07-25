@@ -1,3 +1,9 @@
+---
+export: true
+title: Ralph — overview
+type: guide
+---
+
 # Ralph
 
 ![Ralph](ralph.webp)

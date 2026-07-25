@@ -1,3 +1,9 @@
+---
+export: true
+title: Ralph → Claude Code Plugin Marketplace
+type: design
+---
+
 # Ralph → Claude Code Plugin Marketplace
 
 ## Architecture decision

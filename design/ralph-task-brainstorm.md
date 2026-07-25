@@ -1,3 +1,9 @@
+---
+export: true
+title: 'Brainstorm: ralph-task'
+type: design
+---
+
 # Brainstorm: ralph-task
 
 Replace the user-global `project-manager-backlog` agent with a thin project-level `ralph-task` skill for one-off / ad-hoc backlog task creation outside the PRD/brainstorm-driven feature pipeline.
