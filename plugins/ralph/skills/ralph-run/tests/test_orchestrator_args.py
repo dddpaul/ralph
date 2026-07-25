@@ -86,6 +86,21 @@ def test_parse_defaults_match_bash() -> None:
     assert parsed.block_end_buffer_min == 0
     assert parsed.devcontainer is False
     assert parsed.max_iterations == 10
+    assert parsed.push is True
+
+
+def test_no_push_flag_disables_push() -> None:
+    """TASK-211 AC #1/#6 — push is on by default; ``--no-push`` opts out."""
+    assert parse([]).push is True
+    assert parse(["--no-push"]).push is False
+    # Opt-out composes with the positional and other flags in any order.
+    assert parse(["--no-push", "5"]).push is False
+    assert parse(["5", "--no-push", "--devcontainer"]).push is False
+
+
+def test_no_push_is_a_valid_arg_combo() -> None:
+    """``--no-push`` passes validation (it gates behavior, not input shape)."""
+    assert validate(parse(["--no-push"])) is None
 
 
 def test_validate_rejects_unknown_tool() -> None:

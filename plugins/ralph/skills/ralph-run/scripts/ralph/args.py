@@ -47,6 +47,7 @@ class ParsedArgs:
     block_end_buffer_min: int
     devcontainer: bool
     max_iterations: int
+    push: bool = True
 
     @property
     def task_whitelist(self) -> list[str]:
@@ -90,6 +91,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--block-end-buffer-min", dest="block_end_buffer_min", type=int, default=0
     )
     parser.add_argument("--devcontainer", action="store_true", default=False)
+    # Push-on-complete is ENABLED BY DEFAULT (TASK-211); --no-push opts out.
+    # A truthy RALPH_NO_PUSH env is the equivalent env opt-out, resolved at
+    # push time by ralph.push.push_enabled (kept out of validation so the env
+    # can override per-run without re-parsing).
+    parser.add_argument("--no-push", dest="push", action="store_false", default=True)
     parser.add_argument("max_iterations", type=int, nargs="?", default=10)
     return parser
 
@@ -115,6 +121,7 @@ def parse(argv: list[str]) -> ParsedArgs:
         block_end_buffer_min=ns.block_end_buffer_min,
         devcontainer=ns.devcontainer,
         max_iterations=ns.max_iterations,
+        push=ns.push,
     )
 
 
