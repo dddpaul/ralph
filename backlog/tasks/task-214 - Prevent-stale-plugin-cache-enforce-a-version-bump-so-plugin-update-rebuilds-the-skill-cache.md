@@ -3,10 +3,10 @@ id: TASK-214
 title: >-
   Prevent stale plugin cache: enforce a version bump so /plugin update rebuilds
   the skill cache
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-26 16:30'
-updated_date: '2026-07-31 07:37'
+updated_date: '2026-07-31 07:58'
 labels: []
 dependencies: []
 priority: high
@@ -60,14 +60,26 @@ DISTRIBUTION: NONE. This guard is project-specific to the plugin-producer repo (
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Cache-refresh trigger recorded in notes: /plugin update is version-gated (rebuilds cache off the version field), with evidence (marketplace/git advanced while cache stayed a frozen 0.1.0 snapshot)
-- [ ] #2 Both manifests bumped 0.1.0 -> 0.2.0 and equal: plugins/ralph/.claude-plugin/plugin.json version and .claude-plugin/marketplace.json metadata.version
-- [ ] #3 Tracked guard at .claude/hooks/version-bump-guard.sh plus a .git/hooks/pre-push wrapper that execs it (standard hook location, existing hooks unaffected)
-- [ ] #4 On a push of refs/heads/master where shipped-set files (plugins/ralph/skills, agents, ralph-run/scripts, plugin.json, marketplace.json) changed in remote-sha..local-sha, the guard exits non-zero unless version at local-sha is strictly greater (sort -V) than at remote-sha
-- [ ] #5 Guard exits 0 for: non-master pushes, ranges touching no shipped-set file (docs/design/backlog-only), and first push (remote-sha all-zeros)
-- [ ] #6 A bats test exercises and passes all three cases: shipped-changed-without-bump -> non-zero, shipped-changed-with-bump -> zero, docs-only -> zero
-- [ ] #7 Guard shell satisfies R5 GNU/BSD portability per .claude/task-reviewer-rules.md (no grep -P, no GNU-only flags)
-- [ ] #8 Guard is project-specific: NOT added to plugins/ralph/skills/ralph-init/templates/ and NOT added to the R11 parity table
-- [ ] #9 README.md or CLAUDE.md documents the release/refresh procedure (bump both manifests, commit, push, consumers run /plugin update) AND the increment discipline (patch default; minor for new skill/agent/flag; major deferred to 1.0), with the stale-cache warning
-- [ ] #10 Lint green (uv run ruff check .) and tests green (uv run pytest)
+- [x] #1 Cache-refresh trigger recorded in notes: /plugin update is version-gated (rebuilds cache off the version field), with evidence (marketplace/git advanced while cache stayed a frozen 0.1.0 snapshot)
+- [x] #2 Both manifests bumped 0.1.0 -> 0.2.0 and equal: plugins/ralph/.claude-plugin/plugin.json version and .claude-plugin/marketplace.json metadata.version
+- [x] #3 Tracked guard at .claude/hooks/version-bump-guard.sh plus a .git/hooks/pre-push wrapper that execs it (standard hook location, existing hooks unaffected)
+- [x] #4 On a push of refs/heads/master where shipped-set files (plugins/ralph/skills, agents, ralph-run/scripts, plugin.json, marketplace.json) changed in remote-sha..local-sha, the guard exits non-zero unless version at local-sha is strictly greater (sort -V) than at remote-sha
+- [x] #5 Guard exits 0 for: non-master pushes, ranges touching no shipped-set file (docs/design/backlog-only), and first push (remote-sha all-zeros)
+- [x] #6 A bats test exercises and passes all three cases: shipped-changed-without-bump -> non-zero, shipped-changed-with-bump -> zero, docs-only -> zero
+- [x] #7 Guard shell satisfies R5 GNU/BSD portability per .claude/task-reviewer-rules.md (no grep -P, no GNU-only flags)
+- [x] #8 Guard is project-specific: NOT added to plugins/ralph/skills/ralph-init/templates/ and NOT added to the R11 parity table
+- [x] #9 README.md or CLAUDE.md documents the release/refresh procedure (bump both manifests, commit, push, consumers run /plugin update) AND the increment discipline (patch default; minor for new skill/agent/flag; major deferred to 1.0), with the stale-cache warning
+- [x] #10 Lint green (uv run ruff check .) and tests green (uv run pytest)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan: (1) bump plugin.json version + marketplace.json metadata.version 0.1.0->0.2.0 (equal). (2) add tracked guard .claude/hooks/version-bump-guard.sh: pre-push reads stdin ref lines, for refs/heads/master diffs remote-sha..local-sha; if any shipped-set path changed (plugins/ralph/skills/**, agents/**, plugin.json, marketplace.json) require plugin.json version at local strictly > remote via sort -V, else exit 1 BLOCKED. Pass-through: non-master, no-shipped-change, first-push(all-zeros). POSIX/portable per R5 (case-glob shipped match, sed BRE version parse, sort -V). (3) install .git/hooks/pre-push wrapper execing the tracked guard (not committable). (4) bats test tests/unit/version-bump-guard.bats: shipped-no-bump->1, shipped-with-bump->0, docs-only->0, +non-master & first-push->0. (5) README release/refresh + increment discipline + stale-cache warning. Carve-out: NOT mirrored to ralph-init templates, NO R11 row (AC#8).
+
+AC#1 evidence: /plugin update is version-gated — Claude Code rebuilds the on-disk skill cache at ~/.claude/plugins/cache/dddpaul-ralph/ralph/<version>/ ONLY when the plugin version field advances. With version pinned at 0.1.0 in both manifests and never bumped, update no-ops while the dev repo, GitHub, and the marketplace advance, freezing the cache at a stale 0.1.0 snapshot. Real incident 2026-07-26: cached ralph-stop SKILL.md was ~a release behind (missing graceful-drain AND whole subsystems ralph-refine / push.py / refine_orchestrator.py); users silently ran stale skills. This change bumps both manifests 0.1.0->0.2.0 (honest minor catch-up for ralph-refine + push.py + resolver simplification landed since 0.1.0) to prove the refresh path, and adds a pre-push guard so future shipped changes cannot ship without a monotonic bump.
+
+Commit: `9c28137` - task-214: pre-push guard enforcing a plugin version bump on shipped changes
+
+Done. Implemented: (1) bumped plugin.json version + marketplace.json metadata.version 0.1.0->0.2.0 (equal). (2) tracked guard .claude/hooks/version-bump-guard.sh (pre-push; POSIX case-glob shipped-set match, sed BRE version parse, sort -V strict-greater; pass-through non-master / no-shipped-change / first-push all-zeros). (3) installed .git/hooks/pre-push wrapper execing the tracked guard (not committable). (4) tests/unit/version-bump-guard.bats — 7 cases green incl. AC#6 block/bump/docs-only + AC#5 pass-throughs. (5) README 'Releasing plugin updates' section: stale-cache warning (2026-07-26 incident), bump-both/commit/push//plugin update procedure, patch/minor/major discipline; expanded Git Hooks. Carve-out honored (AC#8): NOT mirrored to ralph-init templates, NO R11 row — R11 escape clause satisfied by task's explicit justification. Quality: ruff clean, 346 pytest, 53 unit bats. E2E-proven through the installed wrapper: real-history shipped-change@0.1.0 -> exit 1 BLOCKED; dry-run push of bumped branch(0.2.0) as master over remote@0.1.0 -> exit 0 ALLOWED. Review: independent task-reviewer-charter agent (registered task-reviewer subagent absent) -> APPROVED, all 10 AC PASS. Known non-blocking edge (reviewer-noted, unreachable in real pre-push): a garbage remote_sha would make git diff fail-open to exit 0; git never supplies such a sha (valid negotiated objects or all-zeros, both handled).
+<!-- SECTION:NOTES:END -->

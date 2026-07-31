@@ -196,6 +196,29 @@ To disable the push for a single run, pass `--no-push` or set `RALPH_NO_PUSH=1`:
 RALPH_NO_PUSH=1 ./ralph.sh
 ```
 
+### Releasing plugin updates (version bump)
+
+This repo is its own plugin marketplace. Claude Code runs the plugin's skills from an on-disk cache at `~/.claude/plugins/cache/dddpaul-ralph/ralph/<version>/`, and `/plugin update` rebuilds that cache **only when it detects a new version**. The plugin version therefore acts as the cache-refresh trigger.
+
+> **⚠️ Stale-cache warning:** if you change a shipped skill/agent but leave the version untouched, `/plugin update` no-ops and every consumer keeps running the **old** cached skills — silently. (Real incident 2026-07-26: a cached `ralph-stop` skill was a release behind, missing graceful-drain and whole subsystems, while the dev repo, GitHub, and the marketplace had all advanced.)
+
+**Release / refresh procedure**
+
+1. Bump the version in **both** manifests to the same value:
+   - `plugins/ralph/.claude-plugin/plugin.json` → `version`
+   - `.claude-plugin/marketplace.json` → `metadata.version`
+2. Commit the bump together with the shipped change and merge to `master`.
+3. Push `master` to `origin` (the Ralph loop does this by default; see above).
+4. Consumers run `/plugin marketplace update dddpaul-ralph` then `/plugin update ralph@dddpaul-ralph` to pull the new version and rebuild their skill cache.
+
+**Increment discipline** (human convention — the guard only enforces that the version moves *up*, not by how much):
+
+- **patch** (`0.2.1`) — default: bug fixes and in-skill edits.
+- **minor** (`0.3.0`) — a new skill/agent/flag, or a removed/renamed skill.
+- **major** (`1.0.0`) — deferred to a future stable-surface declaration.
+
+A `pre-push` git hook (`.claude/hooks/version-bump-guard.sh`, activated via a `.git/hooks/pre-push` wrapper) enforces this at the push boundary: if a push of `master` changes any shipped-set file (`plugins/ralph/skills/**`, `plugins/ralph/agents/**`, `plugin.json`, `marketplace.json`) without a strictly-greater version (`sort -V`), it is **blocked**. Non-master pushes, docs/tooling-only ranges, and the first push pass through. This guard is project-specific to this producer repo and is intentionally **not** part of the `ralph-init` template tree (seeded consumer projects ship no manifests).
+
 **Examples:**
 
 ```bash
@@ -318,6 +341,8 @@ Every task branch is reviewed before merging. The agent spawns the `task-reviewe
 ### Git Hooks
 
 The post-commit hook appends commit hashes to task files on `task-*` branches. This creates an audit trail linking commits to tasks. Use `--append-notes` (never `--notes`) to avoid overwriting hook-generated content.
+
+A `pre-push` hook additionally guards the publish boundary: pushing `master` with a shipped skill/agent change but no version bump is blocked, so `/plugin update` always has a new version to rebuild the consumer cache from. See [Releasing plugin updates](#releasing-plugin-updates-version-bump).
 
 ### AGENTS.md / CLAUDE.md Updates
 
