@@ -3,9 +3,10 @@ id: TASK-213
 title: >-
   Verify and reconcile ralph-stop graceful-drain guarantee against the Step 5
   signal path in devcontainer mode
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-26 16:16'
+updated_date: '2026-08-01 08:16'
 labels: []
 dependencies: []
 priority: medium
@@ -58,12 +59,38 @@ If anything is unclear or any check fails: STOP and ask the user. Do NOT start w
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A live --devcontainer Ralph run is stopped mid-iteration using ONLY the documented ralph-stop Step 5 signals (pkill -TERM -P <pid> then kill -TERM <pid>); the implementation notes record which signals were sent, the in-flight task ID, and the observed post-stop git state (branch, whether the task merged, whether the working tree was clean)
-- [ ] #2 The notes state a clear verdict: under the documented Step 5 path the in-flight in-container agent EITHER drained to a clean merge with no dirty working tree, OR it did not (with the failure mode described)
-- [ ] #3 If the agent did NOT drain cleanly under the Step 5 path: plugins/ralph/skills/ralph-stop/SKILL.md and/or plugins/ralph/skills/ralph-run/scripts/ralph/loop.py are changed so the documented clean-drain guarantee holds in --devcontainer mode, with the change scoped to devcontainer runs
-- [ ] #4 If the agent DID drain cleanly under the Step 5 path: plugins/ralph/skills/ralph-stop/SKILL.md is annotated to state the verified signal path so the graceful-drain guarantee and the Step 5 commands are demonstrably consistent
-- [ ] #5 Non-devcontainer (host-process) stop behavior and the TASK-160 SIGTERM-forwarding in loop.py _SignalInstaller are unchanged for host-process runs (verified by inspection and by the full suite staying green)
-- [ ] #6 No force-kill of the in-container agent is introduced (grep of the skill and scripts shows no 'devcontainer exec' + 'pkill'/'kill' targeting the in-container claude/opencode)
-- [ ] #7 Lint green: uv run ruff check .
-- [ ] #8 Tests green: uv run pytest
+- [x] #1 A live --devcontainer Ralph run is stopped mid-iteration using ONLY the documented ralph-stop Step 5 signals (pkill -TERM -P <pid> then kill -TERM <pid>); the implementation notes record which signals were sent, the in-flight task ID, and the observed post-stop git state (branch, whether the task merged, whether the working tree was clean)
+- [x] #2 The notes state a clear verdict: under the documented Step 5 path the in-flight in-container agent EITHER drained to a clean merge with no dirty working tree, OR it did not (with the failure mode described)
+- [x] #3 If the agent did NOT drain cleanly under the Step 5 path: plugins/ralph/skills/ralph-stop/SKILL.md and/or plugins/ralph/skills/ralph-run/scripts/ralph/loop.py are changed so the documented clean-drain guarantee holds in --devcontainer mode, with the change scoped to devcontainer runs — N/A: clean drain was verified under the Step 5 path, so the AC#4 (annotate) branch was taken and no mechanism fix was required
+- [x] #4 If the agent DID drain cleanly under the Step 5 path: plugins/ralph/skills/ralph-stop/SKILL.md is annotated to state the verified signal path so the graceful-drain guarantee and the Step 5 commands are demonstrably consistent
+- [x] #5 Non-devcontainer (host-process) stop behavior and the TASK-160 SIGTERM-forwarding in loop.py _SignalInstaller are unchanged for host-process runs (verified by inspection and by the full suite staying green)
+- [x] #6 No force-kill of the in-container agent is introduced (grep of the skill and scripts shows no 'devcontainer exec' + 'pkill'/'kill' targeting the in-container claude/opencode)
+- [x] #7 Lint green: uv run ruff check .
+- [x] #8 Tests green: uv run pytest
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan (interactive experiment): (1) create synthetic throwaway guinea-pig task; (2) launch a --devcontainer Ralph run on it with --no-push (avoid publishing throwaway); (3) once the in-container agent is mid-iteration (branch created / WIP), issue ONLY the documented ralph-stop Step 5 signals: pkill -TERM -P <orchestrator-pid> then kill -TERM <orchestrator-pid>; (4) observe + record post-stop git state (branch, merged?, tree clean?); (5) verdict -> clean drain: annotate ralph-stop SKILL.md with verified path; aborted: fix mechanism scoped to devcontainer; (6) cleanup guinea-pig.
+
+Empirical verification (interactive, 3 --devcontainer --no-push guinea-pig runs on synthetic throwaway tasks):
+
+- Runs 1 & 2 (TASK-216, TASK-217): trivial one-line tasks completed the full lifecycle (branch → file → lint/test → review → merge → Done) in ~4-6 min, faster than an observe-then-fire round-trip could catch mid-iteration → null result (no signal ever landed). Kept as timing calibration.
+- Run 3 (TASK-218): atomic detect-and-fire. The instant the host-side proxy `node devcontainer exec … claude --print` appeared (~4s in, state=running, master unchanged, branch not yet created), issued ONLY the documented Step 5 signals against the status-file PID: `pkill -TERM -P 42144` (rc=0) then `kill -TERM 42144` (rc=0).
+
+Observed post-fire (host):
+- Orchestrator 42144 exited 2s after fire; status.json state=failed.
+- The entire host-side proxy chain died: `node devcontainer exec … claude` (36562-analog) + both `docker exec -i` clients — all gone.
+- master unchanged; no task-218 branch yet; probe file absent.
+
+Observed inside the container (docker exec … ps) — the decisive evidence:
+- The in-container agent `claude --model … --print` was STILL ALIVE, PID 710962, reparented to PPID 0 (container init) — its `docker exec -i` parent was gone but the agent (separate PID namespace) survived the severed stdio.
+- It kept working with NO orchestrator alive: created branch task-218, committed design/drain-probe-3.md, then (watched over ~180s) marked the task Done (2nd commit), ran `git checkout master && merge --no-ff && branch -d`. master advanced 55c7f23 → 3d8346a; branch deleted; working tree clean (only the unrelated experimenter task-213 edit).
+
+VERDICT (AC #2): Under the documented Step 5 signal path the in-flight in-container agent DRAINED TO A CLEAN MERGE — no dirty working tree, no partial diff. The Step 5 pkill/kill + loop.py _SignalInstaller SIGTERM-forwarding reach only the host-side proxy (node devcontainer exec → docker exec -i, no -t/--sig-proxy); the PID-namespace-isolated agent is untouched and completes. AC #4 path taken (annotate SKILL.md); AC #3 (mechanism fix) NOT needed. Throwaway guinea-pig commits/files reset off master (master realigned to origin 5b3c1a1); TASK-216/217/218 discarded.
+
+Commit: `833fe51` - task-213: annotate ralph-stop with the verified graceful-drain signal path (Step 5 kills only the host-side devcontainer-exec/docker-exec proxy; the PID-isolated in-container agent, orphaned with PPID 0, drains to a clean merge)
+
+Deliverable: SKILL.md '### Verified signal path (TASK-213)' annotation (commit on task-213 branch). Review: ralph:task-reviewer → APPROVED (doc-only, 14 lines; loop.py untouched per AC#5; no force-kill added per AC#6; reviewer PPID nit reconciled to observed PPID 0). Final gate green: ruff clean, pytest 346 passed. AC#3 N/A (clean-drain verdict → AC#4 branch taken).
+<!-- SECTION:NOTES:END -->
