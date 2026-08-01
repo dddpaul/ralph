@@ -57,3 +57,26 @@ Single-task feature (one `devcontainer` + `ralph-init` deliverable, no cross-tas
 - Add the Init doc note (token export + `.mcp.json` convention) near the `CLAUDE_CODE_OAUTH_TOKEN` section.
 - Add the Upgrade Mode detect-and-offer `.mcp.json` step to the U-flow.
 - Verify: grep decoupling (no `OKF`/`9000`), JSONC validity, `ruff`, `pytest`, `Dockerfile`/firewall unchanged, no `forwardPorts`.
+
+---
+
+## Addendum: multi-server / multi-token support (added 2026-08-01)
+
+### Why
+
+Design-review question: what if a project needs **several** host MCP servers with different URLs and tokens? The single-slot design (`MCP_GATEWAY_HOST` + one `MCP_GATEWAY_TOKEN`) looks like it boxes that in.
+
+### What changed
+
+Clarified the scaling boundary and recorded the sanctioned extension. **TASK-215 scope is UNCHANGED — the single generic slot stands.**
+
+- **Reachability already scales to N servers for free.** Every host-run MCP server is reached the same way (`localhost` on host, `host.docker.internal` in-container), so the single `MCP_GATEWAY_HOST` variable serves unlimited servers — reuse `${MCP_GATEWAY_HOST:-localhost}` in each server's URL with its own port/path. URLs are not a constraint.
+- **Only token forwarding is per-server**, and `devcontainer.json` cannot wildcard-forward an unknown set of env vars (`${localEnv:NAME}` must name each), so enumerating project tokens in the Ralph-owned template would reintroduce the upgrade-clobber problem.
+- **Decision: defer (YAGNI).** okf-mcp-gateway is a *gateway* — it aggregates many knowledge sources behind one endpoint/token, which is exactly the single-slot case. Ship one token now; do not build multi-token machinery before a second independently-tokened host server actually exists.
+- **Sanctioned extension path (when that second server appears): a project-owned env-file.** Ralph seeds an empty, gitignored `.devcontainer/mcp.env` and wires `runArgs: ["--env-file", ".devcontainer/mcp.env"]`. Docker `--env-file` forwards a **bare** `NAME` line (no `=`) from the host environment, so the project lists its tokens (one bare `NAME` per line) with **zero** enumeration in `devcontainer.json` and **no** section-aware merge. `.mcp.json` then references `${OKF_TOKEN}`, `${FOO_TOKEN}`, etc. Ralph never sees token names and stays fully generic. Seeding the file empty is required so `--env-file` never hard-fails when absent.
+- **Alternative considered, not chosen:** a preserved `containerEnv` block (`// >>> ralph:project-env … <<<`) that upgrade merges section-aware — rejected for now as more machinery than the env-file for the same outcome.
+
+### Implementation checklist
+
+- No change to TASK-215 (single generic slot stands; the reworked ACs are correct as-is).
+- When multi-token is actually needed, open a follow-up task: seed an empty gitignored `.devcontainer/mcp.env`, add `--env-file` to the devcontainer `runArgs` (template + repo, R11), gitignore the env-file, and document the bare-`NAME` convention in `ralph-init` Init **and** Upgrade — reusing the same init/upgrade-parity discipline as the single slot.
