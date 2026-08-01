@@ -53,7 +53,9 @@
     "POWERLEVEL9K_DISABLE_GITSTATUS": "true",
     "HTTP_PROXY": "http://host.docker.internal:3128",
     "HTTPS_PROXY": "http://host.docker.internal:3128",
-    "NO_PROXY": "localhost,127.0.0.1,.local",
+    "NO_PROXY": "localhost,127.0.0.1,.local,host.docker.internal",
+    "MCP_GATEWAY_HOST": "host.docker.internal",
+    "MCP_GATEWAY_TOKEN": "${localEnv:MCP_GATEWAY_TOKEN}",
     "TZ": "${localEnv:TZ:America/Los_Angeles}"
   },
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",

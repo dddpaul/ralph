@@ -195,6 +195,32 @@ Assemble the Dockerfile from base + language snippets, then write three files:
 
 **Do not** commit the token value anywhere — only the env var name and the `${localEnv:...}` substitution belong in `devcontainer.json`.
 
+**Host MCP gateway slot (optional):** the template also ships a neutral, service-agnostic "host MCP gateway" slot so MCP-dependent phases can run with `devcontainer=true` (sandbox isolation intact) instead of falling back to `devcontainer=false`. Inside the container `localhost` points at the container, so a gateway published on the host is unreachable by that name; the host is reachable at `host.docker.internal`, and `init-firewall.sh` already permits that container→host egress (same path as the `host.docker.internal:3128` Squid proxy). The template forwards two neutral vars — `MCP_GATEWAY_HOST` (fixed to `host.docker.internal`) and `MCP_GATEWAY_TOKEN` (a `${localEnv:MCP_GATEWAY_TOKEN}` passthrough) — and appends `host.docker.internal` to `NO_PROXY` so the MCP client connects **directly** to the host gateway instead of routing through Squid (which is not configured to reach it). Ralph ships only this reachability plumbing; the specific gateway (its port and path) stays in the project's own `.mcp.json`. Ralph never names the service. If the project has no host MCP gateway, ignore this — the vars resolve empty and nothing else changes. Tell the user:
+
+1. **Export the gateway token from the shell's always-sourced env file** (same gotcha as the OAuth token above): zsh users add the export to `~/.zshenv` — NOT `~/.zshrc`, which is interactive-only, so non-interactive Ralph launches would see an empty value. bash users use the equivalent always-sourced env file.
+
+   ```sh
+   export MCP_GATEWAY_TOKEN="<your host gateway token>"
+   ```
+
+2. **Point `.mcp.json` at the slot** so a single file resolves correctly both on the host and inside the container. Use `${MCP_GATEWAY_HOST:-localhost}` for the host (→ `localhost` on the host, `host.docker.internal` in-container) and `Bearer ${MCP_GATEWAY_TOKEN}` for auth:
+
+   ```json
+   {
+     "mcpServers": {
+       "<name>": {
+         "type": "http",
+         "url": "http://${MCP_GATEWAY_HOST:-localhost}:<port>/<path>",
+         "headers": { "Authorization": "Bearer ${MCP_GATEWAY_TOKEN}" }
+       }
+     }
+   }
+   ```
+
+**Graceful degradation:** when the host shell does not export `MCP_GATEWAY_TOKEN`, `${localEnv:MCP_GATEWAY_TOKEN}` resolves to empty string and the container starts unaffected — a server that needs the token simply fails to authenticate, exactly like the OAuth-token path. `MCP_GATEWAY_HOST` is a constant, so the reachability wiring is inert until a `.mcp.json` actually references it.
+
+> **colima caveat:** Docker Desktop maps `host.docker.internal` automatically; colima may need an explicit host mapping for it to resolve in-container. This is a host runtime prerequisite, not a repo change.
+
 ### 3.7a `.claude/hooks/` and `.claude/settings.local.json` (template write)
 Read each `templates/claude/hooks/*-guard.sh` and `templates/claude/hooks/task-validator.sh` → write to `.claude/hooks/<name>.sh`. Make executable (`chmod +x`). Create `.claude/hooks/` directory if it does not exist.
 Read `templates/claude/settings.local.json` → write to `.claude/settings.local.json` (user permissions).
@@ -549,6 +575,34 @@ For each file the user approved:
   5. Write the merged result back to `.claude/brainstorm-rules.md`.
 
 **Missing files**: create from template using the same logic as the init flow (copy template, `chmod +x` where applicable).
+
+The Ralph-owned `.devcontainer/devcontainer.json` carries the host MCP gateway slot (`MCP_GATEWAY_HOST` / `MCP_GATEWAY_TOKEN` + the widened `NO_PROXY`), so it upgrades through the normal U2/U4 sync above like any other managed file — no special handling. The per-consumer `.mcp.json` is handled separately in U4.5.
+
+---
+
+### U4.5: Offer `.mcp.json` host-rewrite (per-consumer, confirm-only)
+
+`.mcp.json` is **per-consumer and not Ralph-owned**, so it is deliberately absent from the U2 status table and the U4 sync — upgrade must **never silently rewrite it**. This step only *offers* a targeted host-rewrite so an existing `.mcp.json` can use the `MCP_GATEWAY_HOST` slot the updated `devcontainer.json` now provides (see the Init "Host MCP gateway slot" note for the convention).
+
+**This step is silent when it does not apply** — print nothing and proceed to U5 when `.mcp.json` is absent, contains no http-type MCP server, or every http server already uses `${MCP_GATEWAY_HOST...}`.
+
+1. If `.mcp.json` does not exist in the project root, skip silently to U5.
+2. Read `.mcp.json`. For each server under `mcpServers` whose `type` is `http` (or that carries a `url`), inspect the URL host.
+3. Collect only servers whose URL host is exactly `localhost` or `127.0.0.1`. Ignore any URL that already contains `${MCP_GATEWAY_HOST`, a non-loopback host, or a non-http server. If none remain, skip silently to U5.
+4. For each collected server, compute the rewrite that substitutes **only the host** with `${MCP_GATEWAY_HOST:-localhost}` — scheme, port, path, headers, and everything else unchanged:
+   - `http://localhost:<port>/<path>` → `http://${MCP_GATEWAY_HOST:-localhost}:<port>/<path>`
+   - `http://127.0.0.1:<port>/<path>` → `http://${MCP_GATEWAY_HOST:-localhost}:<port>/<path>`
+5. Present a **before/after unified diff** of the proposed change and ask:
+
+   ```
+   Rewrite <n> .mcp.json server url(s) to ${MCP_GATEWAY_HOST:-localhost} so they resolve to the
+   host gateway inside the devcontainer (and stay localhost on the host)? This edits your
+   (non-Ralph) .mcp.json. [y/N]
+   ```
+
+6. On **y**: apply the host substring rewrite only (do not reformat or re-key the rest of the file) and print `  .mcp.json rewritten (<n> url(s))`. On **N** (default) or an empty answer: leave the file untouched and print `  .mcp.json skipped (user)`.
+
+Never rewrite silently and never touch anything but the loopback host substring. When in doubt, leave the entry and let the user decide.
 
 ---
 
