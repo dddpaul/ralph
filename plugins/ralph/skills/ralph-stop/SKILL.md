@@ -23,6 +23,20 @@ So "stop" lands on a **clean task boundary**: the current task finishes and merg
 
 Do NOT "fix" this by force-killing the in-container agent (e.g. `devcontainer exec ... pkill claude`). Killing `claude -p` mid-iteration leaves a partial, uncommitted diff on the task branch that needs `git reset` + manual cleanup — the opposite of a graceful stop.
 
+### Verified signal path (TASK-213)
+
+The clean-drain guarantee above was verified empirically against the **exact Step 5 commands** on a live `--devcontainer` run. Sending the documented signals mid-iteration — `pkill -TERM -P <orchestrator-pid>` then `kill -TERM <orchestrator-pid>` — terminates only the **host-side proxy chain**:
+
+```
+<orchestrator>  (status-file PID)
+ └ python orchestrator loop                    _SignalInstaller runs here; on SIGTERM it
+    │                                           forwards to the active subprocess's pgroup
+    └ node devcontainer exec … claude --print   the "active subprocess" (host-side proxy)
+       └ docker exec -i …                        stdio bridge into the container (no -t, no --sig-proxy)
+```
+
+The in-container agent (`claude -p`) runs in the container's **separate PID namespace**, invisible to the host `pkill`/`kill`. When its `docker exec -i` client is killed, the agent is orphaned but keeps its work intact — its parent (the `docker exec` shim) lived outside the container's PID namespace, so the container's own `ps` reports the survivor reparented with `PPID 0` — and it drains to completion: it committed the task, marked it Done, merged `--no-ff` to master, and deleted the branch — leaving a **clean working tree, no partial diff**. So loop.py's `_SignalInstaller` SIGTERM-forwarding (the TASK-160 parity closer) reaches only the proxy, never the PID-isolated agent — which is exactly why the graceful drain holds under this documented path. (Force-killing the client's `docker exec` peer, or adding `-t`/`--sig-proxy`, would break this; hence the anti-pattern warning above.)
+
 Note: ralph-stop is a plugin skill, not a bootstrap-seeded template, so there is NO R11 template-parity pair to also edit — single file change. The installed plugin-cache copy updates on next plugin reinstall; only the repo source is edited here.
 
 ---
