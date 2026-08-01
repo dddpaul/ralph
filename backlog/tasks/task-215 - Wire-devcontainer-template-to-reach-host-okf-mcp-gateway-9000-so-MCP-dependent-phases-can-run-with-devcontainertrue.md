@@ -1,13 +1,15 @@
 ---
 id: TASK-215
 title: >-
-  Wire devcontainer template to reach host okf-mcp-gateway (:9000) so
-  MCP-dependent phases can run with devcontainer=true
+  Add a generic host MCP gateway slot to the devcontainer template (init +
+  upgrade)
 status: To Do
 assignee: []
 created_date: '2026-07-28 17:11'
+updated_date: '2026-08-01 13:20'
 labels:
   - template
+  - 'feature:host-mcp-gateway'
 dependencies: []
 priority: medium
 ---
@@ -17,98 +19,60 @@ priority: medium
 <!-- SECTION:DESCRIPTION:BEGIN -->
 ## Why
 
-Ralph projects that consume shared knowledge register the okf-mcp-gateway as an
-**HTTP** MCP server at `http://localhost:9000/<owner>/mcp` (Bearer token). That works
-on the host, but inside the Ralph devcontainer `localhost:9000` points at the
-container itself, so every MCP resource is unreachable — MCP-dependent phases must be
-run with `devcontainer=false`, sacrificing sandbox isolation. The gateway is
-reachable from the container at `host.docker.internal:9000` (Docker Desktop maps it),
-and `init-firewall.sh` already permits egress to the host network (HOST_NETWORK /24 +
-private ranges) — the same path the existing `host.docker.internal:3128` proxy uses.
-So only three declarative wires are missing in the devcontainer template; no Dockerfile
-or firewall change is needed. This mirrors TASK-114 (CLAUDE_CODE_OAUTH_TOKEN forward)
-in shape and applies to both the template and this repo's own `.devcontainer` (R11
-byte-for-byte parity).
+Ralph devcontainers cannot reach host-run HTTP MCP servers: inside the container "localhost:<port>" points at the container itself, so a gateway published on the host (for example a shared-knowledge MCP gateway on :9000) is unreachable, and MCP-dependent phases must run with devcontainer=false, sacrificing sandbox isolation. The host is reachable from the container at host.docker.internal, and init-firewall.sh already permits egress to the host network (HOST_NETWORK /24 + private ranges) — the same path the existing host.docker.internal:3128 Squid proxy uses. So the wiring is small and declarative; no Dockerfile or firewall change is needed.
+
+Rather than bake a specific gateway service into the generic Ralph template (which would couple every ralph-init project to a service most do not use), ship a NEUTRAL, reusable "host MCP gateway" slot: generic env names MCP_GATEWAY_HOST and MCP_GATEWAY_TOKEN that any project can point its own .mcp.json at. The specific service (owner path, port) stays pure per-project .mcp.json config; Ralph never names it. This mirrors the existing CLAUDE_CODE_OAUTH_TOKEN forward (ralph-init SKILL.md around Step 3.6): a ${localEnv:...} containerEnv passthrough plus a host-setup doc note with graceful degradation when the token is unset.
+
+Existing projects must receive this through "ralph-init upgrade", not only new-project init — so BOTH flows are updated. devcontainer.json is Ralph-owned and flows through the normal upgrade file-sync (U2/U4). .mcp.json is per-consumer and NOT Ralph-owned, so upgrade must never silently rewrite it: it uses a detect-and-offer step (show a before/after diff, apply only on user confirm).
 
 ## Scope
 
 In scope:
-- Add to `containerEnv` in the devcontainer template (and mirror in this repo's own
-  `.devcontainer/devcontainer.json`, R11 parity):
-  - `"OKF_GATEWAY_HOST": "host.docker.internal"` — so a consumer `.mcp.json` can point
-    the gateway URL at the host from inside the container.
-  - `"OKF_GATEWAY_TOKEN": "${localEnv:OKF_GATEWAY_TOKEN}"` — forward the gateway Bearer
-    token (same forwarding shape as CLAUDE_CODE_OAUTH_TOKEN).
-  - Append `host.docker.internal` to `NO_PROXY` (currently
-    `localhost,127.0.0.1,.local`) so the MCP client connects DIRECTLY to
-    host.docker.internal:9000 instead of routing through the Squid proxy at :3128
-    (which is not configured to reach :9000). The firewall already allows this direct
-    egress.
-- Document in `ralph-init` SKILL.md, parallel to the existing CLAUDE_CODE_OAUTH_TOKEN
-  host-setup note (~lines 180-196):
-  - export `OKF_GATEWAY_TOKEN` from `~/.zshenv` (NOT `~/.zshrc` — interactive-only, so
-    non-interactive Ralph launches would see an empty value; same gotcha as the OAuth
-    token), with graceful degradation when unset.
-  - the consumer-side `.mcp.json` convention: use
-    `"url": "http://${OKF_GATEWAY_HOST:-localhost}:9000/<owner>/mcp"` so the same file
-    resolves to `localhost` on the host and `host.docker.internal` inside the container.
-
-The additions are safe as unconditional template defaults: a project that does not set
-`OKF_GATEWAY_TOKEN` on the host gets an empty `${localEnv:...}` (graceful, like OAuth),
-an unused `OKF_GATEWAY_HOST` is inert, and a wider `NO_PROXY` is harmless.
+- plugins/ralph/skills/ralph-init/templates/devcontainer/devcontainer.json (and the repo own .devcontainer/devcontainer.json, R11 byte-for-byte parity):
+  - containerEnv: "MCP_GATEWAY_HOST": "host.docker.internal" and "MCP_GATEWAY_TOKEN": "${localEnv:MCP_GATEWAY_TOKEN}".
+  - Append host.docker.internal to NO_PROXY (currently localhost,127.0.0.1,.local) so the MCP client connects DIRECTLY to the host gateway instead of routing through Squid at :3128 (which is not configured to reach it). The firewall already allows this direct egress.
+- plugins/ralph/skills/ralph-init/SKILL.md Init (near the CLAUDE_CODE_OAUTH_TOKEN note, around lines 180-196):
+  - document exporting MCP_GATEWAY_TOKEN from ~/.zshenv (NOT ~/.zshrc — interactive-only, so non-interactive Ralph launches would see an empty value; same gotcha as the OAuth token), with graceful degradation when unset.
+  - document the consumer .mcp.json convention: "url": "http://${MCP_GATEWAY_HOST:-localhost}:<port>/<path>" with Authorization: Bearer ${MCP_GATEWAY_TOKEN}, so the same file resolves to localhost on the host and host.docker.internal inside the container.
+- plugins/ralph/skills/ralph-init/SKILL.md Upgrade Mode (U-flow):
+  - devcontainer.json changes flow through the existing U2 status-table and U4 apply (Ralph-owned file).
+  - NEW detect-and-offer for .mcp.json: if the project has a .mcp.json containing an http-type MCP server whose url host is localhost or 127.0.0.1, present a before/after diff rewriting the host to ${MCP_GATEWAY_HOST:-localhost} (dual-mode), and apply ONLY on user confirm. Never rewrite silently; do nothing when .mcp.json is absent or already uses the convention.
 
 Out of scope:
-- Editing `Dockerfile` or `init-firewall.sh` — egress to the host network is already
-  permitted; no new firewall rule is required.
-- Adding a `forwardPorts` entry for 9000 — that publishes a CONTAINER port to the host
-  (wrong direction); the need here is container→host egress, which already works.
-- Creating or templating a `.mcp.json` — ralph-init does not own it; it is per-consumer.
-  Only DOCUMENT the URL convention.
-- Changing the host `~/.zshenv` on any machine — that is a per-user manual step the doc
-  describes, not a repo edit.
+- Editing Dockerfile or init-firewall.sh — host-network egress is already permitted; no new firewall rule is required.
+- A forwardPorts entry for the gateway port — that publishes a container port to the host (wrong direction); the need is container-to-host egress, which already works.
+- Owning or templating .mcp.json as a synced file — it stays per-consumer; upgrade only OFFERS a targeted host-rewrite.
+- Naming any specific gateway service (no OKF_ prefix, no hardcoded owner) in the template or the skill — the slot is generic; a concrete service is an example at most.
+- Changing any host ~/.zshenv, or runtime setup for host.docker.internal (Docker Desktop maps it automatically; colima needs an explicit host mapping — note this as a doc caveat, not a repo change).
 
 ## Files
 
-- `plugins/ralph/skills/ralph-init/templates/devcontainer/devcontainer.json` (exists) —
-  add the two containerEnv keys + extend NO_PROXY.
-- `.devcontainer/devcontainer.json` (exists) — mirror the same three changes byte-for-
-  byte (R11 parity with the template, per TASK-114 precedent).
-- `plugins/ralph/skills/ralph-init/SKILL.md` (exists) — add the OKF_GATEWAY_TOKEN host
-  note (~near the CLAUDE_CODE_OAUTH_TOKEN section, lines ~180-196) + the `.mcp.json`
-  `${OKF_GATEWAY_HOST:-localhost}` convention.
+- plugins/ralph/skills/ralph-init/templates/devcontainer/devcontainer.json (exists) — add the two containerEnv keys + extend NO_PROXY.
+- .devcontainer/devcontainer.json (exists) — mirror the same three changes byte-for-byte (R11 parity).
+- plugins/ralph/skills/ralph-init/SKILL.md (exists) — Init token/.mcp.json convention note + Upgrade Mode detect-and-offer step.
 
 ## Source
 
-Source: /Users/paul/Private/Alfa/Projects/channels@b4c776ce9f8f
-No source design doc — derived from a live channels devcontainer/MCP diagnostics
-session: channels `.mcp.json` registers the gateway over HTTP at `localhost:9000`
-(type=http, Bearer `${OKF_GATEWAY_TOKEN}`); the gateway container publishes
-`0.0.0.0:9000->8080/tcp`; channels `.devcontainer/init-firewall.sh` already ACCEPTs
-egress to HOST_NETWORK (lines ~116-117) and private ranges (~46-48); channels
-devcontainer.json already reaches the host via `host.docker.internal` for HTTP_PROXY
-(:3128). These are seeded from this repo's devcontainer template, hence the fix belongs
-upstream here.
+Source: /Users/paul/Private/Alfa/Projects/channels@b4c776ce9f8f (derived from a live channels devcontainer/MCP diagnostics session). Reworked 2026-08-01 from an okf-specific wiring to a generic, service-agnostic host MCP gateway slot (MCP_GATEWAY_HOST/MCP_GATEWAY_TOKEN) with ralph-init init + upgrade support and a detect-and-offer .mcp.json migration.
 
-## Before starting (destination Claude validation checklist)
+## Before starting (destination validation checklist)
 
-Before running this task, verify:
-1. Both devcontainer.json files exist and their `containerEnv` blocks still mirror each
-   other (R11 parity target).
-2. Each AC is objectively pass/fail (grep over the two JSON files + the SKILL.md, plus
-   `uv run pytest`) — not "works correctly".
-3. Dockerfile and init-firewall.sh are genuinely untouched by the final diff.
-4. No `forwardPorts` 9000 entry is introduced.
-
-If anything is unclear or any check fails: STOP and ask the user. Do NOT start blindly.
+1. Both devcontainer.json files exist and their containerEnv / NO_PROXY blocks still mirror each other (R11 parity target).
+2. Each AC is objectively pass/fail (grep over the two JSON files + SKILL.md, JSONC validity, ruff, pytest) — not "works correctly".
+3. Dockerfile and init-firewall.sh are genuinely untouched by the final diff, and no forwardPorts entry is added.
+4. No service-specific identifier (OKF_, a hardcoded owner, a hardcoded gateway port) is introduced into the template or the skill.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Template devcontainer.json containerEnv contains "OKF_GATEWAY_HOST": "host.docker.internal"
-- [ ] #2 Template devcontainer.json containerEnv forwards the token as "OKF_GATEWAY_TOKEN": "${localEnv:OKF_GATEWAY_TOKEN}"
-- [ ] #3 Template devcontainer.json NO_PROXY value includes host.docker.internal
+- [ ] #1 Template devcontainer/devcontainer.json containerEnv contains "MCP_GATEWAY_HOST": "host.docker.internal"
+- [ ] #2 Template devcontainer/devcontainer.json containerEnv forwards the token as "MCP_GATEWAY_TOKEN": "${localEnv:MCP_GATEWAY_TOKEN}"
+- [ ] #3 Template devcontainer/devcontainer.json NO_PROXY value includes host.docker.internal
 - [ ] #4 Repo own .devcontainer/devcontainer.json mirrors all three additions byte-for-byte (R11 parity with the template)
-- [ ] #5 Both devcontainer.json files remain valid JSONC and uv run pytest passes
-- [ ] #6 ralph-init SKILL.md documents (a) exporting OKF_GATEWAY_TOKEN from ~/.zshenv not ~/.zshrc, parallel to the CLAUDE_CODE_OAUTH_TOKEN note, and (b) the .mcp.json url convention http://${OKF_GATEWAY_HOST:-localhost}:9000/<owner>/mcp
-- [ ] #7 Dockerfile and init-firewall.sh are unchanged in the final diff, and no forwardPorts entry for 9000 is added
+- [ ] #5 Neither devcontainer.json contains a service-specific identifier (grep for OKF, okf, or a hardcoded gateway port such as 9000 is clean) — the slot is generic
+- [ ] #6 ralph-init SKILL.md Init documents exporting MCP_GATEWAY_TOKEN from ~/.zshenv (not ~/.zshrc), parallel to the CLAUDE_CODE_OAUTH_TOKEN note, with graceful degradation when unset
+- [ ] #7 ralph-init SKILL.md Init documents the .mcp.json url convention http://${MCP_GATEWAY_HOST:-localhost}:<port>/<path> with Authorization: Bearer ${MCP_GATEWAY_TOKEN}
+- [ ] #8 ralph-init SKILL.md Upgrade Mode documents a detect-and-offer step: when a project .mcp.json has an http MCP server whose url host is localhost or 127.0.0.1, present a before/after diff rewriting the host to ${MCP_GATEWAY_HOST:-localhost} and apply only on user confirm (never silent; no-op when .mcp.json absent)
+- [ ] #9 Both devcontainer.json files are valid JSONC; uv run ruff check . and uv run pytest pass
+- [ ] #10 Dockerfile and init-firewall.sh are unchanged in the final diff, and no forwardPorts entry for the gateway port is added
 <!-- AC:END -->
