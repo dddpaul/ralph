@@ -3,10 +3,10 @@ id: TASK-215
 title: >-
   Add a generic host MCP gateway slot to the devcontainer template (init +
   upgrade)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-28 17:11'
-updated_date: '2026-08-01 13:20'
+updated_date: '2026-08-01 18:55'
 labels:
   - template
   - 'feature:host-mcp-gateway'
@@ -65,14 +65,24 @@ Source: /Users/paul/Private/Alfa/Projects/channels@b4c776ce9f8f (derived from a 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Template devcontainer/devcontainer.json containerEnv contains "MCP_GATEWAY_HOST": "host.docker.internal"
-- [ ] #2 Template devcontainer/devcontainer.json containerEnv forwards the token as "MCP_GATEWAY_TOKEN": "${localEnv:MCP_GATEWAY_TOKEN}"
-- [ ] #3 Template devcontainer/devcontainer.json NO_PROXY value includes host.docker.internal
-- [ ] #4 Repo own .devcontainer/devcontainer.json mirrors all three additions byte-for-byte (R11 parity with the template)
-- [ ] #5 Neither devcontainer.json contains a service-specific identifier (grep for OKF, okf, or a hardcoded gateway port such as 9000 is clean) — the slot is generic
-- [ ] #6 ralph-init SKILL.md Init documents exporting MCP_GATEWAY_TOKEN from ~/.zshenv (not ~/.zshrc), parallel to the CLAUDE_CODE_OAUTH_TOKEN note, with graceful degradation when unset
-- [ ] #7 ralph-init SKILL.md Init documents the .mcp.json url convention http://${MCP_GATEWAY_HOST:-localhost}:<port>/<path> with Authorization: Bearer ${MCP_GATEWAY_TOKEN}
-- [ ] #8 ralph-init SKILL.md Upgrade Mode documents a detect-and-offer step: when a project .mcp.json has an http MCP server whose url host is localhost or 127.0.0.1, present a before/after diff rewriting the host to ${MCP_GATEWAY_HOST:-localhost} and apply only on user confirm (never silent; no-op when .mcp.json absent)
-- [ ] #9 Both devcontainer.json files are valid JSONC; uv run ruff check . and uv run pytest pass
-- [ ] #10 Dockerfile and init-firewall.sh are unchanged in the final diff, and no forwardPorts entry for the gateway port is added
+- [x] #1 Template devcontainer/devcontainer.json containerEnv contains "MCP_GATEWAY_HOST": "host.docker.internal"
+- [x] #2 Template devcontainer/devcontainer.json containerEnv forwards the token as "MCP_GATEWAY_TOKEN": "${localEnv:MCP_GATEWAY_TOKEN}"
+- [x] #3 Template devcontainer/devcontainer.json NO_PROXY value includes host.docker.internal
+- [x] #4 Repo own .devcontainer/devcontainer.json mirrors all three additions byte-for-byte (R11 parity with the template)
+- [x] #5 Neither devcontainer.json contains a service-specific identifier (grep for OKF, okf, or a hardcoded gateway port such as 9000 is clean) — the slot is generic
+- [x] #6 ralph-init SKILL.md Init documents exporting MCP_GATEWAY_TOKEN from ~/.zshenv (not ~/.zshrc), parallel to the CLAUDE_CODE_OAUTH_TOKEN note, with graceful degradation when unset
+- [x] #7 ralph-init SKILL.md Init documents the .mcp.json url convention http://${MCP_GATEWAY_HOST:-localhost}:<port>/<path> with Authorization: Bearer ${MCP_GATEWAY_TOKEN}
+- [x] #8 ralph-init SKILL.md Upgrade Mode documents a detect-and-offer step: when a project .mcp.json has an http MCP server whose url host is localhost or 127.0.0.1, present a before/after diff rewriting the host to ${MCP_GATEWAY_HOST:-localhost} and apply only on user confirm (never silent; no-op when .mcp.json absent)
+- [x] #9 Both devcontainer.json files are valid JSONC; uv run ruff check . and uv run pytest pass
+- [x] #10 Dockerfile and init-firewall.sh are unchanged in the final diff, and no forwardPorts entry for the gateway port is added
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan: (1) Add generic host MCP gateway slot to BOTH devcontainer.json files (template + repo own, R11 byte-for-byte): containerEnv MCP_GATEWAY_HOST=host.docker.internal and MCP_GATEWAY_TOKEN=${localEnv:MCP_GATEWAY_TOKEN}, and append host.docker.internal to NO_PROXY. (2) ralph-init SKILL.md Init: add a note near the CLAUDE_CODE_OAUTH_TOKEN section documenting the ~/.zshenv token export (not ~/.zshrc) with graceful degradation, plus the .mcp.json url convention http://${MCP_GATEWAY_HOST:-localhost}:<port>/<path> with Authorization: Bearer ${MCP_GATEWAY_TOKEN}. (3) ralph-init SKILL.md Upgrade Mode: devcontainer.json already flows through U2/U4; add a new U4.5 detect-and-offer step for per-consumer .mcp.json (rewrite localhost/127.0.0.1 http hosts to ${MCP_GATEWAY_HOST:-localhost}, before/after diff, apply only on confirm, no-op when absent). Keep names generic (no OKF/port). Verify: grep clean, JSONC valid, ruff+pytest, Dockerfile/init-firewall.sh untouched, no forwardPorts.
+
+Commit: `6cd577c` - task-215: add generic host MCP gateway slot to devcontainer template
+
+Done: Added generic host MCP gateway slot to BOTH devcontainer.json files (repo + ralph-init template, R11 byte-for-byte identical): containerEnv MCP_GATEWAY_HOST=host.docker.internal and MCP_GATEWAY_TOKEN=${localEnv:MCP_GATEWAY_TOKEN}, plus host.docker.internal appended to NO_PROXY for direct container->host egress. ralph-init SKILL.md Init got a 'Host MCP gateway slot' note (token export from ~/.zshenv with graceful degradation + dual-mode .mcp.json url convention http://${MCP_GATEWAY_HOST:-localhost}:<port>/<path> with Authorization: Bearer ${MCP_GATEWAY_TOKEN}); Upgrade Mode got new step U4.5, a confirm-only detect-and-offer .mcp.json host-rewrite (localhost/127.0.0.1 -> ${MCP_GATEWAY_HOST:-localhost}), never silent, no-op when absent. No service identifier (OKF/9000) in template or skill; Dockerfile/init-firewall.sh untouched; no forwardPorts added. JSONC valid, ruff clean, 346 pytest pass. task-reviewer: APPROVED. Multi-token support intentionally deferred (see design/host-mcp-gateway-brainstorm.md addendum).
+<!-- SECTION:NOTES:END -->
