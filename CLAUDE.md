@@ -48,7 +48,7 @@ In an **interactive session**, before implementing ANY backlog task — whether 
 3. **Implement:** write code, run build/linter/tests, check off AC with `backlog task edit <id> --check-ac <n>`.
 4. **Review:** after tests pass, spawn the `task-reviewer` agent (NOT `general-purpose` or any other) on `git diff master..HEAD`. Do not proceed to step 5 (Done) or step 6 (Merge) without an APPROVED verdict from the task-reviewer agent.
 5. **Done:** final build+lint+tests must pass. `backlog task edit <id> -s "Done" --append-notes "..."`.
-6. **Merge:** commit task file, `git checkout master && git merge <branch> && git branch -d <branch>`.
+6. **Merge:** (a) on the task branch, run `.claude/hooks/bump-version.sh --auto` — it auto-bumps the plugin version (both manifests) and commits **iff** a shipped `plugins/ralph/**` file changed in `master..HEAD`, else no-ops (so the pre-push `version-bump-guard.sh` passes without a human); (b) commit the task file; (c) `git checkout master && git merge --no-ff <branch>`; (d) on master, run `.claude/hooks/bump-version.sh --tag` — it annotates the merge commit `vX.Y.Z` for the current version (no-op if the tag exists) so the tag rides the next push via `push.followTags`; (e) `git branch -d <branch>`. (Steps (a)/(d) are repo-specific plugin-marketplace governance — the helper lives only under `.claude/`; NOT mirrored to `ralph-init` templates.)
 
 Use `backlog` CLI for all task operations; run `backlog task edit --help` for syntax. For one-off / ad-hoc task creation and judgment-bearing edits (split / add as AC / rework vague AC), use the `ralph-task` skill ("create a task" / "add a task" / "should I split this"). For PRD-driven feature decomposition, use `ralph-prd` then `ralph-backlog`.
 
