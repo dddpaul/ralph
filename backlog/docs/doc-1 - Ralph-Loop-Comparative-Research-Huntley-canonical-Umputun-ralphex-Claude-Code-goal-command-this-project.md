@@ -1,4 +1,5 @@
 ---
+export: true
 id: doc-1
 title: >-
   Ralph Loop Comparative Research - Huntley canonical, Umputun ralphex, Claude
