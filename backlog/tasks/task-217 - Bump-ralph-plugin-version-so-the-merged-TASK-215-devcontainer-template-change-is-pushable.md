@@ -1,10 +1,10 @@
 ---
 id: TASK-217
 title: Auto-bump plugin version on shipped-file changes (helper + lifecycle + tag)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-02 07:11'
-updated_date: '2026-08-02 08:21'
+updated_date: '2026-08-02 09:06'
 labels: []
 dependencies: []
 priority: high
@@ -59,16 +59,26 @@ Key decisions (rationale in the design doc):
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 .claude/hooks/bump-version.sh exists, is executable, and supports the modes: --auto, an explicit patch|minor|major, --tag, and --no-commit
-- [ ] #2 .claude/hooks/lib/shipped-set.sh defines a sourced is_shipped predicate, and both version-bump-guard.sh and bump-version.sh source it (grep shows no duplicated inline shipped-set case-glob across the two)
-- [ ] #3 bump-version.sh --auto exits 0 without editing when git diff --name-only master..HEAD contains no shipped-set path
-- [ ] #4 bump-version.sh --auto infers minor when a newly-added (--diff-filter=A) skill dir under plugins/ralph/skills/ or agent file under plugins/ralph/agents/ is among the shipped changes, and patch otherwise; it never auto-selects major
-- [ ] #5 bump-version.sh --auto computes the target relative to local master version, is idempotent (no-op when HEAD is already ahead of master), and writes the same new version to both plugins/ralph/.claude-plugin/plugin.json and .claude-plugin/marketplace.json
-- [ ] #6 bump-version.sh --auto commits the bump with a single-line branch-aware message matching task-<N>: (accepted by the commit-prefix guard)
-- [ ] #7 bump-version.sh --tag creates an annotated tag vX.Y.Z on HEAD when absent and no-ops when the tag already exists, and repo-local git config push.followTags is true
-- [ ] #8 CLAUDE.md Task Lifecycle Merge step documents, in order, bump-version.sh --auto before merge and bump-version.sh --tag after merge on master
-- [ ] #9 The post-commit hook prints a non-blocking one-line nudge when a commit touched shipped files and the version is not yet ahead of master
-- [ ] #10 version-bump-guard.sh still blocks a push whose master..range changes shipped files without a strictly-greater version (behavior preserved after the is_shipped refactor)
-- [ ] #11 tests/unit/bump-version.bats covers no-op-no-shipped, patch inference, minor-on-new-skill, idempotent re-run, tag create+skip, and branch-aware commit message; uv run pytest, uv run ruff check ., and the full bats suite pass
-- [ ] #12 No file is added under plugins/ralph/ for this task (grep of the task diff is clean); all new tooling lives under .claude/ or tests/
+- [x] #1 .claude/hooks/bump-version.sh exists, is executable, and supports the modes: --auto, an explicit patch|minor|major, --tag, and --no-commit
+- [x] #2 .claude/hooks/lib/shipped-set.sh defines a sourced is_shipped predicate, and both version-bump-guard.sh and bump-version.sh source it (grep shows no duplicated inline shipped-set case-glob across the two)
+- [x] #3 bump-version.sh --auto exits 0 without editing when git diff --name-only master..HEAD contains no shipped-set path
+- [x] #4 bump-version.sh --auto infers minor when a newly-added (--diff-filter=A) skill dir under plugins/ralph/skills/ or agent file under plugins/ralph/agents/ is among the shipped changes, and patch otherwise; it never auto-selects major
+- [x] #5 bump-version.sh --auto computes the target relative to local master version, is idempotent (no-op when HEAD is already ahead of master), and writes the same new version to both plugins/ralph/.claude-plugin/plugin.json and .claude-plugin/marketplace.json
+- [x] #6 bump-version.sh --auto commits the bump with a single-line branch-aware message matching task-<N>: (accepted by the commit-prefix guard)
+- [x] #7 bump-version.sh --tag creates an annotated tag vX.Y.Z on HEAD when absent and no-ops when the tag already exists, and repo-local git config push.followTags is true
+- [x] #8 CLAUDE.md Task Lifecycle Merge step documents, in order, bump-version.sh --auto before merge and bump-version.sh --tag after merge on master
+- [x] #9 The post-commit hook prints a non-blocking one-line nudge when a commit touched shipped files and the version is not yet ahead of master
+- [x] #10 version-bump-guard.sh still blocks a push whose master..range changes shipped files without a strictly-greater version (behavior preserved after the is_shipped refactor)
+- [x] #11 tests/unit/bump-version.bats covers no-op-no-shipped, patch inference, minor-on-new-skill, idempotent re-run, tag create+skip, and branch-aware commit message; uv run pytest, uv run ruff check ., and the full bats suite pass
+- [x] #12 No file is added under plugins/ralph/ for this task (grep of the task diff is clean); all new tooling lives under .claude/ or tests/
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan: (1) Factor is_shipped into .claude/hooks/lib/shipped-set.sh; source from version-bump-guard.sh (behavior-preserving) + new bump-version.sh. (2) Write .claude/hooks/bump-version.sh with modes --auto (infer patch|minor vs local master, idempotent, edits BOTH manifests via portable awk match/substr, branch-aware single-line commit), explicit patch|minor|major, --tag (annotated vX.Y.Z on HEAD + ensure push.followTags), --nudge (non-blocking post-commit reminder), --no-commit. cd to git toplevel; source lib via abs HOOK_DIR. (3) Wire --nudge into .git/hooks/post-commit (live hook only; template out of scope). (4) Set repo-local push.followTags=true. (5) CLAUDE.md Merge step: document --auto before merge, --tag after merge (live only; R11 template mirror explicitly out of scope per task). (6) tests/unit/bump-version.bats mirroring version-bump-guard.bats. Verify: uv run pytest, uv run ruff check ., full bats suite; grep confirms nothing under plugins/ralph/.
+
+Commit: `0a551f2` - task-217: auto-bump plugin version on shipped-file changes (helper + shared shipped-set predicate + lifecycle + tests)
+
+Implemented the auto-bump helper (Approach B, explicit lifecycle step). Files: .claude/hooks/lib/shipped-set.sh (new, shared is_shipped predicate), .claude/hooks/bump-version.sh (new, executable — modes --auto/patch|minor|major/--tag/--nudge/--no-commit), .claude/hooks/version-bump-guard.sh (refactored to source the shared predicate; behavior preserved — 7/7 guard bats still pass), CLAUDE.md (Merge step now documents --auto before merge + --tag after merge), tests/unit/bump-version.bats (new, 13 tests). Also (untracked, so not in the diff): live .git/hooks/post-commit gained a non-blocking '--nudge' call; repo-local 'git config push.followTags true' set. Key decisions: (1) compare against LOCAL master not origin (guard only needs one bump above origin; local master >= origin) — no network/staleness/concurrency; (2) portable in-place edit via awk match/substr (first 'version' only) — avoids GNU-only sed '0,/re/'; (3) target = master version + inferred increment (patch, or minor for a --diff-filter=A skill dir/agent file; major never auto); idempotent via already_ahead; (4) the post-commit nudge lives in .git/ (untracked) but its reusable logic is bump-version.sh --nudge, which IS in the diff and bats-tested (AC#9). R11: the CLAUDE.md Merge-step change is a deliberate one-sided change (NOT mirrored to ralph-init templates) — repo-specific plugin-marketplace governance; justified in the task Out-of-scope, satisfying R11's explicit carve-out. AC#12 clean: nothing under plugins/ralph/. Review: the lifecycle-mandated 'task-reviewer' subagent is not registered this session; substituted an independent 'claude' agent carrying the full task-reviewer charter (8-item checklist + R1-R16). Verdict APPROVED with full per-AC traceability. Verification: uv run ruff check . (clean), uv run pytest (346 passed), bats tests/unit (66 ok / 0 fail incl. 13 new), bats integration+e2e (58 ok / 0 fail). Live end-to-end demo (isolated throwaway repo): --auto patch 0.1.0->0.1.1 + branch-aware commit, --nudge silent post-bump, --auto idempotent no-op, --tag annotated v0.1.1 + push.followTags, and the live post-commit nudge firing on a shipped change.
+<!-- SECTION:NOTES:END -->
