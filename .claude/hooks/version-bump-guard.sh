@@ -33,16 +33,13 @@ set -euo pipefail
 # The plugin manifest whose version gates the on-disk cache rebuild.
 MANIFEST="plugins/ralph/.claude-plugin/plugin.json"
 
-# Is a repo-relative path part of the shipped-and-executed plugin surface?
-is_shipped() {
-  case "$1" in
-    plugins/ralph/skills/*) return 0 ;;
-    plugins/ralph/agents/*) return 0 ;;
-    plugins/ralph/.claude-plugin/plugin.json) return 0 ;;
-    .claude-plugin/marketplace.json) return 0 ;;
-    *) return 1 ;;
-  esac
-}
+# The shipped-set predicate (is_shipped) is the single source of truth shared
+# with the auto-bump helper (bump-version.sh) so the two cannot drift. Resolve
+# the hooks dir to an absolute path first so the source works regardless of the
+# caller's CWD (git invokes this hook from the repo root; bats from a temp dir).
+HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=lib/shipped-set.sh
+. "$HOOK_DIR/lib/shipped-set.sh"
 
 # Parse the top-level (or only) "version": "X.Y.Z" from JSON read on stdin.
 extract_version() {
