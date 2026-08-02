@@ -1,6 +1,6 @@
 {
   "name": "ralph",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Autonomous Claude Code agent loop over Backlog.md tasks. Bundles all ralph-* skills (init, prd, backlog, run, status, review, task, handoff) plus the task-reviewer and ralph-reviewer agents.",
   "author": {
     "name": "dddpaul",
