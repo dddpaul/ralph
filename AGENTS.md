@@ -1,9 +1,3 @@
----
-export: true
-title: Ralph — agent instructions
-type: guide
----
-
 # Ralph Agent Instructions
 
 ## Overview
