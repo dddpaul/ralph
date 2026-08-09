@@ -96,25 +96,27 @@ If the output starts with `ERROR:`, report the message verbatim to the user and 
 
 ## Step 4: Launch
 
-Build the command from parsed arguments:
+Build the command as a shell array (**not** a string — see the note below):
 
 ```bash
-RALPH_CMD="<path-to-ralph.sh> --tool <tool> --model <model> --effort <effort> --timeout <timeout> <max_iterations>"
+RALPH_CMD=(<path-to-ralph.sh> --tool <tool> --model <model> --effort <effort> --timeout <timeout> <max_iterations>)
 ```
 
-Add `--devcontainer` flag only if devcontainer=true.
+Append conditional flags as array elements (never string concatenation):
 
-When `tasks` is set, append `--tasks <ids>` to the command.
-
-When `block_end_buffer_min > 0`, append `--block-end-buffer-min <N>` to the command.
+- devcontainer=true → `RALPH_CMD+=(--devcontainer)`
+- `tasks` is set → `RALPH_CMD+=(--tasks <ids>)`
+- `block_end_buffer_min > 0` → `RALPH_CMD+=(--block-end-buffer-min <N>)`
 
 Launch fully detached, capturing early output to a launch log. **You MUST set `dangerouslyDisableSandbox: true`** on this Bash tool call — the orchestrator needs full OS access (mktemp, /dev/fd, tee, docker) which the sandbox blocks.
 
 ```bash
 LAUNCH_LOG='backlog/.ralph-launch.log'
-nohup $RALPH_CMD > "$LAUNCH_LOG" 2>&1 & disown
+nohup "${RALPH_CMD[@]}" > "$LAUNCH_LOG" 2>&1 & disown
 RALPH_PID=$!
 ```
+
+> **Note — zsh word-splitting:** Build `RALPH_CMD` as an array and expand it with `"${RALPH_CMD[@]}"`; never store the command in a string and run it as unquoted `$RALPH_CMD`. Under zsh — the shell Claude Code's Bash tool uses — unquoted parameter expansion does **not** word-split, so `nohup $RALPH_CMD` hands the whole command to `nohup` as a single argv[0] and dies with `No such file or directory`. The array form passes `<path-to-ralph.sh>` as argv[0] and each flag as a separate argument identically under bash and zsh.
 
 Wait for the heartbeat file to appear using the `wait-heartbeat.sh` launcher shim (in the `scripts/` directory next to this SKILL.md). Invoke it the same way as the Step 3 preflight — the shim sets its own `PYTHONPATH` and execs `python -m ralph.wait_heartbeat`, and the harness renders `${CLAUDE_PLUGIN_ROOT}` to the installed plugin directory:
 
