@@ -19,3 +19,18 @@ Apply to any `.md` change that adds or edits prose in the project's working lang
 - a specific commit SHA in prose (references to task IDs are allowed).
 
 Do NOT flag the project's keep-list terms — they are canon.
+
+## R-DOCS-3: Markdown prose no hard-wrap
+
+Apply to any `.md` change that adds or edits prose. The source of truth is the "Markdown prose
+line-wrapping" section in CLAUDE.md (do NOT duplicate it here). The reviewer must NOT require,
+request, or itself introduce a hard mid-paragraph line break to satisfy a column limit — that
+limit is code-only. Return CHANGES REQUESTED if the diff:
+
+- inserts a hard newline inside a prose paragraph purely to wrap at a column width (a paragraph
+  that was one physical line is split into several with no semantic reason);
+- re-wraps an already-reflowed document back to a column limit.
+
+Do NOT flag the legitimately multi-line structures (blank-line paragraph separators, list items,
+table rows, headings, code fences, blockquote paragraphs) — only hard wraps inside a single
+prose paragraph are a defect.
