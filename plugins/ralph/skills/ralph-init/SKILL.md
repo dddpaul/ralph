@@ -385,7 +385,7 @@ Run this manual smoke test once after any change to the init permission flow. It
 - ✅ **Heartbeat wait** (`bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-run/scripts/wait-heartbeat.sh && rm -f backlog/.ralph-launch.log`) — no prompt. The shim is read-only (TASK-192) and the trailing `rm` only touches `backlog/.ralph-launch.log` inside the workspace, so the whole command stays sandbox-covered.
 - ✅ **ralph-status `utc-to-moscow.sh`** (fired by `watch`) — no prompt. Read-only helper, sandbox-covered.
 - ✅ **backlog / git / jq** helpers — no prompt. Covered by the template allowlist.
-- ⚠️ **Launch** (`nohup $RALPH_CMD > backlog/.ralph-launch.log 2>&1 & disown`) — **one** prompt. ralph-run Step 4 sets `dangerouslyDisableSandbox: true` on this call so the orchestrator gets full OS access (mktemp, /dev/fd, tee, docker); disabling the sandbox always prompts. This is the expected devcontainer bypass and the only prompt allowed to appear.
+- ⚠️ **Launch** (`nohup "${RALPH_CMD[@]}" > backlog/.ralph-launch.log 2>&1 & disown`) — **one** prompt. ralph-run Step 4 sets `dangerouslyDisableSandbox: true` on this call so the orchestrator gets full OS access (mktemp, /dev/fd, tee, docker); disabling the sandbox always prompts. This is the expected devcontainer bypass and the only prompt allowed to appear.
 
 If any command other than the launch prompts, a seeded-rule regression has crept back in — a helper is no longer read-only or workspace-confined, or its invocation no longer leads with `bash ${CLAUDE_PLUGIN_ROOT}/…`. Fix the helper or skill, not the allowlist: re-adding a narrow rule is exactly the regression this flow removed.
 
