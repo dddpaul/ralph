@@ -34,3 +34,12 @@ This is a documentation project using Obsidian for markdown editing and the /ppt
 - Python scripts: Follow PEP 8, use type hints
 - Markdown: Consistent heading hierarchy, no skipped levels
 - File naming: lowercase-kebab-case for all documents
+
+### Obsidian cross-link convention
+
+The documents in this project live in an Obsidian vault. Links between them must resolve — otherwise clicking a link makes Obsidian create empty stub notes.
+
+- **Link to a canonical document:** `[[<full-basename-without-.md>#<verbatim-heading>|<short display>]]`. The filename is the FULL basename (`doc-2 - Architecture-layers-and-system-classes`), not `doc-2`. `§X.Y` is NOT an anchor; the anchor is the exact section-heading text (`#1.3. Cross-product services`).
+- **Documents without item-headings** (e.g. the TERMS glossary) — link to the whole file: `[[TERMS|TERMS #14]]`. Jumping to a specific item is impossible if it has no heading.
+- **Inside markdown table cells** the display-alias pipe MUST be escaped: `[[…\|display]]`. An unescaped `|` is read by the table as a column separator and breaks the markup. In prose (outside tables) no escaping is needed.
+- **Link into an adjacent vault (cross-vault):** `obsidian://open?vault=<vault>&file=<full-basename>`; encode spaces in the filename as `%20`.
