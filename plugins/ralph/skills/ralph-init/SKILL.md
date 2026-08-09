@@ -253,6 +253,14 @@ jq --arg p1 "$PPTX1" --arg p2 "$PPTX2" \
 
 Both rules use single-quoted bash strings: there is no `$HOME` to expand, so the literal characters must be preserved verbatim.
 
+### 3.7c Write docs reviewer rules to `.claude/task-reviewer-rules.md` (Documentation / Mixed only)
+
+**Gate:** run this sub-step **only when `project_type ∈ {Documentation, Mixed}`** (Q0 answer B or C). For **Code-only** projects (Q0 answer A), skip entirely — print `[skip] 3.7c docs reviewer rules (Code-only project)` and proceed to Step 3.8. This gate is what keeps Code-only projects free of the docs reviewer rule (Code-only vaults have no `[[…]]` links, so the rule would be noise).
+
+Documentation / Mixed projects keep their canonical `.md` documents in an Obsidian vault (Step 3.9), so wiki-links between them must resolve. Read `templates/claude/task-reviewer-rules.docs.md` → write to `.claude/task-reviewer-rules.md` (create the `.claude/` directory if it does not exist). This gives the `task-reviewer` agent rule `R-DOCS-1`, whose source of truth is the "Obsidian cross-link convention" section that Step 3.2 appended to `CLAUDE.md` (from `CLAUDE.conventions.docs.md`) — the rule points at that section rather than restating it, so the two never drift.
+
+Skip if `.claude/task-reviewer-rules.md` already exists (same skip-if-exists policy as other Step 3 files) — print `[skip] .claude/task-reviewer-rules.md already exists`. A project may maintain its own reviewer rules there; never overwrite them.
+
 ### 3.8 `.claude/brainstorm-rules.md`
 Read `templates/claude/brainstorm-rules.md` → write to `.claude/brainstorm-rules.md`. Skip if file already exists (same skip-if-exists policy as other init files in Step 3).
 
@@ -327,6 +335,7 @@ Files created:
   .claude/hooks/             - Hook scripts referenced by settings.json
   .claude/settings.local.json - Claude Code permissions
   .claude/brainstorm-rules.md - Phase 3/4 brainstorm rules (section-aware merge on upgrade)
+  .claude/task-reviewer-rules.md - (if Documentation/Mixed) task-reviewer rules (Obsidian cross-links)
   .devcontainer/        - (if applicable) Sandboxed execution environment
   .obsidian/            - (if Documentation/Mixed) Obsidian vault configuration
 
@@ -499,6 +508,7 @@ Compare each managed file against its current template. Assign one status per fi
 12. **`.devcontainer/Dockerfile`** — always **skipped** (assembled from fragments, cannot diff meaningfully)
 13. **`.gitignore`** — always **skipped** (append-only logic in init flow)
 14. **`.claude/brainstorm-rules.md`** — managed via section-aware merge: pre-heading content is regenerated from `templates/claude/brainstorm-rules.md`; the `## Project additions` heading and everything below it are preserved verbatim. Status is **current** when the pre-heading region matches the template byte-for-byte; **outdated** when it differs; **missing** when the file does not exist (would be created from template).
+15. **`.claude/task-reviewer-rules.md`** — Documentation / Mixed only (detect via an existing `.obsidian/` directory). This file may hold a project's own reviewer rules, so upgrade treats it as **create-if-missing** and never overwrites it: status is **missing** (would be created from `templates/claude/task-reviewer-rules.docs.md`) when a Documentation / Mixed project lacks it; **skipped (present, project-owned)** when it already exists; **skipped (Code-only)** when no `.obsidian/` directory is present.
 
 ---
 
@@ -519,6 +529,7 @@ CLAUDE.md (generic section)       current
 .claude/hooks/                    current
 .claude/settings.local.json       current
 .claude/brainstorm-rules.md       outdated
+.claude/task-reviewer-rules.md    skipped (Code-only)
 .devcontainer/devcontainer.json   skipped (no .devcontainer/)
 .devcontainer/init-firewall.sh    skipped (no .devcontainer/)
 .devcontainer/Dockerfile          skipped (assembled)
@@ -573,6 +584,7 @@ For each file the user approved:
   3. **If the heading is present:** split the existing file at that line. The heading + everything below is the **user block** (preserved verbatim). Read `templates/claude/brainstorm-rules.md` and take everything **above** the same `## Project additions` heading — this is the **template block**. Write: template block + user block (concatenated, no extra blank lines between them).
   4. **If the heading is absent** (legacy file lacking the convention): one-time migration. Treat the entire existing file as user content. Write: template block (everything above `## Project additions` in the template) + the template's `## Project additions` heading + HTML comment + the existing file content appended verbatim below the heading.
   5. Write the merged result back to `.claude/brainstorm-rules.md`.
+- **`.claude/task-reviewer-rules.md`** (Documentation / Mixed only — detect via an existing `.obsidian/` directory): **create-if-missing only.** If the file is absent, create it from `templates/claude/task-reviewer-rules.docs.md`; this is how existing docs/mixed projects pick up the `R-DOCS-1` rule on upgrade. If it already exists, leave it untouched — it may hold the project's own reviewer rules, so never overwrite it. Code-only projects have no `.obsidian/` directory and are skipped.
 
 **Missing files**: create from template using the same logic as the init flow (copy template, `chmod +x` where applicable).
 
@@ -623,6 +635,7 @@ Ralph upgrade complete!
   .claude/hooks/                    current
   .claude/settings.local.json       current
   .claude/brainstorm-rules.md       updated
+  .claude/task-reviewer-rules.md    skipped (Code-only)
   .devcontainer/devcontainer.json   skipped (no .devcontainer/)
   .devcontainer/init-firewall.sh    skipped (no .devcontainer/)
   .devcontainer/Dockerfile          skipped (assembled)

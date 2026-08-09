@@ -1,10 +1,10 @@
 ---
 id: TASK-220
 title: Add Obsidian cross-link convention to ralph-init docs templates
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-04 13:06'
-updated_date: '2026-08-04 13:13'
+updated_date: '2026-08-09 10:38'
 labels: []
 dependencies: []
 priority: medium
@@ -117,9 +117,48 @@ If anything is unclear or any check fails: STOP and ask the user. Do NOT start w
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 CLAUDE.conventions.docs.md содержит секцию «Obsidian cross-link convention» с правилами: полный basename + дословный заголовок-якорь, §X.Y не якорь, ссылка на файл целиком для документов без заголовков-пунктов, экранирование \| в ячейках таблиц, cross-vault obsidian:// с %20
-- [ ] #2 Создан templates/claude/task-reviewer-rules.docs.md с правилом R-DOCS-1, которое ссылается на конвенцию в CLAUDE.md как на источник истины и не дублирует её текст
-- [ ] #3 SKILL.md ralph-init содержит новый шаг записи task-reviewer-rules.docs.md в .claude/task-reviewer-rules.md, гейтированный на тип проекта Documentation/Mixed (Code-only пропускается с печатью [skip])
-- [ ] #4 Новый шаг следует существующему образцу гейта Documentation/Mixed (как Step 3.7b/c для pptx-правил); Step 4 file-list обновлён новым файлом
-- [ ] #5 Поведение для Code-only проектов не изменено: ни секция конвенции в CLAUDE.md, ни docs-правило ревьюера туда не попадают
+- [x] #1 CLAUDE.conventions.docs.md содержит секцию «Obsidian cross-link convention» с правилами: полный basename + дословный заголовок-якорь, §X.Y не якорь, ссылка на файл целиком для документов без заголовков-пунктов, экранирование \| в ячейках таблиц, cross-vault obsidian:// с %20
+- [x] #2 Создан templates/claude/task-reviewer-rules.docs.md с правилом R-DOCS-1, которое ссылается на конвенцию в CLAUDE.md как на источник истины и не дублирует её текст
+- [x] #3 SKILL.md ralph-init содержит новый шаг записи task-reviewer-rules.docs.md в .claude/task-reviewer-rules.md, гейтированный на тип проекта Documentation/Mixed (Code-only пропускается с печатью [skip])
+- [x] #4 Новый шаг следует существующему образцу гейта Documentation/Mixed (как Step 3.7b/c для pptx-правил); Step 4 file-list обновлён новым файлом
+- [x] #5 Поведение для Code-only проектов не изменено: ни секция конвенции в CLAUDE.md, ни docs-правило ревьюера туда не попадают
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+LANGUAGE RECONCILIATION (owner decision 2026-08-09): land this task in ENGLISH. The template CLAUDE.conventions.docs.md and the new task-reviewer-rules.docs.md are English-only. The two Russian code blocks in the description ("Convention text" and "Reviewer rule text") are SUPERSEDED — insert the English versions below VERBATIM instead. Section headings and rule IDs are unchanged. Everything else in the description (Why / Scope / Files / Before-starting / ACs) still applies as guidance.
+
+=== Convention text — insert verbatim into CLAUDE.conventions.docs.md after the "### Code Style" block ===
+
+### Obsidian cross-link convention
+
+The documents in this project live in an Obsidian vault. Links between them must resolve — otherwise clicking a link makes Obsidian create empty stub notes.
+
+- **Link to a canonical document:** `[[<full-basename-without-.md>#<verbatim-heading>|<short display>]]`. The filename is the FULL basename (`doc-2 - Architecture-layers-and-system-classes`), not `doc-2`. `§X.Y` is NOT an anchor; the anchor is the exact section-heading text (`#1.3. Cross-product services`).
+- **Documents without item-headings** (e.g. the TERMS glossary) — link to the whole file: `[[TERMS|TERMS #14]]`. Jumping to a specific item is impossible if it has no heading.
+- **Inside markdown table cells** the display-alias pipe MUST be escaped: `[[…\|display]]`. An unescaped `|` is read by the table as a column separator and breaks the markup. In prose (outside tables) no escaping is needed.
+- **Link into an adjacent vault (cross-vault):** `obsidian://open?vault=<vault>&file=<full-basename>`; encode spaces in the filename as `%20`.
+
+=== Reviewer rule text — full contents of the new templates/claude/task-reviewer-rules.docs.md ===
+
+# Task reviewer rules (Documentation projects)
+
+## R-DOCS-1: Obsidian cross-link convention
+
+Apply to any `.md` change that adds or edits `[[…]]` wiki-links or `obsidian://` URIs. The source of truth for the format is the "Obsidian cross-link convention" section in CLAUDE.md (do NOT duplicate it here). Return CHANGES REQUESTED if:
+
+- a wiki-link to a canonical doc uses a short name (`[[doc-2 …]]`) instead of the full basename, or `§X.Y` as an anchor instead of the verbatim section heading;
+- inside a markdown table cell the wiki-link's display pipe is NOT escaped (`|` instead of `\|`) — check that the column count is consistent across all rows of the table;
+- a cross-vault `obsidian://…file=` uses a short name instead of the full basename, or spaces are not encoded as `%20`.
+
+RALPH-INIT UPGRADE PARITY (this repo's standing rule): ralph-init changes must update BOTH the Init flow (Step 3.x) AND Upgrade Mode (U1–U5), because existing projects only receive template changes via `ralph-init upgrade`. This task's ACs cover only the init-time gated write step + Step 4 file-list. When implementing, also add the matching Documentation/Mixed-gated Upgrade-Mode step so existing docs/mixed projects get `.claude/task-reviewer-rules.md` (from task-reviewer-rules.docs.md) on upgrade — mirroring how the pptx-gate is handled in both flows. If that meaningfully exceeds this task's scope, note it and the reviewer/owner can spin a follow-up; do not silently ship an init-only change.
+
+Plan (impl 2026-08-09, English per owner reconciliation): (1) AC#1 insert '### Obsidian cross-link convention' verbatim into CLAUDE.conventions.docs.md after '### Code Style'. (2) AC#2 create templates/claude/task-reviewer-rules.docs.md with R-DOCS-1 (references CLAUDE.md as source of truth, no duplication). (3) AC#3/#4 add SKILL.md Step 3.7c (Documentation/Mixed-gated write of task-reviewer-rules.docs.md -> .claude/task-reviewer-rules.md; Code-only prints [skip], modeled on 3.7b); update Step 4 file-list. (4) UPGRADE PARITY (standing rule): add .claude/task-reviewer-rules.md to U2 table + U4 apply as create-if-missing for docs/mixed (detected via .obsidian/); NEVER clobber an existing project-owned file (this repo's own R1-R11 rules show why); Code-only skipped. Update U3/U5 example tables. (5) AC#5 Code-only untouched by construction. Then bump plugin version (both manifests), task-reviewer review, Done, merge, tag.
+
+Commit: `cc41735` - task-220: seed Obsidian cross-link convention + docs reviewer rule in ralph-init templates
+
+DONE 2026-08-09 (English per owner reconciliation). Implemented: AC#1 Obsidian cross-link convention section appended to CLAUDE.conventions.docs.md after Code Style (verbatim); AC#2 new templates/claude/task-reviewer-rules.docs.md with R-DOCS-1 (points at CLAUDE.md section as source of truth, no duplication); AC#3/#4 SKILL.md Step 3.7c (Documentation/Mixed-gated write to .claude/task-reviewer-rules.md, Code-only prints [skip] 3.7c, modeled byte-for-byte on 3.7b gate) + Step 4 file-list line; AC#5 Code-only untouched by construction. UPGRADE PARITY (standing rule): added U2 item 15 + U4 apply logic as CREATE-IF-MISSING (never overwrite an existing project-owned rules file; detect docs/mixed via .obsidian/), plus U3/U5 example rows. Gate: uv run ruff check . clean; uv run pytest 346 passed. Review: task-reviewer APPROVED on git diff master..HEAD (HEAD cc41735). Key decision: upgrade uses create-if-missing (not overwrite) because a project may hold its own reviewer rules (this repo's own R1-R16 is the exemplar). R11 reconciliation: the new docs template has no live<->template pair, so R11 parity is NOT triggered (carve-out forbids mirroring THIS repo's live rules, which is unchanged). NOTE for owner: R11 line-117 / R16 line-207 descriptive prose says task-reviewer-rules.md is written from scratch or starts empty; docs/mixed bootstraps now seed R-DOCS-1. The normative parity-exclusion is unaffected; refining that descriptive sentence would require a separate approved rules-file task per R13 (not done here).
+
+Commit: `800e6a3` - task-220: bump plugin version to 0.3.0 (minor)
+<!-- SECTION:NOTES:END -->
