@@ -11,7 +11,6 @@ This is a documentation project using Obsidian for markdown editing and the /ppt
 
 - One H1 heading per file (the document title)
 - Use ATX-style headings (`#`, `##`, `###`)
-- Wrap lines at 120 characters in source files
 - Use fenced code blocks with language identifiers
 - Prefer tables over nested lists for structured data
 
@@ -54,3 +53,11 @@ The documents in this project (and your own answers) are written in the project'
 - **Keep a project keep-list** of established domain/canonical terms that must NOT be rewritten; extend it per project.
 - **Follow the vocabulary of the referenced project/domain** — do not "fix" an established term to your taste.
 - **Remove commit SHAs from prose**; references to task IDs (e.g. TASK-N) are fine (provenance).
+
+### Markdown prose line-wrapping
+
+Prose in markdown documents is NOT hard-wrapped to a column limit.
+
+- **One paragraph = one physical line.** Do not insert manual line breaks (real `\n`) inside a paragraph to hit a column width. Write the paragraph as one long line and let the editor soft-wrap it.
+- **Why this is safe.** A single `\n` inside a paragraph renders as a space in CommonMark (Obsidian, Confluence), so removing hard wraps does NOT change the rendered output — only the source layout changes. Diffs stay clean (editing a paragraph touches one line, not the whole block) and the text is not "chopped up" by wraps when reading.
+- **Still on their own lines, as before:** the blank line between paragraphs (paragraph separator), list items (one marker per item), table rows, headings, code fences, and blockquotes (one `>` per quote-paragraph). A hard break is forbidden only inside a prose paragraph.
