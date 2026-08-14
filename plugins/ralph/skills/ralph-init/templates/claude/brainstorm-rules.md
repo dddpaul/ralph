@@ -110,6 +110,16 @@ In Phase 4 (Next Steps), the first option must always be:
 
 The remaining options (Write plan, Plan mode, Start now) follow after.
 
+### Design sign-off gate — before any task creation
+
+`ralph-task` / `backlog task create` MUST NOT be invoked until the user has **explicitly approved the design in-session** (e.g. "design ok", "approved", "create the task(s)"). This approval is a distinct, affirmative act — separate from presenting the Phase 4 options and separate from the user selecting one.
+
+**Selecting the "Create backlog task(s)" option is NOT itself sign-off.** Picking a Phase 4 option chooses a direction; it does not approve the design. A separate, explicit user approval is always required before the task is created — do not conflate choosing the option with signing off on the design.
+
+On **any ambiguity** — approval only implied, the user selected the option without approving, an unclear reply, or you would otherwise be inferring consent — **stop and ask**. Never create the task on inference.
+
+> **Review-first steps are a Project addition, not a template default.** A project may require a review step ahead of this gate — e.g. pushing the design to an off-desk review vault (offdesk) and awaiting a verdict before the user signs off. Such steps are project-specific and belong under **Project additions** below (the `ralph upgrade`-safe zone), never hardcoded into this canonical template.
+
 ---
 
 ## Project additions

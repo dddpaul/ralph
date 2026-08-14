@@ -46,6 +46,8 @@ Before creating, classify the ask:
 - **Open exploration** ("what could we do about X?", "should we even build this?") → propose `brainstorm` first.
 - **One or a few well-formed asks** → continue with the create flow.
 
+**Design sign-off gate (brainstorm Phase 4 hand-offs).** When this skill is invoked from a Phase 4 hand-off, the design must already be **explicitly approved in-session** per the "Design sign-off gate" in `.claude/brainstorm-rules.md`. Selecting the Phase 4 "Create backlog task(s)" option is NOT itself sign-off, and being invoked with `feature=<slug>` is not proof of it. Do NOT run `backlog task create` on inference — if the approval is ambiguous, stop and ask first.
+
 ---
 
 ## Canonical `backlog task create` pattern
