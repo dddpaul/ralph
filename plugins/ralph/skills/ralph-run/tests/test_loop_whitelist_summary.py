@@ -25,7 +25,7 @@ from ralph.args import ParsedArgs
 def _args(*, tasks: str = "") -> ParsedArgs:
     return ParsedArgs(
         tool="claude",
-        model="claude-opus-4-8",
+        model="claude-opus-5",
         effort="max",
         timeout="15",
         on_error="continue",

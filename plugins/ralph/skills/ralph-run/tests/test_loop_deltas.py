@@ -39,7 +39,7 @@ def _args(
 ) -> ParsedArgs:
     return ParsedArgs(
         tool="opencode",
-        model="claude-opus-4-8",
+        model="claude-opus-5",
         effort="max",
         timeout="15",
         on_error=on_error,
