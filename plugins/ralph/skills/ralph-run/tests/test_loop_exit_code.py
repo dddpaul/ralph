@@ -28,7 +28,7 @@ from ralph.tools import OnSpawn, Tool, ToolResult
 def _args(max_iterations: int = 2) -> ParsedArgs:
     return ParsedArgs(
         tool="claude",
-        model="claude-opus-4-8",
+        model="claude-opus-5",
         effort="max",
         timeout="15",
         on_error="continue",

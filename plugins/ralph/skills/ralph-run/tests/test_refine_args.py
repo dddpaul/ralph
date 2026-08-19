@@ -147,7 +147,7 @@ def test_parse_defaults_match_refine_sh() -> None:
     assert parsed.reviewer == ""
     assert parsed.artifact_type == "md"
     assert parsed.tool == "claude"
-    assert parsed.model == "claude-opus-4-8"
+    assert parsed.model == "claude-opus-5"
     assert parsed.effort == "medium"
     assert parsed.timeout == 15
     assert parsed.max_iterations == 10

@@ -87,7 +87,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--reviewer", default="")
     parser.add_argument("--type", dest="artifact_type", default="md")
     parser.add_argument("--tool", default="claude")
-    parser.add_argument("--model", default="claude-opus-4-8")
+    parser.add_argument("--model", default="claude-opus-5")
     parser.add_argument("--effort", default="medium")
     parser.add_argument("--timeout", type=int, default=15)
     parser.add_argument(
