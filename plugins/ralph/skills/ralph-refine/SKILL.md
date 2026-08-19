@@ -34,7 +34,7 @@ pairs. Each maps to a `refine.sh` flag; defaults below **match `refine.sh`**.
 | `max_iterations` | `10`             | `--max-iterations` | Hard cap on author→reviewer rounds. |
 | `output_dir`     | `iterations/`    | `--output-dir`     | Where per-iteration and final files land. |
 | `tool`           | `claude`         | `--tool`           | `claude` or `opencode`. |
-| `model`          | `claude-opus-5`| `--model`          | Model id passed to the tool. |
+| `model`          | `claude-opus-5`  | `--model`          | Model id passed to the tool. |
 | `effort`         | `medium`         | `--effort`         | `low`, `medium`, `high`, or `max`. |
 | `timeout`        | `15`             | `--timeout`        | Per-call timeout in minutes. |
 | `on_error`       | `stop`           | `--on-error`       | `stop`, `continue`, or `retry` on a failed LLM call. |
