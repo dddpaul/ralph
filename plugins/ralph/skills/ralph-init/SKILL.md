@@ -128,7 +128,7 @@ Read `templates/git-hooks/post-commit` → write to `.git/hooks/post-commit`. Ma
 
 Read `templates/git-hooks/commit-msg` → write to `.git/hooks/commit-msg`. Make executable (`chmod +x`). If hook already exists, warn user and ask before overwriting.
 
-Read `templates/git-hooks/pre-commit` → write to `.git/hooks/pre-commit`. Make executable (`chmod +x`). If hook already exists, warn user and ask before overwriting. The hook rejects a commit when a staged path duplicates an existing tree path under a different Unicode normalization (NFD vs NFC) — see TASK-136 for the downstream incident that prompted it.
+Read `templates/git-hooks/pre-commit` → write to `.git/hooks/pre-commit`. Make executable (`chmod +x`). If hook already exists, warn user and ask before overwriting. The hook rejects a commit when a staged path duplicates an existing tree path under a different Unicode normalization (NFD vs NFC) — see TASK-136 for the downstream incident that prompted it. It also delegates to `.claude/hooks/filename-length-guard.sh` (written in Step 3.7a), which rejects any staged path whose name components exceed 125 bytes — the cap that keeps names inside the ~140-byte ecryptfs/Syncthing budget, Windows MAX_PATH, and archive round-trips. The delegation is guarded by `[ -x ]`, so the hook degrades to the NFC check alone in a project that predates the guard script.
 
 Then bootstrap git's Unicode normalization so working-tree paths are recorded in NFC even on macOS APFS, which hands filenames back in NFD:
 
@@ -222,7 +222,7 @@ Assemble the Dockerfile from base + language snippets, then write three files:
 > **colima caveat:** Docker Desktop maps `host.docker.internal` automatically; colima may need an explicit host mapping for it to resolve in-container. This is a host runtime prerequisite, not a repo change.
 
 ### 3.7a `.claude/hooks/` and `.claude/settings.local.json` (template write)
-Read each `templates/claude/hooks/*-guard.sh` and `templates/claude/hooks/task-validator.sh` → write to `.claude/hooks/<name>.sh`. Make executable (`chmod +x`). Create `.claude/hooks/` directory if it does not exist.
+Read each `templates/claude/hooks/*-guard.sh` and `templates/claude/hooks/task-validator.sh` → write to `.claude/hooks/<name>.sh`. Make executable (`chmod +x`). Create `.claude/hooks/` directory if it does not exist. The `*-guard.sh` glob includes `filename-length-guard.sh`, which is not a PreToolUse hook — it is the tracked implementation that `.git/hooks/pre-commit` (Step 3.3) invokes, so it must be executable even though `settings.json` never references it.
 Read `templates/claude/settings.local.json` → write to `.claude/settings.local.json` (user permissions).
 
 `.claude/settings.json` (the project-wide file that *registers* the hooks with Claude Code) is deliberately **not** written here. The hook scripts on disk are inert until the registration file lands, so this step leaves them dormant. See Step 3.11 for the deferred activation rationale.
@@ -328,7 +328,7 @@ Files created:
   CLAUDE.md             - Agent instructions for Claude Code
   .git/hooks/post-commit - Commit hash tracking for tasks
   .git/hooks/commit-msg  - Forbidden trailer/heading guard
-  .git/hooks/pre-commit  - Unicode NFC/NFD duplicate-path guard
+  .git/hooks/pre-commit  - Filename-length (125-byte) + Unicode NFC/NFD guards
   .gitignore            - Updated with Ralph entries
   backlog/              - Backlog initialized
   .claude/settings.json      - Claude Code hooks (project-wide)
@@ -499,9 +499,9 @@ Compare each managed file against its current template. Assign one status per fi
 3. **`CLAUDE.md`** — compare only lines **above** the `## Project-Specific` heading against the same region in `templates/root/CLAUDE.md`. Everything from `## Project-Specific` down (including conventions) is the project block and must never be touched.
 4. **`.git/hooks/post-commit`** — exact content match against `templates/git-hooks/post-commit`
 5. **`.git/hooks/commit-msg`** — exact content match against `templates/git-hooks/commit-msg`
-6. **`.git/hooks/pre-commit`** — exact content match against `templates/git-hooks/pre-commit` (Unicode NFC/NFD duplicate guard, see TASK-136)
+6. **`.git/hooks/pre-commit`** — exact content match against `templates/git-hooks/pre-commit` (125-byte filename-length guard + Unicode NFC/NFD duplicate guard, see TASK-136)
 7. **`.claude/settings.json`** — exact content match against `templates/claude/settings.json`
-8. **`.claude/hooks/`** — each script in `templates/claude/hooks/*-guard.sh` and `templates/claude/hooks/task-validator.sh` must match `.claude/hooks/<name>.sh`
+8. **`.claude/hooks/`** — each script in `templates/claude/hooks/*-guard.sh` and `templates/claude/hooks/task-validator.sh` must match `.claude/hooks/<name>.sh`. A project that predates `filename-length-guard.sh` reports it **missing**; U4 creates it, which is what arms the pre-commit length check.
 9. **`.claude/settings.local.json`** — exact content match against `templates/claude/settings.local.json`
 10. **`.devcontainer/devcontainer.json`** — exact content match against `templates/devcontainer/devcontainer.json`. If `.devcontainer/` directory does not exist, status is **skipped**.
 11. **`.devcontainer/init-firewall.sh`** — exact content match against `templates/devcontainer/init-firewall.sh`. If `.devcontainer/` directory does not exist, status is **skipped**.
@@ -565,9 +565,9 @@ For each file the user approved:
 - **`refine.sh`**: overwrite from `templates/root/refine.sh`, then `chmod +x`.
 - **`.git/hooks/post-commit`**: overwrite from `templates/git-hooks/post-commit`, then `chmod +x`.
 - **`.git/hooks/commit-msg`**: overwrite from `templates/git-hooks/commit-msg`, then `chmod +x`.
-- **`.git/hooks/pre-commit`**: overwrite from `templates/git-hooks/pre-commit`, then `chmod +x`. Also re-assert `git config --local core.precomposeunicode true` (idempotent — no-op if already set) so the macOS NFD-on-write defense ships alongside the hook.
+- **`.git/hooks/pre-commit`**: overwrite from `templates/git-hooks/pre-commit`, then `chmod +x`. Also re-assert `git config --local core.precomposeunicode true` (idempotent — no-op if already set) so the macOS NFD-on-write defense ships alongside the hook. The overwritten hook calls `.claude/hooks/filename-length-guard.sh`; if the user skipped the `.claude/hooks/` update the `[ -x ]` guard makes the call a silent no-op rather than a broken hook, so the two files may be updated in either order.
 - **`.claude/settings.json`**: overwrite from `templates/claude/settings.json`.
-- **`.claude/hooks/`**: for each `templates/claude/hooks/*-guard.sh` and `templates/claude/hooks/task-validator.sh`, overwrite `.claude/hooks/<name>.sh`, then `chmod +x`. Create directory if needed.
+- **`.claude/hooks/`**: for each `templates/claude/hooks/*-guard.sh` and `templates/claude/hooks/task-validator.sh`, overwrite `.claude/hooks/<name>.sh`, then `chmod +x`. Create directory if needed. This is how an existing project picks up `filename-length-guard.sh`; `chmod +x` is not optional for it, since pre-commit tests `[ -x ]` before calling it.
 - **`.claude/settings.local.json`**: overwrite from `templates/claude/settings.local.json`. **If the project is Documentation or Mixed** (detect via existing `.obsidian/` directory), run the Step 3.7b pptx merge so the overwrite does not strip the `Bash(python scripts/office/soffice.py:*)` and `Bash(pdftoppm:*)` rules. **Code-only** projects need no post-overwrite merge — the ralph-run and ralph-status helpers are read-only and authorized at run time by `autoAllowBashIfSandboxed`, so no seeded allow-rule is required. User-added custom permissions in the existing `allow` array are preserved by the `+ unique` merge. After any merge, run the Step 3.10 verification block (pptx rules, Documentation / Mixed only) and surface any `WARN` to the user before completing the upgrade.
 - **`.devcontainer/devcontainer.json`**: overwrite from `templates/devcontainer/devcontainer.json`.
 - **`.devcontainer/init-firewall.sh`**: overwrite from `templates/devcontainer/init-firewall.sh`, then `chmod +x`.

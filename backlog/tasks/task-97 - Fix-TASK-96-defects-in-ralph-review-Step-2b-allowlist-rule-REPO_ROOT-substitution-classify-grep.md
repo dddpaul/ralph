@@ -1,12 +1,12 @@
 ---
 id: TASK-97
 title: >-
-  Fix TASK-96 defects: missing allowlist rule (AC #5), fragile {REPO_ROOT}
-  substitution, Step 2b re-prompt clarity, redundant classify grep
+  Fix TASK-96 defects in ralph-review Step 2b: allowlist rule, REPO_ROOT
+  substitution, classify grep
 status: Done
 assignee: []
 created_date: '2026-05-03 13:57'
-updated_date: '2026-05-03 14:04'
+updated_date: '2026-09-03 20:25'
 labels:
   - skill
   - ralph-sync
