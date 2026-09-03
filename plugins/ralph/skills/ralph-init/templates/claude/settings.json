@@ -26,6 +26,26 @@
           },
           {
             "type": "command",
+            "if": "Bash(backlog task edit *)",
+            "command": ".claude/hooks/naming-guard.sh"
+          },
+          {
+            "type": "command",
+            "if": "Bash(backlog doc create *)",
+            "command": ".claude/hooks/naming-guard.sh"
+          },
+          {
+            "type": "command",
+            "if": "Bash(backlog decision create *)",
+            "command": ".claude/hooks/naming-guard.sh"
+          },
+          {
+            "type": "command",
+            "if": "Bash(backlog draft create *)",
+            "command": ".claude/hooks/naming-guard.sh"
+          },
+          {
+            "type": "command",
             "if": "Bash(git checkout -b *)",
             "command": ".claude/hooks/naming-guard.sh"
           },

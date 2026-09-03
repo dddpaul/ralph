@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# Two staged-path guards, in order:
+#
+#   1. Filename length — delegated to .claude/hooks/filename-length-guard.sh.
+#   2. Unicode normalization — implemented below.
+#
 # Reject commits whose staged paths duplicate an existing tree path under a
 # different Unicode normalization (NFC vs NFD). macOS APFS auto-collapses both
 # forms into one working-tree file, but `git ls-tree` records the byte form
@@ -10,6 +15,19 @@
 # already on master. See TASK-136 for the incident.
 
 set -euo pipefail
+
+# Filename-length guard (TASK-227): reject staged paths whose name components
+# exceed the 125-byte cap the ecryptfs sync target imposes. The logic lives in
+# a tracked, testable script rather than inline here; projects bootstrapped
+# before it existed simply lack the file and skip, matching the graceful
+# bail-out the NFC check below uses when no normalizer is available.
+#
+# This runs FIRST: the NFC check exits 0 early on an empty stage or a missing
+# HEAD, which would otherwise skip the length guard on a repo's first commit.
+repo_root=$(git rev-parse --show-toplevel)
+if [ -x "$repo_root/.claude/hooks/filename-length-guard.sh" ]; then
+  "$repo_root/.claude/hooks/filename-length-guard.sh" || exit 1
+fi
 
 # core.quotePath=false → emit raw UTF-8 bytes instead of C-style \320\271 escapes.
 # Without this, NFC and NFD forms render as different escape strings, so the

@@ -4,9 +4,13 @@
 # The hook rejects a commit when a staged path's Unicode-normalized (NFC) form
 # collides with an existing tree path that differs only by normalization (NFD vs
 # NFC). See TASK-136 for the downstream incident.
+#
+# It also delegates to .claude/hooks/filename-length-guard.sh when that script is
+# present and executable — see TASK-227.
 
 PROJECT_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/../.." && pwd)"
 HOOK="$PROJECT_ROOT/plugins/ralph/skills/ralph-init/templates/git-hooks/pre-commit"
+LENGTH_GUARD="$PROJECT_ROOT/plugins/ralph/skills/ralph-init/templates/claude/hooks/filename-length-guard.sh"
 
 # Russian й in NFC (U+0439, bytes d0 b9) and NFD (U+0438 U+0306, bytes d0 b8 cc 86).
 NFC_NAME=$(python3 -c 'import unicodedata, sys; sys.stdout.write(unicodedata.normalize("NFC", "й.md"))')
@@ -91,6 +95,66 @@ teardown() {
 
   echo b > "$NFC_NAME"
   git add "$NFC_NAME"
+
+  run bash "$HOOK"
+  [ "$status" -eq 0 ]
+}
+
+# ===========================================================================
+# filename-length-guard delegation (TASK-227)
+# ===========================================================================
+
+# Install the length guard into the temp repo at the path the hook resolves.
+install_length_guard() {
+  mkdir -p .claude/hooks
+  cp "$LENGTH_GUARD" .claude/hooks/filename-length-guard.sh
+  chmod +x .claude/hooks/filename-length-guard.sh
+}
+
+# A basename of 126 bytes — one over the cap.
+stage_over_limit_path() {
+  local name="" i
+  for ((i = 0; i < 123; i++)); do name="${name}a"; done
+  name="${name}.md"
+  echo x > "$name"
+  git add "$name"
+}
+
+@test "pre-commit: blocks an over-limit staged path when the length guard is executable" {
+  install_length_guard
+  stage_over_limit_path
+
+  run bash "$HOOK"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"125-byte"* ]]
+}
+
+@test "pre-commit: skips silently when the length guard is not executable" {
+  install_length_guard
+  chmod -x .claude/hooks/filename-length-guard.sh
+  stage_over_limit_path
+
+  run bash "$HOOK"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"125-byte"* ]]
+}
+
+@test "pre-commit: skips silently when the length guard is absent" {
+  stage_over_limit_path
+
+  run bash "$HOOK"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"125-byte"* ]]
+}
+
+@test "pre-commit: allows an at-limit staged path when the length guard is executable" {
+  install_length_guard
+  name=""
+  for ((i = 0; i < 122; i++)); do name="${name}a"; done
+  name="${name}.md"
+  [ "${#name}" -eq 125 ]
+  echo x > "$name"
+  git add "$name"
 
   run bash "$HOOK"
   [ "$status" -eq 0 ]

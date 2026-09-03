@@ -230,6 +230,120 @@ run_hook_in_repo() {
 }
 
 # ===========================================================================
+# 4b. naming-guard — title length (TASK-227)
+#
+# Artifact filenames are derived from titles, so a title over 100 characters
+# produces a filename that blows the 125-byte cap enforced at commit time by
+# filename-length-guard.sh.
+# ===========================================================================
+
+# A title of exactly $1 ASCII characters.
+title_of() {
+  local n="$1" out="" i
+  for ((i = 0; i < n; i++)); do out="${out}A"; done
+  printf '%s' "$out"
+}
+
+hook_json() {
+  printf '{"tool_name":"Bash","tool_input":{"command":"%s"}}' "$1"
+}
+
+@test "naming-guard: blocks a 101-char title in backlog task create" {
+  run run_hook "naming-guard.sh" \
+    "$(hook_json "backlog task create \\\"$(title_of 101)\\\"")"
+  [[ "$output" == *"deny"* ]]
+  [[ "$output" == *"101 chars, max 100"* ]]
+}
+
+@test "naming-guard: allows a title of exactly 100 chars in backlog task create" {
+  run run_hook "naming-guard.sh" \
+    "$(hook_json "backlog task create \\\"$(title_of 100)\\\"")"
+  [[ -z "$output" ]]
+}
+
+@test "naming-guard: blocks a 101-char title in backlog task edit -t" {
+  run run_hook "naming-guard.sh" \
+    "$(hook_json "backlog task edit 42 -t \\\"$(title_of 101)\\\"")"
+  [[ "$output" == *"deny"* ]]
+  [[ "$output" == *"101 chars, max 100"* ]]
+}
+
+@test "naming-guard: blocks a 101-char title in backlog task edit --title" {
+  run run_hook "naming-guard.sh" \
+    "$(hook_json "backlog task edit 42 --title \\\"$(title_of 101)\\\"")"
+  [[ "$output" == *"deny"* ]]
+}
+
+@test "naming-guard: allows a title of exactly 100 chars in backlog task edit -t" {
+  run run_hook "naming-guard.sh" \
+    "$(hook_json "backlog task edit 42 -t \\\"$(title_of 100)\\\"")"
+  [[ -z "$output" ]]
+}
+
+@test "naming-guard: blocks non-ASCII title in backlog task edit -t" {
+  run run_hook "naming-guard.sh" \
+    '{"tool_name":"Bash","tool_input":{"command":"backlog task edit 42 -t \"Привет мир\""}}'
+  [[ "$output" == *"deny"* ]]
+  [[ "$output" == *"ASCII English"* ]]
+}
+
+@test "naming-guard: blocks a 101-char title in backlog doc create" {
+  run run_hook "naming-guard.sh" \
+    "$(hook_json "backlog doc create \\\"$(title_of 101)\\\"")"
+  [[ "$output" == *"deny"* ]]
+}
+
+@test "naming-guard: blocks non-ASCII title in backlog doc create" {
+  run run_hook "naming-guard.sh" \
+    '{"tool_name":"Bash","tool_input":{"command":"backlog doc create \"Привет мир\""}}'
+  [[ "$output" == *"deny"* ]]
+  [[ "$output" == *"ASCII English"* ]]
+}
+
+@test "naming-guard: blocks a 101-char title in backlog decision create" {
+  run run_hook "naming-guard.sh" \
+    "$(hook_json "backlog decision create \\\"$(title_of 101)\\\"")"
+  [[ "$output" == *"deny"* ]]
+}
+
+@test "naming-guard: blocks non-ASCII title in backlog decision create" {
+  run run_hook "naming-guard.sh" \
+    '{"tool_name":"Bash","tool_input":{"command":"backlog decision create \"Привет мир\""}}'
+  [[ "$output" == *"deny"* ]]
+}
+
+@test "naming-guard: blocks a 101-char title in backlog draft create" {
+  run run_hook "naming-guard.sh" \
+    "$(hook_json "backlog draft create \\\"$(title_of 101)\\\"")"
+  [[ "$output" == *"deny"* ]]
+}
+
+@test "naming-guard: blocks non-ASCII title in backlog draft create" {
+  run run_hook "naming-guard.sh" \
+    '{"tool_name":"Bash","tool_input":{"command":"backlog draft create \"Привет мир\""}}'
+  [[ "$output" == *"deny"* ]]
+}
+
+@test "naming-guard: does not treat a long --append-notes value as a title" {
+  run run_hook "naming-guard.sh" \
+    "$(hook_json "backlog task edit 42 --append-notes \\\"$(title_of 400)\\\"")"
+  [[ -z "$output" ]]
+}
+
+@test "naming-guard: does not apply the length cap to branch names" {
+  run run_hook "naming-guard.sh" \
+    "$(hook_json "git checkout -b task-42-$(title_of 200)")"
+  [[ -z "$output" ]]
+}
+
+@test "naming-guard: checks each command separately in a multi-line invocation" {
+  run run_hook "naming-guard.sh" \
+    "$(hook_json "backlog task create \\\"Short one\\\"\\nbacklog task create \\\"$(title_of 101)\\\"")"
+  [[ "$output" == *"deny"* ]]
+  [[ "$output" == *"101 chars, max 100"* ]]
+}
+
+# ===========================================================================
 # 5. commit-prefix-guard
 # ===========================================================================
 
