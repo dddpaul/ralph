@@ -18,7 +18,8 @@ prompt, is what guarantees a valid slug. When claude errors out or returns
 nothing usable after one retry, the existing slug is truncated instead, so a
 file is never left over the limit.
 
-Dry-run by default; ``--apply`` performs the renames with ``git mv``.
+Dry-run by default; ``--apply`` performs the renames with ``git mv``, or
+with a plain rename for a file git does not track yet.
 
 Usage::
 
@@ -43,9 +44,12 @@ DEFAULT_LIMIT = 125
 DEFAULT_MODEL = "haiku"
 DEFAULT_PATH = "backlog"
 
-# Live artifact directories. Archive/completed hold historical files and are
-# opt-in via --include-archive.
-SCAN_SUBDIRS = ("tasks", "docs", "decisions", "drafts")
+# Live artifact directories, i.e. every one `backlog init` creates. Milestones
+# belong here even though backlog.md caps their slug itself: it slices at 50
+# UTF-16 code units, which is 150 bytes of CJK, so a milestone name can clear
+# the byte cap. Archive/completed hold historical files and are opt-in via
+# --include-archive; their walk recurses, so archived milestones come along.
+SCAN_SUBDIRS = ("tasks", "docs", "decisions", "drafts", "milestones")
 ARCHIVE_SUBDIRS = ("archive", "completed")
 
 CLAUDE_TIMEOUT_S = 60.0
@@ -53,12 +57,17 @@ CONTENT_CAP = 2500
 MIN_SLUG_BYTES = 3
 ATTEMPTS = 2  # one call plus exactly one retry
 MAX_COLLISION_SUFFIX = 99
+# Whitespace-separated words tolerated on a line that is not already a bare
+# kebab-case slug. Beyond this the line reads as prose, not a proposal.
+MAX_SLUG_WORDS = 4
 
 # `<type>-<id> - <slug>.md`, e.g. `task-231 - Add-a-script.md`. Ids stay
 # strings: backlog subtasks carry dotted ids such as `task-90.1`.
 NAME_RE = re.compile(
     r"^(?P<kind>[a-z][a-z0-9]*)-(?P<ident>\d+(?:\.\d+)*) - (?P<slug>.+)\.md$"
 )
+# A response that already obeys the prompt: one bare kebab-case token.
+CLEAN_SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 FRONTMATTER_RE = re.compile(r"\A---\n(?P<fm>.*?)\n---\n?(?P<body>.*)\Z", re.DOTALL)
 TITLE_RE = re.compile(r"^title:[ \t]*(?P<title>.+?)[ \t]*$", re.MULTILINE)
 
@@ -77,6 +86,18 @@ Title: {title}
 Content:
 {content}
 """
+
+
+def warn(message: str) -> None:
+    """Write ``message`` to stderr after flushing stdout.
+
+    The plan rows go to stdout and the warnings here to stderr. Without the
+    flush the two streams are buffered independently and a piped run
+    interleaves them out of order, detaching a warning from the row it
+    belongs next to.
+    """
+    sys.stdout.flush()
+    print(message, file=sys.stderr, flush=True)
 
 
 def basename_bytes(name: str) -> int:
@@ -138,18 +159,36 @@ def trim_to_budget(slug: str, budget: int) -> str:
     return trimmed.strip("-")
 
 
+def pick_slug_line(raw: str) -> str:
+    """Choose the line of ``raw`` most likely to be the proposed slug.
+
+    Two passes, because "output ONLY the slug" is a request, not a
+    guarantee. A model that adds a preamble still puts the slug on a line of
+    its own, so an already-conforming kebab-case line anywhere in the output
+    wins over position. Only when there is no such line does the first
+    non-empty, non-fence line get used -- and then just when it is short
+    enough to be a slug: ``Here is the slug you asked for:`` is a sentence,
+    and returning ``""`` for it routes the artifact to the retry and then
+    the FALLBACK truncation instead of onto the filesystem.
+    """
+    lines = [candidate.strip() for candidate in raw.splitlines()]
+    for candidate in lines:
+        if CLEAN_SLUG_RE.match(candidate) and len(candidate) >= MIN_SLUG_BYTES:
+            return candidate
+    for candidate in lines:
+        if candidate and not candidate.startswith("```"):
+            words = candidate.split()
+            return candidate if len(words) <= MAX_SLUG_WORDS else ""
+    return ""
+
+
 def normalize_slug(raw: str, budget: int) -> str:
     """Coerce untrusted ``claude -p`` output into a filename-safe slug.
 
     The prompt asks for a bare kebab-case slug; this is what enforces it.
     Returns ``""`` when nothing usable survives.
     """
-    line = ""
-    for candidate in raw.splitlines():
-        stripped = candidate.strip()
-        if stripped and not stripped.startswith("```"):
-            line = stripped
-            break
+    line = pick_slug_line(raw)
     hyphenated = re.sub(r"[\s_/\\]+", "-", line.lower())
     cleaned = re.sub(r"[^a-z0-9-]+", "", hyphenated)
     collapsed = re.sub(r"-{2,}", "-", cleaned).strip("-")
@@ -243,7 +282,9 @@ def propose_slug(
         if basename_bytes(slug) >= MIN_SLUG_BYTES:
             return slug, False
     fallback = trim_to_budget(parsed.slug, budget) or _cut_bytes(parsed.slug, budget)
-    return fallback or "untitled", True
+    # `untitled` is 8 bytes; cut it too, or a tiny budget would be blown by
+    # the very last resort.
+    return fallback or _cut_bytes("untitled", budget), True
 
 
 @dataclass
@@ -301,18 +342,14 @@ def plan_renames(files: Sequence[Path], opts: Options) -> tuple[list[Rename], Co
         parsed = parse_prefix(path.name)
         if parsed is None:
             counters.skipped += 1
-            print(
-                f"WARNING: skipping {path}: name is not '<type>-<id> - <slug>.md'",
-                file=sys.stderr,
-            )
+            warn(f"WARNING: skipping {path}: name is not '<type>-<id> - <slug>.md'")
             continue
         budget = slug_budget(parsed.prefix, opts.limit)
         if budget < MIN_SLUG_BYTES:
             counters.skipped += 1
-            print(
+            warn(
                 f"WARNING: skipping {path}: prefix leaves no room for a slug "
-                f"under the {opts.limit}-byte limit",
-                file=sys.stderr,
+                f"under the {opts.limit}-byte limit"
             )
             continue
         slug, used_fallback = propose_slug(
@@ -321,7 +358,14 @@ def plan_renames(files: Sequence[Path], opts: Options) -> tuple[list[Rename], Co
         claimed = taken.setdefault(
             path.parent, {p.name for p in path.parent.glob("*.md")}
         )
-        new_name = dedupe_target(parsed.prefix, slug, budget, claimed)
+        try:
+            new_name = dedupe_target(parsed.prefix, slug, budget, claimed)
+        except RuntimeError as exc:
+            # Every -2..-99 suffix is taken. One unnameable file must not
+            # abort the run and strand the ones after it.
+            counters.skipped += 1
+            warn(f"WARNING: skipping {path}: {exc}")
+            continue
         claimed.add(new_name)
         plan = Rename(path=path, new_name=new_name)
         if used_fallback:
@@ -334,11 +378,25 @@ def plan_renames(files: Sequence[Path], opts: Options) -> tuple[list[Rename], Co
     return plans, counters
 
 
-def git_repo_root(start: Path) -> Path | None:
-    """Return the git top-level containing ``start``, or ``None``."""
+def run_git(
+    cwd: Path, *args: str, trust: Sequence[Path] = ()
+) -> subprocess.CompletedProcess[str] | None:
+    """Run git in ``cwd``; return ``None`` when git cannot be run at all.
+
+    The container this runs in occasionally reports dubious ownership, at
+    which point every git call fails until the repository is listed in
+    ``safe.directory``. That entry must name the *resolved top-level*: a
+    relative path is a silent no-op, and so is a subdirectory of the
+    repository. Callers that already know the top-level get it as ``cwd``;
+    ``trust`` is for the discovery call, which does not yet. ``LC_ALL=C``
+    keeps the stderr we quote stable.
+    """
+    config: list[str] = []
+    for path in trust or (cwd,):
+        config += ["-c", f"safe.directory={path}"]
     try:
-        proc = subprocess.run(
-            ["git", "-C", str(start), "rev-parse", "--show-toplevel"],
+        return subprocess.run(
+            ["git", *config, "-C", str(cwd), *args],
             capture_output=True,
             text=True,
             check=False,
@@ -346,35 +404,77 @@ def git_repo_root(start: Path) -> Path | None:
         )
     except OSError:
         return None
+
+
+def git_repo_root(start: Path) -> tuple[Path | None, str]:
+    """Return ``(git top-level containing start, "")``, or ``(None, reason)``.
+
+    The reason is git's own stderr: "is not inside a git repository" is a
+    misleading thing to print at a repository whose ownership git merely
+    finds dubious.
+    """
+    # The top-level is what git wants trusted and is exactly what this call
+    # exists to find, so list `start` and every ancestor: the top-level is
+    # one of them. Naming ancestors of a path the user pointed us at is far
+    # narrower than `safe.directory=*`, and it is a per-invocation `-c`.
+    resolved = start.resolve()
+    proc = run_git(
+        resolved, "rev-parse", "--show-toplevel", trust=(resolved, *resolved.parents)
+    )
+    if proc is None:
+        return None, "git is not on PATH"
     if proc.returncode != 0:
-        return None
-    return Path(proc.stdout.strip())
+        return None, proc.stderr.strip() or f"git rev-parse exited {proc.returncode}"
+    return Path(proc.stdout.strip()), ""
+
+
+def git_tracked(repo_root: Path, path: Path) -> bool:
+    """Return whether ``path`` is in ``repo_root``'s index.
+
+    ``ls-files --error-unmatch`` exits 1 for a path git does not track and
+    128 for a git that could not answer at all. Only the first is really
+    "untracked"; anything else is reported as tracked so the rename goes
+    through ``git mv`` and surfaces git's own error, rather than quietly
+    taking the plain-rename path under a NOTICE that is not true.
+    """
+    root = repo_root.resolve()
+    proc = run_git(
+        root, "ls-files", "--error-unmatch", "--", str(path.resolve().relative_to(root))
+    )
+    return proc is None or proc.returncode != 1
 
 
 def git_mv(repo_root: Path, source: Path, target: Path) -> str | None:
     """``git mv`` ``source`` to ``target``; return stderr on failure."""
-    # safe.directory must name the resolved top-level: a relative path is a
-    # silent no-op, and the container occasionally reports dubious ownership.
     root = repo_root.resolve()
-    proc = subprocess.run(
-        [
-            "git",
-            "-c",
-            f"safe.directory={root}",
-            "-C",
-            str(root),
-            "mv",
-            "--",
-            str(source.resolve().relative_to(root)),
-            str(target.resolve().parent.relative_to(root) / target.name),
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
-        env={**os.environ, "LC_ALL": "C"},
+    proc = run_git(
+        root,
+        "mv",
+        "--",
+        str(source.resolve().relative_to(root)),
+        str(target.resolve().parent.relative_to(root) / target.name),
     )
+    if proc is None:
+        return "git is not on PATH"
     if proc.returncode != 0:
         return proc.stderr.strip() or f"git mv exited {proc.returncode}"
+    return None
+
+
+def plain_rename(source: Path, target: Path) -> str | None:
+    """Rename an untracked file; return the reason on failure.
+
+    ``Path.rename`` overwrites silently on POSIX, so the target is checked
+    first: a plan is built against a directory listing taken earlier and a
+    stale one must not cost a file. The check is ``lexists``, because a
+    dangling symlink occupies the name just as well as a file does.
+    """
+    if os.path.lexists(target):
+        return f"{target.name} already exists"
+    try:
+        source.rename(target)
+    except OSError as exc:
+        return str(exc)
     return None
 
 
@@ -387,19 +487,37 @@ def report(plan: Rename) -> None:
 
 
 def apply_renames(plans: Sequence[Rename], root: Path, counters: Counters) -> None:
-    """Perform every planned rename with ``git mv``, reporting failures."""
-    repo_root = git_repo_root(root)
+    """Perform every planned rename, reporting failures.
+
+    Tracked files move with ``git mv`` so the rename lands staged; untracked
+    ones fall back to a plain rename.
+    """
+    repo_root, reason = git_repo_root(root)
     if repo_root is None:
-        print(f"ERROR: {root} is not inside a git repository", file=sys.stderr)
+        warn(f"ERROR: cannot resolve the git repository for {root}: {reason}")
         counters.errors += len(plans)
         return
     for plan in plans:
-        error = git_mv(repo_root, plan.path, plan.target)
-        if error is None:
-            counters.renamed += 1
+        # `git mv` refuses a file it does not track, which is exactly how an
+        # over-limit file arrives: the pre-commit guard rejects the commit
+        # that would have added it. Rename it anyway rather than leave it
+        # over the limit, and say so, because nothing gets staged.
+        tracked = git_tracked(repo_root, plan.path)
+        if tracked:
+            error = git_mv(repo_root, plan.path, plan.target)
         else:
+            error = plain_rename(plan.path, plan.target)
+        if error is not None:
             counters.errors += 1
-            print(f"ERROR: git mv failed for {plan.path}: {error}", file=sys.stderr)
+            verb = "git mv" if tracked else "rename"
+            warn(f"ERROR: {verb} failed for {plan.path}: {error}")
+            continue
+        counters.renamed += 1
+        if not tracked:
+            warn(
+                f"NOTICE: {plan.path} is untracked; renamed to {plan.new_name} "
+                "without git. Run `git add` to stage it."
+            )
 
 
 def print_summary(counters: Counters, apply: bool) -> None:
@@ -462,7 +580,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
     root = Path(args.path)
     if not root.is_dir():
-        print(f"ERROR: {root} is not a directory", file=sys.stderr)
+        warn(f"ERROR: {root} is not a directory")
         return 2
     opts = Options(limit=args.limit, model=args.model, timeout=args.timeout)
     files = collect_files(root, include_archive=args.include_archive)

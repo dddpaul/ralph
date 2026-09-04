@@ -178,14 +178,72 @@ def test_normalize_slug_hard_cuts_when_there_is_no_hyphen() -> None:
 
 
 def test_normalize_slug_never_exceeds_the_budget() -> None:
+    # Kebab-case, i.e. what the prompt asks for: a spaced six-word phrase
+    # would be rejected as prose and make every assertion below vacuous.
     for budget in range(1, 40):
-        slug = sbf.normalize_slug("Some Rather Long Proposed Slug Here", budget)
+        slug = sbf.normalize_slug("some-rather-long-proposed-slug-here", budget)
+        assert slug, f"budget {budget} produced no slug at all"
         assert sbf.basename_bytes(slug) <= budget
 
 
 def test_normalize_slug_does_not_split_a_multibyte_character() -> None:
     # A raw byte cut at 5 would land inside the third character.
     assert sbf.trim_to_budget("ααα", 5) == "αα"
+
+
+# --------------------------------------------------------------------------
+# pick_slug_line — prose is not a slug proposal (TASK-232 finding 1)
+# --------------------------------------------------------------------------
+
+
+PREAMBLE = "Here is the slug you asked for:"
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        PREAMBLE,
+        "Sure! Here is a short kebab-case slug for that artifact.",
+        "I cannot propose a slug because the content is empty.",
+    ],
+)
+def test_normalize_slug_rejects_a_prose_line(raw: str) -> None:
+    """Prose clears MIN_SLUG_BYTES, so only a "" here forces the retry."""
+    assert sbf.normalize_slug(raw, 111) == ""
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "ralph-stop-drain",
+        "  ralph-stop-drain  ",
+        "Ralph Stop Drain",
+        "Ralph Stop Drain Guarantee",  # exactly MAX_SLUG_WORDS
+    ],
+)
+def test_normalize_slug_still_accepts_a_short_proposal(raw: str) -> None:
+    assert sbf.normalize_slug(raw, 111).startswith("ralph-stop-drain")
+
+
+def test_normalize_slug_prefers_a_clean_line_under_a_preamble() -> None:
+    """The slug on its own line wins over the prose that introduces it."""
+    assert sbf.normalize_slug(f"{PREAMBLE}\nralph-stop-drain\n", 111) == (
+        "ralph-stop-drain"
+    )
+
+
+def test_normalize_slug_prefers_a_clean_line_over_a_leading_bullet() -> None:
+    raw = "Options:\n- first idea\nralph-stop-drain\nHope that helps!\n"
+    assert sbf.normalize_slug(raw, 111) == "ralph-stop-drain"
+
+
+def test_pick_slug_line_skips_a_clean_line_below_the_minimum() -> None:
+    """A two-byte token is not a slug; the next candidate is considered."""
+    assert sbf.pick_slug_line("ok\nralph-stop-drain\n") == "ralph-stop-drain"
+
+
+def test_pick_slug_line_returns_empty_for_no_candidate() -> None:
+    assert sbf.pick_slug_line("```\n```\n") == ""
 
 
 # --------------------------------------------------------------------------
@@ -500,6 +558,230 @@ def test_archive_is_excluded_unless_requested(tmp_path: Path) -> None:
     with_archive = _run_script(repo, bin_dir, "--include-archive")
     assert "over-limit=1" in with_archive.stdout
     assert f"task-101 - {STUB_SLUG}.md" in with_archive.stdout
+
+
+def test_a_prose_preamble_falls_back_instead_of_becoming_the_filename(
+    tmp_path: Path,
+) -> None:
+    """A stub that only ever answers in prose must not name the file."""
+    repo = _make_repo(tmp_path, [LONG_101])
+    bin_dir = tmp_path / "bin"
+    _write_stub(bin_dir, 'printf "Here is the slug you asked for:\\n"')
+
+    proc = _run_script(repo, bin_dir, "--apply")
+
+    assert proc.returncode == 0, proc.stderr
+    assert "[FALLBACK]" in proc.stdout
+    assert "fallbacks=1" in proc.stdout and "renamed=1" in proc.stdout
+    budget = sbf.slug_budget("task-101 - ", LIMIT)
+    truncated = sbf.trim_to_budget(LONG_SLUG, budget)
+    renamed = [p.name for p in (repo / "backlog" / "tasks").iterdir()]
+    assert renamed == [f"task-101 - {truncated}.md"]
+    assert "here-is-the-slug" not in renamed[0]
+
+
+def test_a_preamble_above_a_clean_slug_still_yields_that_slug(
+    tmp_path: Path,
+) -> None:
+    """The retry is for unusable output, not for a chatty wrapper."""
+    repo = _make_repo(tmp_path, [LONG_101])
+    bin_dir = tmp_path / "bin"
+    _write_stub(
+        bin_dir,
+        f'printf "Here is the slug you asked for:\\n{STUB_SLUG}\\nHope that helps!\\n"',
+    )
+
+    proc = _run_script(repo, bin_dir, "--apply")
+
+    assert proc.returncode == 0, proc.stderr
+    assert "[FALLBACK]" not in proc.stdout
+    assert "fallbacks=0" in proc.stdout and "renamed=1" in proc.stdout
+    names = [p.name for p in (repo / "backlog" / "tasks").iterdir()]
+    assert names == [f"task-101 - {STUB_SLUG}.md"]
+
+
+def test_apply_renames_an_untracked_file(tmp_path: Path) -> None:
+    """The pre-commit guard rejects a long new name, so it stays untracked."""
+    repo = _make_repo(tmp_path, [SHORT_103])
+    untracked = repo / "backlog" / "tasks" / LONG_102
+    untracked.write_text("---\nid: task-102\n---\n\nNever committed.\n")
+    assert _git(repo, "status", "--porcelain").stdout.strip().startswith("??")
+    bin_dir = tmp_path / "bin"
+    _write_stub(bin_dir, f'printf "%s\\n" "{STUB_OUTPUT}"')
+
+    proc = _run_script(repo, bin_dir, "--apply")
+
+    assert proc.returncode == 0, proc.stderr
+    assert "renamed=1" in proc.stdout and "errors=0" in proc.stdout
+    assert "NOTICE:" in proc.stderr and LONG_102 in proc.stderr
+    assert "git add" in proc.stderr
+    names = sorted(p.name for p in (repo / "backlog" / "tasks").iterdir())
+    assert names == sorted([SHORT_103, f"task-102 - {STUB_SLUG}.md"])
+    # Renamed, not staged: an untracked file has nothing in the index to move.
+    porcelain = _git(repo, "status", "--porcelain").stdout
+    assert porcelain.lstrip().startswith("??")
+    assert STUB_SLUG in porcelain and "R  " not in porcelain
+
+
+def test_untracked_rename_refuses_to_clobber_an_existing_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A stale plan must cost an error, not a file."""
+    repo = _make_repo(tmp_path, [SHORT_103])
+    tasks = repo / "backlog" / "tasks"
+    (tasks / LONG_102).write_text("---\nid: task-102\n---\n\nSource.\n")
+    monkeypatch.setattr(sbf, "ask_claude", lambda *_args, **_kw: STUB_OUTPUT)
+    target = tasks / f"task-102 - {STUB_SLUG}.md"
+
+    plans, counters = sbf.plan_renames([tasks / LONG_102], sbf.Options())
+    assert [plan.new_name for plan in plans] == [target.name]
+    target.write_text("Squatter.\n")  # appears only after the plan is built
+
+    sbf.apply_renames(plans, repo / "backlog", counters)
+
+    assert counters.errors == 1 and counters.renamed == 0
+    assert target.read_text() == "Squatter.\n"
+    assert (tasks / LONG_102).is_file()
+
+
+# `git` pretends the repository belongs to someone else, which is the state
+# that makes safe.directory load-bearing. Supported since git 2.36.
+DUBIOUS = {"GIT_TEST_ASSUME_DIFFERENT_OWNER": "1"}
+
+
+def _dubious_ownership_is_simulable(repo: Path) -> bool:
+    proc = subprocess.run(
+        ["git", "-C", str(repo), "rev-parse", "--show-toplevel"],
+        capture_output=True,
+        text=True,
+        env={**os.environ, **DUBIOUS, "LC_ALL": "C"},
+    )
+    return proc.returncode != 0 and "dubious ownership" in proc.stderr
+
+
+def test_git_repo_root_resolves_under_dubious_ownership(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """safe.directory must name the top-level, which discovery starts below."""
+    repo = _make_repo(tmp_path, [SHORT_103])
+    if not _dubious_ownership_is_simulable(repo):  # pragma: no cover
+        pytest.skip("this git does not honour GIT_TEST_ASSUME_DIFFERENT_OWNER")
+    for key, value in DUBIOUS.items():
+        monkeypatch.setenv(key, value)
+
+    # The script is pointed at backlog/, a subdirectory: trusting only that
+    # is a no-op, so the ancestor chain is what makes this resolve.
+    root, reason = sbf.git_repo_root(repo / "backlog")
+
+    assert reason == ""
+    assert root is not None and root.resolve() == repo.resolve()
+
+
+def test_apply_renames_under_dubious_ownership(tmp_path: Path) -> None:
+    """The whole --apply path, not just discovery, survives the state."""
+    repo = _make_repo(tmp_path, [LONG_101])
+    if not _dubious_ownership_is_simulable(repo):  # pragma: no cover
+        pytest.skip("this git does not honour GIT_TEST_ASSUME_DIFFERENT_OWNER")
+    bin_dir = tmp_path / "bin"
+    _write_stub(bin_dir, f'printf "%s\\n" "{STUB_OUTPUT}"')
+
+    proc = _run_script(repo, bin_dir, "--apply", **DUBIOUS)
+
+    assert proc.returncode == 0, proc.stderr
+    assert "renamed=1" in proc.stdout and "errors=0" in proc.stdout
+    assert "dubious ownership" not in proc.stderr
+    names = [p.name for p in (repo / "backlog" / "tasks").iterdir()]
+    assert names == [f"task-101 - {STUB_SLUG}.md"]
+
+
+def test_git_repo_root_reports_gits_own_reason(tmp_path: Path) -> None:
+    """Not a repository at all still has to say so, and say why."""
+    plain = tmp_path / "plain"
+    (plain / "backlog").mkdir(parents=True)
+
+    root, reason = sbf.git_repo_root(plain / "backlog")
+
+    assert root is None
+    assert "not a git repository" in reason
+
+
+def test_git_tracked_reads_only_exit_1_as_untracked(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A broken git must not be mistaken for a clean 'not in the index'."""
+    repo = _make_repo(tmp_path, [SHORT_103])
+    tracked = repo / "backlog" / "tasks" / SHORT_103
+    assert sbf.git_tracked(repo, tracked) is True
+
+    untracked = repo / "backlog" / "tasks" / "task-104 - Fresh.md"
+    untracked.write_text("---\nid: task-104\n---\n\nBody.\n")
+    assert sbf.git_tracked(repo, untracked) is False
+
+    monkeypatch.setattr(
+        sbf,
+        "run_git",
+        lambda *_a, **_kw: subprocess.CompletedProcess([], 128, "", "boom"),
+    )
+    assert sbf.git_tracked(repo, untracked) is True
+
+
+def test_plain_rename_refuses_a_dangling_symlink_target(tmp_path: Path) -> None:
+    source = tmp_path / "source.md"
+    source.write_text("keep me\n")
+    target = tmp_path / "target.md"
+    target.symlink_to(tmp_path / "gone.md")  # points at nothing
+
+    reason = sbf.plain_rename(source, target)
+
+    assert reason is not None and "already exists" in reason
+    assert source.read_text() == "keep me\n"
+    assert target.is_symlink()
+
+
+def test_plan_renames_survives_an_unnameable_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A file with no free name is skipped, not allowed to abort the run."""
+    tasks = tmp_path / "tasks"
+    tasks.mkdir()
+    doomed = tasks / LONG_101
+    survivor = tasks / LONG_102
+    for path in (doomed, survivor):
+        path.write_text("---\nid: task-0\n---\n\nBody.\n")
+    monkeypatch.setattr(sbf, "ask_claude", lambda *_a, **_kw: STUB_OUTPUT)
+    real_dedupe = sbf.dedupe_target
+
+    def _raise_for_the_first(prefix: str, *args: object) -> str:
+        if prefix == "task-101 - ":
+            raise RuntimeError("could not find a free name")
+        return real_dedupe(prefix, *args)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(sbf, "dedupe_target", _raise_for_the_first)
+
+    plans, counters = sbf.plan_renames([doomed, survivor], sbf.Options())
+
+    assert counters.over_limit == 2 and counters.skipped == 1
+    assert [plan.new_name for plan in plans] == [f"task-102 - {STUB_SLUG}.md"]
+
+
+def test_milestones_are_scanned(tmp_path: Path) -> None:
+    """`backlog init` creates milestones/ and its names can clear the cap."""
+    repo = _make_repo(tmp_path, [SHORT_103])
+    milestones = repo / "backlog" / "milestones"
+    milestones.mkdir(parents=True)
+    long_milestone = f"m-0 - {LONG_SLUG}.md"
+    assert sbf.basename_bytes(long_milestone) > LIMIT
+    (milestones / long_milestone).write_text("---\nid: m-0\n---\n\nMilestone.\n")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "milestone")
+    bin_dir = tmp_path / "bin"
+    _write_stub(bin_dir, f'printf "%s\\n" "{STUB_OUTPUT}"')
+
+    proc = _run_script(repo, bin_dir, "--apply")
+
+    assert proc.returncode == 0, proc.stderr
+    assert "over-limit=1" in proc.stdout and "renamed=1" in proc.stdout
+    assert [p.name for p in milestones.iterdir()] == [f"m-0 - {STUB_SLUG}.md"]
 
 
 def test_missing_path_is_an_error(tmp_path: Path) -> None:
