@@ -1,8 +1,10 @@
-"""Tests for ``scripts/shorten-backlog-filenames.py`` (TASK-231).
+"""Tests for ``scripts/shorten-backlog-filenames.py`` (TASK-231, TASK-236).
 
 The script is a hyphenated PEP 723 file, so it is loaded by path rather than
 imported. Unit tests cover the pure layer; the integration tests drive the CLI
-end to end over a throwaway git repository with a stubbed ``claude`` on PATH.
+end to end over throwaway git repositories with a stubbed ``claude`` on PATH --
+one repository for the single-project case, a tree of them for the multi-project
+sweep, which renames and then commits each project on its own.
 """
 
 from __future__ import annotations
@@ -420,14 +422,29 @@ def _write_stub(bin_dir: Path, body: str) -> None:
     stub.chmod(0o755)
 
 
-def _make_repo(tmp_path: Path, names: list[str]) -> Path:
-    repo = tmp_path / "repo"
-    tasks = repo / "backlog" / "tasks"
+# The shape `backlog init` leaves behind. config.yml is half of the two-signal
+# backlog-root test, so a fixture without one is not a project at all.
+CONFIG_YML = """\
+project_name: "{name}"
+default_status: "To Do"
+statuses: ["To Do", "In Progress", "Done"]
+"""
+
+
+def _write_backlog(backlog: Path, names: list[str], project_name: str) -> Path:
+    """Create one backlog root: a config.yml and ``names`` under tasks/."""
+    tasks = backlog / "tasks"
     tasks.mkdir(parents=True)
+    (backlog / "config.yml").write_text(CONFIG_YML.format(name=project_name))
     for index, name in enumerate(names):
         (tasks / name).write_text(
             f"---\nid: task-{index}\ntitle: {name}\n---\n\nBody of {name}.\n"
         )
+    return backlog
+
+
+def _init_repo(repo: Path) -> Path:
+    """Turn ``repo`` into a git repository with everything in it committed."""
     subprocess.run(["git", "init", "-q", str(repo)], check=True)
     _git(repo, "config", "user.email", "test@example.com")
     _git(repo, "config", "user.name", "Test")
@@ -436,11 +453,55 @@ def _make_repo(tmp_path: Path, names: list[str]) -> Path:
     return repo
 
 
-def _run_script(repo: Path, bin_dir: Path, *args: str, **env_extra: str):
+def _make_repo(
+    base: Path,
+    names: list[str],
+    *,
+    at: str = "repo",
+    project_name: str = "fixture",
+) -> Path:
+    """A committed git repository holding one backlog root."""
+    repo = base / at
+    _write_backlog(repo / "backlog", names, project_name)
+    return _init_repo(repo)
+
+
+def _install_hook(repo: Path, body: str) -> None:
+    """Install ``body`` as ``repo``'s pre-commit hook."""
+    hook = repo / ".git" / "hooks" / "pre-commit"
+    hook.parent.mkdir(parents=True, exist_ok=True)
+    hook.write_text(f"#!/bin/bash\n{body}\n")
+    hook.chmod(0o755)
+
+
+def _subjects(repo: Path) -> list[str]:
+    """Commit subjects, newest first."""
+    return _git(repo, "log", "--format=%s").stdout.splitlines()
+
+
+def _head_changes(repo: Path) -> list[str]:
+    """``<status>\t<path>`` for every path in HEAD, renames left as add+delete.
+
+    ``--no-renames`` on purpose: the point of the assertion is *which* paths
+    the commit carries, and a rename pair collapsed into one R row hides the
+    old path the commit is supposed to contain.
+    """
+    out = _git(repo, "show", "--name-status", "--no-renames", "--format=", "HEAD")
+    return sorted(line for line in out.stdout.splitlines() if line)
+
+
+def _shortened(count: int) -> str:
+    """The fixed housekeeping commit message the sweep writes."""
+    return f"chore(backlog): shorten {count} over-limit filename(s) for ecryptfs sync"
+
+
+def _run_script(
+    repo: Path, bin_dir: Path, *args: str, path: str = "backlog", **env_extra: str
+):
     env = {**os.environ, "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}"}
     env.update(env_extra)
     return subprocess.run(
-        [sys.executable, str(SCRIPT), "--path", "backlog", *args],
+        [sys.executable, str(SCRIPT), "--path", path, *args],
         cwd=repo,
         capture_output=True,
         text=True,
@@ -537,9 +598,13 @@ def test_dry_run_reports_renames_and_changes_nothing(
     assert "WARNING: skipping" in proc.stderr and UNPARSEABLE in proc.stderr
     assert (
         "Summary: scanned=5 over-limit=3 renamed=0 fallbacks=0 "
-        "collisions=1 skipped=1 errors=0" in proc.stdout
+        "collisions=1 skipped=1 errors=0 projects=1 committed=0 project-errors=0"
+        in proc.stdout
     )
     assert "Dry run: nothing changed." in proc.stdout
+    # A single backlog root is the one-project case of the same sweep.
+    assert f"== fixture [{repo.resolve()}] ==" in proc.stdout
+    assert f"Would commit 2 rename(s) in fixture [{repo.resolve()}]" in proc.stdout
 
     assert sorted(p.name for p in tasks.iterdir()) == before
     assert _git(repo, "status", "--porcelain").stdout == ""
@@ -565,10 +630,18 @@ def test_apply_renames_via_git_mv(stubbed_repo: tuple[Path, Path]) -> None:
             DECOY_101,
         ]
     )
-    # git mv stages the rename and preserves the body.
-    staged = _git(repo, "status", "--porcelain").stdout
-    assert staged.count("R  ") == 2
-    assert f"task-102 - {STUB_SLUG}.md" in staged
+    # git mv stages the rename, the project commit lands it, and the body
+    # rides along untouched.
+    assert _git(repo, "status", "--porcelain").stdout == ""
+    assert _subjects(repo) == [_shortened(2), "fixtures"]
+    assert _head_changes(repo) == sorted(
+        [
+            f"A\tbacklog/tasks/task-101 - {STUB_SLUG}-2.md",
+            f"A\tbacklog/tasks/task-102 - {STUB_SLUG}.md",
+            f"D\tbacklog/tasks/{LONG_101}",
+            f"D\tbacklog/tasks/{LONG_102}",
+        ]
+    )
     moved = (tasks / f"task-102 - {STUB_SLUG}.md").read_text()
     assert f"Body of {LONG_102}." in moved
 
@@ -576,18 +649,24 @@ def test_apply_renames_via_git_mv(stubbed_repo: tuple[Path, Path]) -> None:
 def test_apply_output_passes_the_filename_length_guard(
     stubbed_repo: tuple[Path, Path],
 ) -> None:
+    """The renames must survive the real guard, run as a real hook."""
     repo, bin_dir = stubbed_repo
-    assert _run_script(repo, bin_dir, "--apply").returncode == 0
+    if not GUARD.is_file():  # pragma: no cover - guard ships with the repo
+        pytest.skip("filename-length-guard.sh not present")
+    # The project commit respects hooks, so installing the shipped guard as
+    # one puts it on the path this run has to clear. The marker keeps the
+    # assertion honest: a guard that never ran would prove nothing.
+    ran = repo / "hook-ran"
+    _install_hook(repo, f'printf "ran\\n" >> "{ran}"\nexec bash "{GUARD}"')
+
+    proc = _run_script(repo, bin_dir, "--apply")
+
+    assert proc.returncode == 0, proc.stderr
+    assert ran.is_file()
+    assert "committed=1" in proc.stdout
     for path in (repo / "backlog" / "tasks").iterdir():
         if path.name != UNPARSEABLE:  # skipped by design, still over-limit
             assert sbf.basename_bytes(path.name) <= LIMIT
-    if not GUARD.is_file():  # pragma: no cover - guard ships with the repo
-        pytest.skip("filename-length-guard.sh not present")
-    # `git mv` leaves the renames staged; run the real pre-commit guard on them.
-    guard = subprocess.run(
-        ["bash", str(GUARD)], cwd=repo, capture_output=True, text=True
-    )
-    assert guard.returncode == 0, guard.stderr
 
 
 def test_second_run_proposes_no_further_renames(
@@ -737,6 +816,9 @@ def test_apply_renames_an_untracked_file(tmp_path: Path) -> None:
     porcelain = _git(repo, "status", "--porcelain").stdout
     assert porcelain.lstrip().startswith("??")
     assert STUB_SLUG in porcelain and "R  " not in porcelain
+    # Nothing tracked changed, so the project has nothing to commit.
+    assert "committed=0" in proc.stdout
+    assert _subjects(repo) == ["fixtures"]
 
 
 def test_untracked_rename_refuses_to_clobber_an_existing_target(
@@ -753,8 +835,9 @@ def test_untracked_rename_refuses_to_clobber_an_existing_target(
     assert [plan.new_name for plan in plans] == [target.name]
     target.write_text("Squatter.\n")  # appears only after the plan is built
 
-    sbf.apply_renames(plans, repo / "backlog", counters)
+    staged = sbf.apply_renames(plans, repo, counters)
 
+    assert staged == []
     assert counters.errors == 1 and counters.renamed == 0
     assert target.read_text() == "Squatter.\n"
     assert (tasks / LONG_102).is_file()
@@ -907,3 +990,361 @@ def test_missing_path_is_an_error(tmp_path: Path) -> None:
     proc = _run_script(repo, bin_dir, "--path", "nope")
     assert proc.returncode == 2
     assert "is not a directory" in proc.stderr
+
+
+# --------------------------------------------------------------------------
+# Multi-project sweep — discovery, grouping, per-project commit (TASK-236)
+# --------------------------------------------------------------------------
+
+
+@pytest.fixture
+def tree(tmp_path: Path) -> Path:
+    """A parent directory holding two projects and three things that are not."""
+    root = tmp_path / "tree"
+    _make_repo(root, [LONG_101], at="alpha", project_name="alpha")
+    _make_repo(root, [LONG_102], at="beta", project_name="beta")
+    # A vendored copy of somebody else's backlog: pruned, never swept.
+    _write_backlog(root / "alpha" / "node_modules" / "pkg" / "backlog", [], "vendored")
+    # config.yml with no artifact directory beside it: one signal is not enough.
+    (root / "decoy").mkdir()
+    (root / "decoy" / "config.yml").write_text('project_name: "decoy"\n')
+    # A backlog root inside a backlog root: a backlog holds artifacts, not
+    # projects, so the walk must stop at the outer one.
+    _write_backlog(root / "alpha" / "backlog" / "archive", [], "nested")
+    # A backlog in no repository at all: nothing to commit to.
+    _write_backlog(root / "loose" / "backlog", [LONG_101], "loose")
+    return root
+
+
+@pytest.fixture
+def swept(tree: Path, tmp_path: Path) -> tuple[Path, Path]:
+    """``tree`` plus a stubbed claude, ready for a CLI sweep."""
+    bin_dir = tmp_path / "bin"
+    _write_stub(bin_dir, f'printf "%s\\n" "{STUB_OUTPUT}"')
+    return tree, bin_dir
+
+
+def test_find_backlog_roots_takes_two_signals_and_prunes(tree: Path) -> None:
+    roots = sbf.find_backlog_roots(tree)
+
+    assert roots == [
+        tree / "alpha" / "backlog",
+        tree / "beta" / "backlog",
+        tree / "loose" / "backlog",
+    ]
+
+
+@pytest.mark.parametrize("pruned", sorted(sbf.PRUNE_DIRS))
+def test_find_backlog_roots_prunes_every_listed_directory(
+    tmp_path: Path, pruned: str
+) -> None:
+    """A backlog under any pruned directory belongs to somebody else."""
+    root = tmp_path / "tree"
+    _write_backlog(root / pruned / "vendored" / "backlog", [], "vendored")
+    _write_backlog(root / "mine" / "backlog", [], "mine")
+
+    assert sbf.find_backlog_roots(root) == [root / "mine" / "backlog"]
+
+
+def test_is_backlog_root_needs_config_and_an_artifact_directory(
+    tmp_path: Path,
+) -> None:
+    both = _write_backlog(tmp_path / "both", [], "both")
+    assert sbf.is_backlog_root(both) is True
+
+    config_only = tmp_path / "config-only"
+    config_only.mkdir()
+    (config_only / "config.yml").write_text('project_name: "x"\n')
+    assert sbf.is_backlog_root(config_only) is False
+
+    tasks_only = tmp_path / "tasks-only"
+    (tasks_only / "tasks").mkdir(parents=True)
+    assert sbf.is_backlog_root(tasks_only) is False
+
+
+def test_discover_projects_groups_by_repo_and_skips_a_root_outside_git(
+    tree: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    projects = sbf.discover_projects(tree)
+
+    assert [project.name for project in projects] == ["alpha", "beta"]
+    assert [project.repo_root for project in projects] == [
+        (tree / "alpha").resolve(),
+        (tree / "beta").resolve(),
+    ]
+    assert [project.backlog_roots for project in projects] == [
+        [tree / "alpha" / "backlog"],
+        [tree / "beta" / "backlog"],
+    ]
+    err = capsys.readouterr().err
+    assert f"WARNING: skipping {tree / 'loose' / 'backlog'}" in err
+    assert "not in a git repository" in err
+
+
+def test_discover_projects_folds_a_monorepo_into_one_project(tmp_path: Path) -> None:
+    repo = _make_repo(tmp_path, [LONG_101], project_name="mono")
+    _write_backlog(repo / "sub" / "backlog", [LONG_102], "second-name-ignored")
+
+    projects = sbf.discover_projects(repo)
+
+    assert len(projects) == 1
+    assert projects[0].name == "mono"
+    assert projects[0].repo_root == repo.resolve()
+    assert projects[0].backlog_roots == [repo / "backlog", repo / "sub" / "backlog"]
+
+
+def test_read_project_name_falls_back_to_the_repository_directory(
+    tmp_path: Path,
+) -> None:
+    backlog = _write_backlog(tmp_path / "anon", [], "unused")
+    (backlog / "config.yml").write_text('default_status: "To Do"\n')
+
+    assert sbf.read_project_name(backlog, "anon") == "anon"
+    assert sbf.read_project_name(tmp_path / "gone", "anon") == "anon"
+
+
+def test_dry_run_reports_every_project_and_changes_nothing(
+    swept: tuple[Path, Path],
+) -> None:
+    tree, bin_dir = swept
+
+    proc = _run_script(tree, bin_dir, path=".")
+
+    assert proc.returncode == 0, proc.stderr
+    for name in ("alpha", "beta"):
+        repo = (tree / name).resolve()
+        assert f"== {name} [{repo}] ==" in proc.stdout
+        assert f"Would commit 1 rename(s) in {name} [{repo}]" in proc.stdout
+    assert f"  -> task-101 - {STUB_SLUG}.md" in proc.stdout
+    assert f"  -> task-102 - {STUB_SLUG}.md" in proc.stdout
+    assert "projects=2 committed=0 project-errors=0" in proc.stdout
+    assert "Dry run: nothing changed." in proc.stdout
+    for name, long_name in (("alpha", LONG_101), ("beta", LONG_102)):
+        # -uno: the tree fixture plants untracked decoys inside alpha, and
+        # what this asserts is that no *tracked* path moved.
+        assert _git(tree / name, "status", "--porcelain", "-uno").stdout == ""
+        assert _subjects(tree / name) == ["fixtures"]
+        assert (tree / name / "backlog" / "tasks" / long_name).is_file()
+
+
+def test_dry_run_does_not_count_an_untracked_file_as_committable(
+    tmp_path: Path,
+) -> None:
+    repo = _make_repo(tmp_path, [LONG_101])
+    (repo / "backlog" / "tasks" / LONG_102).write_text("---\nid: task-102\n---\n")
+    bin_dir = tmp_path / "bin"
+    _write_stub(bin_dir, f'printf "%s\\n" "{STUB_OUTPUT}"')
+
+    proc = _run_script(repo, bin_dir)
+
+    assert proc.returncode == 0, proc.stderr
+    assert "over-limit=2" in proc.stdout
+    assert f"Would commit 1 rename(s) in fixture [{repo.resolve()}]" in proc.stdout
+
+
+def test_apply_commits_each_project_on_its_own(swept: tuple[Path, Path]) -> None:
+    tree, bin_dir = swept
+
+    proc = _run_script(tree, bin_dir, "--apply", path=".")
+
+    assert proc.returncode == 0, proc.stderr
+    assert "renamed=2" in proc.stdout
+    assert "projects=2 committed=2 project-errors=0" in proc.stdout
+    for name, ident, long_name in (
+        ("alpha", "101", LONG_101),
+        ("beta", "102", LONG_102),
+    ):
+        repo = tree / name
+        assert f"Committed 1 rename(s) in {name}" in proc.stdout
+        assert _subjects(repo) == [_shortened(1), "fixtures"]
+        assert _head_changes(repo) == sorted(
+            [
+                f"A\tbacklog/tasks/task-{ident} - {STUB_SLUG}.md",
+                f"D\tbacklog/tasks/{long_name}",
+            ]
+        )
+        # -uno: alpha carries the fixture's untracked decoys either way.
+        assert _git(repo, "status", "--porcelain", "-uno").stdout == ""
+    # The unversioned backlog is warned about, never touched.
+    assert (tree / "loose" / "backlog" / "tasks" / LONG_101).is_file()
+
+
+def test_a_monorepo_takes_one_commit_for_both_backlogs(tmp_path: Path) -> None:
+    repo = _make_repo(tmp_path, [LONG_101], project_name="mono")
+    _write_backlog(repo / "sub" / "backlog", [LONG_102], "mono")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "second backlog")
+    bin_dir = tmp_path / "bin"
+    _write_stub(bin_dir, f'printf "%s\\n" "{STUB_OUTPUT}"')
+
+    proc = _run_script(repo, bin_dir, "--apply", path=".")
+
+    assert proc.returncode == 0, proc.stderr
+    assert "projects=1 committed=1 project-errors=0" in proc.stdout
+    assert _subjects(repo)[0] == _shortened(2)
+    assert _head_changes(repo) == sorted(
+        [
+            f"A\tbacklog/tasks/task-101 - {STUB_SLUG}.md",
+            f"D\tbacklog/tasks/{LONG_101}",
+            f"A\tsub/backlog/tasks/task-102 - {STUB_SLUG}.md",
+            f"D\tsub/backlog/tasks/{LONG_102}",
+        ]
+    )
+
+
+def test_the_commit_leaves_a_pre_existing_staged_change_alone(
+    tmp_path: Path,
+) -> None:
+    """A sweep runs over repositories nobody has inspected first."""
+    repo = _make_repo(tmp_path, [LONG_101, SHORT_103])
+    (repo / "backlog" / "tasks" / SHORT_103).write_text(
+        "---\nid: task-103\n---\n\nEdited by the operator.\n"
+    )
+    _git(repo, "add", "--", f"backlog/tasks/{SHORT_103}")
+    bin_dir = tmp_path / "bin"
+    _write_stub(bin_dir, f'printf "%s\\n" "{STUB_OUTPUT}"')
+
+    proc = _run_script(repo, bin_dir, "--apply")
+
+    assert proc.returncode == 0, proc.stderr
+    assert _subjects(repo) == [_shortened(1), "fixtures"]
+    assert _head_changes(repo) == sorted(
+        [
+            f"A\tbacklog/tasks/task-101 - {STUB_SLUG}.md",
+            f"D\tbacklog/tasks/{LONG_101}",
+        ]
+    )
+    # The operator's edit is still staged, and still uncommitted.
+    porcelain = _git(repo, "status", "--porcelain").stdout
+    assert porcelain.startswith("M  ")
+    assert SHORT_103 in porcelain
+    assert "Edited by the operator." not in _git(repo, "show", "HEAD").stdout
+
+
+def test_an_untracked_rename_stays_out_of_the_project_commit(tmp_path: Path) -> None:
+    repo = _make_repo(tmp_path, [LONG_101])
+    (repo / "backlog" / "tasks" / LONG_102).write_text(
+        "---\nid: task-102\n---\n\nNever committed.\n"
+    )
+    bin_dir = tmp_path / "bin"
+    _write_stub(bin_dir, f'printf "%s\\n" "{STUB_OUTPUT}"')
+
+    proc = _run_script(repo, bin_dir, "--apply")
+
+    assert proc.returncode == 0, proc.stderr
+    # Two files renamed, one of them committed: the untracked one is not.
+    assert "renamed=2" in proc.stdout
+    assert "committed=1" in proc.stdout
+    assert _subjects(repo) == [_shortened(1), "fixtures"]
+    assert _head_changes(repo) == sorted(
+        [
+            f"A\tbacklog/tasks/task-101 - {STUB_SLUG}.md",
+            f"D\tbacklog/tasks/{LONG_101}",
+        ]
+    )
+    porcelain = _git(repo, "status", "--porcelain").stdout
+    assert porcelain.startswith("??")
+    assert f"task-102 - {STUB_SLUG}.md" in porcelain
+
+
+def test_a_failing_hook_blocks_the_commit_and_no_verify_bypasses_it(
+    tmp_path: Path,
+) -> None:
+    """Another project's commit guard is an answer, not an obstacle."""
+    repo = _make_repo(tmp_path, [LONG_101])
+    _install_hook(repo, 'printf "BLOCKED: not your commit\\n" >&2\nexit 1')
+    bin_dir = tmp_path / "bin"
+    _write_stub(bin_dir, f'printf "%s\\n" "{STUB_OUTPUT}"')
+
+    blocked = _run_script(repo, bin_dir, "--apply")
+
+    assert blocked.returncode == 1
+    assert "ERROR: commit failed in fixture" in blocked.stderr
+    assert "BLOCKED: not your commit" in blocked.stderr
+    assert "committed=0 project-errors=1" in blocked.stdout
+    assert _subjects(repo) == ["fixtures"]
+    # The rename happened and is staged; only the commit was refused.
+    assert "R  " in _git(repo, "status", "--porcelain").stdout
+
+    _git(repo, "reset", "--hard", "-q")
+    bypassed = _run_script(repo, bin_dir, "--apply", "--no-verify")
+
+    assert bypassed.returncode == 0, bypassed.stderr
+    assert "committed=1 project-errors=0" in bypassed.stdout
+    assert _subjects(repo) == [_shortened(1), "fixtures"]
+    assert _git(repo, "status", "--porcelain").stdout == ""
+
+
+def test_a_blocked_project_does_not_strand_the_rest_of_the_sweep(
+    swept: tuple[Path, Path],
+) -> None:
+    tree, bin_dir = swept
+    _install_hook(tree / "alpha", "exit 1")
+
+    proc = _run_script(tree, bin_dir, "--apply", path=".")
+
+    assert proc.returncode == 1
+    assert "ERROR: commit failed in alpha" in proc.stderr
+    assert "projects=2 committed=1 project-errors=1" in proc.stdout
+    assert _subjects(tree / "alpha") == ["fixtures"]
+    assert _subjects(tree / "beta") == [_shortened(1), "fixtures"]
+
+
+def test_a_rename_failure_does_not_strand_the_rest_of_the_sweep(
+    tree: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The second project is swept even when the first cannot rename at all."""
+    monkeypatch.setattr(sbf, "ask_claude", lambda *_a, **_kw: STUB_OUTPUT)
+    real_git_mv = sbf.git_mv
+
+    def _fail_in_alpha(repo_root: Path, source: Path, target: Path) -> str | None:
+        if repo_root == (tree / "alpha").resolve():
+            return "fatal: destination exists"
+        return real_git_mv(repo_root, source, target)
+
+    monkeypatch.setattr(sbf, "git_mv", _fail_in_alpha)
+
+    code = sbf.main(["--path", str(tree), "--apply"])
+
+    assert code == 1
+    # A project that only failed to rename never reaches its commit, and
+    # still has to be counted as a failed project.
+    assert "projects=2 committed=1 project-errors=1" in capsys.readouterr().out
+    assert (tree / "alpha" / "backlog" / "tasks" / LONG_101).is_file()
+    assert _subjects(tree / "alpha") == ["fixtures"]
+    assert _subjects(tree / "beta") == [_shortened(1), "fixtures"]
+
+
+def test_an_unexpected_failure_in_one_project_does_not_stop_the_sweep(
+    tree: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Anything a repository can raise is that project's problem alone."""
+    monkeypatch.setattr(sbf, "ask_claude", lambda *_a, **_kw: STUB_OUTPUT)
+    real_sweep = sbf.sweep_project
+
+    def _boom(project: sbf.Project, opts: sbf.Options, **kwargs: bool):
+        if project.name == "alpha":
+            raise OSError("Input/output error")
+        return real_sweep(project, opts, **kwargs)
+
+    monkeypatch.setattr(sbf, "sweep_project", _boom)
+
+    code = sbf.main(["--path", str(tree), "--apply"])
+
+    assert code == 1
+    assert "ERROR: alpha" in capsys.readouterr().err
+    assert _subjects(tree / "alpha") == ["fixtures"]
+    assert _subjects(tree / "beta") == [_shortened(1), "fixtures"]
+
+
+def test_a_tree_with_no_backlog_at_all_says_so(tmp_path: Path) -> None:
+    empty = tmp_path / "empty"
+    (empty / "src").mkdir(parents=True)
+    bin_dir = tmp_path / "bin"
+    _write_stub(bin_dir, "exit 1")
+
+    proc = _run_script(empty, bin_dir, path=".")
+
+    assert proc.returncode == 0
+    assert "WARNING: no backlog project found" in proc.stderr
+    assert "projects=0 committed=0 project-errors=0" in proc.stdout
