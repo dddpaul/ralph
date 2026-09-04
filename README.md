@@ -276,6 +276,7 @@ The same workflow (branch, implement, review, merge) applies in both modes.
 | `plugins/ralph/` | The `ralph` plugin (`.claude-plugin/plugin.json` manifest) — bundles all `ralph-*` skills and both agents |
 | `plugins/ralph/agents/` | Plugin-bundled agents: `task-reviewer` and `ralph-reviewer` |
 | `backlog/` | Task files managed by backlog.md CLI |
+| `scripts/shorten-backlog-filenames.py` | Repo-level remediation for backlog filenames already over the 125-byte cap (dry-run by default, `--apply` renames via `git mv`) |
 | `.devcontainer/` | DevContainer configuration with firewall for sandboxed execution |
 | `plugins/ralph/skills/ralph-init/` | Skill for bootstrapping Ralph in a new project |
 | `plugins/ralph/skills/ralph-prd/` | Skill for generating PRDs |
@@ -337,6 +338,18 @@ Every task branch is reviewed before merging. The agent spawns the `task-reviewe
 The post-commit hook appends commit hashes to task files on `task-*` branches. This creates an audit trail linking commits to tasks. Use `--append-notes` (never `--notes`) to avoid overwriting hook-generated content.
 
 A `pre-push` hook additionally guards the publish boundary: pushing `master` with a shipped skill/agent change but no version bump is blocked, so `/plugin update` always has a new version to rebuild the consumer cache from. See [Releasing plugin updates](#releasing-plugin-updates-version-bump).
+
+The `pre-commit` hook runs `.claude/hooks/filename-length-guard.sh`, which rejects any staged path whose name component exceeds 125 bytes (the ecryptfs sync target caps names at ~140 bytes and Syncthing adds 15 for its transfer name). The guard only blocks *new* names; to repair backlog files that are already over the cap, run the remediation script — it asks `claude -p` for a shorter semantic slug, keeps the `<type>-<id> - ` prefix, and leaves `title:` frontmatter alone (backlog.md addresses artifacts by `id:`, not by filename):
+
+```bash
+# Dry run: print planned old -> new for every over-limit backlog file
+uv run scripts/shorten-backlog-filenames.py
+
+# Apply the renames with git mv
+uv run scripts/shorten-backlog-filenames.py --apply
+```
+
+Rows tagged `[FALLBACK]` mean claude returned nothing usable and the existing slug was truncated instead; `[COLLISION]` means a numeric suffix was added. Flags: `--limit`, `--model`, `--path`, `--include-archive`, `--timeout`.
 
 ### AGENTS.md / CLAUDE.md Updates
 
@@ -500,10 +513,10 @@ npm run test:e2e
 
 ### Python tests (pytest)
 
-The orchestrator suite lives at `plugins/ralph/skills/ralph-run/tests/test_*.py`; test paths and `pythonpath` are configured in `pyproject.toml`. Run it with uv:
+The orchestrator suite lives at `plugins/ralph/skills/ralph-run/tests/test_*.py`, and tests for repo-level scripts live at `tests/python/test_*.py`; both test paths and `pythonpath` are configured in `pyproject.toml`. Run them with uv:
 
 ```bash
-# Run the full orchestrator suite
+# Run the full Python suite
 uv run pytest
 
 # Run a single test file
@@ -547,6 +560,10 @@ uv run pytest plugins/ralph/skills/ralph-run/tests/test_loop_exit_code.py
 - Preflight & usage checks - `test_preflight.py`, `test_usage_check.py`, `test_usage_wrapper.py`
 - Tool wrappers - `test_tool_claude.py`, `test_tool_opencode.py`, `test_tools.py`
 - Devcontainer, signals, summary, task selection, end-to-end - `test_devcontainer.py`, `test_signals.py`, `test_summary.py`, `test_tasks.py`, `test_e2e_fake_claude.py`
+
+**Python (`tests/python/`)** — also run by `uv run pytest`:
+
+- `test_shorten_backlog_filenames.py` - Tests `scripts/shorten-backlog-filenames.py` (slug normalizer, byte budget math, collision suffixing, plus CLI runs over a throwaway git repo with a stubbed `claude`)
 
 ## Customizing
 

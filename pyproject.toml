@@ -23,5 +23,5 @@ strict = ["plugins/ralph/skills/ralph-run/scripts"]
 pythonVersion = "3.14"
 
 [tool.pytest.ini_options]
-testpaths = ["plugins/ralph/skills/ralph-run/tests"]
+testpaths = ["plugins/ralph/skills/ralph-run/tests", "tests/python"]
 pythonpath = ["plugins/ralph/skills/ralph-run/scripts"]
