@@ -644,6 +644,126 @@ def test_untracked_rename_refuses_to_clobber_an_existing_target(
     assert (tasks / LONG_102).is_file()
 
 
+# `git` pretends the repository belongs to someone else, which is the state
+# that makes safe.directory load-bearing. Supported since git 2.36.
+DUBIOUS = {"GIT_TEST_ASSUME_DIFFERENT_OWNER": "1"}
+
+
+def _dubious_ownership_is_simulable(repo: Path) -> bool:
+    proc = subprocess.run(
+        ["git", "-C", str(repo), "rev-parse", "--show-toplevel"],
+        capture_output=True,
+        text=True,
+        env={**os.environ, **DUBIOUS, "LC_ALL": "C"},
+    )
+    return proc.returncode != 0 and "dubious ownership" in proc.stderr
+
+
+def test_git_repo_root_resolves_under_dubious_ownership(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """safe.directory must name the top-level, which discovery starts below."""
+    repo = _make_repo(tmp_path, [SHORT_103])
+    if not _dubious_ownership_is_simulable(repo):  # pragma: no cover
+        pytest.skip("this git does not honour GIT_TEST_ASSUME_DIFFERENT_OWNER")
+    for key, value in DUBIOUS.items():
+        monkeypatch.setenv(key, value)
+
+    # The script is pointed at backlog/, a subdirectory: trusting only that
+    # is a no-op, so the ancestor chain is what makes this resolve.
+    root, reason = sbf.git_repo_root(repo / "backlog")
+
+    assert reason == ""
+    assert root is not None and root.resolve() == repo.resolve()
+
+
+def test_apply_renames_under_dubious_ownership(tmp_path: Path) -> None:
+    """The whole --apply path, not just discovery, survives the state."""
+    repo = _make_repo(tmp_path, [LONG_101])
+    if not _dubious_ownership_is_simulable(repo):  # pragma: no cover
+        pytest.skip("this git does not honour GIT_TEST_ASSUME_DIFFERENT_OWNER")
+    bin_dir = tmp_path / "bin"
+    _write_stub(bin_dir, f'printf "%s\\n" "{STUB_OUTPUT}"')
+
+    proc = _run_script(repo, bin_dir, "--apply", **DUBIOUS)
+
+    assert proc.returncode == 0, proc.stderr
+    assert "renamed=1" in proc.stdout and "errors=0" in proc.stdout
+    assert "dubious ownership" not in proc.stderr
+    names = [p.name for p in (repo / "backlog" / "tasks").iterdir()]
+    assert names == [f"task-101 - {STUB_SLUG}.md"]
+
+
+def test_git_repo_root_reports_gits_own_reason(tmp_path: Path) -> None:
+    """Not a repository at all still has to say so, and say why."""
+    plain = tmp_path / "plain"
+    (plain / "backlog").mkdir(parents=True)
+
+    root, reason = sbf.git_repo_root(plain / "backlog")
+
+    assert root is None
+    assert "not a git repository" in reason
+
+
+def test_git_tracked_reads_only_exit_1_as_untracked(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A broken git must not be mistaken for a clean 'not in the index'."""
+    repo = _make_repo(tmp_path, [SHORT_103])
+    tracked = repo / "backlog" / "tasks" / SHORT_103
+    assert sbf.git_tracked(repo, tracked) is True
+
+    untracked = repo / "backlog" / "tasks" / "task-104 - Fresh.md"
+    untracked.write_text("---\nid: task-104\n---\n\nBody.\n")
+    assert sbf.git_tracked(repo, untracked) is False
+
+    monkeypatch.setattr(
+        sbf,
+        "run_git",
+        lambda *_a, **_kw: subprocess.CompletedProcess([], 128, "", "boom"),
+    )
+    assert sbf.git_tracked(repo, untracked) is True
+
+
+def test_plain_rename_refuses_a_dangling_symlink_target(tmp_path: Path) -> None:
+    source = tmp_path / "source.md"
+    source.write_text("keep me\n")
+    target = tmp_path / "target.md"
+    target.symlink_to(tmp_path / "gone.md")  # points at nothing
+
+    reason = sbf.plain_rename(source, target)
+
+    assert reason is not None and "already exists" in reason
+    assert source.read_text() == "keep me\n"
+    assert target.is_symlink()
+
+
+def test_plan_renames_survives_an_unnameable_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A file with no free name is skipped, not allowed to abort the run."""
+    tasks = tmp_path / "tasks"
+    tasks.mkdir()
+    doomed = tasks / LONG_101
+    survivor = tasks / LONG_102
+    for path in (doomed, survivor):
+        path.write_text("---\nid: task-0\n---\n\nBody.\n")
+    monkeypatch.setattr(sbf, "ask_claude", lambda *_a, **_kw: STUB_OUTPUT)
+    real_dedupe = sbf.dedupe_target
+
+    def _raise_for_the_first(prefix: str, *args: object) -> str:
+        if prefix == "task-101 - ":
+            raise RuntimeError("could not find a free name")
+        return real_dedupe(prefix, *args)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(sbf, "dedupe_target", _raise_for_the_first)
+
+    plans, counters = sbf.plan_renames([doomed, survivor], sbf.Options())
+
+    assert counters.over_limit == 2 and counters.skipped == 1
+    assert [plan.new_name for plan in plans] == [f"task-102 - {STUB_SLUG}.md"]
+
+
 def test_milestones_are_scanned(tmp_path: Path) -> None:
     """`backlog init` creates milestones/ and its names can clear the cap."""
     repo = _make_repo(tmp_path, [SHORT_103])

@@ -378,17 +378,25 @@ def plan_renames(files: Sequence[Path], opts: Options) -> tuple[list[Rename], Co
     return plans, counters
 
 
-def run_git(cwd: Path, *args: str) -> subprocess.CompletedProcess[str] | None:
-    """Run git in ``cwd`` with ``safe.directory`` set; ``None`` if it cannot run.
+def run_git(
+    cwd: Path, *args: str, trust: Sequence[Path] = ()
+) -> subprocess.CompletedProcess[str] | None:
+    """Run git in ``cwd``; return ``None`` when git cannot be run at all.
 
-    ``safe.directory`` must name a *resolved* path -- a relative one is a
-    silent no-op -- and the container this runs in occasionally reports
-    dubious ownership, at which point every git call fails until the
-    directory is listed. ``LC_ALL=C`` keeps the stderr we quote stable.
+    The container this runs in occasionally reports dubious ownership, at
+    which point every git call fails until the repository is listed in
+    ``safe.directory``. That entry must name the *resolved top-level*: a
+    relative path is a silent no-op, and so is a subdirectory of the
+    repository. Callers that already know the top-level get it as ``cwd``;
+    ``trust`` is for the discovery call, which does not yet. ``LC_ALL=C``
+    keeps the stderr we quote stable.
     """
+    config: list[str] = []
+    for path in trust or (cwd,):
+        config += ["-c", f"safe.directory={path}"]
     try:
         return subprocess.run(
-            ["git", "-c", f"safe.directory={cwd}", "-C", str(cwd), *args],
+            ["git", *config, "-C", str(cwd), *args],
             capture_output=True,
             text=True,
             check=False,
@@ -405,7 +413,14 @@ def git_repo_root(start: Path) -> tuple[Path | None, str]:
     misleading thing to print at a repository whose ownership git merely
     finds dubious.
     """
-    proc = run_git(start.resolve(), "rev-parse", "--show-toplevel")
+    # The top-level is what git wants trusted and is exactly what this call
+    # exists to find, so list `start` and every ancestor: the top-level is
+    # one of them. Naming ancestors of a path the user pointed us at is far
+    # narrower than `safe.directory=*`, and it is a per-invocation `-c`.
+    resolved = start.resolve()
+    proc = run_git(
+        resolved, "rev-parse", "--show-toplevel", trust=(resolved, *resolved.parents)
+    )
     if proc is None:
         return None, "git is not on PATH"
     if proc.returncode != 0:
@@ -414,12 +429,19 @@ def git_repo_root(start: Path) -> tuple[Path | None, str]:
 
 
 def git_tracked(repo_root: Path, path: Path) -> bool:
-    """Return whether ``path`` is in ``repo_root``'s index."""
+    """Return whether ``path`` is in ``repo_root``'s index.
+
+    ``ls-files --error-unmatch`` exits 1 for a path git does not track and
+    128 for a git that could not answer at all. Only the first is really
+    "untracked"; anything else is reported as tracked so the rename goes
+    through ``git mv`` and surfaces git's own error, rather than quietly
+    taking the plain-rename path under a NOTICE that is not true.
+    """
     root = repo_root.resolve()
     proc = run_git(
         root, "ls-files", "--error-unmatch", "--", str(path.resolve().relative_to(root))
     )
-    return proc is not None and proc.returncode == 0
+    return proc is None or proc.returncode != 1
 
 
 def git_mv(repo_root: Path, source: Path, target: Path) -> str | None:
@@ -444,9 +466,10 @@ def plain_rename(source: Path, target: Path) -> str | None:
 
     ``Path.rename`` overwrites silently on POSIX, so the target is checked
     first: a plan is built against a directory listing taken earlier and a
-    stale one must not cost a file.
+    stale one must not cost a file. The check is ``lexists``, because a
+    dangling symlink occupies the name just as well as a file does.
     """
-    if target.exists():
+    if os.path.lexists(target):
         return f"{target.name} already exists"
     try:
         source.rename(target)
