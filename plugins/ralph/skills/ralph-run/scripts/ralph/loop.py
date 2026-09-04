@@ -119,8 +119,10 @@ def run(args: ParsedArgs, project_root: Path) -> int:
     """
     prompt_file_body = load_prompt_file(args.prompt_file) if args.prompt_file else None
 
+    # --rebuild is scoped to this call, which is why it is a no-op unless
+    # --devcontainer is also set (TASK-237).
     if args.devcontainer:
-        rc = start_devcontainer(project_root)
+        rc = start_devcontainer(project_root, rebuild=args.rebuild)
         if rc != 0:
             return rc
 

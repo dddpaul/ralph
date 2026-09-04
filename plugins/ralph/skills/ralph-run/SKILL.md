@@ -23,12 +23,15 @@ The user may pass overrides as skill arguments. Parse them as space-separated ke
 | timeout | 60 | --timeout |
 | tasks | (none) | --tasks |
 | devcontainer | true | --devcontainer |
+| rebuild | false | --rebuild |
 | verbose | false | --verbose |
 | watch | (none) | — |
 | block_end_buffer_min | 0 | --block-end-buffer-min |
 | max_iterations | 10 | (positional, last arg) |
 
 Set `block_end_buffer_min` to N>0 to pause the run when the active 5h Anthropic usage block has <=N minutes remaining. 0 disables the check (default). Requires ccusage to be installed; preflight warns if missing.
+
+Set `rebuild=true` to force a **fresh** container instead of reusing the existing one — the orchestrator then runs `devcontainer up ... --remove-existing-container`. Needed only after editing `.devcontainer/devcontainer.json`, because mounts and other container config apply at container **creation**: a reused container silently ignores them. Off by default (a rebuild is expensive), and a no-op unless `devcontainer=true`. Image-level rebuilds for `Dockerfile` changes are not covered — run `devcontainer build --no-cache` by hand for those.
 
 The `watch` parameter enables automatic progress monitoring after launch. Accepted values:
 - `true` — normalized to `5m`
@@ -54,6 +57,7 @@ The `tasks` parameter accepts comma-separated numeric task IDs only (e.g. `62,64
 - `/ralph-run` — all defaults
 - `/ralph-run tool=opencode timeout=30 max_iterations=5`
 - `/ralph-run devcontainer=false effort=high`
+- `/ralph-run rebuild=true` — recreate the container so devcontainer.json mount changes take effect
 - `/ralph-run tasks=62` — only TASK-62
 - `/ralph-run tasks=62,64,65 max_iterations=3`
 - `/ralph-run watch=5m` — launch with automatic 5-minute progress alerts
@@ -105,6 +109,7 @@ RALPH_CMD=(<path-to-ralph.sh> --tool <tool> --model <model> --effort <effort> --
 Append conditional flags as array elements (never string concatenation):
 
 - devcontainer=true → `RALPH_CMD+=(--devcontainer)`
+- devcontainer=true **and** rebuild=true → `RALPH_CMD+=(--rebuild)` (skip it when devcontainer=false — the flag is a no-op there)
 - `tasks` is set → `RALPH_CMD+=(--tasks <ids>)`
 - `block_end_buffer_min > 0` → `RALPH_CMD+=(--block-end-buffer-min <N>)`
 

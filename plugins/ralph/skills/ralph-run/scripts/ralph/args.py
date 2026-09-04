@@ -48,6 +48,7 @@ class ParsedArgs:
     devcontainer: bool
     max_iterations: int
     push: bool = True
+    rebuild: bool = False
 
     @property
     def task_whitelist(self) -> list[str]:
@@ -91,6 +92,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--block-end-buffer-min", dest="block_end_buffer_min", type=int, default=0
     )
     parser.add_argument("--devcontainer", action="store_true", default=False)
+    # Force a FRESH container instead of reusing the existing one (TASK-237).
+    # devcontainer.json mount/config changes apply only at container CREATION,
+    # so a plain `devcontainer up` silently ignores them on a reused container.
+    # Opt-in because a rebuild is expensive; a no-op without --devcontainer.
+    parser.add_argument("--rebuild", action="store_true", default=False)
     # Push-on-complete is ENABLED BY DEFAULT (TASK-211); --no-push opts out.
     # A truthy RALPH_NO_PUSH env is the equivalent env opt-out, resolved at
     # push time by ralph.push.push_enabled (kept out of validation so the env
@@ -122,6 +128,7 @@ def parse(argv: list[str]) -> ParsedArgs:
         devcontainer=ns.devcontainer,
         max_iterations=ns.max_iterations,
         push=ns.push,
+        rebuild=ns.rebuild,
     )
 
 
