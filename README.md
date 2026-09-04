@@ -74,6 +74,8 @@ To run Ralph in the devcontainer:
 
 This starts the container automatically and executes Ralph inside the isolated environment. The firewall (`init-firewall.sh`) restricts outbound network access using iptables and validates restrictions on startup.
 
+**Host `.venv` isolation:** `workspaceMount` bind-mounts the project folder at `/workspace`, so a container-side `uv sync` would otherwise write a Linux interpreter path into the host's `.venv/pyvenv.cfg` and leave `.venv/bin/python3` dangling on the host. `devcontainer.json` mounts a named volume over that one path (`source=claude-code-project-venv-${devcontainerId},target=/workspace/.venv,type=volume`, chowned to `node` in `postCreateCommand`), so the container builds its own virtualenv and the host keeps its own. Mount changes need a **container rebuild**, not a restart; if an earlier run already clobbered the host venv, repair it once with `rm -rf .venv && uv sync` on the host.
+
 ## Workflow
 
 ### 1. Brainstorm (recommended)

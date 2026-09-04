@@ -156,6 +156,9 @@ backlog/.ralph-heartbeat
 !.claude/task-reviewer-rules.md
 !.claude/brainstorm-rules.md
 !.claude/hooks/
+
+# Python virtualenv (also the devcontainer .venv volume mountpoint)
+.venv/
 ```
 Do NOT add `backlog/` — task files should be committed.
 
@@ -194,6 +197,25 @@ Assemble the Dockerfile from base + language snippets, then write three files:
 **Graceful degradation:** when the host shell does not export the token, `${localEnv:CLAUDE_CODE_OAUTH_TOKEN}` resolves to empty string and the container starts unaffected. The existing host Keychain auth path stays intact for non-devcontainer use.
 
 **Do not** commit the token value anywhere — only the env var name and the `${localEnv:...}` substitution belong in `devcontainer.json`.
+
+**`.venv` volume overlay (keeps the container virtualenv off the host):** `workspaceMount` bind-mounts the host project folder at `/workspace`, so anything the container writes under it lands on the host. For a Python project that includes `.venv/` — `uv sync` inside the container rewrites `.venv/pyvenv.cfg` to a container-only interpreter home (`/home/node/.local/share/uv/python/cpython-<ver>-linux-<arch>-gnu/bin`) and repoints `.venv/bin/python` at it. Back on the host that symlink dangles, so `uv run ...` and the ralph-run preflight fail until the user does `rm -rf .venv && uv sync`. The template therefore mounts a named volume over that one path:
+
+```
+"source=claude-code-project-venv-${devcontainerId},target=/workspace/.venv,type=volume"
+```
+
+Same shape as the `.claude` overlay directly above it, and the same reason `postCreateCommand` chowns it — Docker creates a fresh named volume root-owned, so `sudo chown node:node /workspace/.claude /workspace/.venv` must run before `uv` writes there as `node`. The container gets its own Linux virtualenv, the host keeps its own, and neither sees the other. Nothing needs to seed the volume: `uv` builds the environment on first use, and it repairs a stale one by itself after an image rebuild (`Ignoring existing virtual environment linked to non-existent Python interpreter` → `Removed virtual environment` → recreate). For non-Python projects the overlay is inert — an empty volume, plus an empty `.venv/` mountpoint directory in the project root, which is why Step 3.4 gitignores `.venv/` for every language.
+
+To confirm the overlay is live, run this **inside the container** after a rebuild — the overlay shows up as its own filesystem nested inside the host bind mount, exactly like `/workspace/.claude` does:
+
+```bash
+awk '$5 == "/workspace" || $5 ~ /^\/workspace\// { print $5, $(NF-2) }' /proc/self/mountinfo
+# /workspace         virtiofs   <- host bind mount (Docker Desktop macOS)
+# /workspace/.claude ext4       <- .claude overlay
+# /workspace/.venv   ext4       <- .venv overlay; absent means it did not apply
+```
+
+A `mounts` change needs **Dev Containers: Rebuild Container** — a restart will not pick it up.
 
 **Host MCP gateway slot (optional):** the template also ships a neutral, service-agnostic "host MCP gateway" slot so MCP-dependent phases can run with `devcontainer=true` (sandbox isolation intact) instead of falling back to `devcontainer=false`. Inside the container `localhost` points at the container, so a gateway published on the host is unreachable by that name; the host is reachable at `host.docker.internal`, and `init-firewall.sh` already permits that container→host egress (same path as the `host.docker.internal:3128` Squid proxy). The template forwards two neutral vars — `MCP_GATEWAY_HOST` (fixed to `host.docker.internal`) and `MCP_GATEWAY_TOKEN` (a `${localEnv:MCP_GATEWAY_TOKEN}` passthrough) — and appends `host.docker.internal` to `NO_PROXY` so the MCP client connects **directly** to the host gateway instead of routing through Squid (which is not configured to reach it). Ralph ships only this reachability plumbing; the specific gateway (its port and path) stays in the project's own `.mcp.json`. Ralph never names the service. If the project has no host MCP gateway, ignore this — the vars resolve empty and nothing else changes. Tell the user:
 
@@ -589,6 +611,17 @@ For each file the user approved:
 **Missing files**: create from template using the same logic as the init flow (copy template, `chmod +x` where applicable).
 
 The Ralph-owned `.devcontainer/devcontainer.json` carries the host MCP gateway slot (`MCP_GATEWAY_HOST` / `MCP_GATEWAY_TOKEN` + the widened `NO_PROXY`), so it upgrades through the normal U2/U4 sync above like any other managed file — no special handling. The per-consumer `.mcp.json` is handled separately in U4.5.
+
+The same file also carries the `.venv` volume overlay (see the Init "`.venv` volume overlay" note) and syncs the same way — but a `mounts` / `postCreateCommand` change only takes effect when the container is **recreated**, not on restart. So whenever U4 rewrites `.devcontainer/devcontainer.json`, add this to the U5 summary:
+
+```
+.devcontainer/devcontainer.json changed — run "Dev Containers: Rebuild Container"
+(a restart will not pick up mount changes). If your host .venv was already
+clobbered by an earlier container run, repair it once on the host with:
+  rm -rf .venv && uv sync
+```
+
+In the same case — and only then, since a project without `.devcontainer/` never gets the mountpoint — append `.venv/` to `.gitignore` if absent: the overlay creates an empty `.venv/` directory in the project root even for non-Python projects. `.gitignore` is skipped by the U2 status table (append-only, never diffed), so this step is the one place the entry gets added on upgrade; when it fires, label the file `skipped (append-only; .venv/ appended)` in the U5 summary instead of the plain `skipped (append-only)`.
 
 ---
 
