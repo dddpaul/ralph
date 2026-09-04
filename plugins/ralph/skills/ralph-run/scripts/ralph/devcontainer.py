@@ -18,13 +18,22 @@ from typing import TextIO
 def start_devcontainer(
     workspace_folder: Path,
     *,
+    rebuild: bool = False,
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
 ) -> int:
     """Run ``devcontainer up --workspace-folder <workspace_folder>`` once.
 
+    A bare ``up`` REUSES any existing container, and ``devcontainer.json``
+    mount/config changes take effect only at container CREATION — so a
+    reused container silently ignores them (TASK-237). ``rebuild=True``
+    appends ``--remove-existing-container`` to force a fresh one.
+
     Args:
         workspace_folder: Path passed verbatim to ``--workspace-folder``.
+        rebuild: When ``True``, discard any existing container first so
+            ``devcontainer.json`` mount changes apply. Off by default —
+            a rebuild is expensive, so normal runs keep reusing.
         stdout: Stream for status messages. Defaults to ``sys.stdout``.
         stderr: Stream for error messages. Defaults to ``sys.stderr``.
 
@@ -43,9 +52,14 @@ def start_devcontainer(
         )
         return 1
 
-    print("Starting devcontainer...", file=out)
+    argv = ["devcontainer", "up", "--workspace-folder", str(workspace_folder)]
+    if rebuild:
+        argv.append("--remove-existing-container")
+        print("Rebuilding devcontainer (removing existing container)...", file=out)
+    else:
+        print("Starting devcontainer...", file=out)
     result = subprocess.run(  # noqa: S603 — argv list, no shell.
-        ["devcontainer", "up", "--workspace-folder", str(workspace_folder)],
+        argv,
         check=False,
         capture_output=True,
         text=True,

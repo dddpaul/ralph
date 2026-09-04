@@ -74,7 +74,7 @@ To run Ralph in the devcontainer:
 
 This starts the container automatically and executes Ralph inside the isolated environment. The firewall (`init-firewall.sh`) restricts outbound network access using iptables and validates restrictions on startup.
 
-**Host `.venv` isolation:** `workspaceMount` bind-mounts the project folder at `/workspace`, so a container-side `uv sync` would otherwise write a Linux interpreter path into the host's `.venv/pyvenv.cfg` and leave `.venv/bin/python3` dangling on the host. `devcontainer.json` mounts a named volume over that one path (`source=claude-code-project-venv-${devcontainerId},target=/workspace/.venv,type=volume`, chowned to `node` in `postCreateCommand`), so the container builds its own virtualenv and the host keeps its own. Mount changes need a **container rebuild**, not a restart; if an earlier run already clobbered the host venv, repair it once with `rm -rf .venv && uv sync` on the host.
+**Host `.venv` isolation:** `workspaceMount` bind-mounts the project folder at `/workspace`, so a container-side `uv sync` would otherwise write a Linux interpreter path into the host's `.venv/pyvenv.cfg` and leave `.venv/bin/python3` dangling on the host. `devcontainer.json` mounts a named volume over that one path (`source=claude-code-project-venv-${devcontainerId},target=/workspace/.venv,type=volume`, chowned to `node` in `postCreateCommand`), so the container builds its own virtualenv and the host keeps its own. Mount changes need a **container rebuild**, not a restart — pass `--rebuild` alongside `--devcontainer` (or `/ralph-run rebuild=true`) to recreate the container; if an earlier run already clobbered the host venv, repair it once with `rm -rf .venv && uv sync` on the host.
 
 ## Workflow
 
@@ -154,6 +154,7 @@ Default is 10 iterations. Use `--tool claude` (default) or `--tool opencode` to 
 | `--prompt-file <path>` | File to load prompt template from | (none) |
 | `--tasks <ids>` | Comma-separated numeric task IDs to run (e.g. `62,64,65`). Mutually exclusive with `--prompt-file` | (none) |
 | `--devcontainer` | Run inside a devcontainer | off |
+| `--rebuild` | With `--devcontainer`, recreate the container from scratch (`devcontainer up --remove-existing-container`) so `devcontainer.json` mount/config changes take effect. No-op without `--devcontainer` | off |
 | `--no-push` | Opt out of pushing `master` to `origin` after the loop finishes (see [Publishing to origin](#publishing-to-origin)) | push on |
 | `--help` | Show help message and exit | |
 | `--version` | Show version and exit | |
@@ -568,7 +569,7 @@ uv run pytest plugins/ralph/skills/ralph-run/tests/test_loop_exit_code.py
 - Heartbeat & status file - `test_heartbeat.py`, `test_wait_heartbeat.py`, `test_status.py`
 - Preflight & usage checks - `test_preflight.py`, `test_usage_check.py`, `test_usage_wrapper.py`
 - Tool wrappers - `test_tool_claude.py`, `test_tool_opencode.py`, `test_tools.py`
-- Devcontainer, signals, summary, task selection, end-to-end - `test_devcontainer.py`, `test_signals.py`, `test_summary.py`, `test_tasks.py`, `test_e2e_fake_claude.py`
+- Devcontainer, signals, summary, task selection, end-to-end - `test_devcontainer.py`, `test_devcontainer_rebuild.py`, `test_signals.py`, `test_summary.py`, `test_tasks.py`, `test_e2e_fake_claude.py`
 
 **Python (`tests/python/`)** — also run by `uv run pytest`:
 
