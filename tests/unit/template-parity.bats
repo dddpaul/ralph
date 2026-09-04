@@ -107,19 +107,15 @@ in_registry() {
 #      lives only under .claude/ and is NOT mirrored to ralph-init templates.
 #   2. TMPL  step 6 — CARVE-OUT. The generic merge step a bootstrapped project
 #      gets instead of (1).
-#   3. LIVE  backlog-CLI line — DRIFT:TASK-229. task-112 added the ralph-task /
-#      ralph-prd -> ralph-backlog references to the live file only. Pinned here
-#      so the guard can land; TASK-229 mirrors it and drops entries 3 and 4.
-#   4. TMPL  backlog-CLI line — DRIFT:TASK-229. The pre-112 sentence.
 #
-# An entry that no longer matches a real deviation is a failure, not dead
-# weight: fixing a pinned DRIFT row must also delete it from this list.
+# Both remaining entries are carve-outs; there is no pinned DRIFT left. An
+# entry that no longer matches a real deviation is a failure, not dead weight,
+# so pinning future drift here obliges whoever fixes it to delete the row too
+# (TASK-229 removed the backlog-CLI pair that way).
 claude_md_allowed_deviations() {
   cat <<'ROWS'
 6. **Merge:** (a) on the task branch, run `.claude/hooks/bump-version.sh --auto` — it auto-bumps the plugin version (both manifests) and commits **iff** a shipped `plugins/ralph/**` file changed in `master..HEAD`, else no-ops (so the pre-push `version-bump-guard.sh` passes without a human); (b) commit the task file; (c) `git checkout master && git merge --no-ff <branch>`; (d) on master, run `.claude/hooks/bump-version.sh --tag` — it annotates the merge commit `vX.Y.Z` for the current version (no-op if the tag exists) so the tag rides the next push via `push.followTags`; (e) `git branch -d <branch>`. (Steps (a)/(d) are repo-specific plugin-marketplace governance — the helper lives only under `.claude/`; NOT mirrored to `ralph-init` templates.)
 6. **Merge:** commit task file, `git checkout master && git merge <branch> && git branch -d <branch>`.
-Use `backlog` CLI for all task operations; run `backlog task edit --help` for syntax. For one-off / ad-hoc task creation and judgment-bearing edits (split / add as AC / rework vague AC), use the `ralph-task` skill ("create a task" / "add a task" / "should I split this"). For PRD-driven feature decomposition, use `ralph-prd` then `ralph-backlog`.
-Use `backlog` CLI for all task operations; run `backlog task edit --help` for syntax.
 ROWS
 }
 
