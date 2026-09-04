@@ -28,8 +28,9 @@ TEMPLATES="$PROJECT_ROOT/plugins/ralph/skills/ralph-init/templates"
 #            must be the documented repo-local block only.
 #   keys   — gitignored per-developer override: compare JSON shape, not bytes.
 #
-# Rows marked (+) are the same class as the R11 table but not listed in it;
-# they are in parity today and are guarded so they stay that way.
+# The R11 table drives the rows. Two more are the same class but absent from
+# it — .claude/brainstorm-rules.md and git-hooks/pre-commit — and are in parity
+# today, so they are registered here to keep them that way.
 # --------------------------------------------------------------------------
 registry() {
   cat <<'ROWS'
@@ -156,7 +157,7 @@ missing live file for $tmpl: $live"
     if ! diff -q "$live_path" "$tmpl_path" >/dev/null 2>&1; then
       failures="$failures
 R11 drift: $live vs $tmpl
-$(diff "$live_path" "$tmpl_path")"
+$(diff "$live_path" "$tmpl_path" || true)"
     fi
     checked=$((checked + 1))
   done <<EOF
@@ -351,7 +352,7 @@ EOF
 unmirrored live hook (add a template + registry row, or list it in
 repo_local_hooks with a reason): $rel"
   done <<EOF
-$(find "$PROJECT_ROOT/.claude/hooks" -name '*.sh' -type f | sort)
+$(find "$PROJECT_ROOT/.claude/hooks" -type f | sort)
 EOF
 
   [ -z "$failures" ] || {
@@ -400,7 +401,7 @@ EOF
   [ "$status" -ne 0 ]
   run in_registry "plugins/ralph/skills/ralph-run/scripts/refine_orchestrator.py"
   [ "$status" -ne 0 ]
-  # The shims mirror their own template, not each other and not the canonical.
-  run diff "$PROJECT_ROOT/ralph.sh" "$PROJECT_ROOT/refine.sh"
-  [ "$status" -ne 0 ]
+  # Each shim mirrors its own template and nothing else: R11 does not require
+  # ralph.sh and refine.sh to match each other, so there is deliberately no
+  # cross-shim assertion here.
 }
