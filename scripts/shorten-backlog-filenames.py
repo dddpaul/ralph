@@ -563,10 +563,12 @@ def git_commit(
 ) -> str | None:
     """Commit exactly ``paths`` in ``repo_root``; return the reason on failure.
 
-    Pathspec form, so the commit carries the renames and nothing else: a
+    Pathspec form, so no path outside ``paths`` can reach the commit: a
     sweep runs unattended over repositories whose working state nobody has
     inspected, and staged-but-unrelated work must not be swept into a
-    housekeeping commit. It lands on whatever branch is checked out.
+    housekeeping commit. The scope is per path, not per hunk -- an
+    uncommitted edit to a file that is itself being renamed rides along.
+    The commit lands on whatever branch is checked out.
 
     Hooks run unless ``no_verify``: another project's commit-prefix guard
     rejecting this message is a real answer, not a bug to route around.

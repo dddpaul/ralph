@@ -1291,7 +1291,7 @@ def test_a_blocked_project_does_not_strand_the_rest_of_the_sweep(
 
 
 def test_a_rename_failure_does_not_strand_the_rest_of_the_sweep(
-    tree: Path, monkeypatch: pytest.MonkeyPatch
+    tree: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """The second project is swept even when the first cannot rename at all."""
     monkeypatch.setattr(sbf, "ask_claude", lambda *_a, **_kw: STUB_OUTPUT)
@@ -1307,6 +1307,9 @@ def test_a_rename_failure_does_not_strand_the_rest_of_the_sweep(
     code = sbf.main(["--path", str(tree), "--apply"])
 
     assert code == 1
+    # A project that only failed to rename never reaches its commit, and
+    # still has to be counted as a failed project.
+    assert "projects=2 committed=1 project-errors=1" in capsys.readouterr().out
     assert (tree / "alpha" / "backlog" / "tasks" / LONG_101).is_file()
     assert _subjects(tree / "alpha") == ["fixtures"]
     assert _subjects(tree / "beta") == [_shortened(1), "fixtures"]
