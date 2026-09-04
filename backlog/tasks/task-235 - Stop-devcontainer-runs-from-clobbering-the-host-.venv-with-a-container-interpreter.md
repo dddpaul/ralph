@@ -3,10 +3,10 @@ id: TASK-235
 title: >-
   Stop devcontainer runs from clobbering the host .venv with a container
   interpreter
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-04 13:46'
-updated_date: '2026-09-04 14:00'
+updated_date: '2026-09-04 14:12'
 labels: []
 dependencies: []
 priority: medium
@@ -53,4 +53,16 @@ Host-side confirmation, once the user rebuilds ('Dev Containers: Rebuild Contain
 One-time host repair is still required before the first post-fix run: the host .venv is already clobbered (this run clobbered it again), so run 'rm -rf .venv && uv sync' on the host ONCE. That is documented in README.md and in the ralph-init Upgrade note, not left as folklore.
 
 Commit: `5270ebb` - task-235: keep the container virtualenv off the host bind mount
+
+Commit: `e103412` - task-235: reconcile the gitignore append with the upgrade status labels
+
+Done. task-reviewer verdict: APPROVED (R1-R16 applied; it independently re-ran all four suites and mutation-tested tests/unit/devcontainer-venv-overlay.bats against master's devcontainer.json — tests 2-6 fail there, so the fix-pinning assertions are live, not vacuous). Its one substantive non-blocking note is addressed in commit e103412: the U4 '.venv/ gitignore append' sentence now states the condition (only when .devcontainer/ is present) and names the U5 label it produces, 'skipped (append-only; .venv/ appended)'. The U2/U5 samples were left alone deliberately — both show '.devcontainer/devcontainer.json  skipped (no .devcontainer/)', so in those samples no append happens and the plain 'skipped (append-only)' label is the correct one; rewriting them as the note suggested verbatim would have made the samples say something false.
+
+Final gate: uv run pytest 468 passed | uv run ruff check . clean | LC_ALL=C bats tests/unit 115 ok | LC_ALL=C bats tests/integration tests/e2e 58 ok (LC_ALL=C is required — a setlocale warning otherwise leaks into bats $output and fails 3 unrelated tests). Baseline before any edit was 468 / clean / 107 / 58, so the only test-count delta is the 8 new overlay tests.
+
+AC #1 and #2 remain unchecked; see the preceding note for why (host-side observation, impossible from inside the container) and for the exact host commands that close them on the user's next rebuild. Everything those two ACs depend on is shipped.
+
+DEFERRED (R2, explicit): AC #1 and AC #2. Reason — both require observing the macOS host filesystem after a devcontainer rebuild, which is unreachable from inside the container this task ran in (no docker CLI, no docker socket, no devcontainer CLI, no host FS). Follow-up plan — no new backlog task is warranted: the code change that satisfies them is already merged, and the observation closes itself on the user's next 'Dev Containers: Rebuild Container' via the three commands listed above (mountinfo probe inside the container; 'grep ^home .venv/pyvenv.cfg' and 'uv run python -V' on the host). If that probe does NOT show '/workspace/.venv ext4' after a rebuild, reopen this task — that is the single signal that the overlay did not apply.
+
+Commit: `a7741fd` - task-235: bump plugin version to 0.4.2 (patch)
 <!-- SECTION:NOTES:END -->
