@@ -44,7 +44,13 @@
     // postCreateCommand copies host files into the volume and patches sandbox.enabled=false.
     // bwrap can't create mount namespaces on Docker Desktop macOS, so sandbox must be off.
     "source=claude-code-project-config-${devcontainerId},target=/workspace/.claude,type=volume",
-    "source=${localWorkspaceFolder}/.claude,target=/workspace-host-claude,type=bind,ro"
+    "source=${localWorkspaceFolder}/.claude,target=/workspace-host-claude,type=bind,ro",
+    // Volume overlay for .venv: keeps the container's Linux virtualenv off the
+    // host bind mount. Without it, `uv sync` in the container writes a
+    // container-only interpreter path into the host's .venv/pyvenv.cfg, leaving
+    // .venv/bin/python3 a broken symlink on the host until `rm -rf .venv`.
+    // postCreateCommand chowns it — a fresh named volume mounts in root-owned.
+    "source=claude-code-project-venv-${devcontainerId},target=/workspace/.venv,type=volume"
   ],
   "containerEnv": {
     "CLAUDE_CODE_OAUTH_TOKEN": "${localEnv:CLAUDE_CODE_OAUTH_TOKEN}",
@@ -60,7 +66,7 @@
   },
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
   "workspaceFolder": "/workspace",
-  "postCreateCommand": "sudo chown node:node /workspace/.claude && cp -a /workspace-host-claude/. /workspace/.claude/ && jq '.sandbox.enabled = false' /workspace/.claude/settings.local.json > /tmp/s.json && mv /tmp/s.json /workspace/.claude/settings.local.json",
+  "postCreateCommand": "sudo chown node:node /workspace/.claude /workspace/.venv && cp -a /workspace-host-claude/. /workspace/.claude/ && jq '.sandbox.enabled = false' /workspace/.claude/settings.local.json > /tmp/s.json && mv /tmp/s.json /workspace/.claude/settings.local.json",
   "postStartCommand": "sudo /usr/local/bin/init-firewall.sh",
   "forwardPorts": [3000],
   "portsAttributes": {
