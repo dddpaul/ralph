@@ -4,6 +4,7 @@ title: Cover the second rot shape in non_mirrored_templates
 status: To Do
 assignee: []
 created_date: '2026-09-04 11:23'
+updated_date: '2026-09-04 13:34'
 labels: []
 dependencies:
   - TASK-230
@@ -42,3 +43,9 @@ Prefer (1) if (2) cannot be made to pass cleanly on today's six entries without 
 - [ ] #3 If the live-counterpart probe (option 2) is implemented, it passes on all six current entries with no new exemption list; if it is not, the task notes state why it was rejected
 - [ ] #4 Full suite stays green: LC_ALL=C node_modules/.bin/bats tests/unit tests/integration tests/e2e reports 0 failures
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Won't do: closed as diminishing-returns tail of the 227-235 review chain. The ecryptfs filename problem is fully solved by TASK-227 (prevention) + TASK-231 (remediation); this task is edge-of-edge test/normalizer coverage with no real-world impact. Archived rather than implemented.
+<!-- SECTION:NOTES:END -->

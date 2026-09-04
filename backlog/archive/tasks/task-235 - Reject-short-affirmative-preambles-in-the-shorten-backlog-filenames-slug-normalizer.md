@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-04 13:21'
+updated_date: '2026-09-04 13:34'
 labels:
   - 'feature:shorten-backlog-filenames'
 dependencies:
@@ -46,3 +47,9 @@ The natural fix is to extend `REFUSAL_OPENERS` into a broader opener stop-list (
 - [ ] #5 An integration test drives a stub claude that only ever answers with an affirmative preamble and asserts the [FALLBACK] marker plus the truncated original slug in the filename
 - [ ] #6 uv run pytest and uv run ruff check . both pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Won't do: closed as diminishing-returns tail of the 227-235 review chain. The ecryptfs filename problem is fully solved by TASK-227 (prevention) + TASK-231 (remediation); this task is edge-of-edge test/normalizer coverage with no real-world impact. Archived rather than implemented.
+<!-- SECTION:NOTES:END -->
