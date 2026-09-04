@@ -57,6 +57,11 @@ ROWS
 
 # Template files that are deliberately NOT mirrors of a live file. Entries
 # ending in "/" match a whole subtree.
+#
+# Consulted only as a "is this path justified?" lookup, so an entry naming a
+# template that was since deleted or renamed would never be exercised. The
+# stale-entry test below closes that: every entry must still match something
+# on disk, so a blanket exemption cannot accumulate (TASK-230).
 non_mirrored_templates() {
   cat <<'ROWS'
 claude/task-reviewer-rules.docs.md
@@ -70,6 +75,10 @@ ROWS
 
 # Live hooks with no template counterpart by design: plugin-marketplace
 # governance that exists only in this repo (CLAUDE.md step 6 says so).
+#
+# Same lookup-only shape as non_mirrored_templates, and the same stale-entry
+# test below: a removed hook must lose its exemption rather than keep it
+# forever (TASK-230).
 repo_local_hooks() {
   cat <<'ROWS'
 .claude/hooks/bump-version.sh
@@ -335,6 +344,78 @@ EOF
     return 1
   }
   [ "$seen" -ge 20 ]
+}
+
+@test "R11: every non_mirrored_templates entry still matches a template path" {
+  # The closure test above only ever asks "is this path justified?", so an
+  # entry whose template was deleted or renamed is never exercised and never
+  # reported. Walk the list from the other side instead: an exemption that
+  # matches nothing on disk is dead weight and must be deleted.
+  rels=""
+  while IFS= read -r tmpl_path; do
+    rels="$rels${tmpl_path#$TEMPLATES/}
+"
+  done <<EOF
+$(find "$TEMPLATES" -type f | sort)
+EOF
+
+  failures=""
+  checked=0
+  while IFS= read -r entry; do
+    [ -n "$entry" ] || continue
+    checked=$((checked + 1))
+    matched=""
+    while IFS= read -r rel; do
+      [ -n "$rel" ] || continue
+      case "$entry" in
+        */) case "$rel" in "$entry"*) matched=yes ;; esac ;;
+        *) case "$rel" in "$entry") matched=yes ;; esac ;;
+      esac
+    done <<EOF
+$rels
+EOF
+    [ -n "$matched" ] || failures="$failures
+stale non_mirrored_templates entry (nothing under templates/ matches it,
+delete it): $entry"
+  done <<EOF
+$(non_mirrored_templates)
+EOF
+
+  [ -z "$failures" ] || {
+    echo "$failures"
+    return 1
+  }
+  # Anti-vacuity: the guard means nothing over an empty list.
+  [ "$checked" -ge 3 ]
+}
+
+@test "R11: every repo_local_hooks entry still names a live hook" {
+  failures=""
+  checked=0
+  while IFS= read -r entry; do
+    [ -n "$entry" ] || continue
+    checked=$((checked + 1))
+    case "$entry" in
+      .claude/hooks/*) ;;
+      *)
+        failures="$failures
+repo_local_hooks entry is not a .claude/hooks path (the list exempts hooks
+only): $entry"
+        continue
+        ;;
+    esac
+    [ -f "$PROJECT_ROOT/$entry" ] || failures="$failures
+stale repo_local_hooks entry (the hook is gone, delete it): $entry"
+  done <<EOF
+$(repo_local_hooks)
+EOF
+
+  [ -z "$failures" ] || {
+    echo "$failures"
+    return 1
+  }
+  # Anti-vacuity: the guard means nothing over an empty list.
+  [ "$checked" -ge 2 ]
 }
 
 @test "R11: every live .claude hook is mirrored or an explicit repo-local hook" {
