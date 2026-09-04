@@ -21,10 +21,17 @@ file is never left over the limit.
 Dry-run by default; ``--apply`` performs the renames with ``git mv``, or
 with a plain rename for a file git does not track yet.
 
+``--path`` names a tree to sweep, not necessarily one backlog: every backlog
+root under it is discovered, grouped by the git repository that owns it, and
+each project is renamed and then committed on its own before the next one is
+touched. A single backlog root is the degenerate one-project case, so
+``--path backlog`` keeps behaving as it always has.
+
 Usage::
 
-    uv run scripts/shorten-backlog-filenames.py            # dry run
+    uv run scripts/shorten-backlog-filenames.py            # dry run, this repo
     uv run scripts/shorten-backlog-filenames.py --apply
+    uv run scripts/shorten-backlog-filenames.py --path ~/projects --apply
 """
 
 from __future__ import annotations
@@ -34,8 +41,8 @@ import os
 import re
 import subprocess
 import sys
-from collections.abc import Collection, Sequence
-from dataclasses import dataclass, field
+from collections.abc import Collection, Iterable, Sequence
+from dataclasses import dataclass, field, fields
 from pathlib import Path
 
 # Byte cap shared with filename-length-guard.sh. Keep the two in sync: this
@@ -51,6 +58,24 @@ DEFAULT_PATH = "backlog"
 # --include-archive; their walk recurses, so archived milestones come along.
 SCAN_SUBDIRS = ("tasks", "docs", "decisions", "drafts", "milestones")
 ARCHIVE_SUBDIRS = ("archive", "completed")
+
+# `backlog init` always writes config.yml, but a config.yml on its own says
+# nothing -- plenty of tools ship one. Requiring an artifact directory next to
+# it is the second signal that makes the pair mean "a backlog lives here".
+BACKLOG_CONFIG = "config.yml"
+# Directories a sweep must not walk into: vendored trees and build output can
+# hold a config.yml + tasks/ pair that belongs to nobody, and .git is large
+# and never interesting.
+PRUNE_DIRS = frozenset(
+    {".git", "node_modules", ".venv", "__pycache__", ".pytest_cache", "dist", "build"}
+)
+PROJECT_NAME_RE = re.compile(r"^project_name:[ \t]*(?P<name>.+?)[ \t]*$", re.MULTILINE)
+
+# Housekeeping commit; the count is the only variable part, so no model is
+# consulted for it.
+COMMIT_MESSAGE = (
+    "chore(backlog): shorten {count} over-limit filename(s) for ecryptfs sync"
+)
 
 CLAUDE_TIMEOUT_S = 60.0
 CONTENT_CAP = 2500
@@ -350,7 +375,7 @@ class Rename:
 
 @dataclass
 class Counters:
-    """End-of-run tallies."""
+    """File tallies, kept per project and folded into the run total."""
 
     scanned: int = 0
     over_limit: int = 0
@@ -359,6 +384,34 @@ class Counters:
     collisions: int = 0
     skipped: int = 0
     errors: int = 0
+
+    def merge(self, other: Counters) -> None:
+        """Add ``other``'s tallies to this one.
+
+        Field-driven rather than written out, so a counter added later is
+        summed across projects without anyone having to remember to.
+        """
+        for spec in fields(self):
+            total = getattr(self, spec.name) + getattr(other, spec.name)
+            setattr(self, spec.name, total)
+
+
+@dataclass
+class SweepTally:
+    """Project tallies for the run: how many were seen, committed, failed."""
+
+    projects: int = 0
+    committed: int = 0
+    errors: int = 0
+
+
+@dataclass
+class ProjectResult:
+    """What one project's pass produced."""
+
+    counters: Counters
+    committed: bool = False
+    failed: bool = False
 
 
 def collect_files(root: Path, include_archive: bool) -> list[Path]:
@@ -505,6 +558,33 @@ def git_mv(repo_root: Path, source: Path, target: Path) -> str | None:
     return None
 
 
+def git_commit(
+    repo_root: Path, paths: Iterable[Path], message: str, no_verify: bool
+) -> str | None:
+    """Commit exactly ``paths`` in ``repo_root``; return the reason on failure.
+
+    Pathspec form, so the commit carries the renames and nothing else: a
+    sweep runs unattended over repositories whose working state nobody has
+    inspected, and staged-but-unrelated work must not be swept into a
+    housekeeping commit. It lands on whatever branch is checked out.
+
+    Hooks run unless ``no_verify``: another project's commit-prefix guard
+    rejecting this message is a real answer, not a bug to route around.
+    """
+    root = repo_root.resolve()
+    pathspecs = [str(path.resolve().relative_to(root)) for path in paths]
+    options = ["--no-verify"] if no_verify else []
+    proc = run_git(root, "commit", *options, "-m", message, "--", *pathspecs)
+    if proc is None:
+        return "git is not on PATH"
+    if proc.returncode != 0:
+        # A blocking hook writes to stdout as often as to stderr, and its
+        # message is the whole reason the commit did not happen.
+        detail = proc.stderr.strip() or proc.stdout.strip()
+        return detail or f"git-commit exited {proc.returncode}"
+    return None
+
+
 def plain_rename(source: Path, target: Path) -> str | None:
     """Rename an untracked file; return the reason on failure.
 
@@ -522,6 +602,96 @@ def plain_rename(source: Path, target: Path) -> str | None:
     return None
 
 
+@dataclass
+class Project:
+    """One git repository and the backlog roots the sweep found inside it."""
+
+    repo_root: Path
+    name: str
+    backlog_roots: list[Path] = field(default_factory=list)
+
+
+def is_backlog_root(path: Path) -> bool:
+    """Return whether ``path`` looks like a backlog root.
+
+    Two signals, both required: the ``config.yml`` every ``backlog init``
+    writes, and at least one of the artifact directories it creates. Either
+    alone is common enough elsewhere to produce false positives.
+    """
+    return (path / BACKLOG_CONFIG).is_file() and any(
+        (path / sub).is_dir() for sub in SCAN_SUBDIRS
+    )
+
+
+def find_backlog_roots(root: Path) -> list[Path]:
+    """Return every backlog root at or under ``root``, in a stable order.
+
+    The walk does not descend into a root it has found: a backlog holds
+    artifacts, not further projects, and its archive/ carries the same
+    directory names a nested project would.
+    """
+    found: list[Path] = []
+    for dirpath, dirnames, _filenames in os.walk(root):
+        current = Path(dirpath)
+        if is_backlog_root(current):
+            found.append(current)
+            dirnames.clear()
+            continue
+        # Sorted so two runs over one tree report the projects in one order.
+        dirnames[:] = sorted(name for name in dirnames if name not in PRUNE_DIRS)
+    return found
+
+
+def read_project_name(backlog_root: Path, default: str) -> str:
+    """Return ``project_name`` from ``backlog_root``'s config.yml.
+
+    Read with a regex rather than a YAML parser to keep the script on the
+    standard library, which is what lets it run under ``uv run`` with no
+    dependency resolution at all. A missing or unreadable key falls back to
+    ``default``.
+    """
+    try:
+        text = (backlog_root / BACKLOG_CONFIG).read_text(
+            encoding="utf-8", errors="replace"
+        )
+    except OSError:
+        return default
+    match = PROJECT_NAME_RE.search(text)
+    if match is None:
+        return default
+    return match["name"].strip("'\"") or default
+
+
+def discover_projects(root: Path) -> list[Project]:
+    """Return the committable projects under ``root``, one per git repository.
+
+    Backlog roots are grouped by the repository that owns them, so a
+    monorepo holding several backlogs is one project and takes one commit.
+    A root in no repository has nothing to commit to and is dropped with a
+    warning rather than renamed without version control.
+    """
+    projects: dict[Path, Project] = {}
+    for backlog_root in find_backlog_roots(root):
+        repo_root, reason = git_repo_root(backlog_root)
+        if repo_root is None:
+            warn(
+                f"WARNING: skipping {backlog_root}: "
+                f"not in a git repository ({reason})"
+            )
+            continue
+        key = repo_root.resolve()
+        project = projects.get(key)
+        if project is None:
+            # Named after the first root found in the repository; a second
+            # backlog in the same repository is part of that same project.
+            project = Project(
+                repo_root=key, name=read_project_name(backlog_root, key.name)
+            )
+            projects[key] = project
+        project.backlog_roots.append(backlog_root)
+    return list(projects.values())
+
+
 def report(plan: Rename) -> None:
     """Print the ``old -> new`` row for one planned rename."""
     old_bytes = basename_bytes(plan.path.name)
@@ -530,17 +700,17 @@ def report(plan: Rename) -> None:
     print(f"  -> {plan.new_name}  ({new_bytes} bytes)  [{plan.label}]")
 
 
-def apply_renames(plans: Sequence[Rename], root: Path, counters: Counters) -> None:
-    """Perform every planned rename, reporting failures.
+def apply_renames(
+    plans: Sequence[Rename], repo_root: Path, counters: Counters
+) -> list[Rename]:
+    """Perform every planned rename; return the ones git has staged.
 
     Tracked files move with ``git mv`` so the rename lands staged; untracked
-    ones fall back to a plain rename.
+    ones fall back to a plain rename. Only the staged ones come back, because
+    only they can be committed -- adding a file the repository has never seen
+    is a larger step than renaming one, and not one to take unattended.
     """
-    repo_root, reason = git_repo_root(root)
-    if repo_root is None:
-        warn(f"ERROR: cannot resolve the git repository for {root}: {reason}")
-        counters.errors += len(plans)
-        return
+    staged: list[Rename] = []
     for plan in plans:
         # `git mv` refuses a file it does not track, which is exactly how an
         # over-limit file arrives: the pre-commit guard rejects the commit
@@ -557,20 +727,74 @@ def apply_renames(plans: Sequence[Rename], root: Path, counters: Counters) -> No
             warn(f"ERROR: {verb} failed for {plan.path}: {error}")
             continue
         counters.renamed += 1
-        if not tracked:
+        if tracked:
+            staged.append(plan)
+        else:
             warn(
                 f"NOTICE: {plan.path} is untracked; renamed to {plan.new_name} "
                 "without git. Run `git add` to stage it."
             )
+    return staged
 
 
-def print_summary(counters: Counters, apply: bool) -> None:
-    """Print the end-of-run tally."""
+def sweep_project(
+    project: Project,
+    opts: Options,
+    *,
+    apply: bool,
+    include_archive: bool,
+    no_verify: bool,
+) -> ProjectResult:
+    """Plan, rename and commit one project, reporting what it did.
+
+    A failure here is the project's own: it is reported and returned, never
+    raised, so one blocked repository cannot strand the rest of the sweep.
+    """
+    print(f"== {project.name} [{project.repo_root}] ==")
+    print(f"   backlog: {', '.join(str(root) for root in project.backlog_roots)}")
+    files: list[Path] = []
+    for backlog_root in project.backlog_roots:
+        files.extend(collect_files(backlog_root, include_archive=include_archive))
+    plans, counters = plan_renames(files, opts)
+    for plan in plans:
+        report(plan)
+    if not apply:
+        # Count what would actually be committed, not what would be renamed:
+        # an untracked file is renamed but never joins the commit.
+        pending = sum(1 for plan in plans if git_tracked(project.repo_root, plan.path))
+        print(
+            f"Would commit {pending} rename(s) in "
+            f"{project.name} [{project.repo_root}]"
+        )
+        return ProjectResult(counters=counters)
+    staged = apply_renames(plans, project.repo_root, counters)
+    result = ProjectResult(counters=counters, failed=counters.errors > 0)
+    if not staged:
+        return result
+    paths = [path for plan in staged for path in (plan.path, plan.target)]
+    error = git_commit(
+        project.repo_root,
+        paths,
+        COMMIT_MESSAGE.format(count=len(staged)),
+        no_verify=no_verify,
+    )
+    if error is None:
+        result.committed = True
+        print(f"Committed {len(staged)} rename(s) in {project.name}")
+    else:
+        result.failed = True
+        warn(f"ERROR: commit failed in {project.name} [{project.repo_root}]: {error}")
+    return result
+
+
+def print_summary(counters: Counters, tally: SweepTally, apply: bool) -> None:
+    """Print the end-of-run tally: files first, then projects."""
     print(
         f"Summary: scanned={counters.scanned} over-limit={counters.over_limit} "
         f"renamed={counters.renamed} fallbacks={counters.fallbacks} "
         f"collisions={counters.collisions} skipped={counters.skipped} "
-        f"errors={counters.errors}"
+        f"errors={counters.errors} projects={tally.projects} "
+        f"committed={tally.committed} project-errors={tally.errors}"
     )
     if not apply:
         print("Dry run: nothing changed. Re-run with --apply to rename.")
@@ -603,7 +827,15 @@ def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     parser.add_argument(
         "--path",
         default=DEFAULT_PATH,
-        help=f"backlog root to scan (default: {DEFAULT_PATH})",
+        help=(
+            "tree to sweep, or a single backlog root; every backlog under it "
+            f"is found and committed to its own repository (default: {DEFAULT_PATH})"
+        ),
+    )
+    parser.add_argument(
+        "--no-verify",
+        action="store_true",
+        help="bypass git hooks when committing (default: hooks run)",
     )
     parser.add_argument(
         "--include-archive",
@@ -620,21 +852,40 @@ def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Scan, plan, report and (with ``--apply``) perform the renames."""
+    """Sweep every project under ``--path``, one project at a time."""
     args = parse_args(argv)
     root = Path(args.path)
     if not root.is_dir():
         warn(f"ERROR: {root} is not a directory")
         return 2
     opts = Options(limit=args.limit, model=args.model, timeout=args.timeout)
-    files = collect_files(root, include_archive=args.include_archive)
-    plans, counters = plan_renames(files, opts)
-    for plan in plans:
-        report(plan)
-    if args.apply:
-        apply_renames(plans, root, counters)
-    print_summary(counters, apply=args.apply)
-    return 1 if counters.errors else 0
+    projects = discover_projects(root)
+    if not projects:
+        warn(f"WARNING: no backlog project found under {root}")
+    counters = Counters()
+    tally = SweepTally()
+    for project in projects:
+        tally.projects += 1
+        try:
+            result = sweep_project(
+                project,
+                opts,
+                apply=args.apply,
+                include_archive=args.include_archive,
+                no_verify=args.no_verify,
+            )
+        except (OSError, ValueError) as exc:
+            # A sweep meets repositories nobody has inspected first. An
+            # unreadable file or a backlog symlinked out of its own repository
+            # costs that project, not the rest of the fleet.
+            warn(f"ERROR: {project.name} [{project.repo_root}] failed: {exc}")
+            tally.errors += 1
+            continue
+        counters.merge(result.counters)
+        tally.committed += int(result.committed)
+        tally.errors += int(result.failed)
+    print_summary(counters, tally, apply=args.apply)
+    return 1 if counters.errors or tally.errors else 0
 
 
 if __name__ == "__main__":

@@ -278,7 +278,7 @@ The same workflow (branch, implement, review, merge) applies in both modes.
 | `plugins/ralph/` | The `ralph` plugin (`.claude-plugin/plugin.json` manifest) — bundles all `ralph-*` skills and both agents |
 | `plugins/ralph/agents/` | Plugin-bundled agents: `task-reviewer` and `ralph-reviewer` |
 | `backlog/` | Task files managed by backlog.md CLI |
-| `scripts/shorten-backlog-filenames.py` | Repo-level remediation for backlog filenames already over the 125-byte cap (dry-run by default, `--apply` renames via `git mv`) |
+| `scripts/shorten-backlog-filenames.py` | Remediation for backlog filenames already over the 125-byte cap, across one project or a whole tree of them (dry-run by default, `--apply` renames via `git mv` and commits each project) |
 | `.devcontainer/` | DevContainer configuration with firewall for sandboxed execution |
 | `plugins/ralph/skills/ralph-init/` | Skill for bootstrapping Ralph in a new project |
 | `plugins/ralph/skills/ralph-prd/` | Skill for generating PRDs |
@@ -347,11 +347,18 @@ The `pre-commit` hook runs `.claude/hooks/filename-length-guard.sh`, which rejec
 # Dry run: print planned old -> new for every over-limit backlog file
 uv run scripts/shorten-backlog-filenames.py
 
-# Apply the renames with git mv
+# Apply the renames with git mv and commit them
 uv run scripts/shorten-backlog-filenames.py --apply
+
+# Sweep every project under a directory, committing to each one in turn
+uv run scripts/shorten-backlog-filenames.py --path ~/projects --apply
 ```
 
-It walks the live artifact directories `backlog/{tasks,docs,decisions,drafts,milestones}`; `--include-archive` adds `archive/` and `completed/`. Rows tagged `[FALLBACK]` mean claude returned nothing usable -- an error, a prose sentence, or a refusal such as `I cannot help` -- and the existing slug was truncated instead; `[COLLISION]` means a numeric suffix was added. A file git does not track yet -- the usual case, since the pre-commit guard is what blocked the commit that would have added it -- is renamed in place with a `NOTICE:` telling you to `git add` it, because `git mv` refuses an untracked path. Flags: `--limit`, `--model`, `--path`, `--include-archive`, `--timeout`.
+It walks the live artifact directories `backlog/{tasks,docs,decisions,drafts,milestones}`; `--include-archive` adds `archive/` and `completed/`. Rows tagged `[FALLBACK]` mean claude returned nothing usable -- an error, a prose sentence, or a refusal such as `I cannot help` -- and the existing slug was truncated instead; `[COLLISION]` means a numeric suffix was added. A file git does not track yet -- the usual case, since the pre-commit guard is what blocked the commit that would have added it -- is renamed in place with a `NOTICE:` telling you to `git add` it, because `git mv` refuses an untracked path. Flags: `--limit`, `--model`, `--path`, `--include-archive`, `--no-verify`, `--timeout`.
+
+`--path` names a *tree* to sweep, not necessarily a single backlog: every backlog root under it (a directory holding `config.yml` **and** one of the artifact directories) is discovered, grouped by the git repository that owns it, and renamed then committed on its own before the next project is touched. A monorepo with several backlogs is one project and takes one commit; a backlog in no repository is skipped with a warning. The default `--path backlog` is simply the one-project case of the same sweep.
+
+Each project gets one pathspec-scoped commit of exactly the renamed paths, `chore(backlog): shorten N over-limit filename(s) for ecryptfs sync`, on whatever branch is checked out -- so work already staged in a repository the sweep passes through is never swept into it, and untracked renames stay out of the commit entirely. Commits respect that project's git hooks; `--no-verify` bypasses them, which is what a Ralph project's own commit-prefix guard on `master` will otherwise refuse. A project that fails to rename or commit is reported and the sweep moves on, and the run exits 1. The summary closes with `projects=<n> committed=<n> project-errors=<n>`.
 
 ### AGENTS.md / CLAUDE.md Updates
 
@@ -565,7 +572,7 @@ uv run pytest plugins/ralph/skills/ralph-run/tests/test_loop_exit_code.py
 
 **Python (`tests/python/`)** — also run by `uv run pytest`:
 
-- `test_shorten_backlog_filenames.py` - Tests `scripts/shorten-backlog-filenames.py` (slug normalizer, byte budget math, collision suffixing, plus CLI runs over a throwaway git repo with a stubbed `claude`)
+- `test_shorten_backlog_filenames.py` - Tests `scripts/shorten-backlog-filenames.py` (slug normalizer, byte budget math, collision suffixing, backlog-root discovery and per-repo grouping, plus CLI runs over throwaway git repos with a stubbed `claude`: single project, multi-project sweep, pathspec-scoped commits, hook-blocked commits and `--no-verify`)
 
 ## Customizing
 

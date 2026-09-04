@@ -68,3 +68,73 @@ Next: single ad-hoc task via `ralph-task` (not PRD-shaped — one cohesive deliv
 - Retry-once + fallback-truncate logic; `FALLBACK`/`COLLISION` markers in dry-run table; end-of-run summary.
 - Tests in `tests/` (pytest): normalizer table, budget/parse/collision/byte-length units, one stubbed-claude integration test.
 - Run `uv run pytest` + `uv run ruff check .`.
+
+---
+
+## Addendum: multi-project recursive sweep with per-project commit (added 2026-09-04)
+
+### Why
+The shipped script is single-project: `--path` points *at one backlog root* and it only stages (`git mv`), never commits. The real use case is a fleet — dozens of projects, each with its own backlog carrying over-limit filenames — replicated by Syncthing to a Linux ecryptfs volume. Pointing the script at each project by hand does not scale. The operator wants to point it at one parent directory and have it recursively find every project's backlog, and for each project: rename over-limit files via the existing `claude -p` slug logic, commit those renames to that project, then move to the next.
+
+### What changed
+The single script gains a **discover → group → per-project loop** shell around the existing per-backlog-root logic. Everything that produces a slug (prompt, normalizer, budget math, dedupe, `git mv`) is reused unchanged; all reused machinery (`git_repo_root`, `git_tracked`, `git_mv`, `plan_renames`, `collect_files`) already exists.
+
+- **Discovery (`discover_projects(root)`):** `os.walk(root)` top-down, pruning `.git`, `node_modules`, `.venv`, `__pycache__`, `.pytest_cache`, `dist`, `build`, and not descending into a backlog root once found. A directory is a **backlog root** iff it contains `config.yml` **and** at least one `SCAN_SUBDIRS` entry (e.g. `tasks/`) — the two-signal test avoids matching unrelated `config.yml` files. `project_name` is read from `config.yml` with a small regex (no YAML dependency — PEP 723 stays stdlib-only), falling back to the repo dir name.
+- **Grouping:** each backlog root is resolved to its enclosing git repo via the existing `git_repo_root()`; roots are grouped by repo top-level, so a monorepo with two backlog roots is one project committed once. A backlog root in **no git repo** is skipped with a warning (nothing to commit to; no VCS-less batch renames).
+- **New `@dataclass Project`:** `repo_root: Path`, `name: str`, `backlog_roots: list[Path]`. `Rename`/`Counters` reused unchanged; a per-project outcome tally is added.
+- **Per-project apply:** collect + `plan_renames` across the project's backlog roots, apply via the existing `git mv` path. **Only tracked files join the commit** — untracked over-limit files are still renamed (`plain_rename`) with the existing NOTICE but not `git add`ed, keeping the shipped script's conservatism about adding brand-new files to a repo unattended.
+- **Commit:** if ≥1 tracked rename succeeded, one **pathspec-scoped** commit covering exactly the old+new paths, on the currently-checked-out branch, message fixed at `chore(backlog): shorten N over-limit filename(s) for ecryptfs sync`. New helper `git_commit(repo_root, paths, message, no_verify)` over the existing `run_git`. Pre-existing staged/unstaged changes in the repo are never swept in.
+- **Hooks:** commits respect project git hooks by default (so a Ralph project's `commit-prefix-guard` / `filename-length-guard` runs); a new `--no-verify` flag opts into bypassing them for the housekeeping commit.
+- **Failure isolation:** a rename or commit failure in one project is reported and the sweep continues; it never aborts the whole run. Exit 1 if any project errored, else 0.
+- **Dry-run (default) preserved:** discover + group + plan and print each project's rename rows plus a `Would commit N rename(s) in <name> [<repo_root>]` line; change nothing.
+- **Backward compatibility:** default `--path backlog` still yields exactly one project (repo `.`) and behaves as today — the single-project case is the degenerate one-project sweep.
+
+### Implementation checklist
+- Add `discover_projects(root)` (os.walk with prune list; two-signal backlog-root test: `config.yml` + a `SCAN_SUBDIRS` entry; regex-read `project_name`), and a `@dataclass Project` grouping backlog roots by `git_repo_root()`; skip non-git roots with a warning.
+- Add `git_commit(repo_root, paths, message, no_verify)` over `run_git`; pathspec-scoped to the exact old+new renamed paths.
+- Rework `main` into a per-project loop: per project → `collect_files`/`plan_renames` over its backlog roots → apply (tracked via `git mv`, untracked via `plain_rename`+NOTICE, not committed) → one commit of the tracked renames (respecting hooks unless `--no-verify`).
+- Add `--no-verify`; widen `--path` help to "a tree to sweep, or a single backlog root". Keep `--apply`/`--limit`/`--model`/`--include-archive`/`--timeout`.
+- Extend the summary with `projects=<n> committed=<n> project-errors=<n>`; keep exit 1 on any error.
+- Tests (extend existing pytest file): `discover_projects` over a temp tree (2 git-backed projects + decoys: `node_modules/`, stray `config.yml` with no `tasks/`, a backlog root outside git); monorepo grouping (two roots → one Project); pathspec isolation (pre-existing staged change excluded from our commit); `--no-verify` (blocked-then-committed against a failing pre-commit hook); untracked-only project (renamed, NOTICE, no commit); failure isolation (project A fails, B still processed).
+- `uv run pytest` + `uv run ruff check .` pass.
+
+### Distilled for ralph-task
+
+**Direction:** Extend `scripts/shorten-backlog-filenames.py` in place into a multi-project recursive orchestrator: given `--path=<tree>`, discover every project's backlog, group by owning git repo, and per project rename over-limit files (reusing the existing `claude -p` slug logic) then commit those renames to that project before moving on. Dry-run stays the default.
+
+**Locked decisions (with rationale):**
+- **Always recurse; auto-detect backlog roots.** *Rationale:* one mental model and zero new flags — a single backlog root is just the one-project degenerate case, so today's `--path backlog` keeps working.
+- **Backlog root = a directory containing `config.yml` AND at least one `SCAN_SUBDIRS` entry (e.g. `tasks/`).** *Rationale:* `backlog init` always writes `config.yml`; the second signal rejects unrelated `config.yml` files. `project_name` is regex-read from it (no YAML dep — PEP 723 stays stdlib-only), falling back to the repo dir name.
+- **Group backlog roots by enclosing git repo (`git_repo_root()`); a monorepo's multiple roots are one project, one commit.** *Rationale:* "commit to this project" means per-repo, not per-backlog-dir.
+- **Backlog root in no git repo → skip with a warning.** *Rationale:* there is nothing to commit to; batch mode does not do VCS-less renames.
+- **Pathspec-scoped commit of exactly the old+new renamed paths, on the current branch, one per project.** *Rationale:* safe to run unattended over repos you don't inspect — pre-existing staged/unstaged work is never swept in.
+- **Fixed message `chore(backlog): shorten N over-limit filename(s) for ecryptfs sync`.** *Rationale:* housekeeping commit; no LLM call needed for the message.
+- **Only tracked files join the commit; untracked over-limit files are renamed with the existing NOTICE but not `git add`ed.** *Rationale:* adding a brand-new file to a repo unattended is a bigger action than a rename — keep the shipped script's conservatism.
+- **Respect git hooks by default; `--no-verify` opt-in to bypass.** *Rationale:* other Ralph projects' `commit-prefix-guard` blocks non-task commits on master; respecting hooks is the safe default, with an escape hatch for sweeping your own fleet.
+- **Failure isolation; exit 1 if any project errored.** *Rationale:* one blocked/failed project must not strand the rest of the sweep.
+- **Dry-run remains the default.** *Rationale:* same safety model as the shipped script — nothing changes until `--apply`.
+
+**Scope cuts:**
+- No `git add` of untracked files, no VCS-less renames, no per-project branch creation (commit lands on whatever branch is checked out).
+- No LLM-generated commit messages; no configurable message.
+- No parallelism across projects; no YAML parser dependency; no change to the slug/normalizer/budget/dedupe logic.
+- No new limit config surface (125-byte default unchanged).
+
+**Acceptance criteria (sketch):**
+- `discover_projects(root)` finds every backlog root under `--path` (dir with `config.yml` + a `SCAN_SUBDIRS` entry), pruning `.git`/`node_modules`/`.venv`/`__pycache__`/`.pytest_cache`/`dist`/`build` and not descending into a found backlog root; decoy `config.yml` (no `tasks/`) and a backlog root outside git are not treated as committable projects.
+- Backlog roots are grouped by enclosing git repo; two roots in one repo produce one project committed once; a root in no git repo is skipped with a warning.
+- `--apply` performs, per project, the existing renames and then a single pathspec-scoped `git commit` of exactly the old+new tracked-rename paths with the fixed `chore(backlog): …` message; a pre-existing staged unrelated change in that repo is not included in the commit.
+- Untracked over-limit files are renamed with the existing NOTICE and are not committed; a project whose only over-limit files are untracked produces no commit.
+- Commits respect git hooks by default (a failing hook is reported and that project is skipped without committing); `--no-verify` bypasses hooks and the commit lands.
+- A rename/commit failure in one project is reported and the sweep continues; the run exits 1 if any project errored, else 0.
+- Default (dry-run) prints per-project grouping, the `old → new` rows, and a `Would commit N rename(s) in <name> [<repo_root>]` line, and changes nothing; `--path backlog` still behaves as the single-project case.
+- The end-of-run summary adds `projects=<n> committed=<n> project-errors=<n>` to the existing file tallies.
+- `uv run pytest` and `uv run ruff check .` pass.
+
+**Implementation checklist:**
+- Add `discover_projects(root)` (os.walk + prune list; two-signal backlog-root test; regex-read `project_name`) and `@dataclass Project(repo_root, name, backlog_roots)`; group by `git_repo_root()`, skip non-git roots with a warning.
+- Add `git_commit(repo_root, paths, message, no_verify)` over `run_git`, pathspec-scoped to the exact renamed paths.
+- Rework `main` into a per-project loop: `collect_files`/`plan_renames` per project → apply (tracked `git mv`; untracked `plain_rename`+NOTICE, uncommitted) → one hook-respecting (or `--no-verify`) commit of the tracked renames.
+- Add `--no-verify`; widen `--path` help; extend the summary with the project tallies; keep exit 1 on any error.
+- Extend the pytest file: discovery over a temp tree with decoys, monorepo grouping, pathspec isolation, `--no-verify` blocked-then-committed, untracked-only, failure isolation.
+- `uv run pytest` + `uv run ruff check .`.
