@@ -51,4 +51,6 @@ Host-side confirmation, once the user rebuilds ('Dev Containers: Rebuild Contain
   grep '^home' .venv/pyvenv.cfg     # must stay /opt/homebrew/... , never /home/node/...
   uv run python -V                  # AC #1
 One-time host repair is still required before the first post-fix run: the host .venv is already clobbered (this run clobbered it again), so run 'rm -rf .venv && uv sync' on the host ONCE. That is documented in README.md and in the ralph-init Upgrade note, not left as folklore.
+
+Commit: `5270ebb` - task-235: keep the container virtualenv off the host bind mount
 <!-- SECTION:NOTES:END -->

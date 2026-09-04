@@ -621,7 +621,7 @@ clobbered by an earlier container run, repair it once on the host with:
   rm -rf .venv && uv sync
 ```
 
-Also append `.venv/` to `.gitignore` if absent — the overlay creates an empty `.venv/` mountpoint in the project root even for non-Python projects. `.gitignore` is append-only in U2/U4, so this is the one place the entry gets added on upgrade.
+In the same case — and only then, since a project without `.devcontainer/` never gets the mountpoint — append `.venv/` to `.gitignore` if absent: the overlay creates an empty `.venv/` directory in the project root even for non-Python projects. `.gitignore` is skipped by the U2 status table (append-only, never diffed), so this step is the one place the entry gets added on upgrade; when it fires, label the file `skipped (append-only; .venv/ appended)` in the U5 summary instead of the plain `skipped (append-only)`.
 
 ---
 
