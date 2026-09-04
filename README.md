@@ -349,7 +349,7 @@ uv run scripts/shorten-backlog-filenames.py
 uv run scripts/shorten-backlog-filenames.py --apply
 ```
 
-Rows tagged `[FALLBACK]` mean claude returned nothing usable and the existing slug was truncated instead; `[COLLISION]` means a numeric suffix was added. Flags: `--limit`, `--model`, `--path`, `--include-archive`, `--timeout`.
+It walks the live artifact directories `backlog/{tasks,docs,decisions,drafts,milestones}`; `--include-archive` adds `archive/` and `completed/`. Rows tagged `[FALLBACK]` mean claude returned nothing usable and the existing slug was truncated instead; `[COLLISION]` means a numeric suffix was added. A file git does not track yet -- the usual case, since the pre-commit guard is what blocked the commit that would have added it -- is renamed in place with a `NOTICE:` telling you to `git add` it, because `git mv` refuses an untracked path. Flags: `--limit`, `--model`, `--path`, `--include-archive`, `--timeout`.
 
 ### AGENTS.md / CLAUDE.md Updates
 
