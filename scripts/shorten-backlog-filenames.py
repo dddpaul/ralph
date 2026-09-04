@@ -60,6 +60,24 @@ MAX_COLLISION_SUFFIX = 99
 # Whitespace-separated words tolerated on a line that is not already a bare
 # kebab-case slug. Beyond this the line reads as prose, not a proposal.
 MAX_SLUG_WORDS = 4
+# Openers that mark a line as a refusal or a first-person aside rather than a
+# proposal. A word count cannot tell the two apart -- `I cannot help` and
+# `Shorten Backlog Filenames` are both three words -- so the fallback pass
+# needs a content signal as well as a length one. Contracted spellings are
+# folded onto their bare form (`i'm` -> `im`) by `opening_token`.
+REFUSAL_OPENERS = frozenset(
+    {
+        "i",
+        "im",
+        "ive",
+        "sorry",
+        "apologies",
+        "unable",
+        "cannot",
+        "cant",
+        "unfortunately",
+    }
+)
 
 # `<type>-<id> - <slug>.md`, e.g. `task-231 - Add-a-script.md`. Ids stay
 # strings: backlog subtasks carry dotted ids such as `task-90.1`.
@@ -159,6 +177,21 @@ def trim_to_budget(slug: str, budget: int) -> str:
     return trimmed.strip("-")
 
 
+def opening_token(line: str) -> str:
+    """Return ``line``'s first word, folded for a stop-list comparison.
+
+    Surrounding punctuation is dropped (``Sorry,`` -> ``sorry``) and inner
+    apostrophes, straight or curly, are removed (``I'm`` -> ``im``) so one
+    entry covers a contraction and its expansion. Nothing else is stripped,
+    which is what keeps ``i18n`` from folding onto ``i``.
+    """
+    words = line.split()
+    if not words:
+        return ""
+    token = words[0].lower().replace("\u2019", "").replace("'", "")
+    return re.sub(r"^[^a-z0-9]+|[^a-z0-9]+$", "", token)
+
+
 def pick_slug_line(raw: str) -> str:
     """Choose the line of ``raw`` most likely to be the proposed slug.
 
@@ -166,19 +199,30 @@ def pick_slug_line(raw: str) -> str:
     guarantee. A model that adds a preamble still puts the slug on a line of
     its own, so an already-conforming kebab-case line anywhere in the output
     wins over position. Only when there is no such line does the first
-    non-empty, non-fence line get used -- and then just when it is short
-    enough to be a slug: ``Here is the slug you asked for:`` is a sentence,
-    and returning ``""`` for it routes the artifact to the retry and then
-    the FALLBACK truncation instead of onto the filesystem.
+    non-empty, non-fence line get used -- and then only if it looks like a
+    proposal rather than an answer *about* the request.
+
+    Two signals disqualify it. Length: ``Here is the slug you asked for:``
+    is a sentence. Content: a refusal short enough to clear the word cap,
+    such as ``I cannot help``, would otherwise pass the byte minimum and
+    name the file ``i-cannot-help``, so the opening word is matched against
+    REFUSAL_OPENERS. Either way ``""`` routes the artifact to the retry and
+    then the FALLBACK truncation instead of onto the filesystem.
+
+    Both signals are confined to this pass. A line matching CLEAN_SLUG_RE
+    has obeyed the prompt and is returned above without ever reaching the
+    stop-list, so a genuine ``cannot-reproduce-the-hang`` slug survives.
     """
     lines = [candidate.strip() for candidate in raw.splitlines()]
     for candidate in lines:
         if CLEAN_SLUG_RE.match(candidate) and len(candidate) >= MIN_SLUG_BYTES:
             return candidate
     for candidate in lines:
-        if candidate and not candidate.startswith("```"):
-            words = candidate.split()
-            return candidate if len(words) <= MAX_SLUG_WORDS else ""
+        if not candidate or candidate.startswith("```"):
+            continue
+        prose = len(candidate.split()) > MAX_SLUG_WORDS
+        refusal = opening_token(candidate) in REFUSAL_OPENERS
+        return "" if prose or refusal else candidate
     return ""
 
 

@@ -1,9 +1,10 @@
 ---
 id: TASK-234
 title: Reject short model refusals in the shorten-backlog-filenames slug normalizer
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-09-04 11:51'
+updated_date: '2026-09-04 13:15'
 labels:
   - 'feature:shorten-backlog-filenames'
 dependencies:
@@ -26,9 +27,15 @@ Note the same threshold reasoning TASK-232 recorded still binds: AC #2 there pin
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A short first-person refusal such as 'I cannot help' or 'Sorry, I am unable to do that' is rejected by pick_slug_line, with a unit test per shape
-- [ ] #2 A three-word legitimate proposal ('Shorten Backlog Filenames') is still accepted and the existing normalizer table in tests/python/test_shorten_backlog_filenames.py still passes unchanged
-- [ ] #3 A line already matching ^[a-z0-9][a-z0-9-]*$ is never rejected by the new signal, even if it starts with a stop-word token
-- [ ] #4 An integration test drives a stub claude that only ever refuses and asserts the [FALLBACK] marker plus the truncated original slug in the filename
-- [ ] #5 uv run pytest and uv run ruff check . both pass
+- [x] #1 A short first-person refusal such as 'I cannot help' or 'Sorry, I am unable to do that' is rejected by pick_slug_line, with a unit test per shape
+- [x] #2 A three-word legitimate proposal ('Shorten Backlog Filenames') is still accepted and the existing normalizer table in tests/python/test_shorten_backlog_filenames.py still passes unchanged
+- [x] #3 A line already matching ^[a-z0-9][a-z0-9-]*$ is never rejected by the new signal, even if it starts with a stop-word token
+- [x] #4 An integration test drives a stub claude that only ever refuses and asserts the [FALLBACK] marker plus the truncated original slug in the filename
+- [x] #5 uv run pytest and uv run ruff check . both pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan: add a REFUSAL_OPENERS stop-list to scripts/shorten-backlog-filenames.py and consult it only in pick_slug_line's second (non-kebab fallback) pass, matching the line's FIRST whitespace token after lowercasing, stripping surrounding punctuation and collapsing apostrophes ('I'm' -> im), so 'I cannot help' returns '' and routes to retry+FALLBACK. Pass 1 (CLEAN_SLUG_RE) returns before the check, so an already-conforming kebab line is never second-guessed (AC #3). MAX_SLUG_WORDS stays 4, keeping the TASK-232 normalizer table green (AC #2). Tests: parametrised refusal shapes + a guard asserting the short ones are under the word cap (so the opener signal, not MAX_SLUG_WORDS, is what rejects them), an accept-case for 'Shorten Backlog Filenames', an AC #3 case for a kebab line opening with a stop-word token, and an integration test with a stub claude that only ever refuses asserting [FALLBACK] and the truncated original slug.
+<!-- SECTION:NOTES:END -->

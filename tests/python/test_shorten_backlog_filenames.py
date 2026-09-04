@@ -247,6 +247,99 @@ def test_pick_slug_line_returns_empty_for_no_candidate() -> None:
 
 
 # --------------------------------------------------------------------------
+# pick_slug_line — a short refusal is not a proposal either (TASK-234)
+# --------------------------------------------------------------------------
+
+
+# Refusals that fit inside the word cap, i.e. exactly the ones MAX_SLUG_WORDS
+# cannot catch. `I cannot help` is the shape TASK-232 left open.
+SHORT_REFUSALS = [
+    "I cannot help",
+    "I'm unable to",
+    "I\u2019m unable to",  # the curly apostrophe a model actually emits
+    "Sorry, cannot comply",
+    "Unfortunately no",
+    "Cannot propose a slug",
+]
+
+# Long enough that the word cap rejects it on its own; kept as an AC shape.
+LONG_REFUSAL = "Sorry, I am unable to do that"
+
+
+@pytest.mark.parametrize("raw", SHORT_REFUSALS)
+def test_short_refusals_sit_within_the_word_cap(raw: str) -> None:
+    """Pins that the opener signal, not MAX_SLUG_WORDS, is what rejects them.
+
+    Without this the refusal cases below would pass for the old reason and
+    silently stop testing the new one.
+    """
+    assert len(raw.split()) <= sbf.MAX_SLUG_WORDS
+
+
+@pytest.mark.parametrize("raw", [*SHORT_REFUSALS, LONG_REFUSAL])
+def test_pick_slug_line_rejects_a_refusal(raw: str) -> None:
+    assert sbf.pick_slug_line(raw) == ""
+
+
+@pytest.mark.parametrize("raw", [*SHORT_REFUSALS, LONG_REFUSAL])
+def test_normalize_slug_rejects_a_refusal(raw: str) -> None:
+    """`I cannot help` clears MIN_SLUG_BYTES as `i-cannot-help` otherwise."""
+    assert sbf.normalize_slug(raw, 111) == ""
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "Shorten Backlog Filenames",  # three words, like `I cannot help`
+        "i18n Support Matrix",  # `i18n` must not fold onto the `i` opener
+        "Ideal Retry Budget",  # a stop word is a token, not a prefix
+    ],
+)
+def test_pick_slug_line_still_accepts_a_short_proposal(raw: str) -> None:
+    assert sbf.pick_slug_line(raw) == raw
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "cannot-reproduce-the-hang",
+        "unable-to-parse-frontmatter",
+        "sorry",
+        "i18n",
+    ],
+)
+def test_pick_slug_line_never_rejects_a_conforming_line(raw: str) -> None:
+    """A line that already obeys the prompt never reaches the stop-list."""
+    assert sbf.CLEAN_SLUG_RE.match(raw)
+    assert sbf.pick_slug_line(raw) == raw
+
+
+def test_pick_slug_line_prefers_a_clean_line_under_a_refusal() -> None:
+    assert sbf.pick_slug_line("I cannot help\nralph-stop-drain\n") == (
+        "ralph-stop-drain"
+    )
+
+
+@pytest.mark.parametrize(
+    ("line", "expected"),
+    [
+        ("I cannot help", "i"),
+        ("I'm sorry", "im"),
+        ("I\u2019ve stopped", "ive"),  # curly apostrophe, folded like a straight one
+        ("Sorry, no.", "sorry"),
+        ("**Cannot** do it", "cannot"),
+        ("i18n Support Matrix", "i18n"),
+        ("Ideal Retry Budget", "ideal"),
+        ("", ""),
+        ("   ", ""),
+        ("Сократить имена", ""),  # nothing in [a-z0-9] survives
+    ],
+)
+def test_opening_token_folds_a_word_for_comparison(line: str, expected: str) -> None:
+    assert sbf.opening_token(line) == expected
+
+
+# --------------------------------------------------------------------------
 # dedupe_target — collision suffixing with a re-trim
 # --------------------------------------------------------------------------
 
@@ -578,6 +671,29 @@ def test_a_prose_preamble_falls_back_instead_of_becoming_the_filename(
     renamed = [p.name for p in (repo / "backlog" / "tasks").iterdir()]
     assert renamed == [f"task-101 - {truncated}.md"]
     assert "here-is-the-slug" not in renamed[0]
+
+
+def test_a_refusing_stub_falls_back_instead_of_naming_the_file(
+    tmp_path: Path,
+) -> None:
+    """A stub that only ever refuses must truncate, not name the file."""
+    repo = _make_repo(tmp_path, [LONG_101])
+    bin_dir = tmp_path / "bin"
+    log = tmp_path / "calls.log"
+    _write_stub(bin_dir, 'printf "call\\n" >> "$STUB_LOG"\nprintf "I cannot help\\n"')
+
+    proc = _run_script(repo, bin_dir, "--apply", STUB_LOG=str(log))
+
+    assert proc.returncode == 0, proc.stderr
+    assert "[FALLBACK]" in proc.stdout
+    assert "fallbacks=1" in proc.stdout and "renamed=1" in proc.stdout
+    # The refusal is unusable output, so it costs the retry like any other.
+    assert log.read_text().count("call") == 2
+    budget = sbf.slug_budget("task-101 - ", LIMIT)
+    truncated = sbf.trim_to_budget(LONG_SLUG, budget)
+    renamed = [p.name for p in (repo / "backlog" / "tasks").iterdir()]
+    assert renamed == [f"task-101 - {truncated}.md"]
+    assert "cannot" not in renamed[0]
 
 
 def test_a_preamble_above_a_clean_slug_still_yields_that_slug(
