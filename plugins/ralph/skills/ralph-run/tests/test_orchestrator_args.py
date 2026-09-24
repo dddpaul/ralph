@@ -76,7 +76,7 @@ def test_parse_defaults_match_bash() -> None:
     parsed = parse([])
     assert parsed.tool == "claude"
     assert parsed.model == "claude-opus-5"
-    assert parsed.effort == "max"
+    assert parsed.effort == "medium"
     assert parsed.timeout == "15"
     assert parsed.on_error == "stop"
     assert parsed.retry_count == 2
