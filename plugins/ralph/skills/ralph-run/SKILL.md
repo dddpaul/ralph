@@ -19,7 +19,7 @@ The user may pass overrides as skill arguments. Parse them as space-separated ke
 |-----------|---------|------|
 | tool | claude | --tool |
 | model | claude-opus-5 | --model |
-| effort | max | --effort |
+| effort | medium | --effort |
 | timeout | 60 | --timeout |
 | tasks | (none) | --tasks |
 | devcontainer | true | --devcontainer |
@@ -46,10 +46,10 @@ BLOCKED: watch must be true, false, or a duration like 5m, 30s, 1h.
 > **Note: Some skill defaults intentionally differ from ralph.sh CLI defaults.**
 > The skill targets interactive sessions where a user launches Ralph from Claude Code,
 > so it optimizes for thoroughness and isolation over speed:
-> - **timeout** (skill: `60`, CLI: `15`) — max-effort iterations take longer; 15 minutes would time out most complex tasks.
+> - **timeout** (skill: `60`, CLI: `15`) — interactive runs target whole backlog tasks, so 15 minutes would time out most complex tasks.
 > - **devcontainer** (skill: `true`, CLI: `false`) — interactive users expect sandboxed runs by default; the CLI leaves this opt-in for scripted/CI use.
 >
-> The `model` and `effort` defaults match the orchestrator's own defaults (`claude-opus-5` and `max`); the skill pins them explicitly so the launch command logs them and per-invocation overrides remain easy.
+> The `model` and `effort` defaults match the orchestrator's own defaults (`claude-opus-5` and `medium`); the skill pins them explicitly so the launch command logs them and per-invocation overrides remain easy.
 
 The `tasks` parameter accepts comma-separated numeric task IDs only (e.g. `62,64,65`). Reject `TASK-` prefix or non-numeric values. Mutually exclusive with `--prompt-file`.
 

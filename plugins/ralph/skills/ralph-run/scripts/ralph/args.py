@@ -81,7 +81,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--tool", default="claude")
     parser.add_argument("--model", default="claude-opus-5")
-    parser.add_argument("--effort", default="max")
+    parser.add_argument("--effort", default="medium")
     parser.add_argument("--timeout", default="15")
     parser.add_argument("--on-error", dest="on_error", default="stop")
     parser.add_argument("--retry-count", dest="retry_count", type=int, default=2)
