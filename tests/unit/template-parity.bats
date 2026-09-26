@@ -51,6 +51,7 @@ prefix|.git/hooks/post-commit|git-hooks/post-commit
 exact|.git/hooks/commit-msg|git-hooks/commit-msg
 exact|.git/hooks/pre-commit|git-hooks/pre-commit
 exact|.devcontainer/devcontainer.json|devcontainer/devcontainer.json
+exact|.devcontainer/container-settings.local.json|devcontainer/container-settings.local.json
 exact|.devcontainer/init-firewall.sh|devcontainer/init-firewall.sh
 ROWS
 }
@@ -173,8 +174,8 @@ EOF
     echo "$failures"
     return 1
   }
-  # Anti-vacuity: 15 exact rows, 2 of which (.git/hooks/*) may be absent in CI.
-  [ "$checked" -ge 13 ]
+  # Anti-vacuity: 16 exact rows, 2 of which (.git/hooks/*) may be absent in CI.
+  [ "$checked" -ge 14 ]
 }
 
 # --------------------------------------------------------------------------
