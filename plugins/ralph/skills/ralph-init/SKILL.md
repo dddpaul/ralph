@@ -564,6 +564,7 @@ Compare each managed file against its current template. Assign one status per fi
 13. **`.gitignore`** — always **skipped** (append-only logic in init flow)
 14. **`.claude/brainstorm-rules.md`** — managed via section-aware merge: pre-heading content is regenerated from `templates/claude/brainstorm-rules.md`; the `## Project additions` heading and everything below it are preserved verbatim. Status is **current** when the pre-heading region matches the template byte-for-byte; **outdated** when it differs; **missing** when the file does not exist (would be created from template).
 15. **`.claude/task-reviewer-rules.md`** — Documentation / Mixed only (detect via an existing `.obsidian/` directory). This file may hold a project's own reviewer rules, so upgrade treats it as **create-if-missing** and never overwrites it: status is **missing** (would be created from `templates/claude/task-reviewer-rules.docs.md`) when a Documentation / Mixed project lacks it; **skipped (present, project-owned)** when it already exists; **skipped (Code-only)** when no `.obsidian/` directory is present.
+16. **`.devcontainer/container-settings.local.json`** — exact content match against `templates/devcontainer/container-settings.local.json`. If `.devcontainer/` directory does not exist, status is **skipped**; if the directory exists but the file does not (every project that predates this scheme), status is **missing** and U4 creates it. It must be created whenever `.devcontainer/devcontainer.json` is updated: the new mount binds this file, and a missing bind source makes Docker materialize a directory at the source path, breaking container creation.
 
 ---
 
@@ -572,24 +573,24 @@ Compare each managed file against its current template. Assign one status per fi
 Display the status table to the user:
 
 ```
-File                              Status
-─────────────────────────────────────────
-ralph.sh                          outdated
-refine.sh                         outdated
-CLAUDE.md (generic section)       current
-.git/hooks/post-commit            outdated
-.git/hooks/commit-msg             outdated
-.git/hooks/pre-commit             outdated
-.claude/settings.json             current
-.claude/hooks/                    current
-.claude/settings.local.json       current
-.claude/brainstorm-rules.md       outdated
-.claude/task-reviewer-rules.md    skipped (Code-only)
-.devcontainer/devcontainer.json   skipped (no .devcontainer/)
-.devcontainer/init-firewall.sh    skipped (no .devcontainer/)
+File                                         Status
+────────────────────────────────────────────────────────────────────────
+ralph.sh                                     outdated
+refine.sh                                    outdated
+CLAUDE.md (generic section)                  current
+.git/hooks/post-commit                       outdated
+.git/hooks/commit-msg                        outdated
+.git/hooks/pre-commit                        outdated
+.claude/settings.json                        current
+.claude/hooks/                               current
+.claude/settings.local.json                  current
+.claude/brainstorm-rules.md                  outdated
+.claude/task-reviewer-rules.md               skipped (Code-only)
+.devcontainer/devcontainer.json              skipped (no .devcontainer/)
+.devcontainer/init-firewall.sh               skipped (no .devcontainer/)
 .devcontainer/container-settings.local.json  skipped (no .devcontainer/)
-.devcontainer/Dockerfile          skipped (assembled)
-.gitignore                        skipped (append-only)
+.devcontainer/Dockerfile                     skipped (assembled)
+.gitignore                                   skipped (append-only)
 ```
 
 **For outdated files, show details:**
