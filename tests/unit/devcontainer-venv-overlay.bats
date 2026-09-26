@@ -11,7 +11,10 @@
 # pin the three properties that make it work, on the live file AND on the
 # ralph-init template that scaffolds it into new projects.
 #
-# See TASK-235.
+# This is the only remaining volume overlay under /workspace; the .claude
+# directory is a plain shared bind, covered by devcontainer-claude-share.bats.
+#
+# See TASK-235, TASK-239.
 
 PROJECT_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/../.." && pwd)"
 LIVE="$PROJECT_ROOT/.devcontainer/devcontainer.json"
@@ -63,7 +66,7 @@ venv_mount() {
   done
 }
 
-@test "the .venv volume is scoped per devcontainer, like the .claude overlay" {
+@test "the .venv volume is scoped per devcontainer" {
   local f mount
   for f in "$LIVE" "$TEMPLATE"; do
     mount="$(venv_mount "$f")"
