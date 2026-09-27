@@ -165,10 +165,10 @@ def test_guard_rejects_a_stage_built_on_a_newer_debian(tmp_path: Path) -> None:
 def test_guard_ignores_uv_binary_copy_and_go_toolchain(tmp_path: Path) -> None:
     # /usr/local/go is a real copy in the shipped go fragment and must stay
     # allowed: it is a self-contained toolchain, not binaries dropped into the
-    # paths the base image's own libraries and binaries live in. The uv line is the pre-TASK-251 shape,
-    # kept here deliberately: uv is now copied in the base from a pinned stage
-    # (no fragment carries it), but the guard must still ignore a single-file
-    # /uv source wherever it appears.
+    # paths the base image's own libraries and binaries live in. The uv line is
+    # the pre-TASK-251 shape, kept here deliberately: uv is now copied in the
+    # base from a pinned stage (no fragment carries it), but the guard must
+    # still ignore a single-file /uv source wherever it appears.
     install = (
         "COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv\n"
         "COPY --from=golang /usr/local/go /usr/local/go\n"

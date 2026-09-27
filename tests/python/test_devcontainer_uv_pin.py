@@ -69,8 +69,9 @@ def pin_problems(text: str) -> list[str]:
         problems.append(f"uv must be copied exactly once, from the stage: {copies}")
     direct = [i for i in ins if "COPY" in i and "astral-sh/uv" in i]
     if direct:
-        problems.append(f"COPY --from cannot expand an ARG, so it must not be used "
-                        f"for uv: {direct}")
+        problems.append(
+            f"COPY --from cannot expand an ARG, so it must not be used for uv: {direct}"
+        )
     if f'LABEL {LABEL}="${{UV_VERSION}}"' not in ins:
         problems.append(f"missing LABEL {LABEL}")
     guards = [i for i in ins if "uv --version" in i]
