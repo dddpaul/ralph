@@ -56,6 +56,11 @@ def pin_problems(text: str) -> list[str]:
     # devcontainer stage (for the LABEL and the guard). Neither may default.
     if args != ["ARG UV_VERSION", "ARG UV_VERSION"]:
         problems.append(f"ARG must be declared twice with no default: {args}")
+    # The global one must precede every FROM: `COPY --from` cannot expand a build
+    # arg, so the uv stage interpolates it, and Dockerfile.lang.go contributes a
+    # FROM of its own — which is why it cannot move later in the file.
+    if ins and ins[0] != "ARG UV_VERSION":
+        problems.append(f"the global ARG must come before the first FROM: {ins[:1]}")
     froms = [i for i in ins if i.startswith("FROM ") and STAGE in i]
     if froms != [f"FROM ghcr.io/astral-sh/uv:${{UV_VERSION}} AS {STAGE}"]:
         problems.append(f"uv stage must pin the ARG: {froms}")
