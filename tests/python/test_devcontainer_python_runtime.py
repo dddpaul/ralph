@@ -173,9 +173,15 @@ def test_guard_ignores_uv_binary_copy_and_go_toolchain(tmp_path: Path) -> None:
     assert _repro(tmp_path, "FROM node:20\n", lang, install) == []
 
 
-def test_docs_and_python_fragments_still_provide_uv() -> None:
+def test_docs_and_python_assemblies_still_provide_uv() -> None:
+    # TASK-242 asserted this on the fragments, which each carried their own uv
+    # copy. TASK-251 pinned uv and left a single copy in the base, so the
+    # guarantee moved rather than went away: the base copies uv for every
+    # flavour, and the fragments must no longer add a second, unpinned one.
+    # The pin itself is covered by tests/python/test_devcontainer_uv_pin.py.
+    assert "COPY --from=uv-bin /uv /usr/local/bin/uv" in BASE.read_text("utf-8")
     for name in ("Dockerfile.install.docs", "Dockerfile.install.python"):
-        assert "astral-sh/uv" in (LANG_DIR / name).read_text("utf-8")
+        assert "astral-sh/uv" not in (LANG_DIR / name).read_text("utf-8")
 
 
 def test_base_image_installs_the_python_the_orchestrator_needs() -> None:

@@ -1,3 +1,19 @@
+# No default on purpose: UV_VERSION comes from devcontainer.json build.args as a
+# concrete X.Y.Z, for the same reason CLAUDE_CODE_VERSION does — a floating tag
+# is resolved once and then frozen in the layer cache, so the image silently
+# ages. It is declared here, before the first FROM, because `COPY --from` cannot
+# expand a build arg ("variable expansion is not supported for --from"); uv
+# therefore arrives through a named stage instead of a direct image reference.
+# BuildKit warns InvalidDefaultArgInFrom here precisely because there is no
+# default — that is the point: a lost build arg must fail, not float. Do not
+# silence it by giving UV_VERSION a default.
+ARG UV_VERSION
+
+###
+### Stage 0: uv binary
+###
+FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uv-bin
+
 {{LANGUAGE_STAGE}}
 
 ###
@@ -94,10 +110,20 @@ RUN { echo "${CLAUDE_CODE_VERSION}" | grep -Eqx '[0-9]+\.[0-9]+\.[0-9]+' \
   && claude --version | grep -qF "${CLAUDE_CODE_VERSION}"
 
 # ---- uv + Python 3.14 (required by Ralph orchestrator regardless of project language) ----
+# Bumping UV_VERSION changes this layer's cache key, so the next build recopies
+# the binary; the label lets `docker image inspect` report the version without
+# starting a container. uv runs the orchestrator, installs the interpreter and
+# executes every PEP 723 script, so a silently stale one is a confusing
+# resolver error rather than an obvious "your uv is old".
+ARG UV_VERSION
+LABEL dev.ralph.uv-version="${UV_VERSION}"
 USER root
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+COPY --from=uv-bin /uv /usr/local/bin/uv
 USER node
-RUN uv python install 3.14
+RUN { echo "${UV_VERSION}" | grep -Eqx '[0-9]+\.[0-9]+\.[0-9]+' \
+    || { echo "UV_VERSION must be a concrete X.Y.Z, got '${UV_VERSION}'" >&2; exit 1; }; } \
+  && uv --version | grep -qF "${UV_VERSION}" \
+  && uv python install 3.14
 
 # ---- Firewall script ----
 COPY init-firewall.sh /usr/local/bin/
