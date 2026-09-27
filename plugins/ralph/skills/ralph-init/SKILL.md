@@ -229,6 +229,26 @@ Two lifecycle hooks go with it:
 
 The single-file bind is deliberately **not** `readonly`: a container-side write to a tracked file is cosmetic and visible in review, whereas a read-only mount would break every run if any startup path wrote that file.
 
+**Second bind of the user `~/.claude` at its own host path (makes plugin agents resolve):** the template binds the host `~/.claude` **twice** — once at `/home/node/.claude`, and once at the literal host path:
+
+```
+"source=${localEnv:HOME}/.claude,target=/home/node/.claude,type=bind",
+"source=${localEnv:HOME}/.claude,target=${localEnv:HOME}/.claude,type=bind",
+```
+
+It looks like a duplicate and it is not. A skills directory is merely scanned, but a **plugin** is resolved through an absolute path recorded in a registry: `~/.claude/plugins/known_marketplaces.json` stores `installLocation` and `plugins/installed_plugins.json` stores `installPath`, both as **host** paths (e.g. `/Users/<user>/.claude/plugins/marketplaces/<name>`). With only the `/home/node/.claude` bind the same directory is present under a different name, which is exactly what the registry cannot follow, so every user plugin fails with `Marketplace <name> failed to load: cache-miss`. The consequence is silent and severe: the `task-reviewer` agent shipped by `ralph@dddpaul-ralph` never registers, so the Review step of the Task Lifecycle degrades to a plain agent reading a rules file — and still reports APPROVED. The second bind makes the recorded path resolve to the same bytes.
+
+`CLAUDE_CONFIG_DIR` stays `/home/node/.claude` and must **not** be repointed at the host path — that is what keeps the new mount free of any write path. It does **not** make the host config safe in general: `/home/node/.claude` is itself a read-write bind of the same host directory, so a container run can and does write into the shared registries through *that* path. Never "fix" cache-miss by editing those two registry JSON files instead: `/home/node/.claude` is a read-write bind of the host's real `~/.claude`, so rewriting a path there breaks the host. Registering the marketplace through `extraKnownMarketplaces` in project settings does not work either — the stale `known_marketplaces.json` entry wins and cache-miss persists.
+
+Verify it **inside the container** after a recreate:
+
+```bash
+claude plugin list                             # ralph@dddpaul-ralph -> enabled, not "cache-miss"
+claude plugin details ralph@dddpaul-ralph      # Agents (2)  task-reviewer, ralph-reviewer
+```
+
+Both commands work without auth, so they are usable even where `claude -p` in the container is not logged in. On a host whose `$HOME` is literally `/home/node` the two binds collapse to the same target; the second one can be dropped there, since the first already puts the directory at the recorded path — but note that U4 rewrites this file from the template, so such a local edit does not survive an upgrade and has to be reapplied (or better, raised as a template change).
+
 **`.venv` volume overlay (keeps the container virtualenv off the host):** `workspaceMount` bind-mounts the host project folder at `/workspace`, so anything the container writes under it lands on the host. For a Python project that includes `.venv/` — `uv sync` inside the container rewrites `.venv/pyvenv.cfg` to a container-only interpreter home (`/home/node/.local/share/uv/python/cpython-<ver>-linux-<arch>-gnu/bin`) and repoints `.venv/bin/python` at it. Back on the host that symlink dangles, so `uv run ...` and the ralph-run preflight fail until the user does `rm -rf .venv && uv sync`. The template therefore mounts a named volume over that one path:
 
 ```
@@ -649,7 +669,7 @@ For each file the user approved:
 
 The Ralph-owned `.devcontainer/devcontainer.json` carries the host MCP gateway slot (`MCP_GATEWAY_HOST` / `MCP_GATEWAY_TOKEN` + the widened `NO_PROXY`), so it upgrades through the normal U2/U4 sync above like any other managed file — no special handling. The per-consumer `.mcp.json` is handled separately in U4.5.
 
-The same file also carries the `.venv` volume overlay and the shared-`.claude` scheme — the single-file bind of `.devcontainer/container-settings.local.json` over `/workspace/.claude/settings.local.json`, the `initializeCommand` that seeds the host file, and the `postCreateCommand` that grants git `safe.directory` (see both Init notes). They sync the same way — but `mounts`, `initializeCommand`, and `postCreateCommand` are read **only when the container is created**, so a change to any of them takes effect on a **recreate**, never on a restart. So whenever U4 rewrites `.devcontainer/devcontainer.json`, add this to the U5 summary:
+The same file also carries the `.venv` volume overlay, the shared-`.claude` scheme — the single-file bind of `.devcontainer/container-settings.local.json` over `/workspace/.claude/settings.local.json`, the `initializeCommand` that seeds the host file, and the `postCreateCommand` that grants git `safe.directory` — and the second bind of the user `~/.claude` at its own host path, `source=${localEnv:HOME}/.claude,target=${localEnv:HOME}/.claude,type=bind`, which is what makes plugin-provided agents (`task-reviewer`) resolve instead of failing with `cache-miss` (see all three Init notes). They sync the same way — but `mounts`, `initializeCommand`, and `postCreateCommand` are read **only when the container is created**, so a change to any of them takes effect on a **recreate**, never on a restart. So whenever U4 rewrites `.devcontainer/devcontainer.json`, add this to the U5 summary:
 
 ```
 .devcontainer/devcontainer.json changed — run "Dev Containers: Rebuild Container"
@@ -657,8 +677,12 @@ The same file also carries the `.venv` volume overlay and the shared-`.claude` s
 is now shared with the container instead of copied into a volume, so host edits
 reach the container and container commits no longer revert .claude files; only
 .claude/settings.local.json is overridden, from
-.devcontainer/container-settings.local.json. If your host .venv was already
-clobbered by an earlier container run, repair it once on the host with:
+.devcontainer/container-settings.local.json. The host ~/.claude is now bound a
+second time at its own host path, so plugin marketplaces resolve inside the
+container and the task-reviewer agent registers; until the container is
+recreated, `claude plugin list` still reports cache-miss and Review silently
+runs without the real reviewer. If your host .venv was already clobbered by an
+earlier container run, repair it once on the host with:
   rm -rf .venv && uv sync
 ```
 

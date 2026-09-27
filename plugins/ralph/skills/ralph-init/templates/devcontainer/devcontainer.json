@@ -40,6 +40,16 @@
   "mounts": [
     "source=claude-code-bashhistory-${devcontainerId},target=/commandhistory,type=volume",
     "source=${localEnv:HOME}/.claude,target=/home/node/.claude,type=bind",
+    // NOT a duplicate of the bind above — do not prune it. Claude Code's plugin
+    // registries (plugins/known_marketplaces.json, installed_plugins.json)
+    // record absolute *host* paths, so a marketplace resolves only when that
+    // literal path also exists in the container. Without this second bind every
+    // user plugin fails with "Marketplace <name> failed to load: cache-miss",
+    // the task-reviewer agent from ralph@dddpaul-ralph never registers, and the
+    // Review step silently degrades while still reporting APPROVED.
+    // No writes are directed through this path: CLAUDE_CONFIG_DIR stays
+    // /home/node/.claude, which is where Claude Code reads and writes.
+    "source=${localEnv:HOME}/.claude,target=${localEnv:HOME}/.claude,type=bind",
     // Single-file overlay for .claude/settings.local.json: the only file that
     // must differ inside the container, because bwrap can't create mount
     // namespaces on Docker Desktop macOS so the sandbox has to be off there.
