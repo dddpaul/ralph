@@ -8,7 +8,11 @@ FROM node:20
 ARG TZ
 ENV TZ="$TZ"
 
-ARG CLAUDE_CODE_VERSION=latest
+# No default on purpose: the version comes from devcontainer.json build.args,
+# a concrete X.Y.Z. A floating tag like `latest` is resolved once and then
+# frozen in the layer cache, so the image silently ages; the npm step below
+# refuses one.
+ARG CLAUDE_CODE_VERSION
 
 # Install basic development tools and networking utilities
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -81,7 +85,15 @@ RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/
   -x
 
 # ---- Claude ----
-RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION} backlog.md
+# Bumping CLAUDE_CODE_VERSION changes this layer's cache key, so the next
+# build reinstalls; the label lets `docker image inspect` report the version.
+LABEL dev.ralph.claude-code-version="${CLAUDE_CODE_VERSION}"
+RUN case "${CLAUDE_CODE_VERSION}" in \
+    [0-9]*.[0-9]*.[0-9]*) ;; \
+    *) echo "CLAUDE_CODE_VERSION must be a concrete X.Y.Z, got '${CLAUDE_CODE_VERSION}'" >&2; exit 1 ;; \
+  esac \
+  && npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION} backlog.md \
+  && claude --version | grep -qF "${CLAUDE_CODE_VERSION}"
 
 # ---- uv + Python 3.14 (required by Ralph orchestrator regardless of project language) ----
 USER root

@@ -276,6 +276,13 @@ awk '$5 == "/workspace" || $5 ~ /^\/workspace\// { print $5, $(NF-2) }' /proc/se
 
 A `mounts` or lifecycle-hook change needs **Dev Containers: Rebuild Container** (or `--rebuild` / `/ralph-run rebuild=true`) — a restart will not pick it up, because `mounts`, `initializeCommand`, and `postCreateCommand` are all read only when the container is created.
 
+**Claude Code version pin (the image must not freeze an old CLI):** `devcontainer.json` passes `CLAUDE_CODE_VERSION` as a concrete `X.Y.Z` build arg, never `latest`. The Dockerfile installs it with `npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}`, and because that `RUN` line never changes, Docker caches the layer: a floating tag is resolved once, at the first build, and every later build silently reuses it. A container 24 releases behind npm then fails every Ralph iteration with `Claude Code X.Y.Z does not support this model; version … or newer is required`, while the image looks freshly rebuilt. With a pin, the version is in the diff, and bumping it changes the layer's cache key, so the next build reinstalls. `Dockerfile.base` declares the `ARG` with **no default** and its npm step fails the build on anything that is not `X.Y.Z` (empty, `latest`, `next`), then checks `claude --version` against the pin; it also stamps the pin as the image label `dev.ralph.claude-code-version`.
+
+- **Bump:** set the value to `npm view @anthropic-ai/claude-code version`, commit, then rebuild the image.
+- **What the next build installs** (no container needed): `grep '"CLAUDE_CODE_VERSION"' .devcontainer/devcontainer.json`
+- **What a built image carries** (no container needed): `docker image inspect --format '{{ index .Config.Labels "dev.ralph.claude-code-version" }}' <image>` — devcontainer images are named `vsc-<folder>-<hash>`; list them with `docker images 'vsc-*'`.
+- **`--remove-existing-container` does NOT refresh the image.** It (like `--rebuild`, `/ralph-run rebuild=true`, and "Rebuild Container") recreates the *container*; the image layers come from the build cache, and any layer whose inputs did not change is reused as-is. To force a fresh image regardless of inputs, run `devcontainer build --workspace-folder . --no-cache`, then recreate the container.
+
 **Host MCP gateway slot (optional):** the template also ships a neutral, service-agnostic "host MCP gateway" slot so MCP-dependent phases can run with `devcontainer=true` (sandbox isolation intact) instead of falling back to `devcontainer=false`. Inside the container `localhost` points at the container, so a gateway published on the host is unreachable by that name; the host is reachable at `host.docker.internal`, and `init-firewall.sh` already permits that container→host egress (same path as the `host.docker.internal:3128` Squid proxy). The template forwards two neutral vars — `MCP_GATEWAY_HOST` (fixed to `host.docker.internal`) and `MCP_GATEWAY_TOKEN` (a `${localEnv:MCP_GATEWAY_TOKEN}` passthrough) — and appends `host.docker.internal` to `NO_PROXY` so the MCP client connects **directly** to the host gateway instead of routing through Squid (which is not configured to reach it). Ralph ships only this reachability plumbing; the specific gateway (its port and path) stays in the project's own `.mcp.json`. Ralph never names the service. If the project has no host MCP gateway, ignore this — the vars resolve empty and nothing else changes. Tell the user:
 
 1. **Export the gateway token from the shell's always-sourced env file** (same gotcha as the OAuth token above): zsh users add the export to `~/.zshenv` — NOT `~/.zshrc`, which is interactive-only, so non-interactive Ralph launches would see an empty value. bash users use the equivalent always-sourced env file.
@@ -696,6 +703,22 @@ to your own $HOME/.claude (the clones themselves are intact, so no re-add is
 needed). If your host .venv was already clobbered by an
 earlier container run, repair it once on the host with:
   rm -rf .venv && uv sync
+```
+
+**Claude Code version pin on upgrade:** the template's `devcontainer.json` pins `CLAUDE_CODE_VERSION` to a concrete `X.Y.Z` (see the Init "Claude Code version pin" note). Two rules apply when U4 rewrites the file:
+
+1. **Never downgrade.** If the project's existing `CLAUDE_CODE_VERSION` is a concrete version **newer** than the template's, keep the project's value in the rewritten file and say so in the U5 summary. An older project value or `latest` takes the template's pin.
+2. **Patch the Dockerfile in place (confirm first).** `.devcontainer/Dockerfile` is skipped by the U2 table (assembled), so it keeps `ARG CLAUDE_CODE_VERSION=latest` and the bare npm `RUN`. The pinned build arg already overrides that default, so the freeze is fixed by `devcontainer.json` alone; still offer to replace those two instructions with the `Dockerfile.base` versions (the default-less `ARG`, the `LABEL dev.ralph.claude-code-version`, and the guarded npm `RUN`) so a lost build arg fails the build instead of quietly installing `latest`. Show the diff, apply only on a yes, and label the file `skipped (assembled; version pin patched)` in U5 when it fires.
+
+Whenever the pin changed, add to the U5 summary:
+
+```
+CLAUDE_CODE_VERSION is now pinned to <X.Y.Z> — the image needs a rebuild to pick
+it up. --remove-existing-container / "Rebuild Container" recreates the container
+but does NOT refresh cached image layers; the changed pin invalidates the npm
+layer on the next build, and `devcontainer build --workspace-folder . --no-cache`
+forces a fresh image. Check what a built image carries with:
+  docker image inspect --format '{{ index .Config.Labels "dev.ralph.claude-code-version" }}' <image>
 ```
 
 **If the project already applied this fix by hand**, U4's overwrite is still the right outcome — the template is the canonical shape — but say so explicitly in the U5 summary rather than letting the rewrite look like a surprise, and check that `.devcontainer/container-settings.local.json` survived with the sandbox switch intact.
