@@ -7,11 +7,11 @@
 # `.syncthing.<name>.tmp` transfer name (+15 bytes) is accounted for.
 # See TASK-227.
 
-PROJECT_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/../.." && pwd)"
+load '../helpers/common'
 GUARD="$PROJECT_ROOT/.claude/hooks/filename-length-guard.sh"
 
 setup() {
-  TEST_DIR=$(mktemp -d)
+  TEST_DIR="$(make_temp_dir)"
   cd "$TEST_DIR"
   git init -q -b master
   git config user.email test@example.com
