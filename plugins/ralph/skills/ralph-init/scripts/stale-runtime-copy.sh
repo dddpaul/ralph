@@ -21,7 +21,9 @@
 # paragraph holding the COPY with the first paragraph of the current
 # Dockerfile.install.<flavour>. The flavour is docs when the file carries the
 # "# ---- Documentation Tools ----" block, python when the stage image is a
-# python:* image; anything else is left for the user (exit 3).
+# python:* image; anything else is left for the user (exit 3), as is a copy
+# paragraph holding anything but comments and COPY lines. Both fragments are
+# read before anything is printed, so a failed read prints nothing.
 set -euo pipefail
 
 usage() {
@@ -46,21 +48,17 @@ function guarded(src) {
   return src == "/usr/local" || src ~ /^\/usr\/local\/(bin|lib)(\/.*)?$/
 }
 function blank(s) { return s ~ /^[ \t]*$/ }
-function emit_file(path,   line, n, rc) {
-  n = 0
-  while ((rc = (getline line < path)) > 0) { print line; n++ }
-  close(path)
-  if (rc < 0 || n == 0) { print "stale-runtime-copy: cannot read " path > "/dev/stderr"; exit 2 }
-}
-function emit_first_paragraph(path,   line, n, rc) {
-  n = 0
+function slurp(path, first_paragraph_only,   line, out, n, rc) {
+  out = ""; n = 0
   while ((rc = (getline line < path)) > 0) {
-    if (blank(line)) break
-    print line; n++
+    if (first_paragraph_only && blank(line)) break
+    out = out line "\n"; n++
   }
   close(path)
   if (rc < 0 || n == 0) { print "stale-runtime-copy: cannot read " path > "/dev/stderr"; exit 2 }
+  return out
 }
+function by_hand(why) { print "stale-runtime-copy: " why "; patch by hand" > "/dev/stderr"; exit 3 }
 BEGIN { ns = split("buster bullseye bookworm trixie forky sid", S, " ") }
 { L[NR] = $0 }
 toupper($1) == "FROM" && NF > 1 { base = $2; basel = NR }
@@ -92,25 +90,29 @@ END {
     exit (nv > 0)
   }
   if (nv == 0) { print "stale-runtime-copy: nothing to patch" > "/dev/stderr"; exit 1 }
-  if (nv > 1) { print "stale-runtime-copy: more than one stale copy; patch by hand" > "/dev/stderr"; exit 3 }
+  if (nv > 1) by_hand("more than one stale copy")
   flavour = ""
-  for (i = 1; i <= NR; i++) if (L[i] == "# ---- Documentation Tools ----") flavour = "docs"
+  for (i = 1; i <= NR; i++) if (L[i] ~ /^# ---- Documentation Tools ----\r?$/) flavour = "docs"
   if (flavour == "" && VI[1] ~ /(^|\/)python:/) flavour = "python"
-  if (flavour == "") {
-    print "stale-runtime-copy: no current fragment replaces stage image " VI[1] "; patch by hand" > "/dev/stderr"
-    exit 3
-  }
+  if (flavour == "") by_hand("no current fragment replaces stage image " VI[1])
   c = V[1]; cl = CL[c]; o = CO[c]
   ss = 0; se = -1
   if (o !~ /[:\/]/ && (o in stage)) {
     se = stagel[o]; ss = se
     while (ss > 1 && L[ss - 1] ~ /^###/) ss--
   }
-  ps = cl; while (ps > 1 && !blank(L[ps - 1])) ps--
+  # The copy paragraph: bounded by blank lines and never reaching the base FROM.
+  ps = cl; while (ps > basel + 1 && !blank(L[ps - 1])) ps--
   pe = cl; while (pe < NR && !blank(L[pe + 1])) pe++
+  for (i = ps; i <= pe; i++)
+    if (L[i] !~ /^[ \t]*#/ && toupper(substr(L[i], 1, 5)) != "COPY ")
+      by_hand("line " i " shares a paragraph with the stale copy")
+  if (se >= ps) by_hand("the stale stage is not above the devcontainer stage")
+  lang_text = slurp(lang_dir "/Dockerfile.lang." flavour, 0)
+  install_text = slurp(lang_dir "/Dockerfile.install." flavour, 1)
   for (i = 1; i <= NR; i++) {
-    if (i == ss) emit_file(lang_dir "/Dockerfile.lang." flavour)
-    if (i == ps) emit_first_paragraph(lang_dir "/Dockerfile.install." flavour)
+    if (i == ss) printf "%s", lang_text
+    if (i == ps) printf "%s", install_text
     if ((i >= ss && i <= se) || (i >= ps && i <= pe)) continue
     print L[i]
   }

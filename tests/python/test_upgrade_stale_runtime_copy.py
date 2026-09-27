@@ -145,6 +145,29 @@ def test_patch_refuses_a_stage_it_has_no_fragment_for(tmp_path: Path) -> None:
     assert "patch by hand" in out.stderr
 
 
+def test_patch_never_swallows_a_neighbouring_instruction(tmp_path: Path) -> None:
+    # No blank lines around the copy: a paragraph walk bounded only by blank
+    # lines would drop the base FROM and the RUN along with the COPY.
+    path = write(
+        tmp_path,
+        "FROM python:3.14 AS python-runtime\n"
+        "FROM node:20\n"
+        "COPY --from=python-runtime /usr/local /usr/local\n"
+        "RUN echo important\n",
+    )
+    assert run("check", path).returncode == 1
+    out = run("patch", path)
+    assert (out.returncode, out.stdout) == (3, "")
+    assert "shares a paragraph" in out.stderr
+
+
+def test_patch_prints_nothing_when_a_fragment_is_unreadable(tmp_path: Path) -> None:
+    path = write(tmp_path, assemble(OLD_STAGE["docs"], OLD_INSTALL["docs"]))
+    env = {**os.environ, "RALPH_LANG_DIR": str(tmp_path / "missing")}
+    out = run("patch", path, env)
+    assert (out.returncode, out.stdout) == (2, "")
+
+
 # The fragment guard's reproduction matrix: (base, stage, install).
 MATRIX = (
     ("FROM node:20\n", "FROM python:3.14 AS python-runtime\n", OLD_COPY),

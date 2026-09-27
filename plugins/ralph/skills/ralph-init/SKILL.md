@@ -637,7 +637,7 @@ CLAUDE.md (generic section)                  current
 - **`.devcontainer/container-settings.local.json`**: show the unified diff (`diff -u`) — it is three lines, and it is the file that decides whether the container runs with the sandbox off.
 - **`.devcontainer/Dockerfile`** when U2 marked it `skipped (assembled; stale runtime copy)`: print the `check` output line and say that `python3` in the image cannot start. The patch itself is offered separately in U4 ("Stale language-runtime copy on upgrade"). A stale Dockerfile counts as pending work: when every other file is **current** or **skipped**, do not print "All Ralph files are up to date." and stop — skip the batch question and go straight to that U4 offer.
 
-If all files are **current** or **skipped**, print "All Ralph files are up to date." and stop.
+If all files are **current** or **skipped** — except a Dockerfile marked `skipped (assembled; stale runtime copy)`, which is pending work (see the bullet above) — print "All Ralph files are up to date." and stop.
 
 **Then ask:**
 ```
@@ -725,7 +725,7 @@ forces a fresh image. Check what a built image carries with:
 **Stale language-runtime copy on upgrade:** projects bootstrapped as Python or Documentation / Mixed before TASK-242 still carry `FROM python:3.14 AS python-runtime` and `COPY --from=python-runtime /usr/local /usr/local` in `.devcontainer/Dockerfile`. `python:3.14` is built on a newer Debian than the `node:20` (bookworm) base, so that copy puts an interpreter linked against a glibc the image lacks first in `PATH`, and `python3 -c ''` cannot start. The upgraded pre-commit hook already skips a `python3` that cannot run, so commits still work; the image is degraded, not broken. When U2 marked the Dockerfile `skipped (assembled; stale runtime copy)`, offer the in-place patch — confirm-only, the same shape as the version-pin patch above:
 
 1. Run `bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-init/scripts/stale-runtime-copy.sh patch .devcontainer/Dockerfile > .devcontainer/Dockerfile.patched`. The script only prints; it never writes the Dockerfile. It replaces the stale stage (the `FROM … AS <stage>` line and the `###` banner above it) with the current `templates/devcontainer/lang/Dockerfile.lang.<flavour>`, and the paragraph holding the `COPY` with the first paragraph of the current `Dockerfile.install.<flavour>`; every other line is kept. The flavour comes from the file itself — `docs` when it carries `# ---- Documentation Tools ----`, `python` when the stage image is `python:*` — so a Mixed project gets the fragments it was assembled from.
-2. **Exit 3** (more than one stale copy, or a stage no current fragment replaces): delete `.devcontainer/Dockerfile.patched`, show the `check` output, tell the user to fix the file by hand, and label it `skipped (assembled; stale runtime copy, patch by hand)` in U5.
+2. **Any exit other than 0** — 3 (more than one stale copy, a stage no current fragment replaces, or a copy paragraph that also holds other instructions), 2 (a fragment could not be read), or anything else: delete `.devcontainer/Dockerfile.patched`, show the script's stderr and the `check` output, tell the user to fix the file by hand, and label it `skipped (assembled; stale runtime copy, patch by hand)` in U5.
 3. **Exit 0:** show `diff -u .devcontainer/Dockerfile .devcontainer/Dockerfile.patched` and ask:
 
    ```
@@ -735,7 +735,7 @@ forces a fresh image. Check what a built image carries with:
 
 4. On **y**: `mv .devcontainer/Dockerfile.patched .devcontainer/Dockerfile` and label the file `skipped (assembled; runtime copy patched)` in U5. On **N** (default) or an empty answer: delete `.devcontainer/Dockerfile.patched`, leave the Dockerfile untouched, and label it `skipped (assembled; stale runtime copy, user declined)`. Never write the Dockerfile without the explicit yes.
 
-A project that deliberately re-pinned the stage and the base to the **same** Debian suite (for example `python:3.14-bookworm` over `node:20-bookworm`) passes `check`, so none of this fires for it. When the patch was applied, add to the U5 summary that the image needs a rebuild to drop the copied interpreter. When both this patch and the version-pin patch fire, combine the labels: `skipped (assembled; version pin patched; runtime copy patched)`.
+A project that deliberately re-pinned the stage and the base to the **same** Debian suite (for example `python:3.14-bookworm` over `node:20-bookworm`) passes `check`, so none of this fires for it. When the patch was applied, add to the U5 summary that the image needs a rebuild to drop the copied interpreter. When the version-pin patch also fired, join both outcomes in one label, version pin first — e.g. `skipped (assembled; version pin patched; runtime copy patched)` or `skipped (assembled; version pin patched; stale runtime copy, user declined)`.
 
 **If the project already applied this fix by hand**, U4's overwrite is still the right outcome — the template is the canonical shape — but say so explicitly in the U5 summary rather than letting the rewrite look like a surprise, and check that `.devcontainer/container-settings.local.json` survived with the sandbox switch intact.
 
