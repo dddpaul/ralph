@@ -87,6 +87,7 @@ When the user types something like `check new task TASK-NNN — do you understan
 2. Run the task's "Before starting" checklist literally:
    - Verify every `(exists)` file path in the Files section is present on disk in this repo.
    - Confirm each AC is objectively pass/fail (a grep, test invocation, build command, or visible behavior — not "works correctly").
+   - If the task changes a default passed to an external tool (CLI flag default, model id, image tag, version pin), confirm at least one AC invokes the tool with the new value and records the result — pass/fail greps, doc tables, and unit tests on the parsed default are not enough, because they cannot see the tool reject the value.
    - Confirm all dependencies listed in the task's frontmatter are status=Done.
    - Confirm out-of-scope items will not be accidentally pulled in.
 3. Report green / yellow / red:
