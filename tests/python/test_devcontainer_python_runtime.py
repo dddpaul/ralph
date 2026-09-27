@@ -192,3 +192,23 @@ def test_devcontainer_builds_the_composed_dockerfile() -> None:
     config = load_jsonc(TEMPLATE)
     assert "image" not in config
     assert config["build"]["dockerfile"] == "Dockerfile"
+
+
+def test_guard_fires_on_a_mutated_copy_of_the_real_fragments(tmp_path: Path) -> None:
+    # Mutation check against the shipped files rather than a synthetic tree:
+    # put the old python:3.14 stage and its /usr/local copy back into a copy of
+    # the real python fragments and assert the guard reports exactly that.
+    lang = tmp_path / "lang"
+    lang.mkdir()
+    for fragment in LANG_DIR.iterdir():
+        (lang / fragment.name).write_bytes(fragment.read_bytes())
+    with (lang / "Dockerfile.lang.python").open("a", encoding="utf-8") as f:
+        f.write("\nFROM python:3.14 AS python-runtime\n")
+    with (lang / "Dockerfile.install.python").open("a", encoding="utf-8") as f:
+        f.write("\nCOPY --from=python-runtime /usr/local /usr/local\n")
+
+    out = check_copies(lang, BASE)
+    assert len(out) == 1
+    assert out[0].startswith("Dockerfile.install.python:")
+    assert "python:3.14" in out[0]
+    assert check_copies(LANG_DIR, BASE) == []
