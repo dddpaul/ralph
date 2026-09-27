@@ -84,8 +84,9 @@ hostpath_mount() {
 @test "the /home/node/.claude bind is still there alongside it" {
   local f mount
   for f in "$LIVE" "$TEMPLATE"; do
-    # CLAUDE_CONFIG_DIR points at /home/node/.claude, so that bind is the one
-    # Claude Code actually reads and writes; the host-path bind is additive.
+    # $HOME inside the container is /home/node, so this bind is what makes a
+    # bare ~/.claude (used by any tool that ignores CLAUDE_CONFIG_DIR) land on
+    # the same shared directory as the config root.
     mount="$(query "$f" '.mounts[] | select(test("target=/home/node/\\.claude(,|$)"))')"
     [ -n "$mount" ]
     [[ "$mount" == *'source=${localEnv:HOME}/.claude'* ]]
@@ -93,13 +94,15 @@ hostpath_mount() {
   done
 }
 
-@test "CLAUDE_CONFIG_DIR still points at /home/node/.claude" {
+@test "CLAUDE_CONFIG_DIR points at the host path this mount provides" {
   local f
   for f in "$LIVE" "$TEMPLATE"; do
-    # The new mount adds a read path, not a write path. If CLAUDE_CONFIG_DIR
-    # ever moved to the host path, container runs would start writing
-    # container-only paths back into the shared registries.
-    [ "$(query "$f" '.containerEnv.CLAUDE_CONFIG_DIR')" = "/home/node/.claude" ]
+    # TASK-241 repointed the config root here. The mount above is what makes
+    # that path exist inside the container, so the two must not drift apart:
+    # drop the mount and Claude Code starts against a config root that is an
+    # empty auto-created directory. The write-direction argument is in
+    # devcontainer-claude-config-root.bats.
+    [ "$(query "$f" '.containerEnv.CLAUDE_CONFIG_DIR')" = '${localEnv:HOME}/.claude' ]
   done
 }
 

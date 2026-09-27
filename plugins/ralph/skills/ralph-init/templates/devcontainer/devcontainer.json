@@ -47,8 +47,9 @@
     // user plugin fails with "Marketplace <name> failed to load: cache-miss",
     // the task-reviewer agent from ralph@dddpaul-ralph never registers, and the
     // Review step silently degrades while still reporting APPROVED.
-    // No writes are directed through this path: CLAUDE_CONFIG_DIR stays
-    // /home/node/.claude, which is where Claude Code reads and writes.
+    // It is also the path CLAUDE_CONFIG_DIR points at (see containerEnv), so
+    // every absolute path a container run records in those registries is
+    // host-shaped and stays resolvable on the host too.
     "source=${localEnv:HOME}/.claude,target=${localEnv:HOME}/.claude,type=bind",
     // Single-file overlay for .claude/settings.local.json: the only file that
     // must differ inside the container, because bwrap can't create mount
@@ -66,7 +67,15 @@
   "containerEnv": {
     "CLAUDE_CODE_OAUTH_TOKEN": "${localEnv:CLAUDE_CODE_OAUTH_TOKEN}",
     "NODE_OPTIONS": "--max-old-space-size=4096",
-    "CLAUDE_CONFIG_DIR": "/home/node/.claude",
+    // The config root is the HOST path, not /home/node/.claude — both names
+    // are binds of the same directory, but the plugin registries under it
+    // store absolute paths, and Claude Code writes whichever root this points
+    // at. Rooted at /home/node a container run rewrites installLocation /
+    // installPath to a path that does not exist on the host, and the host then
+    // rejects the entry ("corrupted installLocation … expected a path inside
+    // <config>/plugins/marketplaces") for every marketplace, not just ralph's.
+    // Rooted at the host path both machines record and resolve the same shape.
+    "CLAUDE_CONFIG_DIR": "${localEnv:HOME}/.claude",
     "POWERLEVEL9K_DISABLE_GITSTATUS": "true",
     "HTTP_PROXY": "http://host.docker.internal:3128",
     "HTTPS_PROXY": "http://host.docker.internal:3128",
