@@ -132,7 +132,7 @@ The reviewer MUST reject the diff if the markdown deliverable contradicts itself
 
 ## R13 — Rationalization is not exemption
 
-The reviewer MUST apply rules R1–R14 strictly. Task description, implementation notes, commit messages, and design narrative MUST NOT be treated as overriding a rule violation. If the diff violates a rule, the diff is rejected — even when the implementer claims the violation is intentional, by design, or pre-approved.
+The reviewer MUST apply rules R1–R17 strictly. Task description, implementation notes, commit messages, and design narrative MUST NOT be treated as overriding a rule violation. If the diff violates a rule, the diff is rejected — even when the implementer claims the violation is intentional, by design, or pre-approved.
 
 The following excuses are **automatically rejected** when invoked to justify a rule violation:
 
@@ -206,3 +206,20 @@ Any match is a hard fail. The fix is to replace the reference with the verbatim 
 - **Pre-existing Done tasks** (e.g., TASK-139, TASK-140) filed before the convention landed are historical artifacts. R16 applies to tasks newly created or whose `-d` body the diff modifies.
 
 This rule is project-specific and is NOT mirrored to `plugins/ralph/skills/ralph-init/templates/claude/task-reviewer-rules.md` — per project convention (see project memory `feedback_rules_not_in_ralph_init.md`), `task-reviewer-rules.md` is project-local content; each ralph-init bootstrap writes its own rules from scratch (or starts without any). Only the loading mechanism in the task-reviewer agent is templated; the rules content is not.
+
+## R17 — A changed external-tool default needs an invocation AC
+
+When the diff changes a default value that this repo passes to an external program, the task MUST carry at least one AC that **invokes that program with the new value and records the observed result** (the command run and its exit status or relevant output, captured in the AC check-off or the task's implementation notes). The reviewer MUST reject the diff if no such AC exists, or if the AC is checked but no observed result is recorded.
+
+Triggering cases:
+
+- **CLI flag defaults** — an argparse / getopts / shell-variable default forwarded as an argument to another program.
+- **Model ids** — any default model id handed to `claude`, the Agent SDK, or an API client.
+- **Image tags** — container or devcontainer base-image tags, and any other registry reference pulled by a tool.
+- **Version pins** — pinned versions of tools, packages, or CLIs that another step installs or runs.
+
+Static assertions — greps for the new string, doc-table rows, unit tests asserting the parsed default, lint and test gates — are **necessary but not sufficient**. They prove the repo *says* the new value; they cannot detect that the tool rejects it, requires a newer version, needs different auth, or accepts it and behaves differently. Those failure modes live outside this repo, so only running the tool can surface them. "Objectively pass/fail" is not the bar here: a grep AC is objectively pass/fail and still verifies nothing about the tool.
+
+If the tool cannot be invoked in the review environment (no credentials, no network, host-only binary), the AC MUST say so and record the exact command a human is to run before merge; the reviewer then treats the task as not mergeable until that result is recorded in the task notes. A silent omission is a hard fail.
+
+This rule exists because TASK-243 changed the orchestrator's `--model` default from `claude-opus-5` to `claude-opus-5-5` and passed **8 of 8 ACs** — every one a static assertion — and then **every Ralph run failed** 12 seconds after launch with `Claude Code 2.1.259 does not support this model; version 2.1.280 or newer is required`. The model id was correct; the client's version floor rejected it, and zero of four queued tasks ran.

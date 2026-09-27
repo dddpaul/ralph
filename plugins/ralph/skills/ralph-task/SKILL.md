@@ -97,7 +97,7 @@ Applies equally to creation ("one task or many?") and edit-deliberation ("add as
 | 2 | Dependency | Cross-purpose-value reference → split + `--dep`. Same-purpose-value reference → keep together. |
 | 3 | Mirror (R11) | Mechanical mirror in parity location → same task. |
 | 4 | Rollback | Partial merge breaks coherence → same task. |
-| 5 | Verification | Every AC objectively pass/fail (grep, test, `bash -n`, file existence). |
+| 5 | Verification | Every AC objectively pass/fail (grep, test, `bash -n`, file existence). A task that changes a default passed to an external tool (CLI flag default, model id, image tag, version pin) also needs an AC that **invokes the tool with the new value and records the result** — static greps and parsed-default unit tests cannot see the tool reject it. |
 
 ### Cadence note
 
@@ -198,7 +198,7 @@ When an edit-deliberation trigger fires, apply the 6 rules to decide between two
 - **Rule 0 (purpose-value):** Is the new outcome part of the existing task's deliverable, or its own deliverable? Different deliverable → split.
 - **Rule 1 (one-PR / ~10 ACs):** Would adding this push the task over the cap? Over → split.
 - **Rule 2 (dependency):** Cross-purpose-value reference → split with `--dep`. Same-purpose-value → keep.
-- **Rule 5 (verification):** Is each AC objectively pass/fail? If the AC is vague ("works correctly", "good UX"), reword it to a verifiable form. If it cannot be made verifiable in one line, split it.
+- **Rule 5 (verification):** Is each AC objectively pass/fail? If the AC is vague ("works correctly", "good UX"), reword it to a verifiable form. If it cannot be made verifiable in one line, split it. If the task changes an external-tool default (CLI flag default, model id, image tag, version pin), add an AC that runs the tool with the new value and records the observed result.
 
 ### Recipe A — split into sibling task
 
