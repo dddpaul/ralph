@@ -1,10 +1,10 @@
 ---
 id: TASK-253
 title: Fail the lint gate on Python lines over 120 characters
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 17:01'
-updated_date: '2026-09-27 18:36'
+updated_date: '2026-09-27 19:03'
 labels: []
 dependencies: []
 priority: low
@@ -82,11 +82,25 @@ The PRD and brainstorm documents under `design/` mention `line-length = 88` as d
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A Python line longer than 120 characters fails uv run ruff check ., demonstrated by adding one temporarily and observing the failure
-- [ ] #2 No Python line is rewrapped for length: E501 reports zero findings on the repo as it stands, so the change touches no shipped code for line length
-- [ ] #3 The three SIM108 findings unlocked by the raised pycodestyle limit are fixed, or narrowly ignored with the reason recorded in pyproject.toml
-- [ ] #4 ruff format keeps line-length 88 and is not added as a gate, with the reason recorded in pyproject.toml or the task notes
-- [ ] #5 CLAUDE.md and templates/root/CLAUDE.conventions.python.md state the 120-character limit and scope it to code, not markdown
-- [ ] #6 No markdownlint config or markdown line-length rule is added anywhere in the repo
-- [ ] #7 uv run pytest, LC_ALL=C bats tests/unit and bats tests/integration pass with no new failures
+- [x] #1 A Python line longer than 120 characters fails uv run ruff check ., demonstrated by adding one temporarily and observing the failure
+- [x] #2 No Python line is rewrapped for length: E501 reports zero findings on the repo as it stands, so the change touches no shipped code for line length
+- [x] #3 The three SIM108 findings unlocked by the raised pycodestyle limit are fixed, or narrowly ignored with the reason recorded in pyproject.toml
+- [x] #4 ruff format keeps line-length 88 and is not added as a gate, with the reason recorded in pyproject.toml or the task notes
+- [x] #5 CLAUDE.md and templates/root/CLAUDE.conventions.python.md state the 120-character limit and scope it to code, not markdown
+- [x] #6 No markdownlint config or markdown line-length rule is added anywhere in the repo
+- [x] #7 uv run pytest, LC_ALL=C bats tests/unit and bats tests/integration pass with no new failures
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan: add E501 with pycodestyle max-line-length=120 in pyproject (formatter stays 88, ungated, reason commented); rewrite the 3 SIM108 sites as ternaries; update CLAUDE.md + python conventions template; verify with a synthetic long line.
+
+Commit: `03552d5` - task-253: fail ruff check on Python lines over 120 characters
+
+Verified: synthetic 146-char line -> E501, rc=1; E501 zero findings on repo; SIM108 x3 rewritten as parenthesized ternaries (formatter-clean; the 3 files' pre-existing ruff-format drift is byte-identical to master). ruff format stays at 88 and ungated, reason commented in pyproject.toml. No markdownlint config exists. pytest 669 passed; bats unit 110 (only #96 R11 settings.local.json fails, pre-existing on master); integration 52/52.
+
+task-reviewer: APPROVED.
+
+Commit: `d32731b` - task-253: bump plugin version to 0.8.1 (patch)
+<!-- SECTION:NOTES:END -->
