@@ -366,7 +366,8 @@ Double-run guard: startup reads status, exits with PID-named error if state=runn
 ### 4.6 Devcontainer
 
 - Base `node:20`, optional Stage-1 language runtime.
-- Mounts: `${HOME}/.claude` → `/home/node/.claude` (bind), and a **volume overlay** at `/workspace/.claude` populated from a bind-ro `/workspace-host-claude` via `postCreateCommand` — disables sandbox by patching `sandbox.enabled=false` without modifying host settings. This overlay is the source of the recurring `.claude/*` drift bug (4 recurrences: TASK-137/139/141/142).
+- Mounts: the project `.claude/` is part of the shared workspace bind (no copy, so no drift); a **single-file bind** overlays only `/workspace/.claude/settings.local.json`, sourced from `.devcontainer/container-settings.local.json`, which turns the sandbox off inside the container without modifying host settings; `${HOME}/.claude` is bound **twice**, at `/home/node/.claude` and at its own host path, so plugin registries resolve on both machines; `CLAUDE_CONFIG_DIR` points at the host path, which keeps registry entries host-shaped.
+- History (resolved): an earlier design copied the project `.claude/` into a container volume, which caused the recurring `.claude/*` drift bug (4 recurrences: TASK-137/139/141/142). TASK-239/240/241 replaced it with the mount set above.
 - Firewall via `init-firewall.sh` + `--cap-add=NET_ADMIN,NET_RAW`. ipset of allowed domains (GitHub IP ranges via meta API, npm, anthropic, sentry, statsig, vscode CDN). Outbound default-deny.
 
 ### 4.7 Usage-cap pause
@@ -462,7 +463,7 @@ Ranked by ROI (impact ÷ effort), with concrete task shapes. Each is a defensibl
 
 ### 6.3 MEDIUM — worktree isolation per task
 
-**Today:** per-task **branch** in a single working tree. Devcontainer volume overlay at `/workspace/.claude/` has caused 4 recurrences of state drift (TASK-137/139/141/142).
+**Today:** per-task **branch** in a single working tree. The devcontainer's former volume overlay at `/workspace/.claude/` caused 4 recurrences of state drift (TASK-137/139/141/142); resolved by TASK-239/240/241, which replaced it with the shared workspace bind plus a single-file `settings.local.json` overlay (see §4.6).
 
 **Proposed (ralphex `--worktree` pattern):** each task gets a fresh `git worktree add` under `.ralph-worktrees/task-<id>/`. After merge, worktree is removed. Status JSON tracks worktree path.
 
