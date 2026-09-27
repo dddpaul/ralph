@@ -126,6 +126,10 @@ settings_mount() {
     # [ -s ] is what makes it idempotent and leaves a real host file alone;
     # [ -f ] would leave a 0-byte file in place, which is the failure mode.
     [[ "$cmd" == *"-s "* ]]
+    # The directory must exist before the redirect: on a fresh clone with no
+    # .claude, the redirect fails, sh exits non-zero, and the devcontainer CLI
+    # aborts container creation.
+    [[ "$cmd" == *"mkdir -p .claude"* ]]
   done
 }
 
@@ -152,6 +156,20 @@ settings_mount() {
   [ "$(jq -r '.sandbox.enabled' "$tmp/.claude/settings.local.json")" = "true" ]
 
   rm -rf "$tmp"
+}
+
+@test "the seeding command succeeds in a clone with no .claude directory" {
+  # A fresh clone may lack .claude entirely (gitignored or never committed).
+  # Docker runs initializeCommand as /bin/sh -c from the project root.
+  local f cmd tmp
+  for f in "$LIVE" "$TEMPLATE"; do
+    cmd="$(query "$f" '.initializeCommand')"
+    tmp="$(mktemp -d)"
+    run sh -c "cd '$tmp' && $cmd"
+    [ "$status" -eq 0 ]
+    [ "$(cat "$tmp/.claude/settings.local.json")" = "{}" ]
+    rm -rf "$tmp"
+  done
 }
 
 @test "postCreateCommand grants git safe.directory on the workspace" {

@@ -90,7 +90,9 @@
   // destination. Without it a fresh clone gets a 0-byte file the host's own
   // Claude Code cannot parse. Runs through /bin/sh with the working directory
   // pinned to the workspace folder, and [ -s ] leaves a real file alone.
-  "initializeCommand": "sh -c '[ -s .claude/settings.local.json ] || echo {} > .claude/settings.local.json'",
+  // mkdir -p comes first: with no .claude the redirect fails, sh exits
+  // non-zero, and the devcontainer CLI aborts container creation.
+  "initializeCommand": "sh -c 'mkdir -p .claude && { [ -s .claude/settings.local.json ] || echo {} > .claude/settings.local.json; }'",
   // /workspace presents as root-owned inside the container while the user is
   // node, so git refuses the repo with "detected dubious ownership" until the
   // folder is marked safe. The .venv chown is for the named volume above.
