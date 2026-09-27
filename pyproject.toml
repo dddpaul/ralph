@@ -10,12 +10,19 @@ dev = [
 ]
 
 [tool.ruff]
+# Formatter wrap target only. `ruff format` is deliberately not a gate: gating
+# it would reformat existing files for no functional reason, and raising this
+# to 120 would make the formatter rejoin deliberately wrapped lines.
 line-length = 88
 target-version = "py314"
 src = ["plugins/ralph/skills/ralph-run/scripts"]
 
 [tool.ruff.lint]
-extend-select = ["I", "B", "UP", "SIM"]
+extend-select = ["I", "B", "UP", "SIM", "E501"]
+
+[tool.ruff.lint.pycodestyle]
+# The enforced code line limit: wrap at 88 by habit, fail the gate past 120.
+max-line-length = 120
 
 [tool.pyright]
 include = ["plugins/ralph/skills/ralph-run/scripts"]

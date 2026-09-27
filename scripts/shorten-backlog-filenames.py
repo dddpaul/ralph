@@ -719,10 +719,11 @@ def apply_renames(
         # that would have added it. Rename it anyway rather than leave it
         # over the limit, and say so, because nothing gets staged.
         tracked = git_tracked(repo_root, plan.path)
-        if tracked:
-            error = git_mv(repo_root, plan.path, plan.target)
-        else:
-            error = plain_rename(plan.path, plan.target)
+        error = (
+            git_mv(repo_root, plan.path, plan.target)
+            if tracked
+            else plain_rename(plan.path, plan.target)
+        )
         if error is not None:
             counters.errors += 1
             verb = "git mv" if tracked else "rename"

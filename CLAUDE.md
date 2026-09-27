@@ -145,5 +145,5 @@ Use these commands:
 - Naming: snake_case for functions/variables, PascalCase for classes
 - Error handling: Use specific exceptions, include context in error messages
 - Docstrings: Google-style docstrings for public functions/classes
-- Line length: Maximum 88 characters
+- Line length: Maximum 120 characters for code (enforced by ruff E501; the formatter still wraps at 88); markdown lines are unrestricted
 - Function length: Keep functions focused and under 50 lines
