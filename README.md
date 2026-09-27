@@ -80,6 +80,8 @@ This starts the container automatically and executes Ralph inside the isolated e
 
 **Host `.venv` isolation:** `workspaceMount` bind-mounts the project folder at `/workspace`, so a container-side `uv sync` would otherwise write a Linux interpreter path into the host's `.venv/pyvenv.cfg` and leave `.venv/bin/python3` dangling on the host. `devcontainer.json` mounts a named volume over that one path (`source=claude-code-project-venv-${devcontainerId},target=/workspace/.venv,type=volume`, chowned to `node` in `postCreateCommand`), so the container builds its own virtualenv and the host keeps its own. Mount changes need a **container rebuild**, not a restart — pass `--rebuild` alongside `--devcontainer` (or `/ralph-run rebuild=true`) to recreate the container; if an earlier run already clobbered the host venv, repair it once with `rm -rf .venv && uv sync` on the host.
 
+**Claude Code version is pinned:** `devcontainer.json` passes `CLAUDE_CODE_VERSION` as a concrete `X.Y.Z` build arg, not `latest`. The npm install layer is cached, so a floating tag is resolved once and then frozen — the container's CLI silently ages until it rejects a newer model (`Claude Code X.Y.Z does not support this model`). Bump the pin to `npm view @anthropic-ai/claude-code version`; the changed value invalidates the npm layer on the next build, and the build fails on a non-`X.Y.Z` value and checks `claude --version` against it. `grep '"CLAUDE_CODE_VERSION"' .devcontainer/devcontainer.json` shows what the next build installs; `docker image inspect --format '{{ index .Config.Labels "dev.ralph.claude-code-version" }}' <image>` shows what a built image carries (images are named `vsc-<folder>-<hash>`). `--rebuild` / `--remove-existing-container` recreates the **container** only and does NOT refresh the image — run `devcontainer build --workspace-folder . --no-cache` to force a fresh one.
+
 ## Workflow
 
 ### 1. Brainstorm (recommended)
@@ -158,7 +160,7 @@ Default is 10 iterations. Use `--tool claude` (default) or `--tool opencode` to 
 | `--prompt-file <path>` | File to load prompt template from | (none) |
 | `--tasks <ids>` | Comma-separated numeric task IDs to run (e.g. `62,64,65`). Mutually exclusive with `--prompt-file` | (none) |
 | `--devcontainer` | Run inside a devcontainer | off |
-| `--rebuild` | With `--devcontainer`, recreate the container from scratch (`devcontainer up --remove-existing-container`) so `devcontainer.json` mount/config changes take effect. No-op without `--devcontainer` | off |
+| `--rebuild` | With `--devcontainer`, recreate the container from scratch (`devcontainer up --remove-existing-container`) so `devcontainer.json` mount/config changes take effect. Does **not** refresh cached image layers — use `devcontainer build --workspace-folder . --no-cache` for that. No-op without `--devcontainer` | off |
 | `--no-push` | Opt out of pushing `master` to `origin` after the loop finishes (see [Publishing to origin](#publishing-to-origin)) | push on |
 | `--help` | Show help message and exit | |
 | `--version` | Show version and exit | |
@@ -579,7 +581,7 @@ uv run pytest plugins/ralph/skills/ralph-run/tests/test_loop_exit_code.py
 **Python (`tests/python/`)** — also run by `uv run pytest`:
 
 - `test_shorten_backlog_filenames.py` - Tests `scripts/shorten-backlog-filenames.py` (slug normalizer, byte budget math, collision suffixing, backlog-root discovery and per-repo grouping, plus CLI runs over throwaway git repos with a stubbed `claude`: single project, multi-project sweep, pathspec-scoped commits, hook-blocked commits and `--no-verify`)
-- `test_devcontainer_*.py` - Pin the devcontainer config on both the live `.devcontainer/` and the ralph-init template: the `.venv` volume overlay, the shared `.claude` scheme and its lifecycle hooks, the host-path `~/.claude` bind, the `CLAUDE_CONFIG_DIR` root, and the language fragments' Python runtime guard. Each module carries a mutated-copy negative case. `devcontainer_config.py` is their shared JSONC reader (it blanks whole-line `//` comments only; inline comments are not supported)
+- `test_devcontainer_*.py` - Pin the devcontainer config on both the live `.devcontainer/` and the ralph-init template: the `.venv` volume overlay, the shared `.claude` scheme and its lifecycle hooks, the host-path `~/.claude` bind, the `CLAUDE_CONFIG_DIR` root, the Claude Code version pin (concrete build arg, no floating `ARG` default, the guard run under `sh`), and the language fragments' Python runtime guard. Each module carries a mutated-copy negative case. `devcontainer_config.py` is their shared JSONC reader (it blanks whole-line `//` comments only; inline comments are not supported)
 
 ## Customizing
 

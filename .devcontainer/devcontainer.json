@@ -4,7 +4,12 @@
     "dockerfile": "Dockerfile",
     "args": {
       "TZ": "${localEnv:TZ:America/Los_Angeles}",
-      "CLAUDE_CODE_VERSION": "latest",
+      // Pinned, never "latest": a floating tag is resolved once and then frozen
+      // in Docker's layer cache, so the container's CLI silently falls behind
+      // (and eventually rejects newer models). Bump deliberately to
+      // `npm view @anthropic-ai/claude-code version`; the changed value
+      // invalidates the npm layer on the next image build.
+      "CLAUDE_CODE_VERSION": "2.1.283",
       "ZSH_IN_DOCKER_VERSION": "1.2.0"
     }
   },
