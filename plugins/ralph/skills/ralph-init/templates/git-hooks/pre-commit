@@ -41,14 +41,30 @@ head_paths=$(git -c core.quotePath=false ls-tree -r HEAD --name-only 2>/dev/null
 [ -z "$head_paths" ] && exit 0
 
 # Pick a normalizer once. macOS BSD iconv ships utf-8-mac (NFD → NFC).
-# Linux glibc iconv does not; fall back to python3.
+# Linux glibc iconv does not; fall back to a Python interpreter.
+#
+# Candidates are probed by RUNNING them, not by `command -v` (TASK-242): a
+# devcontainer can carry a python3 first in PATH that cannot start at all —
+# e.g. an interpreter copied from an official python:* image whose glibc is
+# newer than the base image's. `command -v` finds it, every to_nfc call then
+# exits non-zero, and `set -euo pipefail` aborts the hook — so every commit in
+# the container is rejected. Probing by execution falls through to the next
+# candidate instead.
 if printf '' | iconv -f utf-8-mac -t utf-8 >/dev/null 2>&1; then
   to_nfc() { printf '%s' "$1" | iconv -f utf-8-mac -t utf-8; }
-elif command -v python3 >/dev/null 2>&1; then
-  to_nfc() { python3 -c 'import sys, unicodedata; sys.stdout.write(unicodedata.normalize("NFC", sys.argv[1]))' "$1"; }
 else
-  echo "pre-commit: neither iconv -f utf-8-mac nor python3 available; cannot normalize. Skipping NFC check." >&2
-  exit 0
+  nfc_python=""
+  for cand in python3 /usr/bin/python3 python /usr/bin/python; do
+    command -v "$cand" >/dev/null 2>&1 || continue
+    "$cand" -c 'import unicodedata' >/dev/null 2>&1 || continue
+    nfc_python="$cand"
+    break
+  done
+  if [ -z "$nfc_python" ]; then
+    echo "pre-commit: no NFC normalizer available (iconv -f utf-8-mac unsupported, no runnable python). Skipping NFC check." >&2
+    exit 0
+  fi
+  to_nfc() { "$nfc_python" -c 'import sys, unicodedata; sys.stdout.write(unicodedata.normalize("NFC", sys.argv[1]))' "$1"; }
 fi
 
 declare -A head_by_nfc

@@ -1,3 +1,4 @@
-# ---- Language Runtime (from multi-stage) ----
-COPY --from=python-runtime /usr/local /usr/local
+# ---- Language Runtime ----
+# Python comes from the base image (uv-managed 3.14 plus the image's own
+# python3); only uv itself is copied in.
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv

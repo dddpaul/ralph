@@ -159,3 +159,70 @@ stage_over_limit_path() {
   run bash "$HOOK"
   [ "$status" -eq 0 ]
 }
+
+# ===========================================================================
+# normalizer selection by execution (TASK-242)
+# ===========================================================================
+#
+# The hook used to pick its NFC normalizer with `command -v python3`. A
+# devcontainer built from the docs/python templates carried a python3 first in
+# PATH that could not start at all (an interpreter copied from an official
+# python:* image whose glibc was newer than the base image's), so every to_nfc
+# call exited non-zero and `set -euo pipefail` aborted the hook — i.e. every
+# commit inside the container was rejected. The host cannot show the defect:
+# macOS BSD iconv ships utf-8-mac, so the first branch wins and python3 is
+# never reached. These tests therefore assert the outcome (blocked / not
+# aborted) rather than which branch ran.
+
+# A python3 first in PATH that exits non-zero on any invocation.
+install_broken_python3() {
+  mkdir -p stub
+  cat > stub/python3 <<'STUB'
+#!/bin/sh
+echo "python3: /lib/libm.so.6: version \`GLIBC_2.38' not found" >&2
+exit 1
+STUB
+  chmod +x stub/python3
+}
+
+# Stage a path through git plumbing: no file is ever written to the working
+# tree. The NFC/NFD pair has to exist as two distinct index entries, and a
+# normalization-collapsing volume (macOS APFS) merges two such files into one —
+# so building the fixture on disk is impossible there, while plumbing works
+# everywhere.
+stage_plumbed() {
+  local blob
+  blob=$(printf '%s\n' "$2" | git hash-object -w --stdin)
+  git update-index --add --cacheinfo "100644,$blob,$1"
+}
+
+@test "pre-commit: still BLOCKS an NFD duplicate when python3 in PATH cannot start" {
+  stage_plumbed "$NFC_NAME" nfc
+  git -c core.hooksPath=/dev/null commit -q -m "add NFC form"
+  stage_plumbed "$NFD_NAME" nfd
+  install_broken_python3
+
+  run env PATH="$PWD/stub:$PATH" bash "$HOOK"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"BLOCKED"* ]]
+}
+
+@test "pre-commit: a broken python3 in PATH does not abort a clean commit" {
+  stage_plumbed existing.md a
+  git -c core.hooksPath=/dev/null commit -q -m "init"
+  stage_plumbed unrelated.md b
+  install_broken_python3
+
+  run env PATH="$PWD/stub:$PATH" bash "$HOOK"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"GLIBC"* ]]
+}
+
+@test "pre-commit: the normalizer is chosen by running the candidate, not by lookup" {
+  # Pins the mechanism so the `command -v` selection cannot come back through a
+  # later edit while both behavioural tests above still pass on a macOS host
+  # (where the iconv branch wins and no python is ever consulted).
+  run grep -n -E "command -v python3.*then" "$HOOK"
+  [ "$status" -ne 0 ]
+  grep -q -- '-c .import unicodedata.' "$HOOK"
+}
