@@ -42,10 +42,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # ---- Language Runtime (from multi-stage) ----
-# If using a different language, update this section:
-# Python: COPY --from=python /usr/local /usr/local
-# Ruby: COPY --from=ruby /usr/local /usr/local
-# Java: COPY --from=openjdk /usr/local/openjdk-* /usr/local/jdk
+# If using a different language, update this section. A stage copied into the
+# image's own /usr/local must be built on the same Debian suite as the base
+# above (node:20 = bookworm, glibc 2.36) — an interpreter from a newer suite
+# lands first in PATH and cannot start (TASK-242). For Python there is nothing
+# to copy: uv and Python 3.14 are installed below for every language.
+# Ruby: COPY --from=ruby:3.3-bookworm /usr/local /usr/local
+# Java: COPY --from=openjdk:21-bookworm /usr/local/openjdk-* /usr/local/jdk
 COPY --from=golang /usr/local/go /usr/local/go
 ENV PATH="/usr/local/go/bin:${PATH}"
 

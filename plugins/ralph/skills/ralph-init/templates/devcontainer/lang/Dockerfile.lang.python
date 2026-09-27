@@ -1,4 +1,9 @@
 ###
-### Stage 1: Language Runtime
+### Stage 1: Language Runtime (none — Python comes from the base image)
 ###
-FROM python:3.14 AS python-runtime
+# No separate Python stage: the devcontainer base installs uv and runs
+# `uv python install 3.14`, and this project type drives Python through
+# `uv run`. Copying an official python:* image over the base would drop an
+# interpreter linked against that image's glibc into /usr/local, ahead of the
+# base's own python3 in PATH — and the base is Debian bookworm, so a newer
+# python:* tag yields a python3 that cannot start at all.
