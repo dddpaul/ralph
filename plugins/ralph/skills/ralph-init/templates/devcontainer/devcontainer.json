@@ -10,6 +10,12 @@
       // `npm view @anthropic-ai/claude-code version`; the changed value
       // invalidates the npm layer on the next image build.
       "CLAUDE_CODE_VERSION": "2.1.283",
+      // Pinned for the same reason, and bumped deliberately to a uv release:
+      // uv runs the orchestrator, installs the interpreter and executes every
+      // PEP 723 script, so a frozen copy surfaces as a confusing resolver
+      // error rather than an obvious stale-tool one. `COPY --from` cannot
+      // expand a build arg, so the Dockerfile pins it through a named stage.
+      "UV_VERSION": "0.12.19",
       "ZSH_IN_DOCKER_VERSION": "1.2.0"
     }
   },

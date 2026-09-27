@@ -1,7 +1,7 @@
 # ---- Language Runtime ----
-# Python comes from the base image (uv-managed 3.14 plus the image's own
-# python3); only uv itself is copied in.
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+# Python comes from the base image: it copies the pinned uv (see the uv stage)
+# and runs `uv python install 3.14`, and this project type drives Python through
+# `uv run`. uv is copied once, in the base, for every language.
 
 # ---- Documentation Tools ----
 RUN apt-get update && apt-get install -y --no-install-recommends \

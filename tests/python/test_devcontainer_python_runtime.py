@@ -163,8 +163,12 @@ def test_guard_rejects_a_stage_built_on_a_newer_debian(tmp_path: Path) -> None:
 
 
 def test_guard_ignores_uv_binary_copy_and_go_toolchain(tmp_path: Path) -> None:
-    # Both are real copies in the shipped fragments and must stay allowed: uv is
-    # a single static binary, and /usr/local/go is a self-contained toolchain.
+    # /usr/local/go is a real copy in the shipped go fragment and must stay
+    # allowed: it is a self-contained toolchain, not binaries dropped into the
+    # paths the base image's own libraries and binaries live in. The uv line is
+    # the pre-TASK-251 shape, kept here deliberately: uv is now copied in the
+    # base from a pinned stage (no fragment carries it), but the guard must
+    # still ignore a single-file /uv source wherever it appears.
     install = (
         "COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv\n"
         "COPY --from=golang /usr/local/go /usr/local/go\n"
@@ -173,9 +177,15 @@ def test_guard_ignores_uv_binary_copy_and_go_toolchain(tmp_path: Path) -> None:
     assert _repro(tmp_path, "FROM node:20\n", lang, install) == []
 
 
-def test_docs_and_python_fragments_still_provide_uv() -> None:
+def test_docs_and_python_assemblies_still_provide_uv() -> None:
+    # TASK-242 asserted this on the fragments, which each carried their own uv
+    # copy. TASK-251 pinned uv and left a single copy in the base, so the
+    # guarantee moved rather than went away: the base copies uv for every
+    # flavour, and the fragments must no longer add a second, unpinned one.
+    # The pin itself is covered by tests/python/test_devcontainer_uv_pin.py.
+    assert "COPY --from=uv-bin /uv /usr/local/bin/uv" in BASE.read_text("utf-8")
     for name in ("Dockerfile.install.docs", "Dockerfile.install.python"):
-        assert "astral-sh/uv" in (LANG_DIR / name).read_text("utf-8")
+        assert "astral-sh/uv" not in (LANG_DIR / name).read_text("utf-8")
 
 
 def test_base_image_installs_the_python_the_orchestrator_needs() -> None:
