@@ -1,7 +1,7 @@
 ---
 id: TASK-251
 title: Pin the uv copy and drop its duplicate from the devcontainer templates
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-27 16:10'
 updated_date: '2026-09-27 17:01'
@@ -104,4 +104,10 @@ Commit: `0e6dfdc` - task-251: document the uv pin in ralph-init Init, Upgrade Mo
 Commit: `74d93e2` - task-251: resolve the upgrade-note cross-references and cover a third patch label
 
 Re-review 2 (task-reviewer): APPROVED, with two fold-ins landed before merge. (1) Restoring the dropped noun had pushed the test comment to 103 characters; re-wrapped to the reviewer's exact six lines, longest line now 86. The reviewer also explained why the gate missed it: pyproject.toml sets line-length = 88 but extend-select = ["I","B","UP","SIM"] omits E501, which is not in ruff's defaults either, so 'ruff check' honours the value only through 'ruff format'. Confirmed repo-wide: 26 over-limit lines across 12+ files, and 'ruff format --check' reports 36 of 76 files would be reformatted. Pre-existing and out of scope here — filed as TASK-253. While measuring it I found my own new test file was among the 36, so I ran 'ruff format' on that one file only (a single string-concat wrap, no semantic change); it is now format-clean at 88. (2) Pluralised SKILL.md:763 with the reviewer's minimal edit — 'When either version-pin patch also fired, join the outcomes in one label' — which keeps the declined-label join that line uniquely carries and that line 748 does not. Gates after the fold-ins: uv run pytest 642 passed 1 skipped, uv run ruff check . clean, ruff format --check clean on both files I touched, LC_ALL=C bats tests/unit 110 with only the two pre-existing macOS APFS failures. Also filed TASK-252 from the reviewer's recommended follow-up: the uv patch offer is conditioned on devcontainer.json being outdated, so a declined patch is never re-offered and a later run reports everything up to date on an unpinned project.
+
+Commit: `92da33a` - task-251: rewrap the runtime-guard comment and pluralise the pin-patch reference
+
+Done: uv pinned to 0.12.19 via a UV_VERSION build arg in both devcontainer.json copies, pulled through a 'FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uv-bin' stage (COPY --from cannot expand a build arg) and copied once in Dockerfile.base for every language; the duplicate copies are gone from the docs and python install fragments, so all four flavours carry exactly one. Guarded RUN rejects a non-X.Y.Z value and checks 'uv --version' against the pin; LABEL dev.ralph.uv-version makes it readable via docker image inspect. Init and Upgrade Mode notes plus a README paragraph make the pin reach existing projects, with the Upgrade note stating that the Dockerfile patch is required rather than optional because nothing absorbs the build arg. New tests/python/test_devcontainer_uv_pin.py (23 tests) mirrors the Claude Code pin test across both copies; the TASK-242 fragment guard was relocated to assert the base carries uv and the fragments do not. Verified on the host by real builds at two pins, a rejected floating tag, and a devcontainer build with no manual --build-arg. 7/7 ACs, task-reviewer APPROVED after two rework rounds.
+
+Commit: `0256a3d` - task-251: bump plugin version to 0.7.1 (patch)
 <!-- SECTION:NOTES:END -->
