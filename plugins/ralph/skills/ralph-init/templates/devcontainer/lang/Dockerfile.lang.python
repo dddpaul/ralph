@@ -1,5 +1,5 @@
 ###
-### Stage 1: Language Runtime
+### Stage 1: Language Runtime (none — Python comes from the base image)
 ###
 # No separate Python stage: the devcontainer base installs uv and runs
 # `uv python install 3.14`, and this project type drives Python through

@@ -48,8 +48,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # lands first in PATH and cannot start (TASK-242). For Python there is nothing
 # to copy: uv and Python 3.14 are installed below for every language.
 # Ruby: COPY --from=ruby:3.3-bookworm /usr/local /usr/local
-# Ruby: COPY --from=ruby /usr/local /usr/local
-# Java: COPY --from=openjdk /usr/local/openjdk-* /usr/local/jdk
+# Java: COPY --from=openjdk:21-bookworm /usr/local/openjdk-* /usr/local/jdk
 COPY --from=golang /usr/local/go /usr/local/go
 ENV PATH="/usr/local/go/bin:${PATH}"
 
