@@ -142,11 +142,12 @@ hostpath_mount() {
   # Mutation check: without it, a detector with a typo'd regex would pass on
   # both files forever and the suite would prove nothing. Derive the pre-fix
   # version by deleting the mount line and its comment block from a scratch
-  # copy, then assert the detector goes quiet on it and the shape assertions
-  # would fail — while the real files still pass.
-  local f pre
+  # copy, then assert the detector goes quiet on it — an over-broad regex such
+  # as target=.*\.claude would still match there and is caught only here.
+  local f pre tmp
+  tmp="$(mktemp -d)"
   for f in "$LIVE" "$TEMPLATE"; do
-    pre="$BATS_TEST_TMPDIR/pre-fix-$(basename "$(dirname "$f")").json"
+    pre="$tmp/pre-fix-$(basename "$(dirname "$f")").json"
     # Drop the target=${localEnv:HOME}/.claude mount and the comment lines
     # introduced with it; the /home/node/.claude bind is left untouched.
     grep -v 'target=${localEnv:HOME}/.claude' "$f" \
@@ -171,4 +172,5 @@ hostpath_mount() {
     # The real file is not in that state.
     [ -n "$(hostpath_mount "$f")" ]
   done
+  rm -rf "$tmp"
 }

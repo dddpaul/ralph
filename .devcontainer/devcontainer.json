@@ -47,8 +47,8 @@
     // user plugin fails with "Marketplace <name> failed to load: cache-miss",
     // the task-reviewer agent from ralph@dddpaul-ralph never registers, and the
     // Review step silently degrades while still reporting APPROVED.
-    // Read-only in practice: CLAUDE_CONFIG_DIR stays /home/node/.claude, so
-    // nothing is ever written through this path.
+    // No writes are directed through this path: CLAUDE_CONFIG_DIR stays
+    // /home/node/.claude, which is where Claude Code reads and writes.
     "source=${localEnv:HOME}/.claude,target=${localEnv:HOME}/.claude,type=bind",
     // Single-file overlay for .claude/settings.local.json: the only file that
     // must differ inside the container, because bwrap can't create mount
