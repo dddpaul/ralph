@@ -4,7 +4,7 @@ title: Stop the devcontainer image from freezing an old Claude Code version
 status: Done
 assignee: []
 created_date: '2026-09-27 13:11'
-updated_date: '2026-09-27 14:18'
+updated_date: '2026-09-27 14:32'
 labels: []
 dependencies: []
 priority: high
@@ -78,4 +78,10 @@ Commit: `9717979` - task-248: require a strict X.Y.Z Claude Code pin and clarify
 Chose pin-and-bump over cache-bust: the version is in the diff and reviewed, and a bump invalidates the npm layer; a date bust would still re-resolve latest non-reproducibly and hide which CLI you got. Pinned CLAUDE_CODE_VERSION=2.1.283 (npm latest 2026-09-27) in both devcontainer.json copies; Dockerfile(.base) ARG has no default, the npm RUN rejects anything not strict X.Y.Z (grep -Eqx) and checks claude --version against the pin, LABEL dev.ralph.claude-code-version exposes it via docker image inspect. Upgrade mode: never downgrade a newer project pin; offer a confirm-only in-place Dockerfile patch. AC2 shown by cache-key structure + build-time version check + tests/python/test_devcontainer_claude_code_pin.py (guard run under sh) — Docker unavailable here, no real image build. Tests: pytest 598 passed; bats unit 110 with only #96 failing, identical on master (pre-existing). task-reviewer: APPROVED; its two optional notes (loose glob guard, bump wording) applied.
 
 Commit: `d2e6c90` - task-248: bump plugin version to 0.6.6 (patch)
+
+Host-side build verification (the AC2/AC3 result the notes above deferred, recorded per R17). Ran real docker builds against .devcontainer/ on the host, where Docker is available:
+(1) Guard rejects a floating tag — 'docker build --build-arg CLAUDE_CODE_VERSION=latest' FAILS at the npm RUN with "CLAUDE_CODE_VERSION must be a concrete X.Y.Z, got 'latest'" (exit 1). The floating tag cannot silently return.
+(2) A changed pin invalidates the layer and installs that exact version — 'docker build --build-arg CLAUDE_CODE_VERSION=2.1.282' produced an image whose 'claude --version' reports '2.1.282 (Claude Code)', not the 2.1.283 pinned in devcontainer.json.
+(3) LABEL is discoverable without exec — 'docker image inspect --format {{index .Config.Labels "dev.ralph.claude-code-version"}}' returns 2.1.282 on that image.
+Test images removed afterwards. AC2 and AC3 are now empirically verified rather than argued from cache-key structure.
 <!-- SECTION:NOTES:END -->
