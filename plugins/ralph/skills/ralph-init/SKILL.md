@@ -176,7 +176,7 @@ Assemble the Dockerfile from base + language snippets, then write four files:
 
 **Dockerfile assembly:** Read `templates/devcontainer/Dockerfile.base`. Replace `{{LANGUAGE_STAGE}}` with contents of `templates/devcontainer/lang/Dockerfile.lang.<lang>` and `{{LANGUAGE_INSTALL}}` with contents of `templates/devcontainer/lang/Dockerfile.install.<lang>`, where `<lang>` is one of: `node`, `python`, `go`, `docs`. For "Other" languages, use `node` as the base and add a comment for the user to customize. For Documentation projects (0B), use `docs` as the language.
 
-- Assembled Dockerfile → `.devcontainer/Dockerfile`
+- Assembled Dockerfile → `.devcontainer/Dockerfile`. Then run `bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-init/scripts/stale-runtime-copy.sh check .devcontainer/Dockerfile`; it must exit 0 with no output. It flags any `COPY --from=<stage or image>` of `/usr/local`, `/usr/local/bin` or `/usr/local/lib` whose image does not pin the same Debian suite as the devcontainer base (the last `FROM`) — the rule `tests/python/test_devcontainer_python_runtime.py` pins on the fragments. The shipped fragments pass; a hand-written stage for an "Other" language may not, and Upgrade Mode runs the same check (see "Stale language-runtime copy on upgrade" in U4).
 - `templates/devcontainer/devcontainer.json` → `.devcontainer/devcontainer.json` — update app label and port if specified
 - `templates/devcontainer/init-firewall.sh` → `.devcontainer/init-firewall.sh`
 - `templates/devcontainer/container-settings.local.json` → `.devcontainer/container-settings.local.json` — copy verbatim; it is the container's `.claude/settings.local.json` (see the "shared `.claude`" note below)
@@ -593,7 +593,7 @@ Compare each managed file against its current template. Assign one status per fi
 9. **`.claude/settings.local.json`** — exact content match against `templates/claude/settings.local.json`
 10. **`.devcontainer/devcontainer.json`** — exact content match against `templates/devcontainer/devcontainer.json`. If `.devcontainer/` directory does not exist, status is **skipped**.
 11. **`.devcontainer/init-firewall.sh`** — exact content match against `templates/devcontainer/init-firewall.sh`. If `.devcontainer/` directory does not exist, status is **skipped**.
-12. **`.devcontainer/Dockerfile`** — always **skipped** (assembled from fragments, cannot diff meaningfully)
+12. **`.devcontainer/Dockerfile`** — always **skipped** (assembled from fragments, cannot diff meaningfully). It is still **checked**, not silently passed over: run `bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-init/scripts/stale-runtime-copy.sh check .devcontainer/Dockerfile`. Exit 0 keeps the plain `skipped (assembled)`; exit 1 means the file still copies a foreign interpreter over `/usr/local` — status **skipped (assembled; stale runtime copy)**, and U4 offers the in-place patch. The file is never added to the mirror registry: it is patched in place, not re-synced.
 13. **`.gitignore`** — always **skipped** (append-only logic in init flow)
 14. **`.claude/brainstorm-rules.md`** — managed via section-aware merge: pre-heading content is regenerated from `templates/claude/brainstorm-rules.md`; the `## Project additions` heading and everything below it are preserved verbatim. Status is **current** when the pre-heading region matches the template byte-for-byte; **outdated** when it differs; **missing** when the file does not exist (would be created from template).
 15. **`.claude/task-reviewer-rules.md`** — Documentation / Mixed only (detect via an existing `.obsidian/` directory). This file may hold a project's own reviewer rules, so upgrade treats it as **create-if-missing** and never overwrites it: status is **missing** (would be created from `templates/claude/task-reviewer-rules.docs.md`) when a Documentation / Mixed project lacks it; **skipped (present, project-owned)** when it already exists; **skipped (Code-only)** when no `.obsidian/` directory is present.
@@ -635,8 +635,9 @@ CLAUDE.md (generic section)                  current
 - **`.claude/brainstorm-rules.md`**: show a plain language summary of what changed in the Ralph-managed region (above `## Project additions`).
 - **`.devcontainer/devcontainer.json`** and **`.devcontainer/init-firewall.sh`**: show a plain language summary of what changed.
 - **`.devcontainer/container-settings.local.json`**: show the unified diff (`diff -u`) — it is three lines, and it is the file that decides whether the container runs with the sandbox off.
+- **`.devcontainer/Dockerfile`** when U2 marked it `skipped (assembled; stale runtime copy)`: print the `check` output line and say that `python3` in the image cannot start. The patch itself is offered separately in U4 ("Stale language-runtime copy on upgrade"). A stale Dockerfile counts as pending work: when every other file is **current** or **skipped**, do not print "All Ralph files are up to date." and stop — skip the batch question and go straight to that U4 offer.
 
-If all files are **current** or **skipped**, print "All Ralph files are up to date." and stop.
+If all files are **current** or **skipped** — except a Dockerfile marked `skipped (assembled; stale runtime copy)`, which is pending work (see the bullet above) — print "All Ralph files are up to date." and stop.
 
 **Then ask:**
 ```
@@ -721,6 +722,21 @@ forces a fresh image. Check what a built image carries with:
   docker image inspect --format '{{ index .Config.Labels "dev.ralph.claude-code-version" }}' <image>
 ```
 
+**Stale language-runtime copy on upgrade:** projects bootstrapped as Python or Documentation / Mixed before TASK-242 still carry `FROM python:3.14 AS python-runtime` and `COPY --from=python-runtime /usr/local /usr/local` in `.devcontainer/Dockerfile`. `python:3.14` is built on a newer Debian than the `node:20` (bookworm) base, so that copy puts an interpreter linked against a glibc the image lacks first in `PATH`, and `python3 -c ''` cannot start. The upgraded pre-commit hook already skips a `python3` that cannot run, so commits still work; the image is degraded, not broken. When U2 marked the Dockerfile `skipped (assembled; stale runtime copy)`, offer the in-place patch — confirm-only, the same shape as the version-pin patch above:
+
+1. Run `bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-init/scripts/stale-runtime-copy.sh patch .devcontainer/Dockerfile > .devcontainer/Dockerfile.patched`. The script only prints; it never writes the Dockerfile. It replaces the stale stage (the `FROM … AS <stage>` line and the `###` banner above it) with the current `templates/devcontainer/lang/Dockerfile.lang.<flavour>`, and the paragraph holding the `COPY` with the first paragraph of the current `Dockerfile.install.<flavour>`; every other line is kept. The flavour comes from the file itself — `docs` when it carries `# ---- Documentation Tools ----`, `python` when the stage image is `python:*` — so a Mixed project gets the fragments it was assembled from.
+2. **Any exit other than 0** — 3 (more than one stale copy, a stage no current fragment replaces, or a copy paragraph that also holds other instructions), 2 (a fragment could not be read), or anything else: delete `.devcontainer/Dockerfile.patched`, show the script's stderr and the `check` output, tell the user to fix the file by hand, and label it `skipped (assembled; stale runtime copy, patch by hand)` in U5.
+3. **Exit 0:** show `diff -u .devcontainer/Dockerfile .devcontainer/Dockerfile.patched` and ask:
+
+   ```
+   .devcontainer/Dockerfile still copies a foreign python over /usr/local, so python3 in the
+   image cannot start. Replace the stale stage and copy with the current language fragment? [y/N]
+   ```
+
+4. On **y**: `mv .devcontainer/Dockerfile.patched .devcontainer/Dockerfile` and label the file `skipped (assembled; runtime copy patched)` in U5. On **N** (default) or an empty answer: delete `.devcontainer/Dockerfile.patched`, leave the Dockerfile untouched, and label it `skipped (assembled; stale runtime copy, user declined)`. Never write the Dockerfile without the explicit yes.
+
+A project that deliberately re-pinned the stage and the base to the **same** Debian suite (for example `python:3.14-bookworm` over `node:20-bookworm`) passes `check`, so none of this fires for it. When the patch was applied, add to the U5 summary that the image needs a rebuild to drop the copied interpreter. When the version-pin patch also fired, join both outcomes in one label, version pin first — e.g. `skipped (assembled; version pin patched; runtime copy patched)` or `skipped (assembled; version pin patched; stale runtime copy, user declined)`.
+
 **If the project already applied this fix by hand**, U4's overwrite is still the right outcome — the template is the canonical shape — but say so explicitly in the U5 summary rather than letting the rewrite look like a surprise, and check that `.devcontainer/container-settings.local.json` survived with the sandbox switch intact.
 
 In the same case — and only then, since a project without `.devcontainer/` never gets the mountpoint — append `.venv/` to `.gitignore` if absent: the overlay creates an empty `.venv/` directory in the project root even for non-Python projects. `.gitignore` is skipped by the U2 status table (append-only, never diffed), so this step is the one place the entry gets added on upgrade; when it fires, label the file `skipped (append-only; .venv/ appended)` in the U5 summary instead of the plain `skipped (append-only)`.
@@ -783,3 +799,4 @@ Use these labels:
 - **current** — file already matched the template
 - **skipped (reason)** — file was excluded from checks, with reason in parentheses
 - **skipped (user)** — user chose to skip this file
+- **skipped (assembled; runtime copy patched)** / **skipped (assembled; stale runtime copy, user declined)** / **skipped (assembled; stale runtime copy, patch by hand)** — `.devcontainer/Dockerfile` only: the outcome of the U4 "Stale language-runtime copy on upgrade" offer. A declined or by-hand result means `python3` in the image still cannot start.
