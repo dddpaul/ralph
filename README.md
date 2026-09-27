@@ -149,7 +149,7 @@ Default is 10 iterations. Use `--tool claude` (default) or `--tool opencode` to 
 | Option | Description | Default |
 |--------|-------------|---------|
 | `--tool <claude\|opencode>` | AI tool to use | `claude` |
-| `--model <model_id>` | Model ID for Claude Code | `claude-opus-5` |
+| `--model <model_id>` | Model ID for Claude Code | `claude-opus-5-5` |
 | `--effort <level>` | Thinking effort for Claude Code: `low`, `medium`, `high`, or `max` | `medium` |
 | `--timeout <minutes>` | Per-iteration timeout in minutes | `15` |
 | `--on-error <strategy>` | How to handle AI tool errors: `stop`, `continue`, or `retry` | `stop` |
