@@ -1,11 +1,11 @@
 #!/usr/bin/env bats
 # Unit tests for PreToolUse hook scripts in .claude/hooks/
 
-PROJECT_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/../.." && pwd)"
+load '../helpers/common'
 HOOKS_DIR="$PROJECT_ROOT/.claude/hooks"
 
 setup() {
-  TEST_DIR=$(mktemp -d)
+  TEST_DIR="$(make_temp_dir)"
 }
 
 teardown() {

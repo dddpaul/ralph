@@ -6,7 +6,7 @@
 # body above the scissor, otherwise the diff trips the guard on the very first
 # commit of a ralph-init scaffold (the diff contains the hook's own grep regex).
 
-PROJECT_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/../.." && pwd)"
+load '../helpers/common'
 HOOK="$PROJECT_ROOT/plugins/ralph/skills/ralph-init/templates/git-hooks/commit-msg"
 
 # Forbidden literals built at runtime so the bats file itself is not flagged
@@ -16,7 +16,7 @@ GEN="Generated with Claude Code"
 TP="## Test plan"
 
 setup() {
-  TEST_DIR=$(mktemp -d)
+  TEST_DIR="$(make_temp_dir)"
   # Run in a tmp git repo so the hook's `[ -e .git/MERGE_MSG ]` check is meaningful.
   cd "$TEST_DIR"
   git init -q

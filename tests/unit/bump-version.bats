@@ -8,7 +8,7 @@
 # helper resolves its lib via $0), but every git operation happens inside a
 # throwaway repo created per test, so nothing here touches the project repo.
 
-PROJECT_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/../.." && pwd)"
+load '../helpers/common'
 HELPER="$PROJECT_ROOT/.claude/hooks/bump-version.sh"
 PLUGIN="plugins/ralph/.claude-plugin/plugin.json"
 MARKET=".claude-plugin/marketplace.json"
@@ -27,7 +27,7 @@ plugin_version() { ver_of "$PLUGIN"; }
 market_version() { ver_of "$MARKET"; }
 
 setup() {
-  TEST_DIR=$(mktemp -d)
+  TEST_DIR="$(make_temp_dir)"
   cd "$TEST_DIR"
   git init -q -b master
   git config user.email test@example.com

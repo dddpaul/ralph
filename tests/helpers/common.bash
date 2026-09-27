@@ -11,14 +11,27 @@ PROJECT_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/../.." && pwd)"
 # the launch path invoke `bash ralph.sh` (the thin shim) relative to
 # $PROJECT_ROOT after `cd "$PROJECT_ROOT"`.
 
+# Print a fresh, canonicalized temp directory. Rooted at BATS_TEST_TMPDIR when
+# set (per-test, cleaned up by bats, and writable even where the system temp
+# dir is not, e.g. a sandboxed agent session); plain mktemp -d otherwise, so
+# the helper works outside a bats run. Canonicalize (pwd -P) so the path
+# matches the shim's canonicalized RALPH_PROJECT_ROOT (also pwd -P): on macOS
+# the temp dir lives under /var/folders, a symlink to /private/var/...; without
+# this shim.bats's resolved-path comparisons (override / plugin-cache tiers)
+# false-fail. No-op on Linux.
+make_temp_dir() {
+  local dir
+  if [[ -n "${BATS_TEST_TMPDIR:-}" ]]; then
+    dir="$(mktemp -d "$BATS_TEST_TMPDIR/tmp.XXXXXX")" || return 1
+  else
+    dir="$(mktemp -d)" || return 1
+  fi
+  (cd "$dir" && pwd -P)
+}
+
 # Create a temporary test directory
 setup_test_dir() {
-  # Canonicalize the temp dir (pwd -P) so it matches the shim's canonicalized
-  # RALPH_PROJECT_ROOT (also pwd -P). On macOS mktemp -d returns a /var/folders
-  # path that symlinks to /private/var/...; without this shim.bats's
-  # resolved-path comparisons (override / plugin-cache tiers) false-fail. No-op
-  # on Linux.
-  TEST_DIR="$(cd "$(mktemp -d)" && pwd -P)"
+  TEST_DIR="$(make_temp_dir)"
   export TEST_DIR
   export RALPH_STATUS_FILE="$TEST_DIR/.ralph-status.json"
   export RALPH_RUN_LOG="$TEST_DIR/.ralph-run.log"

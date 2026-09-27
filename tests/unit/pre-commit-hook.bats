@@ -8,7 +8,7 @@
 # It also delegates to .claude/hooks/filename-length-guard.sh when that script is
 # present and executable — see TASK-227.
 
-PROJECT_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/../.." && pwd)"
+load '../helpers/common'
 HOOK="$PROJECT_ROOT/plugins/ralph/skills/ralph-init/templates/git-hooks/pre-commit"
 LENGTH_GUARD="$PROJECT_ROOT/plugins/ralph/skills/ralph-init/templates/claude/hooks/filename-length-guard.sh"
 
@@ -17,7 +17,7 @@ NFC_NAME=$(python3 -c 'import unicodedata, sys; sys.stdout.write(unicodedata.nor
 NFD_NAME=$(python3 -c 'import unicodedata, sys; sys.stdout.write(unicodedata.normalize("NFD", "й.md"))')
 
 setup() {
-  TEST_DIR=$(mktemp -d)
+  TEST_DIR="$(make_temp_dir)"
   cd "$TEST_DIR"
   git init -q -b master
   git config user.email test@example.com
