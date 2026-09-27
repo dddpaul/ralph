@@ -56,10 +56,11 @@ class FakeBacklog:
             status_raw: object = spec.get("status", "To Do")
             deps_raw: object = spec.get("deps", ())
             status = status_raw if isinstance(status_raw, str) else "To Do"
-            if isinstance(deps_raw, (list, tuple)):
-                deps_iter = [str(d) for d in deps_raw]
-            else:
-                deps_iter = []
+            deps_iter = (
+                [str(d) for d in deps_raw]
+                if isinstance(deps_raw, (list, tuple))
+                else []
+            )
             return _view_payload(tid, status=status, dependencies=deps_iter)
         return ""
 

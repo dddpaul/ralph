@@ -334,10 +334,11 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     # Check 1: To Do tasks (or whitelist when --tasks is supplied).
-    if args.tasks_raw:
-        rc = _check_tasks_whitelist(args.tasks_raw, args.verbose)
-    else:
-        rc = _check_todo_tasks(args.verbose)
+    rc = (
+        _check_tasks_whitelist(args.tasks_raw, args.verbose)
+        if args.tasks_raw
+        else _check_todo_tasks(args.verbose)
+    )
     if rc != 0:
         return rc
 
