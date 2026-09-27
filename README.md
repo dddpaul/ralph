@@ -579,6 +579,7 @@ uv run pytest plugins/ralph/skills/ralph-run/tests/test_loop_exit_code.py
 **Python (`tests/python/`)** — also run by `uv run pytest`:
 
 - `test_shorten_backlog_filenames.py` - Tests `scripts/shorten-backlog-filenames.py` (slug normalizer, byte budget math, collision suffixing, backlog-root discovery and per-repo grouping, plus CLI runs over throwaway git repos with a stubbed `claude`: single project, multi-project sweep, pathspec-scoped commits, hook-blocked commits and `--no-verify`)
+- `test_devcontainer_*.py` - Pin the devcontainer config on both the live `.devcontainer/` and the ralph-init template: the `.venv` volume overlay, the shared `.claude` scheme and its lifecycle hooks, the host-path `~/.claude` bind, the `CLAUDE_CONFIG_DIR` root, and the language fragments' Python runtime guard. Each module carries a mutated-copy negative case. `devcontainer_config.py` is their shared JSONC reader (it blanks whole-line `//` comments only; inline comments are not supported)
 
 ## Customizing
 
