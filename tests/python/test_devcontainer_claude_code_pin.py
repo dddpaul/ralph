@@ -79,7 +79,15 @@ def test_dockerfile_cannot_float(path: Path) -> None:
 @each_dockerfile
 @pytest.mark.parametrize(
     ("value", "ok"),
-    [("2.1.283", True), ("latest", False), ("next", False), ("", False)],
+    [
+        ("2.1.283", True),
+        ("latest", False),
+        ("next", False),
+        ("", False),
+        ("2.1.283-beta.1", False),
+        ("1x.2.3", False),
+        ("1.2.3.4", False),
+    ],
 )
 def test_guard_rejects_floating_tags(path: Path, value: str, ok: bool) -> None:
     result = subprocess.run(
