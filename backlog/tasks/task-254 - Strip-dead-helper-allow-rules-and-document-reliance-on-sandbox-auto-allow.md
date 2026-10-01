@@ -1,12 +1,10 @@
 ---
 id: TASK-254
-title: >-
-  Seed allow-rules for plugin helper scripts instead of relying on sandbox
-  auto-allow
-status: In Progress
+title: Strip dead helper allow-rules and document reliance on sandbox auto-allow
+status: Done
 assignee: []
 created_date: '2026-09-30 10:29'
-updated_date: '2026-10-01 05:21'
+updated_date: '2026-10-01 05:22'
 labels: []
 dependencies: []
 priority: medium
@@ -142,4 +140,10 @@ ACs #1, #3, #4 and #6 reworded to match the decision (they asked for the rule th
 Commit: `824460e` - task-254: drop the seeded helper rule and strip dead helper rules on upgrade
 
 task-reviewer round 2: CHANGES REQUESTED (R12). ralph-status:65 and ralph-status-watch:75 still justified the single-bash call shape by a seeded allow-rule that no longer exists; ralph-run:83 promised auto-allow without naming the measured version. All three reworded to point at sandbox auto-allow and ralph-init Step 3.7a, with the version named in ralph-run. Added test_no_skill_still_cites_a_seeded_helper_rule (mutation-checked: fails with the stale sentence restored). Full pytest hit the known-flaky test_orchestrator_exits_promptly_on_sigterm once (-15 vs 130); passes alone and on a full re-run (673 passed).
+
+Commit: `704c1ba` - task-254: point the helper call-shape notes at sandbox auto-allow
+
+task-reviewer round 3: APPROVED. Retitled from 'Seed allow-rules for plugin helper scripts instead of relying on sandbox auto-allow' (reviewer nit: the original title described the opposite of what shipped; the Description keeps the handoff's original text as the source contract, and these notes record the decision). Final gates: ruff clean; pytest 673 passed / 2 skipped; bats unit 110 with only #34/#35 (pre-existing, APFS-only).
+
+Commit: `c761d0d` - task-254: bump plugin version to 0.8.2 (patch)
 <!-- SECTION:NOTES:END -->
