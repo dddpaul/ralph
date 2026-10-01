@@ -320,6 +320,19 @@ A `mounts` or lifecycle-hook change needs **Dev Containers: Rebuild Container** 
 Read each `templates/claude/hooks/*-guard.sh` and `templates/claude/hooks/task-validator.sh` → write to `.claude/hooks/<name>.sh`. Make executable (`chmod +x`). Create `.claude/hooks/` directory if it does not exist. The `*-guard.sh` glob includes `filename-length-guard.sh`, which is not a PreToolUse hook — it is the tracked implementation that `.git/hooks/pre-commit` (Step 3.3) invokes, so it must be executable even though `settings.json` never references it.
 Read `templates/claude/settings.local.json` → write to `.claude/settings.local.json` (user permissions).
 
+**No allow-rule is seeded for the plugin helper scripts** (ralph-run `preflight.sh` / `wait-heartbeat.sh`, ralph-status `utc-to-moscow.sh`). The skills invoke them as `bash ${CLAUDE_PLUGIN_ROOT}/...`, and on Claude Code 2.1.280 sandbox auto-allow (`autoAllowBashIfSandboxed`, set in the template) approves every one of those calls without a prompt — measured in TASK-254, including the older two-line `utc_iso=` snippet. A host measured prompting on every launch and watch tick ran 2.1.274; the fix there is upgrading Claude Code, not the allowlist. Do not add a helper rule — every shape is unacceptable (measured on 2.1.280 with the sandbox off):
+
+| Rule | Why not |
+|---|---|
+| `Bash(bash <claude-dir>/plugins/cache/dddpaul-ralph/ralph/*)` | matches, but a bare `*` crosses `/`: it auto-allows `bash` on every file in every cached plugin version (ralph.sh templates, patchers, the firewall script) and possibly on `ralph/../...` paths. That is reviewer rule R6's forbidden `Bash(bash:*)` in all but name |
+| `Bash(bash <claude-dir>/plugins/cache/dddpaul-ralph/ralph/:*)` | does not match — `:*` is a word-boundary prefix and cannot end mid-path |
+| `Bash(bash <claude-dir>/.../ralph/*/skills/.../utc-to-moscow.sh:*)` | does not match — mid-pattern wildcard |
+| `Bash(bash <claude-dir>/.../ralph/0.8.1/skills/.../utc-to-moscow.sh:*)` | matches, but dies at the next plugin bump — how earlier version-pinned rules went dead |
+
+A rule written with `$HOME` would not match either: the matcher compares literal text and never expands variables (TASK-126).
+
+The ralph-status and ralph-status-watch skills call `utc-to-moscow.sh` as a single `bash` command with the timestamp inlined, not behind a `VAR=` assignment. The upstream auto-allow defect (Claude Code changelog, fixed in 2.1.285) concerned inline scripts containing `=`, so the single-command shape stays clear of it on any version.
+
 `.claude/settings.json` (the project-wide file that *registers* the hooks with Claude Code) is deliberately **not** written here. The hook scripts on disk are inert until the registration file lands, so this step leaves them dormant. See Step 3.11 for the deferred activation rationale.
 
 ### 3.7b Merge pptx helper rules into `settings.local.json` (Documentation / Mixed only)
@@ -379,7 +392,7 @@ Also append these entries to `.gitignore` (don't duplicate existing lines):
 
 ### 3.10 Verify `settings.local.json` pptx helper rules landed (Documentation / Mixed only)
 
-The ralph-run preflight / heartbeat-wait helpers and the ralph-status `utc-to-moscow.sh` helper are all read-only and invoked as `bash ${CLAUDE_PLUGIN_ROOT}/...`, so `autoAllowBashIfSandboxed` (set in the template `settings.local.json`) authorizes them at run time by what they touch — no seeded allow-rule is required, and there is nothing to verify for them here.
+The ralph-run and ralph-status helper scripts get no seeded rule (Step 3.7a), so there is nothing to verify for them here.
 
 The only rules this step checks are the two **pptx helper** rules from Step 3.7b, which apply to **Documentation / Mixed** projects. Verify they are present and surface a `WARN` naming each missing one — this catches a silently-skipped 3.7b merge (e.g. if `jq` was missing on the host and the pipeline failed without surfacing). For **Code-only** projects the rules are intentionally absent (Step 3.7b does not run), so skip this step entirely.
 
@@ -463,15 +476,16 @@ Next steps:
 
 Run this manual smoke test once after any change to the init permission flow. It confirms a fresh scaffold launches Ralph with **zero permission prompts except the single devcontainer sandbox bypass** — the property this init flow exists to guarantee. It exercises the real Claude Code permission matcher, which the Python unit tests cannot.
 
-**Why zero seeded rules suffice:** the scaffolded `.claude/settings.local.json` sets `sandbox.enabled: true` and `autoAllowBashIfSandboxed: true`. Under a devcontainer run, sandbox auto-allow authorizes a command by **what it touches, not the script path** — so the ralph-run / ralph-status helpers need no seeded allow-rule. There are no `Bash(bash $HOME/.claude/skills/...:*)` narrow rules to seed or verify; that subsystem was removed.
+**Why no seeded rule is needed:** the scaffolded `.claude/settings.local.json` sets `sandbox.enabled: true` and `autoAllowBashIfSandboxed: true`, and on Claude Code 2.1.280 sandbox auto-allow approves the ralph-run / ralph-status helpers without a prompt (TASK-254). Run this test on the Claude Code version you ship with. On older builds (2.1.274 was measured prompting) the fix is upgrading Claude Code, not seeding a rule — Step 3.7a lists why every rule shape is unacceptable.
 
 **Setup — scaffold a throwaway project:**
 
 1. In an empty git repo (`git init`), install the ralph plugin, then run `/ralph-init` and answer **Code-only** (Q0 → A) with the devcontainer **enabled**. Code-only skips Step 3.7b, so the scaffold carries **no** pptx rules and **no** `.claude/skills` narrow rules — only the template allowlist plus the two sandbox keys.
 2. Confirm the scaffold is clean:
    ```bash
-   # Expect NO output: no seeded narrow skills rules should exist.
-   grep -n '\.claude/skills/ralph' .claude/settings.local.json
+   # Expect NO output: no helper rules of any shape (pre-marketplace
+   # .claude/skills rules or plugin-cache rules).
+   grep -nE '\.claude/skills/ralph|plugins/cache/' .claude/settings.local.json
    # Expect { "enabled": true, "autoAllowBashIfSandboxed": true }.
    jq -c '.sandbox' .claude/settings.local.json
    ```
@@ -485,13 +499,13 @@ Run this manual smoke test once after any change to the init permission flow. It
 
 **Expected result — exactly one prompt:**
 
-- ✅ **Preflight** (`bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-run/scripts/preflight.sh …`) — no prompt. Read-only, so sandbox auto-allow covers it.
-- ✅ **Heartbeat wait** (`bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-run/scripts/wait-heartbeat.sh && rm -f backlog/.ralph-launch.log`) — no prompt. The shim is read-only (TASK-192) and the trailing `rm` only touches `backlog/.ralph-launch.log` inside the workspace, so the whole command stays sandbox-covered.
-- ✅ **ralph-status `utc-to-moscow.sh`** (fired by `watch`) — no prompt. Read-only helper, sandbox-covered.
+- ✅ **Preflight** (`bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-run/scripts/preflight.sh …`) — no prompt. Sandbox auto-allow covers it (Claude Code 2.1.280; TASK-254).
+- ✅ **Heartbeat wait** (`bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-run/scripts/wait-heartbeat.sh && rm -f backlog/.ralph-launch.log`) — no prompt. The helper and the trailing `rm` (which only touches `backlog/.ralph-launch.log` inside the workspace) are both sandbox-covered.
+- ✅ **ralph-status `utc-to-moscow.sh`** (fired by `watch`) — no prompt. Sandbox-covered; the skill invokes it as a single `bash` command with no `VAR=` assignment in front.
 - ✅ **backlog / git / jq** helpers — no prompt. Covered by the template allowlist.
 - ⚠️ **Launch** (`nohup "${RALPH_CMD[@]}" > backlog/.ralph-launch.log 2>&1 & disown`) — **one** prompt. ralph-run Step 4 sets `dangerouslyDisableSandbox: true` on this call so the orchestrator gets full OS access (mktemp, /dev/fd, tee, docker); disabling the sandbox always prompts. This is the expected devcontainer bypass and the only prompt allowed to appear.
 
-If any command other than the launch prompts, a seeded-rule regression has crept back in — a helper is no longer read-only or workspace-confined, or its invocation no longer leads with `bash ${CLAUDE_PLUGIN_ROOT}/…`. Fix the helper or skill, not the allowlist: re-adding a narrow rule is exactly the regression this flow removed.
+If a helper prompts, check the Claude Code version first: builds before 2.1.280 may not auto-allow it, and the fix is upgrading. Then check that the invocation leads with `bash ${CLAUDE_PLUGIN_ROOT}/…` with no assignment in front, and that the helper is still read-only and workspace-confined. Do not add a helper allow-rule — Step 3.7a explains why every shape is either too broad (R6) or dies at the next plugin upgrade.
 
 ---
 
@@ -668,7 +682,19 @@ For each file the user approved:
 - **`.git/hooks/pre-commit`**: overwrite from `templates/git-hooks/pre-commit`, then `chmod +x`. Also re-assert `git config --local core.precomposeunicode true` (idempotent — no-op if already set) so the macOS NFD-on-write defense ships alongside the hook. The overwritten hook calls `.claude/hooks/filename-length-guard.sh`; if the user skipped the `.claude/hooks/` update the `[ -x ]` guard makes the call a silent no-op rather than a broken hook, so the two files may be updated in either order.
 - **`.claude/settings.json`**: overwrite from `templates/claude/settings.json`.
 - **`.claude/hooks/`**: for each `templates/claude/hooks/*-guard.sh` and `templates/claude/hooks/task-validator.sh`, overwrite `.claude/hooks/<name>.sh`, then `chmod +x`. Create directory if needed. This is how an existing project picks up `filename-length-guard.sh`; `chmod +x` is not optional for it, since pre-commit tests `[ -x ]` before calling it.
-- **`.claude/settings.local.json`**: overwrite from `templates/claude/settings.local.json`. **If the project is Documentation or Mixed** (detect via existing `.obsidian/` directory), run the Step 3.7b pptx merge so the overwrite does not strip the `Bash(python scripts/office/soffice.py:*)` and `Bash(pdftoppm:*)` rules. **Code-only** projects need no post-overwrite merge — the ralph-run and ralph-status helpers are read-only and authorized at run time by `autoAllowBashIfSandboxed`, so no seeded allow-rule is required. User-added custom permissions in the existing `allow` array are preserved by the `+ unique` merge. After any merge, run the Step 3.10 verification block (pptx rules, Documentation / Mixed only) and surface any `WARN` to the user before completing the upgrade.
+- **`.claude/settings.local.json`**: overwrite from `templates/claude/settings.local.json`. **If the project is Documentation or Mixed** (detect via existing `.obsidian/` directory), run the Step 3.7b pptx merge so the overwrite does not strip the `Bash(python scripts/office/soffice.py:*)` and `Bash(pdftoppm:*)` rules. User-added custom permissions in the existing `allow` array are preserved by the `+ unique` merge.
+
+  That merge would also preserve **dead helper rules** from earlier versions, so strip them afterwards. Ralph seeds no helper rule any more (Step 3.7a), and both older shapes are dead: pre-marketplace rules naming `.claude/skills/ralph-run/` or `.claude/skills/ralph-status/` (in either `$HOME/...` or absolute form — those files no longer exist), and plugin-cache rules pinned to a concrete version (`.../ralph/0.1.0/skills/...` — dead at the first plugin upgrade after they were written). List them first, then remove them:
+
+  ```bash
+  dead='/\.claude/skills/ralph-(run|status)/|/plugins/cache/[^/]+/ralph/[0-9]+\.[0-9]+\.[0-9]+/'
+  jq -r --arg re "$dead" '(.permissions.allow // [])[] | select(test($re))' .claude/settings.local.json
+  jq --arg re "$dead" '.permissions.allow = ((.permissions.allow // []) | map(select(test($re) | not)))' \
+    .claude/settings.local.json > .claude/settings.local.json.tmp \
+    && mv .claude/settings.local.json.tmp .claude/settings.local.json
+  ```
+
+  Report every removed rule by name in the U5 summary (`removed dead helper rule: <rule>`), or `no dead helper rules found`. After any merge, run the Step 3.10 verification block (pptx rules, Documentation / Mixed only) and surface any `WARN` to the user before completing the upgrade.
 - **`.devcontainer/devcontainer.json`**: overwrite from `templates/devcontainer/devcontainer.json`.
 - **`.devcontainer/init-firewall.sh`**: overwrite from `templates/devcontainer/init-firewall.sh`, then `chmod +x`.
 - **`.devcontainer/container-settings.local.json`**: overwrite from `templates/devcontainer/container-settings.local.json`. Not executable, and it must stay at the sandbox switch alone — never merge project permissions into it (see the Init "shared `.claude`" note).

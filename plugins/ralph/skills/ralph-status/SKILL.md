@@ -59,9 +59,10 @@ Skip this check for `"completed"` and `"failed"` states.
 Before displaying any UTC timestamp from the JSON (e.g. `completed_at`), convert it to Europe/Moscow time using the helper script:
 
 ```bash
-utc_iso="<the UTC ISO 8601 value, e.g. 2026-05-01T08:50:16Z>"
-moscow_time=$(bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-status/scripts/utc-to-moscow.sh "$utc_iso")
+bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-status/scripts/utc-to-moscow.sh "<the UTC ISO 8601 value, e.g. 2026-05-01T08:50:16Z>"
 ```
+
+Read the converted time from its output. Keep the command in exactly this shape — starting with `bash`, the timestamp inlined, no shell variable assignment in front — so sandbox auto-allow approves it without a prompt. No allow-rule is seeded for this helper; the shape avoids the auto-allow defect with `VAR=` inline scripts (see ralph-init Step 3.7a).
 
 The helper tries GNU `date -d` first, then falls back to macOS BSD `date -j -u -f` with explicit UTC parsing. The result is a string like `2026-05-01 11:50:16 MSK`.
 

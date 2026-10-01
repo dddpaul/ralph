@@ -69,9 +69,10 @@ Apply these rules in order. The first rule that matches determines the output. O
 **Timestamp conversion:** Before displaying `completed_at`, convert it from UTC to Europe/Moscow time using the helper script:
 
 ```bash
-utc_iso="<completed_at value>"
-moscow_time=$(bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-status/scripts/utc-to-moscow.sh "$utc_iso")
+bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-status/scripts/utc-to-moscow.sh "<completed_at value>"
 ```
+
+Read the converted time from its output. Keep this exact shape — starting with `bash`, no `VAR=` assignment in front — so sandbox auto-allow approves it and the tick does not prompt (see ralph-init Step 3.7a).
 
 **Output:** Full status block (same format as `/ralph-status`):
 
