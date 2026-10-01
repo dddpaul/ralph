@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import io
 import os
+import shlex
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
@@ -96,7 +97,9 @@ def test_stale_container_is_refused_with_both_timestamps_and_remedy(
     assert AFTER.isoformat() in err
     assert stale_name in err
     assert "rebuild=true" in err
-    assert f"--workspace-folder {ws} --remove-existing-container" in err
+    assert (
+        f"--workspace-folder {shlex.quote(str(ws))} --remove-existing-container" in err
+    )
     assert "Devcontainer is ready." not in out
 
 

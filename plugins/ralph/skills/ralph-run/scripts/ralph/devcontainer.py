@@ -8,6 +8,7 @@ launch fails immediately with ``Error: Dev container not found.``
 
 from __future__ import annotations
 
+import shlex
 import shutil
 import subprocess
 import sys
@@ -106,7 +107,7 @@ def _report_stale(
         "would silently ignore these changes. Recreate it:",
         "  /ralph-run rebuild=true   (CLI: --devcontainer --rebuild)",
         "or by hand:",
-        f"  devcontainer up --workspace-folder {workspace_folder}"
+        f"  devcontainer up --workspace-folder {shlex.quote(str(workspace_folder))}"
         " --remove-existing-container",
         bar,
     ]
