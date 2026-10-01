@@ -42,16 +42,6 @@ If `backlog` is missing: `npm install -g backlog.md`
 If not a git repo: `git init -b master`
 
 ```bash
-[ -s "$HOME/.claude/agents/task-reviewer.md" ] || {
-  echo "ERROR: ~/.claude/agents/task-reviewer.md missing. Copy it from the Ralph repo:"
-  echo "  cp <ralph-repo>/agents/task-reviewer.md ~/.claude/agents/"
-  exit 1
-}
-```
-
-If the user-global agent file is missing, print the error and **abort** — do NOT proceed to Step 2 or write any project files.
-
-```bash
 CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 find "$CLAUDE_DIR/plugins/cache" -type f \
   -path '*/ralph/*/skills/ralph-run/scripts/ralph_orchestrator.py' 2>/dev/null \
@@ -64,6 +54,8 @@ find "$CLAUDE_DIR/plugins/cache" -type f \
 ```
 
 The project-root `ralph.sh` written in Step 3.1 is a thin shim that resolves the Ralph orchestrator wherever the plugin is installed — by precedence (`$RALPH_ORCHESTRATOR` explicit override, then the newest plugin-cache install, else error) — and `exec`s it via `uv run`. Absent an override, the orchestrator comes from the installed plugin cache; if the ralph plugin is not installed the shim has nothing to exec and the bootstrap is broken. Hard-stop here and instruct the user to install the plugin first.
+
+The same plugin also ships the `task-reviewer` agent (`agents/task-reviewer.md`, resolved as `ralph:task-reviewer`), so this check covers it too — no user-level copy under `~/.claude/agents/` is needed.
 
 ---
 
