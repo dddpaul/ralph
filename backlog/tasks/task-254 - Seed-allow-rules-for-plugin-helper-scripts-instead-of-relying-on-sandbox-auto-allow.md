@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-09-30 10:29'
-updated_date: '2026-10-01 05:08'
+updated_date: '2026-10-01 05:16'
 labels: []
 dependencies: []
 priority: medium
@@ -81,12 +81,12 @@ If anything is unclear or any check fails: STOP and ask the user. Do NOT start w
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [x] #1 plugins/ralph/skills/ralph-init/templates/claude/settings.local.json contains an allow-rule covering each of preflight.sh, wait-heartbeat.sh and utc-to-moscow.sh under the plugin cache
+- [x] #1 No helper allow-rule is seeded in templates/claude/settings.local.json, and ralph-init SKILL.md Step 3.7a records why: sandbox auto-allow covers the helpers on the Claude Code version in use, and every measured rule shape is either over-broad under R6 or version-pinned
 - [x] #2 No seeded allow-rule contains a concrete plugin version number: grep -E 'ralph/[0-9]+\.[0-9]+\.[0-9]+' over both settings.local.json files returns nothing
-- [x] #3 .claude/settings.local.json carries the same three rules as the template (R11 parity)
-- [x] #4 The chosen rule pattern was verified to actually match on the Claude Code version in use, and the verification method plus its result are recorded in the task notes
+- [x] #3 .claude/settings.local.json carries no helper rules, matching the template (R11 parity)
+- [x] #4 Candidate rule patterns were verified against the Claude Code version in use, and the verification method plus results are recorded in the task notes
 - [x] #5 ralph-init Upgrade Mode removes allow-rules naming $HOME/.claude/skills/ralph-run or $HOME/.claude/skills/ralph-status from an existing project settings.local.json, and reports what it removed
-- [x] #6 plugins/ralph/skills/ralph-init/SKILL.md no longer claims the helper scripts need no seeded allow-rule and no longer promises 'no prompt' for preflight and heartbeat wait
+- [x] #6 plugins/ralph/skills/ralph-init/SKILL.md ties the helpers' no-prompt behaviour to the Claude Code version it was measured on, and tells hosts on older builds to upgrade Claude Code rather than seed a rule
 - [x] #7 Whether Skill(ralph-run) still matches a plugin skill was checked, and the finding recorded in the task notes
 - [x] #8 uv run ruff check . and uv run pytest both pass
 <!-- AC:END -->
@@ -130,4 +130,12 @@ Round 3, end to end: rendered the real template with the real Step 3.7a snippet 
   H1 bash <C>/ralph/0.8.1/skills/ralph-run/scripts/preflight.sh ./ralph.sh true --tasks 1 -> RAN (0)
   H2 bash <C>/ralph/0.8.1/skills/ralph-run/scripts/wait-heartbeat.sh                      -> RAN (0)
   H3 bash <C>/ralph/0.8.1/skills/ralph-status/scripts/utc-to-moscow.sh "2026-09-30T10:00:00Z" -> RAN (0)
+
+Commit: `5b8f39d` - task-254: seed a version-independent allow-rule for the plugin helper scripts
+
+task-reviewer round 1: CHANGES REQUESTED. Blocking (R6): a bare trailing '*' crosses '/', so Bash(bash <C>/ralph/*) auto-allows bash on every file in every cached plugin version (ralph.sh templates, patchers, init-firewall.sh) and possibly on ralph/../ traversal paths -- effectively the Bash(bash:*) R6 forbids; R13 says notes cannot waive it. The reviewer asked the main session to run a traversal probe it had been blocked from running; not run (surfaced to the user instead).
+
+User decision: drop the seeded rule. Evidence: on Claude Code 2.1.280 sandbox auto-allow approved every helper shape with no prompt (T1-T5 above), so the rule fixes a symptom this host does not have, at an R6 cost. Kept: the dead-rule migration, the utc-to-moscow snippet collapse, and the SKILL.md corrections, reworded to the measured truth (auto-allow covers the helpers on 2.1.280; older builds should upgrade Claude Code). The {{CLAUDE_DIR}} render machinery was removed with the rule; the template is byte-identical to master. Live .claude/settings.local.json: rule removed; its allow set now equals the template's.
+
+ACs #1, #3, #4 and #6 reworded to match the decision (they asked for the rule that was rejected). Reviewer nits folded in: the strip now tolerates a file with no permissions.allow (previously exit 5), and the test runs the jq lines from SKILL.md rather than re-checking the regex in Python.
 <!-- SECTION:NOTES:END -->

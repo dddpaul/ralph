@@ -1,20 +1,15 @@
-"""The seeded allow-rule for the plugin helper scripts (TASK-254).
+"""No allow-rule is seeded for the plugin helper scripts (TASK-254).
 
-Sandbox auto-allow does not reliably cover the ralph-run and ralph-status
-helpers before Claude Code 2.1.285, so ralph-init seeds one rule for them:
-``Bash(bash <claude-dir>/plugins/cache/dddpaul-ralph/ralph/*)``. Three
-properties make that rule work, and each is pinned here:
+ralph-init seeds nothing for the ralph-run and ralph-status helpers. On Claude
+Code 2.1.280 sandbox auto-allow approves them, and every rule shape that could
+cover them was measured as either too broad (a bare ``ralph/*`` crosses ``/``,
+which reviewer rule R6 forbids in effect) or dead at the next plugin bump
+(version-pinned). Older projects still carry dead helper rules, which the
+upgrade flow strips.
 
-- It is rendered to an absolute path. The permission matcher compares literal
-  text and never expands ``$HOME`` (TASK-126), so the template carries a
-  ``{{CLAUDE_DIR}}`` placeholder that init renders.
-- It stops above the version directory, so it survives plugin upgrades.
-- Every helper call starts with ``bash``. The rule matches by prefix, so a call
-  led by ``VAR=...`` can never match it.
-
-The render and dead-rule snippets are executed straight out of SKILL.md, the
-way the upgrade flow runs them, because the escaping is easy to get wrong in
-a way that reads fine and silently matches nothing.
+The strip runs straight out of SKILL.md, because its escaping is easy to get
+wrong in a way that reads fine and silently matches nothing: it shipped once
+with doubled backslashes that jq read as a literal backslash.
 """
 
 from __future__ import annotations
@@ -29,78 +24,60 @@ from devcontainer_config import REPO_ROOT
 SKILLS = REPO_ROOT / "plugins/ralph/skills"
 INIT_MD = SKILLS / "ralph-init/SKILL.md"
 TEMPLATE = SKILLS / "ralph-init/templates/claude/settings.local.json"
-HELPER_RULE = "Bash(bash {{CLAUDE_DIR}}/plugins/cache/dddpaul-ralph/ralph/*)"
-VERSIONED = re.compile(r"ralph/[0-9]+\.[0-9]+\.[0-9]+")
+HELPER = re.compile(r"plugins/cache/|\.claude/skills/ralph")
 
-
-def allow(path: Path) -> list[str]:
-    return json.loads(path.read_text("utf-8"))["permissions"]["allow"]
+DEAD = [
+    # Pre-marketplace, $HOME and absolute forms: the files no longer exist.
+    "Bash(bash $HOME/.claude/skills/ralph-run/scripts/preflight.sh:*)",
+    "Bash(bash /Users/x/.claude/skills/ralph-status/scripts/utc-to-moscow.sh:*)",
+    # Plugin cache pinned to a version: dead at the next plugin bump.
+    "Bash(bash /Users/x/.claude/plugins/cache/dddpaul-ralph/ralph/0.1.0/skills/ralph-run/scripts/w.sh:*)",
+]
+KEPT = ["Bash(my-custom-tool:*)", "Bash(git add:*)", "Skill(ralph-run)"]
 
 
 def init_text() -> str:
     return INIT_MD.read_text("utf-8")
 
 
-def render_snippet() -> str:
-    """The Step 3.7a render command, as written."""
+def strip_snippet() -> str:
+    """The Upgrade Mode dead-rule strip, dedented, exactly as written."""
     lines = init_text().splitlines()
-    i = next(n for n, line in enumerate(lines) if "gsub(" in line)
-    return "\n".join(lines[i - 1 : i + 3])
+    start = next(n for n, line in enumerate(lines) if line.lstrip().startswith("dead='"))
+    end = next(n for n in range(start, len(lines)) if lines[n].strip() == "```")
+    return "\n".join(line.removeprefix("  ") for line in lines[start:end])
 
 
-def dead_pattern() -> str:
-    """The U4 dead-rule regex, as the shell would hand it to jq."""
-    (line,) = [line for line in init_text().splitlines() if line.lstrip().startswith("dead='")]
+def run_strip(tmp_path: Path, settings: dict[str, object]) -> tuple[str, dict[str, object]]:
+    (tmp_path / ".claude").mkdir()
+    target = tmp_path / ".claude/settings.local.json"
+    target.write_text(json.dumps(settings), encoding="utf-8")
     out = subprocess.run(
-        ["bash", "-c", f'{line.strip()}\nprintf %s "$dead"'],
+        ["bash", "-c", "set -e\n" + strip_snippet()],
+        cwd=tmp_path,
         capture_output=True,
         text=True,
         check=True,
     )
-    return out.stdout
+    return out.stdout, json.loads(target.read_text("utf-8"))
 
 
-def test_template_seeds_exactly_one_helper_rule() -> None:
-    rules = [r for r in allow(TEMPLATE) if "plugins/cache" in r]
-    assert rules == [HELPER_RULE]
+def test_template_seeds_no_helper_rule() -> None:
+    allow = json.loads(TEMPLATE.read_text("utf-8"))["permissions"]["allow"]
+    assert [r for r in allow if HELPER.search(r)] == []
+    assert "{{" not in TEMPLATE.read_text("utf-8")
 
 
-def test_no_seeded_rule_names_a_plugin_version() -> None:
-    assert not [r for r in allow(TEMPLATE) if VERSIONED.search(r)]
+def test_strip_removes_both_dead_shapes_and_keeps_the_rest(tmp_path: Path) -> None:
+    listed, after = run_strip(tmp_path, {"permissions": {"allow": DEAD + KEPT}})
+    assert listed.splitlines() == DEAD
+    assert after["permissions"] == {"allow": KEPT}
 
 
-def test_render_produces_an_absolute_rule(tmp_path: Path) -> None:
-    out = tmp_path / "settings.local.json"
-    cmd = render_snippet().replace("${CLAUDE_PLUGIN_ROOT}", str(REPO_ROOT / "plugins/ralph"))
-    cmd = cmd.replace("> .claude/settings.local.json", f'> "{out}"')
-    subprocess.run(
-        ["bash", "-c", cmd],
-        check=True,
-        env={"PATH": "/usr/bin:/bin:/opt/homebrew/bin:/usr/local/bin", "HOME": "/home/someone"},
-    )
-    rendered = allow(out)
-    assert "Bash(bash /home/someone/.claude/plugins/cache/dddpaul-ralph/ralph/*)" in rendered
-    assert "{{" not in out.read_text("utf-8")
-    # Everything but the placeholder rule is carried over untouched.
-    assert len(rendered) == len(allow(TEMPLATE))
-
-
-def test_dead_rule_pattern_strips_both_dead_shapes() -> None:
-    dead = re.compile(dead_pattern())
-    removed = [
-        # Pre-marketplace, $HOME and absolute forms: the files no longer exist.
-        "Bash(bash $HOME/.claude/skills/ralph-run/scripts/preflight.sh:*)",
-        "Bash(bash /Users/x/.claude/skills/ralph-status/scripts/utc-to-moscow.sh:*)",
-        # Plugin cache pinned to a version: dead at the next plugin bump.
-        "Bash(bash /Users/x/.claude/plugins/cache/dddpaul-ralph/ralph/0.1.0/skills/ralph-run/scripts/w.sh:*)",
-    ]
-    kept = [
-        "Bash(bash /Users/x/.claude/plugins/cache/dddpaul-ralph/ralph/*)",
-        "Bash(my-custom-tool:*)",
-        "Skill(ralph-run)",
-    ]
-    assert [r for r in removed if not dead.search(r)] == []
-    assert [r for r in kept if dead.search(r)] == []
+def test_strip_tolerates_a_file_without_an_allow_array(tmp_path: Path) -> None:
+    listed, after = run_strip(tmp_path, {"sandbox": {"enabled": True}})
+    assert listed == ""
+    assert after == {"sandbox": {"enabled": True}, "permissions": {"allow": []}}
 
 
 def test_every_helper_call_starts_with_bash() -> None:
@@ -114,7 +91,9 @@ def test_every_helper_call_starts_with_bash() -> None:
     assert not offenders, offenders
 
 
-def test_init_no_longer_promises_no_seeded_rule() -> None:
+def test_init_documents_why_no_helper_rule_is_seeded() -> None:
     text = init_text()
-    assert "no seeded allow-rule is required" not in text
-    assert "Why zero seeded rules suffice" not in text
+    assert "No allow-rule is seeded for the plugin helper scripts" in text
+    assert "Do not add a helper rule" in text
+    assert "R6" in text
+    assert "{{CLAUDE_DIR}}" not in text
