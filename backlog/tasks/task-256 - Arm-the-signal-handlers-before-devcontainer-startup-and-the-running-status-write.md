@@ -3,10 +3,10 @@ id: TASK-256
 title: >-
   Arm the signal handlers before devcontainer startup and the running status
   write
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-01 05:46'
-updated_date: '2026-10-01 06:02'
+updated_date: '2026-10-01 06:07'
 labels: []
 dependencies: []
 priority: high
@@ -68,17 +68,26 @@ SIGTERM currently maps to exit `130` (`state.exit_code = 130` at line ~188). 130
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Signal handlers are installed before start_devcontainer() is called, so a SIGTERM during container startup is handled rather than killing the process with signal 15
-- [ ] #2 A SIGTERM arriving during startup causes a prompt exit without running the iteration loop, verified by a test that signals before the loop begins
-- [ ] #3 installer.restore() still runs on every exit path after the install() move, including the early devcontainer-failure return
-- [ ] #4 A test asserts the invariant that the handlers are armed by the time the status file reports state=running
-- [ ] #5 test_orchestrator_exits_promptly_on_sigterm passes with a deliberate multi-second delay inserted between the running status write and the start of the iteration loop, demonstrating the race window is closed
-- [ ] #6 The SIGTERM exit code is either kept at 130 or changed deliberately, with the choice and its rationale recorded in the task notes
-- [ ] #7 uv run ruff check . and uv run pytest both pass, and the full suite runs three consecutive times with no intermittent failure in test_loop_signal_interrupt.py
+- [x] #1 Signal handlers are installed before start_devcontainer() is called, so a SIGTERM during container startup is handled rather than killing the process with signal 15
+- [x] #2 A SIGTERM arriving during startup causes a prompt exit without running the iteration loop, verified by a test that signals before the loop begins
+- [x] #3 installer.restore() still runs on every exit path after the install() move, including the early devcontainer-failure return
+- [x] #4 A test asserts the invariant that the handlers are armed by the time the status file reports state=running
+- [x] #5 test_orchestrator_exits_promptly_on_sigterm passes with a deliberate multi-second delay inserted between the running status write and the start of the iteration loop, demonstrating the race window is closed
+- [x] #6 The SIGTERM exit code is either kept at 130 or changed deliberately, with the choice and its rationale recorded in the task notes
+- [x] #7 uv run ruff check . and uv run pytest both pass, and the full suite runs three consecutive times with no intermittent failure in test_loop_signal_interrupt.py
 <!-- AC:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 Plan: wrap run() so _SignalInstaller is installed before start_devcontainer and restored in an outer finally; move the body into _run_armed with raise_if_pending() right after bring-up (before the running write) inside the existing except/finally so _finalize records interrupted/130; extract _initial_status. Tests: startup-delay variant of the E2E SIGTERM test (stalls build_tool after the running write), in-process SIGTERM-during-bring-up, devcontainer-failure restore, armed-at-every-running-write invariant.
+
+Commit: `cf9fc9a` - task-256: arm signal handlers before devcontainer startup and the running status write
+
+Exit-code decision (AC #6): SIGTERM keeps exit 130, same as SIGINT. Reason: ralph-refine documents 130 for SIGINT/SIGTERM and refine/loop.py returns it, the status-file exit_code and the E2E assertions consume 130 as the single 'interrupted' code, and ralph.sh has no separate SIGTERM code to keep parity with. Splitting to 143 would fork the interrupted contract between the two loops for no consumer benefit.
+AC #5 evidence: test_orchestrator_exits_promptly_on_sigterm[startup-delay] stalls build_tool 3s after the running write; against master loop.py it fails (exit -15), with the fix it passes. All four new tests fail on master loop.py. Full suite 682 passed x3, ruff clean.
+
+Review: task-reviewer APPROVED. Non-blocking follow-up noted: if a stop arrives during bring-up AND start_devcontainer then fails (e.g. Ctrl-C kills the devcontainer CLI too), run() returns that rc with no status file rather than 130.
+
+Commit: `d697416` - task-256: bump plugin version to 0.8.4 (patch)
 <!-- SECTION:NOTES:END -->
