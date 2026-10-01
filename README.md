@@ -162,7 +162,7 @@ Default is 10 iterations. Use `--tool claude` (default) or `--tool opencode` to 
 | `--prompt-file <path>` | File to load prompt template from | (none) |
 | `--tasks <ids>` | Comma-separated numeric task IDs to run (e.g. `62,64,65`). Mutually exclusive with `--prompt-file` | (none) |
 | `--devcontainer` | Run inside a devcontainer | off |
-| `--rebuild` | With `--devcontainer`, recreate the container from scratch (`devcontainer up --remove-existing-container`) so `devcontainer.json` mount/config changes take effect. Does **not** refresh cached image layers — use `devcontainer build --workspace-folder . --no-cache` for that. No-op without `--devcontainer` | off |
+| `--rebuild` | With `--devcontainer`, recreate the container from scratch (`devcontainer up --remove-existing-container`) so `devcontainer.json` mount/config changes take effect. Does **not** refresh cached image layers — use `devcontainer build --workspace-folder . --no-cache` for that. No-op without `--devcontainer`. Without it, a `--devcontainer` launch whose existing container is older than `.devcontainer/devcontainer.json` or `.devcontainer/Dockerfile` (container `Created` vs file mtime, looked up by the `devcontainer.local_folder` label) **refuses to start** and prints both timestamps plus this remedy; the probe is skipped silently when docker or the container is unavailable | off |
 | `--no-push` | Opt out of pushing `master` to `origin` after the loop finishes (see [Publishing to origin](#publishing-to-origin)) | push on |
 | `--help` | Show help message and exit | |
 | `--version` | Show version and exit | |
@@ -578,7 +578,7 @@ uv run pytest plugins/ralph/skills/ralph-run/tests/test_loop_exit_code.py
 - Heartbeat & status file - `test_heartbeat.py`, `test_wait_heartbeat.py`, `test_status.py`
 - Preflight & usage checks - `test_preflight.py`, `test_usage_check.py`, `test_usage_wrapper.py`
 - Tool wrappers - `test_tool_claude.py`, `test_tool_opencode.py`, `test_tools.py`
-- Devcontainer, signals, summary, task selection, end-to-end - `test_devcontainer.py`, `test_devcontainer_rebuild.py`, `test_signals.py`, `test_summary.py`, `test_tasks.py`, `test_e2e_fake_claude.py`
+- Devcontainer, signals, summary, task selection, end-to-end - `test_devcontainer.py`, `test_devcontainer_rebuild.py`, `test_devcontainer_stale.py`, `test_signals.py`, `test_summary.py`, `test_tasks.py`, `test_e2e_fake_claude.py`
 
 **Python (`tests/python/`)** — also run by `uv run pytest`:
 

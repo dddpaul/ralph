@@ -11,6 +11,12 @@ import pytest
 from ralph import devcontainer as devcontainer_module
 
 
+@pytest.fixture(autouse=True)
+def _no_existing_container(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep the TASK-258 staleness probe off the host's real docker."""
+    monkeypatch.setattr(devcontainer_module, "container_created_at", lambda _ws: None)
+
+
 def test_missing_cli_returns_1_and_prints_install_hint(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
