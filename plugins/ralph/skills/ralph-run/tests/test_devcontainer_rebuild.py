@@ -27,6 +27,12 @@ from ralph.tools import OnSpawn, Tool, ToolResult
 _BASE_ARGV = ["devcontainer", "up", "--workspace-folder", "/workspace"]
 
 
+@pytest.fixture(autouse=True)
+def _no_existing_container(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep the TASK-258 staleness probe off the host's real docker."""
+    monkeypatch.setattr(devcontainer_module, "container_created_at", lambda _ws: None)
+
+
 @pytest.fixture
 def captured_argv(monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
     """Stub out the CLI lookup and ``subprocess.run``; record every argv."""
