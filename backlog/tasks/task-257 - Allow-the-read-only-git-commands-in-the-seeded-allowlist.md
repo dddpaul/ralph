@@ -1,9 +1,10 @@
 ---
 id: TASK-257
 title: Allow the read-only git commands in the seeded allowlist
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-01 06:34'
+updated_date: '2026-10-01 07:01'
 labels: []
 dependencies: []
 priority: medium
@@ -54,10 +55,22 @@ All six additions are narrow subcommand prefixes with no interpreter and no muta
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The template settings.local.json allows exactly these six: git log, git status, git diff, git show, git rev-parse, git ls-files
-- [ ] #2 The template allowlist contains no Bash(git tag:*), no Bash(git branch:*) and no blanket Bash(git:*)
-- [ ] #3 This repo's live .claude/settings.local.json carries the same six rules, so its allow set still equals the template's
-- [ ] #4 A test asserts every git rule in the template is a named subcommand prefix, and fails if a blanket Bash(git:*) or a mutating subcommand such as tag or branch is added
-- [ ] #5 LC_ALL=C bats tests/unit passes, including the R11 settings.local.json shape test
-- [ ] #6 uv run ruff check . and uv run pytest both pass
+- [x] #1 The template settings.local.json allows exactly these six: git log, git status, git diff, git show, git rev-parse, git ls-files
+- [x] #2 The template allowlist contains no Bash(git tag:*), no Bash(git branch:*) and no blanket Bash(git:*)
+- [x] #3 This repo's live .claude/settings.local.json carries the same six rules, so its allow set still equals the template's
+- [x] #4 A test asserts every git rule in the template is a named subcommand prefix, and fails if a blanket Bash(git:*) or a mutating subcommand such as tag or branch is added
+- [x] #5 LC_ALL=C bats tests/unit passes, including the R11 settings.local.json shape test
+- [x] #6 uv run ruff check . and uv run pytest both pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Commit: `9efe593` - task-257: allow the read-only git queries in the seeded allowlist
+
+Plan: add the six read-only git prefix rules to the template (after the write rules) and the live gitignored settings.local.json (sorted); add tests/python/test_git_allow_rules.py asserting every template git rule is a named subcommand from a vetted read/write set and that tag/branch/blanket are absent.
+
+Implemented: six read-only git prefix rules added to the template and the live (gitignored) settings.local.json; allow sets equal. New tests/python/test_git_allow_rules.py pins every template git rule to a vetted named subcommand (mutation-checked: git:*, tag, branch, push each fail). Residual: git log/diff/show accept --output=<file>, verified to write a file; a prefix rule cannot exclude a flag, the sandbox write boundary bounds it (noted in the test docstring). Gates: ruff clean, pytest 685 passed, bats tests/unit 110/110 (via node_modules/.bin/bats). task-reviewer: APPROVED.
+
+Commit: `76cf507` - task-257: bump plugin version to 0.8.5 (patch)
+<!-- SECTION:NOTES:END -->
