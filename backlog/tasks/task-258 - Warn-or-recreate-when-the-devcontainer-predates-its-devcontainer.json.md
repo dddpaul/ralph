@@ -1,9 +1,10 @@
 ---
 id: TASK-258
 title: Warn or recreate when the devcontainer predates its devcontainer.json
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-01 07:12'
+updated_date: '2026-10-01 12:06'
 labels: []
 dependencies: []
 priority: high
@@ -63,11 +64,27 @@ Degrade cleanly when the information is unavailable: no `docker` on PATH, no mat
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 start_devcontainer compares the existing container's creation time against the mtime of .devcontainer/devcontainer.json and .devcontainer/Dockerfile before reusing it
-- [ ] #2 When the container is older than either file, the operator sees an unmissable message naming both timestamps and the rebuild=true remedy
-- [ ] #3 The chosen behaviour on detection (warn, auto-recreate, or refuse) is implemented and its rationale recorded in the task notes
-- [ ] #4 A missing docker binary, no matching container, or a failing docker inspect leaves the launch working exactly as it does today
-- [ ] #5 A test covers the stale case, the current case, and each degraded case, with the container creation time and the file mtimes stubbed rather than requiring a real container
-- [ ] #6 rebuild defaults to off and its behaviour is unchanged when passed explicitly
-- [ ] #7 uv run ruff check . and uv run pytest both pass
+- [x] #1 start_devcontainer compares the existing container's creation time against the mtime of .devcontainer/devcontainer.json and .devcontainer/Dockerfile before reusing it
+- [x] #2 When the container is older than either file, the operator sees an unmissable message naming both timestamps and the rebuild=true remedy
+- [x] #3 The chosen behaviour on detection (warn, auto-recreate, or refuse) is implemented and its rationale recorded in the task notes
+- [x] #4 A missing docker binary, no matching container, or a failing docker inspect leaves the launch working exactly as it does today
+- [x] #5 A test covers the stale case, the current case, and each degraded case, with the container creation time and the file mtimes stubbed rather than requiring a real container
+- [x] #6 rebuild defaults to off and its behaviour is unchanged when passed explicitly
+- [x] #7 uv run ruff check . and uv run pytest both pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan: in start_devcontainer (rebuild=False only) probe docker ps -aq --filter label=devcontainer.local_folder=<abs ws> + docker inspect {{.Created}}; compare to mtimes of .devcontainer/devcontainer.json and Dockerfile; on stale, print a banner to stderr and return STALE_CONTAINER_EXIT without running up. Every probe failure -> None -> launch unchanged.
+
+Decision (AC #3): REFUSE. /ralph-run launches detached and deletes backlog/.ralph-launch.log once the heartbeat is fresh, so a warn-and-continue banner would literally be deleted unread — the same silent drift as today. Refusing kills the process before the heartbeat, wait-heartbeat.sh FAILs, and the skill shows the launch-log tail containing the banner: unmissable. Auto-recreate rejected: expensive and surprising, and it would change rebuild's opt-in contract. Cost: an mtime bump without a content change (e.g. a checkout touching devcontainer.json) is a false positive; the remedy is one rebuild, accepted over silent drift. The banner also names the by-hand devcontainer up --remove-existing-container, because ralph-refine calls start_devcontainer with no rebuild flag of its own. rebuild=True skips the probe entirely, argv unchanged.
+
+Commit: `8392908` - task-258: refuse to reuse a devcontainer older than its devcontainer.json or Dockerfile
+
+Commit: `8544200` - task-258: shell-quote the workspace path in the stale-container remedy
+
+Implemented: ralph/devcontainer.py container_created_at/stale_inputs/_report_stale; start_devcontainer refuses (STALE_CONTAINER_EXIT=1) when rebuild is off and the labelled container predates devcontainer.json/Dockerfile. Tests: tests/test_devcontainer_stale.py (stale x2, current, missing Dockerfile, rebuild skip, 7 degraded probes, nanosecond parse, end-to-end); existing devcontainer tests stub the probe via an autouse fixture. Docs: README --rebuild row, ralph-run SKILL.md. task-reviewer APPROVED; applied its shlex.quote nit. Gotcha: ruff format with target py314 rewrites except (A, B): to the paren-less PEP 758 form, which Python <3.14 rejects; use a tuple constant.
+
+Commit: `ebc8e4b` - task-258: bump plugin version to 0.9.0 (minor)
+<!-- SECTION:NOTES:END -->
