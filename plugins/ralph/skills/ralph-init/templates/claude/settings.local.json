@@ -28,6 +28,7 @@
       "Bash(git rm:*)",
       "Bash(./ralph.sh:*)",
       "Bash(nohup ./ralph.sh:*)",
+      "Bash(bash {{CLAUDE_DIR}}/plugins/cache/dddpaul-ralph/ralph/*)",
       "Bash(ccusage:*)",
       "Bash(grep:*)",
       "Bash(stat:*)",
