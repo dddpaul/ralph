@@ -80,7 +80,7 @@ Error: ralph.sh not found. Checked ./ralph.sh and scripts/ralph/ralph.sh. Run /r
 
 ## Step 3: Validate Preconditions
 
-Run the preflight check via its bash launcher shim (`preflight.sh` in the `scripts/` directory next to this SKILL.md — i.e. `${CLAUDE_PLUGIN_ROOT}/skills/ralph-run/scripts`) with the ralph path from Step 2 and the devcontainer flag from Step 1. The shim resolves its own directory as `PYTHONPATH` and execs `python -m ralph.preflight`. The harness renders `${CLAUDE_PLUGIN_ROOT}` to the installed plugin directory; preflight is read-only, so sandbox auto-allow covers it and no allow-rule is needed:
+Run the preflight check via its bash launcher shim (`preflight.sh` in the `scripts/` directory next to this SKILL.md — i.e. `${CLAUDE_PLUGIN_ROOT}/skills/ralph-run/scripts`) with the ralph path from Step 2 and the devcontainer flag from Step 1. The shim resolves its own directory as `PYTHONPATH` and execs `python -m ralph.preflight`. The harness renders `${CLAUDE_PLUGIN_ROOT}` to the installed plugin directory; preflight is read-only, so sandbox auto-allow covers it and no allow-rule is needed (measured on Claude Code 2.1.280; a host on an older build that prompts here should upgrade Claude Code — see ralph-init Step 3.7a):
 
 ```bash
 bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-run/scripts/preflight.sh "$RALPH_PATH" <devcontainer:true|false> [--verbose] [--tasks <ids>] [--block-end-buffer-min <N>]

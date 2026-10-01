@@ -72,7 +72,7 @@ Apply these rules in order. The first rule that matches determines the output. O
 bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-status/scripts/utc-to-moscow.sh "<completed_at value>"
 ```
 
-Read the converted time from its output. Keep this exact shape — starting with `bash`, no `VAR=` assignment in front — so the seeded allow-rule matches it and the tick does not prompt.
+Read the converted time from its output. Keep this exact shape — starting with `bash`, no `VAR=` assignment in front — so sandbox auto-allow approves it and the tick does not prompt (see ralph-init Step 3.7a).
 
 **Output:** Full status block (same format as `/ralph-status`):
 

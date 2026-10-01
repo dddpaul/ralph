@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-09-30 10:29'
-updated_date: '2026-10-01 05:16'
+updated_date: '2026-10-01 05:21'
 labels: []
 dependencies: []
 priority: medium
@@ -138,4 +138,8 @@ task-reviewer round 1: CHANGES REQUESTED. Blocking (R6): a bare trailing '*' cro
 User decision: drop the seeded rule. Evidence: on Claude Code 2.1.280 sandbox auto-allow approved every helper shape with no prompt (T1-T5 above), so the rule fixes a symptom this host does not have, at an R6 cost. Kept: the dead-rule migration, the utc-to-moscow snippet collapse, and the SKILL.md corrections, reworded to the measured truth (auto-allow covers the helpers on 2.1.280; older builds should upgrade Claude Code). The {{CLAUDE_DIR}} render machinery was removed with the rule; the template is byte-identical to master. Live .claude/settings.local.json: rule removed; its allow set now equals the template's.
 
 ACs #1, #3, #4 and #6 reworded to match the decision (they asked for the rule that was rejected). Reviewer nits folded in: the strip now tolerates a file with no permissions.allow (previously exit 5), and the test runs the jq lines from SKILL.md rather than re-checking the regex in Python.
+
+Commit: `824460e` - task-254: drop the seeded helper rule and strip dead helper rules on upgrade
+
+task-reviewer round 2: CHANGES REQUESTED (R12). ralph-status:65 and ralph-status-watch:75 still justified the single-bash call shape by a seeded allow-rule that no longer exists; ralph-run:83 promised auto-allow without naming the measured version. All three reworded to point at sandbox auto-allow and ralph-init Step 3.7a, with the version named in ralph-run. Added test_no_skill_still_cites_a_seeded_helper_rule (mutation-checked: fails with the stale sentence restored). Full pytest hit the known-flaky test_orchestrator_exits_promptly_on_sigterm once (-15 vs 130); passes alone and on a full re-run (673 passed).
 <!-- SECTION:NOTES:END -->

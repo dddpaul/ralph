@@ -97,3 +97,15 @@ def test_init_documents_why_no_helper_rule_is_seeded() -> None:
     assert "Do not add a helper rule" in text
     assert "R6" in text
     assert "{{CLAUDE_DIR}}" not in text
+
+
+def test_no_skill_still_cites_a_seeded_helper_rule() -> None:
+    # The first cut of TASK-254 seeded a rule and explained the helper call
+    # shape by it; the rule was dropped and two sentences outlived it.
+    stale = [
+        f"{md.relative_to(REPO_ROOT)}:{n}"
+        for md in sorted(SKILLS.glob("*/SKILL.md"))
+        for n, line in enumerate(md.read_text("utf-8").splitlines(), 1)
+        if "seeded allow-rule" in line or "seeded helper rule" in line
+    ]
+    assert not stale, stale
