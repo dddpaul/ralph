@@ -119,6 +119,27 @@ def run(args: ParsedArgs, project_root: Path) -> int:
     """
     prompt_file_body = load_prompt_file(args.prompt_file) if args.prompt_file else None
 
+    # TASK-256: arm the handlers BEFORE the (possibly multi-minute) devcontainer
+    # bring-up and the first ``state="running"`` write, so ``/ralph-stop``'s
+    # SIGTERM is always handled instead of killing the process with signal 15.
+    # Invariant: once the status file says ``running``, the handlers are armed.
+    # Arming early is safe — with no tool subprocess registered the handler
+    # only sets the pending flag.
+    installer = _SignalInstaller()
+    installer.install()
+    try:
+        return _run_armed(args, project_root, prompt_file_body, installer)
+    finally:
+        installer.restore()
+
+
+def _run_armed(
+    args: ParsedArgs,
+    project_root: Path,
+    prompt_file_body: str | None,
+    installer: _SignalInstaller,
+) -> int:
+    """Body of :func:`run`, executed with the signal handlers already armed."""
     # --rebuild is scoped to this call, which is why it is a no-op unless
     # --devcontainer is also set (TASK-237).
     if args.devcontainer:
@@ -133,43 +154,27 @@ def run(args: ParsedArgs, project_root: Path) -> int:
     timeout_sec = timeout_to_seconds(args.timeout)
 
     state = _RunState()
-    started_at_iso = _now_iso()
     started_epoch = _now_epoch()
-    status = StatusFile(
-        pid=os.getpid(),
-        started_at=started_at_iso,
-        state="running",
-        iteration=0,
-        max_iterations=args.max_iterations,
-        tool=args.tool,
-        tasks_done=[],
-        tasks_remaining=tasks_module.count_remaining(args.task_whitelist or None),
-        current_task=None,
-        last_iteration_duration=None,
-        elapsed=0,
-        errors=[],
-        completed_at=None,
-        exit_code=None,
-        iteration_started_at=None,
-        timeout_sec=timeout_sec,
-    )
-    status.write_atomic(status_path)
+    status = _initial_status(args, timeout_sec)
 
-    # TASK-211: snapshot the master ref BEFORE the loop so we can detect
-    # whether this run advanced it. The agent merges task branches to master
-    # during the loop (loop.py itself never merges); an advanced ref is the
-    # signal that there is new canon to publish to origin once the loop ends.
     push_is_enabled = push_module.push_enabled(args.push)
-    rev_before = (
-        push_module.current_rev(project_root, push_module.DEFAULT_MASTER_REF)
-        if push_is_enabled
-        else None
-    )
-
-    tool = build_tool(args, project_root, run_log_path=run_log_path)
-    installer = _SignalInstaller()
-    installer.install()
+    rev_before: str | None = None
     try:
+        # A stop that arrived during the devcontainer bring-up exits here,
+        # before the loop; _finalize still records the interrupted state.
+        installer.raise_if_pending()
+        status.write_atomic(status_path)
+
+        # TASK-211: snapshot the master ref BEFORE the loop so we can detect
+        # whether this run advanced it. The agent merges task branches to master
+        # during the loop (loop.py itself never merges); an advanced ref is the
+        # signal that there is new canon to publish to origin once the loop ends.
+        if push_is_enabled:
+            rev_before = push_module.current_rev(
+                project_root, push_module.DEFAULT_MASTER_REF
+            )
+
+        tool = build_tool(args, project_root, run_log_path=run_log_path)
         with Heartbeat(heartbeat_path):
             _run_loop(
                 args=args,
@@ -184,6 +189,8 @@ def run(args: ParsedArgs, project_root: Path) -> int:
                 installer=installer,
             )
     except _Interrupted:
+        # 130 for SIGTERM as well as SIGINT (TASK-256 decision): matches
+        # ralph-refine's documented contract and the status-file consumers.
         state.exit_reason = "interrupted"
         state.exit_code = 130
     finally:
@@ -207,6 +214,28 @@ def run(args: ParsedArgs, project_root: Path) -> int:
         f"exit_reason {state.exit_reason!r} not in closed set {EXIT_REASONS!r}"
     )
     return state.exit_code
+
+
+def _initial_status(args: ParsedArgs, timeout_sec: int) -> StatusFile:
+    """Build the ``state="running"`` status record published at loop start."""
+    return StatusFile(
+        pid=os.getpid(),
+        started_at=_now_iso(),
+        state="running",
+        iteration=0,
+        max_iterations=args.max_iterations,
+        tool=args.tool,
+        tasks_done=[],
+        tasks_remaining=tasks_module.count_remaining(args.task_whitelist or None),
+        current_task=None,
+        last_iteration_duration=None,
+        elapsed=0,
+        errors=[],
+        completed_at=None,
+        exit_code=None,
+        iteration_started_at=None,
+        timeout_sec=timeout_sec,
+    )
 
 
 def _run_loop(

@@ -3,9 +3,10 @@ id: TASK-256
 title: >-
   Arm the signal handlers before devcontainer startup and the running status
   write
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-10-01 05:46'
+updated_date: '2026-10-01 06:02'
 labels: []
 dependencies: []
 priority: high
@@ -75,3 +76,9 @@ SIGTERM currently maps to exit `130` (`state.exit_code = 130` at line ~188). 130
 - [ ] #6 The SIGTERM exit code is either kept at 130 or changed deliberately, with the choice and its rationale recorded in the task notes
 - [ ] #7 uv run ruff check . and uv run pytest both pass, and the full suite runs three consecutive times with no intermittent failure in test_loop_signal_interrupt.py
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan: wrap run() so _SignalInstaller is installed before start_devcontainer and restored in an outer finally; move the body into _run_armed with raise_if_pending() right after bring-up (before the running write) inside the existing except/finally so _finalize records interrupted/130; extract _initial_status. Tests: startup-delay variant of the E2E SIGTERM test (stalls build_tool after the running write), in-process SIGTERM-during-bring-up, devcontainer-failure restore, armed-at-every-running-write invariant.
+<!-- SECTION:NOTES:END -->

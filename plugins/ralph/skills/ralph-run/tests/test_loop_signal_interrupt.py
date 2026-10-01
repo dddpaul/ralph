@@ -15,6 +15,11 @@ These tests pin the new contract:
   stdout.
 * AC #4 — an end-to-end run of the orchestrator over a hanging tool
   exits within ``TERMINATE_GRACE_SEC * 2`` of SIGTERM.
+
+TASK-256 adds the startup half: the handlers are armed before the
+devcontainer bring-up and before the first ``state="running"`` write, so a
+SIGTERM during startup is handled (exit 130) instead of killing the process
+with signal 15.
 """
 
 from __future__ import annotations
@@ -35,9 +40,14 @@ from pathlib import Path
 import pytest
 
 from ralph import loop as loop_module
+from ralph.args import ParsedArgs
+from ralph.signals import IterationSignals
+from ralph.status import StatusFile
+from ralph.tools import OnSpawn, Tool, ToolResult
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-ORCHESTRATOR = REPO_ROOT / "skills" / "ralph-run" / "scripts" / "ralph_orchestrator.py"
+SCRIPTS_DIR = REPO_ROOT / "skills" / "ralph-run" / "scripts"
+ORCHESTRATOR = SCRIPTS_DIR / "ralph_orchestrator.py"
 FAKE_CLAUDE = REPO_ROOT / "skills" / "ralph-run" / "tests" / "fixtures" / "fake_claude.py"
 BACKLOG_BIN = shutil.which("backlog")
 UV_BIN = shutil.which("uv")
@@ -307,12 +317,31 @@ def _reap_session(proc: subprocess.Popen[str]) -> None:
         proc.wait(timeout=5)
 
 
+_STARTUP_DELAY_SEC = 3.0
+
+_DELAYED_ENTRY = f"""
+import sys, time
+sys.path.insert(0, {str(SCRIPTS_DIR)!r})
+from ralph import loop
+_build_tool = loop.build_tool
+def _slow_build_tool(*a, **kw):
+    time.sleep({_STARTUP_DELAY_SEC})
+    return _build_tool(*a, **kw)
+loop.build_tool = _slow_build_tool
+import ralph_orchestrator
+sys.exit(ralph_orchestrator.main())
+"""
+
+
 @pytest.mark.skipif(
     BACKLOG_BIN is None or UV_BIN is None,
     reason="E2E test requires both 'backlog' and 'uv' on PATH",
 )
+@pytest.mark.parametrize("startup_delay", [False, True], ids=["plain", "startup-delay"])
 def test_orchestrator_exits_promptly_on_sigterm(
     hang_project: tuple[Path, str, dict[str, str]],
+    tmp_path: Path,
+    startup_delay: bool,
 ) -> None:
     """AC #4 — orchestrator + hanging tool + SIGTERM → exit in <10s.
 
@@ -322,13 +351,23 @@ def test_orchestrator_exits_promptly_on_sigterm(
     Uses ``FAKE_CLAUDE_MODE=hang`` which sleeps indefinitely; without the
     TASK-160 plumbing the orchestrator would not interrupt the subprocess
     until ``--timeout`` (here: 60 minutes) elapsed.
+
+    The ``startup-delay`` variant (TASK-256) stalls ``build_tool`` — which
+    runs after the ``state="running"`` write and before the loop — so the
+    SIGTERM deterministically lands in that window. It must still exit 130,
+    proving the handlers are armed by the time the status says ``running``.
     """
     project_dir, task_id, env = hang_project
 
+    entry = [sys.executable, str(ORCHESTRATOR)]
+    if startup_delay:
+        wrapper = tmp_path / "delayed_orchestrator.py"
+        wrapper.write_text(_DELAYED_ENTRY)
+        entry = [sys.executable, str(wrapper)]
+
     proc = subprocess.Popen(
         [
-            sys.executable,
-            str(ORCHESTRATOR),
+            *entry,
             "--tool",
             "claude",
             "--tasks",
@@ -394,3 +433,154 @@ def test_orchestrator_exits_promptly_on_sigterm(
         # fake_claude.py orphan does not leak across runs.
         if proc.poll() is None:
             _reap_session(proc)
+
+
+def _startup_args(*, devcontainer: bool) -> ParsedArgs:
+    return ParsedArgs(
+        tool="claude",
+        model="claude-opus-5",
+        effort="max",
+        timeout="15",
+        on_error="continue",
+        retry_count=0,
+        log_file="",
+        prompt_file="",
+        tasks="",
+        block_end_buffer_min=0,
+        devcontainer=devcontainer,
+        max_iterations=1,
+    )
+
+
+class _RecordingTool(Tool):
+    def __init__(self, call_log: list[str]) -> None:
+        self._log = call_log
+
+    def run(
+        self,
+        prompt: str,
+        timeout_sec: int,
+        *,
+        on_spawn: OnSpawn | None = None,
+    ) -> ToolResult:
+        _ = (prompt, timeout_sec, on_spawn)
+        self._log.append("tool.run")
+        return ToolResult(
+            stdout_path=Path("/tmp/ralph-test.out"),
+            exit_code=0,
+            signals=IterationSignals(
+                task_summary_count=1, complete=True, error_text=None
+            ),
+        )
+
+
+def _sigterm_is_armed() -> bool:
+    handler = signal.getsignal(signal.SIGTERM)
+    return isinstance(getattr(handler, "__self__", None), loop_module._SignalInstaller)
+
+
+@pytest.fixture
+def startup_loop(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> tuple[Path, list[str]]:
+    """In-process ``loop.run`` with tasks, devcontainer and tool stubbed."""
+    monkeypatch.setattr(loop_module.tasks_module, "pick_next_task", lambda **_: "TASK-1")
+    monkeypatch.setattr(loop_module.tasks_module, "count_remaining", lambda *_a, **_kw: 1)
+    monkeypatch.setattr(loop_module.tasks_module, "done_task_ids", lambda: [])
+    monkeypatch.setattr(
+        loop_module.tasks_module, "current_in_progress_task", lambda: None
+    )
+    monkeypatch.setattr(loop_module, "ITER_SLEEP_SEC", 0)
+    monkeypatch.setenv("RALPH_STATUS_FILE", str(tmp_path / "status.json"))
+    monkeypatch.setenv("RALPH_HEARTBEAT_FILE", str(tmp_path / "heartbeat"))
+    call_log: list[str] = []
+    monkeypatch.setattr(
+        loop_module, "build_tool", lambda *_a, **_kw: _RecordingTool(call_log)
+    )
+    return tmp_path, call_log
+
+
+def test_sigterm_during_devcontainer_startup_exits_before_loop(
+    monkeypatch: pytest.MonkeyPatch,
+    startup_loop: tuple[Path, list[str]],
+) -> None:
+    """TASK-256 AC #1/#2 — a real SIGTERM during bring-up is handled, the
+    loop never runs, and the run records ``interrupted`` / 130."""
+    project_root, call_log = startup_loop
+    # Sentinel: on a regression the SIGTERM lands here instead of killing
+    # the whole pytest session; with the fix, run() restores it on exit.
+    leaked: list[int] = []
+
+    def sentinel(signum: int, _frame: object) -> None:
+        leaked.append(signum)
+
+    original = signal.signal(signal.SIGTERM, sentinel)
+    try:
+
+        def fake_start(_workspace: Path, **_kw: object) -> int:
+            call_log.append(f"start_devcontainer armed={_sigterm_is_armed()}")
+            os.kill(os.getpid(), signal.SIGTERM)
+            return 0
+
+        monkeypatch.setattr(loop_module, "start_devcontainer", fake_start)
+        rc = loop_module.run(_startup_args(devcontainer=True), project_root)
+        restored = signal.getsignal(signal.SIGTERM)
+    finally:
+        signal.signal(signal.SIGTERM, original)
+
+    assert leaked == [], "SIGTERM during bring-up bypassed the loop's handler"
+    assert rc == 130
+    assert call_log == ["start_devcontainer armed=True"]
+    status = json.loads((project_root / "status.json").read_text())
+    assert status["state"] == "failed", status
+    assert status["exit_code"] == 130, status
+    assert restored is sentinel
+
+
+def test_devcontainer_failure_restores_signal_handlers(
+    monkeypatch: pytest.MonkeyPatch,
+    startup_loop: tuple[Path, list[str]],
+) -> None:
+    """TASK-256 AC #3 — the early devcontainer-failure return still restores."""
+    project_root, call_log = startup_loop
+    prev_int = signal.getsignal(signal.SIGINT)
+    prev_term = signal.getsignal(signal.SIGTERM)
+    armed_during_start: list[bool] = []
+
+    def failing_start(_workspace: Path, **_kw: object) -> int:
+        armed_during_start.append(_sigterm_is_armed())
+        return 2
+
+    monkeypatch.setattr(loop_module, "start_devcontainer", failing_start)
+    rc = loop_module.run(_startup_args(devcontainer=True), project_root)
+
+    assert rc == 2
+    assert armed_during_start == [True]
+    assert call_log == []
+    assert signal.getsignal(signal.SIGINT) is prev_int
+    assert signal.getsignal(signal.SIGTERM) is prev_term
+
+
+def test_handlers_armed_whenever_status_reports_running(
+    monkeypatch: pytest.MonkeyPatch,
+    startup_loop: tuple[Path, list[str]],
+) -> None:
+    """TASK-256 AC #4 — invariant: every ``state="running"`` write happens
+    with the SIGTERM handler armed (the contract ralph-stop relies on)."""
+    project_root, _ = startup_loop
+    prev_term = signal.getsignal(signal.SIGTERM)
+    armed_at_running_write: list[bool] = []
+    original_write = StatusFile.write_atomic
+
+    def recording_write(self: StatusFile, path: Path) -> None:
+        if self.state == "running":
+            armed_at_running_write.append(_sigterm_is_armed())
+        original_write(self, path)
+
+    monkeypatch.setattr(StatusFile, "write_atomic", recording_write)
+    rc = loop_module.run(_startup_args(devcontainer=False), project_root)
+
+    assert rc == 0
+    assert armed_at_running_write, "no state=running write observed"
+    assert all(armed_at_running_write), armed_at_running_write
+    assert signal.getsignal(signal.SIGTERM) is prev_term
