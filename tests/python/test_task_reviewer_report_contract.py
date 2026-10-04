@@ -91,4 +91,3 @@ def test_report_ends_with_a_score_line_refine_can_parse() -> None:
     body = section("Report Format")
     assert "the report's last line is `SCORE: N`, with nothing after it" in body
     assert "`^SCORE:\\s*(\\d+)`" in body
-    assert re.search(r"^SCORE:\s*(\d+)", "SCORE: 7", re.MULTILINE)

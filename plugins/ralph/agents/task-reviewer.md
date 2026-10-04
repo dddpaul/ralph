@@ -85,7 +85,7 @@ An AC that cannot be verified from inside the review environment (for example, i
 Classify every finding as **blocking** or **minor**.
 
 - **Blocking:** an AC not met (including an AC without evidence, or not verifiable here without an explicit deferral in the task notes); a violation of a rule from a loaded rules file; a finding under checklist items 2, 3, 4 or 8 (functionality and edge cases, bugs and error handling, security, unintended changes).
-- **Minor:** style remarks not backed by a rule.
+- **Minor:** style remarks not backed by a rule — including findings under checklist items 5, 6 and 7 (code style, test coverage, debug or commented-out code) unless a loaded rule backs them, in which case they are rule violations and blocking.
 
 Name every violated rule from a loaded rules file by its rule ID (for example `R5` or `R-DOCS-4`) in the finding.
 
