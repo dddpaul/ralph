@@ -3,10 +3,10 @@ id: TASK-260
 title: >-
   Require evidence per AC and a findings-derived score in the task-reviewer
   report
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-04 17:33'
-updated_date: '2026-10-04 17:57'
+updated_date: '2026-10-04 18:18'
 labels: []
 dependencies:
   - TASK-259
@@ -64,13 +64,13 @@ If anything is unclear or any check fails: STOP and ask the user. Do NOT start w
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 task-reviewer.md requires every AC counted as met to carry evidence of one of three kinds (a command run plus its relevant output lines, a file:line quote, a rendered image or crop path) and reports an AC without evidence as NOT met — verified by grep
-- [ ] #2 task-reviewer.md states that the reviewer runs checks itself where it can and that quoting the task's own notes or the author's summary is not evidence — verified by grep
-- [ ] #3 task-reviewer.md reports an AC that cannot be verified inside the review environment as not verifiable here with a reason, counting it as met only when the task notes defer it explicitly with a reason — verified by grep
-- [ ] #4 task-reviewer.md classifies findings as blocking or minor and names violated rules from loaded rules files by rule ID — verified by grep
-- [ ] #5 task-reviewer.md defines the rubric: APPROVED iff zero blocking findings with SCORE = 10 minus minor findings (floor 7); any blocking finding gives CHANGES REQUESTED with SCORE = 5 minus (blocking findings - 1) (floor 1); the report's last line is SCORE: N — verified by grep
-- [ ] #6 A new test asserts the evidence requirement, the rubric and the last-line SCORE contract in plugins/ralph/agents/task-reviewer.md and fails against master's version of that file (mutation-checked)
-- [ ] #7 uv run ruff check . is clean, uv run pytest passes and LC_ALL=C bats tests/unit passes
+- [x] #1 task-reviewer.md requires every AC counted as met to carry evidence of one of three kinds (a command run plus its relevant output lines, a file:line quote, a rendered image or crop path) and reports an AC without evidence as NOT met — verified by grep
+- [x] #2 task-reviewer.md states that the reviewer runs checks itself where it can and that quoting the task's own notes or the author's summary is not evidence — verified by grep
+- [x] #3 task-reviewer.md reports an AC that cannot be verified inside the review environment as not verifiable here with a reason, counting it as met only when the task notes defer it explicitly with a reason — verified by grep
+- [x] #4 task-reviewer.md classifies findings as blocking or minor and names violated rules from loaded rules files by rule ID — verified by grep
+- [x] #5 task-reviewer.md defines the rubric: APPROVED iff zero blocking findings with SCORE = 10 minus minor findings (floor 7); any blocking finding gives CHANGES REQUESTED with SCORE = 5 minus (blocking findings - 1) (floor 1); the report's last line is SCORE: N — verified by grep
+- [x] #6 A new test asserts the evidence requirement, the rubric and the last-line SCORE contract in plugins/ralph/agents/task-reviewer.md and fails against master's version of that file (mutation-checked)
+- [x] #7 uv run ruff check . is clean, uv run pytest passes and LC_ALL=C bats tests/unit passes
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -85,4 +85,14 @@ R4 limit (this repo's own reviewer rules). Both this task and TASK-259 edit plug
 How the result can and cannot be checked. Nothing in Ralph records review verdicts: summary.py RunSummary carries exit_reason, tasks_completed, tasks_remaining, iterations_used, max_iterations, failed_iterations, wall_time_sec and iter_durations_sec with no verdict field, failed_iterations counts tool failures rather than review refusals, and loop.py:574 _truncate_run_log zeroes the run log at every startup so it is not a history. The ACs here verify the mechanism exists; they cannot show a reviewer began refusing bad work. The design's own measures are downstream and after the fact — for P1, CHANGES REQUESTED appearing in core and channels plus fewer rounds of human remarks — against this baseline: stacks 353 tasks / 41 refusals / 94 rule lines; services 90 / 18 / 160; channels 144 / 4 (and those four are rule text quoted in task descriptions, not refusals) / 38; core 127 / 0 / 26. The falsifiable predictions are channels 0 -> >0 and core 0 -> >0 after they upgrade. Counting substrings over task notes would reproduce exactly the channels false positives above; honest measurement needs real review events (project, task, reviewed commit, round, rules version, verdict, findings) plus later human-correction rounds on the same artifact, compared across comparable pre/post work, and must not optimise for refusal count alone since false refusals are also a cost. This repo could host such a collector; it cannot prove the outcome with its own unit tests.
 
 P3 (frozen examples) remains outstanding, channels first per the design. It is load-bearing for the design's larger claim — the design states P1's limit as "доказательство ловит непроверенное, но не неверно проверенное", and in services the slide crop existed but was rendered with the wrong fonts. R-DOCS-6's fc-match step covers that specific failure mode; R-DOCS-4/5 check internal consistency, whereas frozen expectations provide an independent oracle. The design schedules P3 third, so it does not block this task, but shipping 259+260 must not be reported as demonstrating the whole outcome.
+
+Plan: handoff gate green (paths exist, TASK-259 Done, ACs grep/test-checkable). Rewrite Instructions step 6 and checklist item 1 of plugins/ralph/agents/task-reviewer.md; add 'Evidence per AC', 'Findings classification' and 'Verdict and score rubric' plus a report-format section ending in SCORE: N (described as the same line syntax refine parses, no automatic consumer). Add tests/python/test_task_reviewer_report_contract.py, mutation-check against master's file. Update README review paragraph.
+
+Commit: `34d63dd` - task-260: require evidence per AC and a findings-derived score in task-reviewer reports
+
+Commit: `6b83896` - task-260: classify unruled checklist items 5-7 findings as minor and drop a vacuous assertion
+
+Implemented: task-reviewer.md gains Evidence per AC, Findings Classification, Verdict and Score Rubric and Report Format sections. Instructions step 6 and checklist item 1 now point at them. Findings under checklist items 5-7 are minor unless a loaded rule backs them; this follows the first review's minor note, since the scope's blocking list leaves them out. The SCORE line is described as the same line syntax refine parses, with no automatic consumer. Test: tests/python/test_task_reviewer_report_contract.py, 8 tests. All 8 fail against master's agent file, and targeted mutations of the floor example, the no-evidence rule and the not-evidence rule each fail one test. Checks: ruff clean; pytest 707 passed; bats tests/unit (node_modules/.bin/bats, LC_ALL=C) 119 tests with 1 failure, #104 R11 settings.local.json shape, which fails identically on master and reads the gitignored machine-local .claude/settings.local.json, so it is unrelated to this diff. Review: ralph:task-reviewer APPROVED (0 blocking / 0 minor after the follow-up commit). One re-review returned CHANGES REQUESTED only because ACs were unchecked, since fixed. As R4 notes, the review ran under the pre-change rules, so the new rubric's first live exercise is the next task. R2 in .claude/task-reviewer-rules.md partially overlaps the new evidence rule but still adds the checked-or-deferred bookkeeping requirement, so it is not redundant.
+
+Commit: `111271f` - task-260: bump plugin version to 0.9.2 (patch)
 <!-- SECTION:NOTES:END -->
