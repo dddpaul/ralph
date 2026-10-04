@@ -3,10 +3,10 @@ id: TASK-259
 title: >-
   Ship docs reviewer rules as an upgrade-managed file and load all rule tiers
   together
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-04 17:33'
-updated_date: '2026-10-04 18:02'
+updated_date: '2026-10-04 18:09'
 labels:
   - 'feature:ralph-init'
 dependencies: []
@@ -117,15 +117,15 @@ If anything is unclear or any check fails: STOP and ask the user. Do NOT start w
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 templates/claude/task-reviewer-rules.docs.md opens with a header saying it is managed by ralph-init, is overwritten on upgrade, and that project rules belong in .claude/task-reviewer-rules.md — verified by grep
-- [ ] #2 The template contains R-DOCS-4 (document consistency), R-DOCS-5 (document family consistency), R-DOCS-6 (fit criterion closed by a crop with verified fonts plus a slack number) and R-DOCS-7 (measurement comments), plus the R-DOCS-1 addition (no pipe-escaping demand outside tables) and the R-DOCS-2 addition (English titles where a naming hook enforces them) — verified by grep for each
-- [ ] #3 The template names no downstream project and no task ID — grep for stacks, services, channels, core and TASK-[0-9] over the template returns nothing
-- [ ] #4 ralph-init SKILL.md Init Step 3.7c writes the template to .claude/task-reviewer-rules.docs.md for Documentation / Mixed projects and no longer writes it into .claude/task-reviewer-rules.md — verified by grep
-- [ ] #5 ralph-init SKILL.md Upgrade overwrites .claude/task-reviewer-rules.docs.md from the template on every upgrade, still never touches .claude/task-reviewer-rules.md, lists the new file in the status table, and prints a hint when the project file repeats a heading present in the managed file — verified by grep
-- [ ] #6 The .gitignore block in ralph-init SKILL.md re-includes !.claude/task-reviewer-rules.docs.md — verified by grep
-- [ ] #7 task-reviewer.md loads every non-empty tier additively in the order user-global, .claude/task-reviewer-rules.docs.md, .claude/task-reviewer-rules.md, reports every applied tier, and states that an explicit project override of a named shared rule wins — verified by a new test that runs the loading snippet from the agent file against fixture files in a temp dir and asserts all three contents appear in that order
-- [ ] #8 tests/unit/template-parity.bats covers the new managed file; uv run ruff check . is clean, uv run pytest passes and LC_ALL=C bats tests/unit passes
-- [ ] #9 The template contains R-DOCS-8 (publication is never implicit, with the in-scope carve-out when a task asks for it) and R-DOCS-9 (the review report uses the project's working language, identifiers and quoted output verbatim) — verified by grep for each
+- [x] #1 templates/claude/task-reviewer-rules.docs.md opens with a header saying it is managed by ralph-init, is overwritten on upgrade, and that project rules belong in .claude/task-reviewer-rules.md — verified by grep
+- [x] #2 The template contains R-DOCS-4 (document consistency), R-DOCS-5 (document family consistency), R-DOCS-6 (fit criterion closed by a crop with verified fonts plus a slack number) and R-DOCS-7 (measurement comments), plus the R-DOCS-1 addition (no pipe-escaping demand outside tables) and the R-DOCS-2 addition (English titles where a naming hook enforces them) — verified by grep for each
+- [x] #3 The template names no downstream project and no task ID — grep for stacks, services, channels, core and TASK-[0-9] over the template returns nothing
+- [x] #4 ralph-init SKILL.md Init Step 3.7c writes the template to .claude/task-reviewer-rules.docs.md for Documentation / Mixed projects and no longer writes it into .claude/task-reviewer-rules.md — verified by grep
+- [x] #5 ralph-init SKILL.md Upgrade overwrites .claude/task-reviewer-rules.docs.md from the template on every upgrade, still never touches .claude/task-reviewer-rules.md, lists the new file in the status table, and prints a hint when the project file repeats a heading present in the managed file — verified by grep
+- [x] #6 The .gitignore block in ralph-init SKILL.md re-includes !.claude/task-reviewer-rules.docs.md — verified by grep
+- [x] #7 task-reviewer.md loads every non-empty tier additively in the order user-global, .claude/task-reviewer-rules.docs.md, .claude/task-reviewer-rules.md, reports every applied tier, and states that an explicit project override of a named shared rule wins — verified by a new test that runs the loading snippet from the agent file against fixture files in a temp dir and asserts all three contents appear in that order
+- [x] #8 tests/unit/template-parity.bats covers the new managed file; uv run ruff check . is clean, uv run pytest passes and LC_ALL=C bats tests/unit passes
+- [x] #9 The template contains R-DOCS-8 (publication is never implicit, with the in-scope carve-out when a task asks for it) and R-DOCS-9 (the review report uses the project's working language, identifiers and quoted output verbatim) — verified by grep for each
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -152,4 +152,14 @@ AC #8 limit. This repo is Code-only (no .obsidian/), so .claude/task-reviewer-ru
 What AC #8 does NOT deliver, to be stated as a limit rather than glossed: overwrite-on-upgrade is synchronization, not drift-impossibility. It restores parity at a successful upgrade; nothing detects drift between upgrades, and post-upgrade edits, plugin-version skew, skipped upgrades and misexecution of the install step all produce drift. Misexecution is a live source, not a theoretical one: Init 3.7c contains zero fenced code blocks (counted between the 3.7c and 3.8 headings), so the write is prose carried out by an agent and no test can prove the destination. The design asks for "проверка совпадения с шаблоном"; this task does not provide a downstream drift detector.
 
 Scope addition, user-approved 2026-10-04: added R-DOCS-8 (publication never implicit) and R-DOCS-9 (review report in the project's working language) to close the two gaps the P2 mapping above identified — publication absent, response language partial. R-DOCS-8 is phrased narrowly on review advice: a blanket 'publication is never part of a task' would collide with explicitly authorized publish work (this environment ships a publish skill), so the rule bans implicit publication and carves out tasks that request it, with projects free to be stricter. R-DOCS-9 covers the reviewer's own report, which CLAUDE.conventions.docs.md did not reach — it governs documents and an agent's answers, but no rule named the review report itself. New AC #9 makes both greppable. P3 (frozen examples, channels first) stays unfiled by decision, not oversight.
+
+Plan: managed header + R-DOCS-1/2 additions + R-DOCS-4..9 in the docs template; task-reviewer loads three tiers additively via a loop (user-global, shared docs, project) and reports them; ralph-init Init 3.7c writes .claude/task-reviewer-rules.docs.md unconditionally and never the project file; Upgrade item 15 overwrites the managed file, never touches the project file, prints a duplicate-heading hint; .gitignore re-include; new tests/unit/task-reviewer-rules-loading.bats extracts and runs both snippets against fixtures; template-parity gains a managed-header test.
+
+Commit: `aacb97a` - task-259: ship docs reviewer rules as a managed tier and load all rule tiers additively
+
+Commit: `15bac81` - task-259: guard the duplicate-heading hint on both rule files
+
+Done. Template: managed header (lines 1-3), R-DOCS-1/2 additions, R-DOCS-4..9. Agent: loop over three tiers, additive, tier list reported, explicit project override of a named rule ID wins. ralph-init: 3.7c writes .claude/task-reviewer-rules.docs.md unconditionally and never the project file; U2 item 15 + write rule overwrite the managed file, project file untouched, portable duplicate-heading hint snippet guarded on both files; .gitignore re-include in the template block and the repo's own .gitignore. Tests: tests/unit/task-reviewer-rules-loading.bats extracts and runs the agent loader and the upgrade hint snippet against fixtures; template-parity.bats keeps the docs template non-mirrored (Code-only repo) and asserts the managed header. Gates: ruff clean, pytest 699 passed, bats tests/unit 119/119 in a clean worktree (in /workspace the settings.local.json shape test fails on the gitignored per-developer file, identically on master). task-reviewer APPROVED; took nit 1 (guard), left nit 2 (U5 table column one char short) and the documented user-global vs shared-docs precedence gap. Limit: overwrite-on-upgrade synchronizes at upgrade time only; no downstream drift detector.
+
+Commit: `5f84f60` - task-259: bump plugin version to 0.9.1 (patch)
 <!-- SECTION:NOTES:END -->
