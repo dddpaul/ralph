@@ -342,7 +342,7 @@ Each task gets its own branch (`task-<id>-description`) created from master. Aft
 
 ### Mandatory Code Review
 
-Every task branch is reviewed before merging. The agent spawns the `task-reviewer` agent to check acceptance criteria, functionality, security, code style, and test coverage. Only approved branches get merged.
+Every task branch is reviewed before merging. The agent spawns the `task-reviewer` agent to check acceptance criteria, functionality, security, code style, and test coverage. The reviewer verifies each acceptance criterion itself and lists evidence for every AC it counts as met — a command it ran plus the relevant output lines, a `file:line` quote, or a rendered image or crop path; an AC without evidence is reported as NOT met, and the author's own notes or summary do not count. Findings are classified as blocking (unmet AC, loaded-rule violation named by rule ID, correctness, bugs, security, unintended changes) or minor (unruled style remarks), and the verdict follows a fixed rubric: APPROVED iff there are zero blocking findings (SCORE = 10 − minor, floor 7), otherwise CHANGES REQUESTED (SCORE = 5 − (blocking − 1), floor 1). The report's last line is `SCORE: N`. Only approved branches get merged.
 
 ### Git Hooks
 

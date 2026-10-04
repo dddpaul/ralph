@@ -53,11 +53,11 @@ If no rules file exists at any tier, proceed with the standard checklist only an
 3. Load custom rules (see above)
 4. View all changes: `git diff master..HEAD`
 5. Evaluate against the checklist below and any custom rules
-6. Report: APPROVED or CHANGES REQUESTED with specific line-level feedback
+6. Verify each AC yourself and record evidence for it (see Evidence per AC), classify every finding as blocking or minor, derive the verdict and score from the findings by the rubric below, and write the report in the Report Format — APPROVED or CHANGES REQUESTED with specific line-level feedback, last line `SCORE: N`
 
 ## Checklist
 
-1. **Acceptance criteria met** — every AC in the task is satisfied by the diff
+1. **Acceptance criteria met** — every AC in the task is satisfied by the diff, and each AC counted as met carries evidence you gathered yourself (see Evidence per AC); an AC without evidence is NOT met
 2. **Functionality correct, edge cases handled** — logic is sound, boundary conditions covered
 3. **No bugs, proper error handling** — no nil dereferences, unchecked errors, or silent failures
 4. **No security issues** — no injection (SQL, command, XSS), no hardcoded secrets, no path traversal
@@ -65,3 +65,45 @@ If no rules file exists at any tier, proceed with the standard checklist only an
 6. **Test coverage for new functionality** — new behavior has corresponding tests
 7. **No debug code or commented-out code** — no console.log, print statements, TODO hacks, or dead code
 8. **No unintended changes to other files** — diff is scoped to the task; no stray formatting or refactoring
+
+## Evidence per AC
+
+Every AC you count as met MUST carry evidence of one of three kinds:
+
+- **command** — a command you ran plus the relevant output lines;
+- **quote** — a `file:line` quote from the post-diff file;
+- **render** — the path of a rendered image or crop you produced, for a visual criterion.
+
+An AC without evidence is reported as NOT met, whatever the diff seems to show.
+
+Run the checks yourself where you can — tests, grep, build, render. Quoting the task's own notes or the author's summary is not evidence: the author's claim that a check passed is what the review exists to verify.
+
+An AC that cannot be verified from inside the review environment (for example, it needs the host, a fresh session or an external service) is reported as **not verifiable here** with the reason. It counts as met only if the task notes defer it explicitly with a reason; otherwise it is NOT met.
+
+## Findings Classification
+
+Classify every finding as **blocking** or **minor**.
+
+- **Blocking:** an AC not met (including an AC without evidence, or not verifiable here without an explicit deferral in the task notes); a violation of a rule from a loaded rules file; a finding under checklist items 2, 3, 4 or 8 (functionality and edge cases, bugs and error handling, security, unintended changes).
+- **Minor:** style remarks not backed by a rule.
+
+Name every violated rule from a loaded rules file by its rule ID (for example `R5` or `R-DOCS-4`) in the finding.
+
+## Verdict and Score Rubric
+
+The verdict and score are derived from the findings by this fixed rubric, never from overall impression:
+
+- **APPROVED** if and only if there are zero blocking findings. SCORE = 10 minus the number of minor findings, floor 7.
+- **CHANGES REQUESTED** on any blocking finding. SCORE = 5 minus (blocking findings - 1), floor 1.
+
+Examples: 0 blocking and 0 minor → APPROVED, SCORE: 10; 0 blocking and 5 minor → APPROVED, SCORE: 7; 1 blocking → CHANGES REQUESTED, SCORE: 5; 6 blocking → CHANGES REQUESTED, SCORE: 1.
+
+## Report Format
+
+1. **Custom rules applied** — only if any tier was loaded (see Custom Rules Loading).
+2. **Acceptance criteria** — one entry per AC: its number, `met`, `NOT met` or `not verifiable here`, and the evidence (command and output lines, `file:line` quote, or render path) or the reason.
+3. **Findings** — each tagged `blocking` or `minor`, with `file:line` and, for a rule violation, the rule ID.
+4. **Verdict** — `APPROVED` or `CHANGES REQUESTED`, with the counts of blocking and minor findings the score is computed from.
+5. **Score line** — the report's last line is `SCORE: N`, with nothing after it.
+
+The `SCORE: N` line uses the same `^SCORE:\s*(\d+)` line syntax the refine loop parses; no tool consumes task-reviewer reports automatically today.
