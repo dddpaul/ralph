@@ -708,7 +708,7 @@ For each file the user approved:
 - **`.claude/task-reviewer-rules.md`** — project-owned: upgrade **never** creates, edits or overwrites it. One read-only check, Documentation / Mixed only: projects initialized before the managed file existed got `R-DOCS-1..3` copied into this file, so after writing the managed file, print a hint for every `## ` heading of the project file that also appears verbatim in `.claude/task-reviewer-rules.docs.md`:
 
   ```bash
-  if [ -f .claude/task-reviewer-rules.md ]; then
+  if [ -f .claude/task-reviewer-rules.md ] && [ -f .claude/task-reviewer-rules.docs.md ]; then
     grep '^## ' .claude/task-reviewer-rules.md | while IFS= read -r heading; do
       if grep -Fxq -- "$heading" .claude/task-reviewer-rules.docs.md; then
         printf 'hint: .claude/task-reviewer-rules.md repeats "%s" from the managed .claude/task-reviewer-rules.docs.md; delete the duplicate from the project file\n' "$heading"
