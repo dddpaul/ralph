@@ -1,10 +1,10 @@
 ---
 id: TASK-275
 title: Let the managed-file drift check accept reviewed local differences
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-05 19:02'
-updated_date: '2026-10-05 19:21'
+updated_date: '2026-10-05 19:28'
 labels: []
 dependencies: []
 priority: low
@@ -57,9 +57,9 @@ Then commit this repo's own `.claude/managed-file-drift.accept`, with the two li
 - [x] #3 For CLAUDE.md, an edit below '## Project-Specific' leaves an acceptance valid and an edit above it voids it — verified by tests
 - [x] #4 managed-file-drift.sh accept <project-dir> <path> prints the accept line for a drifting managed path and exits 2 with a reason for an unmanaged or non-drifting path; it never writes the accept file — verified by tests
 - [x] #5 A malformed accept-file line makes check exit 2 with a message naming the file and line number — verified by a test
-- [ ] #6 This repo commits .claude/managed-file-drift.accept with lines for CLAUDE.md and .git/hooks/post-commit, and bash plugins/ralph/skills/ralph-init/scripts/managed-file-drift.sh check . exits 0 with no output; the output is recorded in the task notes
+- [x] #6 This repo commits .claude/managed-file-drift.accept with lines for CLAUDE.md and .git/hooks/post-commit, and bash plugins/ralph/skills/ralph-init/scripts/managed-file-drift.sh check . exits 0 with no output; the output is recorded in the task notes
 - [x] #7 README.md or the ralph-run SKILL.md preflight section documents the accept file, its line format and the accept subcommand
-- [ ] #8 On the macOS host, tests/python/test_managed_file_drift.py passes with /bin/bash 3.2 and /usr/bin sed, grep, awk and shasum first on PATH; the output is recorded in the task notes
+- [x] #8 On the macOS host, tests/python/test_managed_file_drift.py passes with /bin/bash 3.2 and /usr/bin sed, grep, awk and shasum first on PATH; the output is recorded in the task notes
 - [x] #9 uv run ruff check . is clean, uv run pytest passes and LC_ALL=C node_modules/.bin/bats tests/unit passes
 <!-- AC:END -->
 
@@ -77,4 +77,8 @@ Scope note: added '!.claude/managed-file-drift.accept' to this repo's .gitignore
 Review 1 (task-reviewer): CHANGES REQUESTED — AC #9 left unchecked with bats 153/154. Resolved: LC_ALL=C bats tests/unit in a clean detached worktree of task-275 (/tmp/b275, no mounted .claude/settings.local.json) gives 1..154 with no 'not ok'; master's worktree gives the same. Test 140 fails only in /workspace because .claude/settings.local.json there is the container's virtiofs mount. ruff clean, pytest 892 passed / 3 skipped. AC #9 checked.
 
 Review 2 (task-reviewer): APPROVED, no findings. Left In Progress and unmerged on task-275: Done, version bump and merge wait for the AC #6 and AC #8 macOS host runs (commands above).
+
+AC #6 host (macOS): bash plugins/ralph/skills/ralph-init/scripts/managed-file-drift.sh check . -> exit 0, no output (also with PATH=/usr/bin:/bin:$PATH, i.e. /bin/bash 3.2 + BSD tools). Control: with .claude/managed-file-drift.accept moved aside it prints 'CLAUDE.md: outdated' and '.git/hooks/post-commit: outdated', exit 1. 'managed-file-drift.sh accept . <path>' on the host (shasum) prints lines byte-identical to the committed ones produced in the container (sha256sum), for both paths. The container-only '.claude/settings.local.json: outdated' line does not occur on the host. AC #8 host: PATH=/usr/bin:/bin:$PATH gives bash=/bin/bash 3.2.57(1)-release, shasum=/usr/bin/shasum (macOS also has /sbin/sha256sum; the script prefers shasum), awk/sed/grep from /usr/bin; uv run pytest tests/python/test_managed_file_drift.py: 63 passed. Host gates after merging master (0.14.1): uv run ruff check . clean; uv run pytest 900 passed, 4 skipped; LC_ALL=C node_modules/.bin/bats tests/unit 154 ok, 0 not ok.
+
+Commit: `a431bc9` - task-275: bump plugin version to 0.14.2 (patch)
 <!-- SECTION:NOTES:END -->
