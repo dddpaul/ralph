@@ -56,7 +56,31 @@ def pin_problems(text: str) -> list[str]:
         problems.append("npm step must check the installed CLI against the pin")
     if f'LABEL {LABEL}="${{CLAUDE_CODE_VERSION}}"' not in ins:
         problems.append(f"missing LABEL {LABEL}")
+    problems.extend(placement_problems(ins))
     return problems
+
+
+def placement_problems(ins: list[str]) -> list[str]:
+    """Where the ``ARG`` sits relative to the npm ``RUN`` (TASK-272).
+
+    A changed ``ARG`` value misses the cache for every ``RUN`` after its
+    declaration, referenced or not, so an ``ARG`` declared above other ``RUN``
+    steps rebuilds them on every version bump. It must be in the final stage
+    and the next ``RUN`` after it must be the guarded npm one.
+    """
+    final = ins[max(n for n, i in enumerate(ins) if i.startswith("FROM ")) :]
+    args = [n for n, i in enumerate(final) if re.match(r"ARG CLAUDE_CODE_VERSION\b", i)]
+    npm = [n for n, i in enumerate(final) if "@anthropic-ai/claude-code@" in i]
+    if len(args) != 1 or len(npm) != 1 or args[0] > npm[0]:
+        return [
+            f"ARG must be declared once in the final stage, before the npm RUN: {args}, {npm}"
+        ]
+    between = [i for i in final[args[0] + 1 : npm[0]] if i.startswith("RUN ")]
+    if between:
+        return [
+            f"RUN between the ARG and the npm RUN rebuilds on every bump: {between}"
+        ]
+    return []
 
 
 def guard_script(text: str) -> str:
@@ -108,3 +132,28 @@ def test_old_floating_dockerfile_is_flagged() -> None:
     problems = pin_problems(old)
     assert any("no default" in p for p in problems)
     assert any("LABEL" in p for p in problems)
+
+
+def test_early_arg_is_flagged() -> None:
+    """The pre-TASK-272 layout: ARG at the top of the stage, RUNs before npm."""
+    text = (TEMPLATE_DIR / "Dockerfile.base").read_text("utf-8")
+    moved = text.replace("ARG CLAUDE_CODE_VERSION\n", "", 1)
+    early = moved.replace("ARG TZ\n", "ARG TZ\nARG CLAUDE_CODE_VERSION\n", 1)
+    assert early != moved and moved != text
+    assert any("RUN between" in p for p in pin_problems(early))
+
+
+def test_run_inserted_after_arg_is_flagged() -> None:
+    text = (TEMPLATE_DIR / "Dockerfile.base").read_text("utf-8")
+    mutated = text.replace(
+        "ARG CLAUDE_CODE_VERSION\n", "ARG CLAUDE_CODE_VERSION\nRUN true\n", 1
+    )
+    assert mutated != text
+    assert any("RUN between" in p for p in pin_problems(mutated))
+
+
+def test_arg_outside_final_stage_is_flagged() -> None:
+    text = (TEMPLATE_DIR / "Dockerfile.base").read_text("utf-8")
+    moved = text.replace("ARG CLAUDE_CODE_VERSION\n", "", 1)
+    global_arg = "ARG CLAUDE_CODE_VERSION\n" + moved
+    assert any("final stage" in p for p in pin_problems(global_arg))
