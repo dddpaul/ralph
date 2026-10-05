@@ -97,8 +97,8 @@ root=${CLAUDE_PLUGIN_ROOT:-$here/../../..}
 report=$(
   table | while IFS='|' read -r path tmpl rule gate; do
     case $gate in
-      git) [ -d "$project/.git" ] || continue ;;
-      devcontainer) [ -d "$project/.devcontainer" ] || continue ;;
+      (git) [ -d "$project/.git" ] || continue ;;
+      (devcontainer) [ -d "$project/.devcontainer" ] || continue ;;
     esac
     if [ "$rule" = hooks ]; then
       for hook in "$root/$tmpl"*-guard.sh "$root/${tmpl}task-validator.sh"; do
