@@ -96,6 +96,8 @@ If the output starts with `OK`, parse `RALPH_PATH` from the output (format: `OK 
 
 If the output starts with `ERROR:`, report the message verbatim to the user and stop.
 
+Preflight also prints one `WARNING: ralph-init managed file behind the installed plugin — <path>: outdated|missing` line on stderr per ralph-init managed file (`ralph.sh`, `CLAUDE.md`'s generic section, git hooks, `.claude/hooks/`, …) whose content differs from the installed plugin's template, from ralph-init's `managed-file-drift.sh`. These never abort: relay them to the user once, recommend running the ralph-init upgrade after this run, and proceed to Step 4.
+
 ---
 
 ## Step 4: Launch

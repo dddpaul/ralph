@@ -372,3 +372,60 @@ def test_does_not_chdir(
     assert rc == 0
     assert chdir_calls == [], chdir_calls
     assert os.getcwd() == cwd_before
+
+
+def test_managed_file_drift_warns_without_aborting(
+    preflight_fixture: PreflightFixture,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The fixture's ralph.sh is not the ralph-init template: warn, still OK."""
+    write_mock_bin(
+        preflight_fixture.bin_dir, "backlog", 'echo "  TASK-1 - Something"'
+    )
+    rc = _run_preflight(
+        preflight_fixture, [str(preflight_fixture.ralph_sh), "false"], monkeypatch
+    )
+    captured = capsys.readouterr()
+    assert rc == 0
+    assert captured.out == f"OK RALPH_PATH={preflight_fixture.ralph_sh}\n"
+    assert (
+        "WARNING: ralph-init managed file behind the installed plugin — "
+        "ralph.sh: outdated (run the ralph-init upgrade)\n"
+    ) in captured.err
+
+
+@pytest.mark.parametrize(
+    ("body", "expected_err"),
+    [
+        ("exit 0", ""),
+        (
+            "echo 'managed-file-drift: boom' >&2; exit 2",
+            "WARNING: could not check ralph-init managed files — "
+            "managed-file-drift: boom\n",
+        ),
+    ],
+)
+def test_managed_file_check_never_changes_the_exit_code(
+    preflight_fixture: PreflightFixture,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    body: str,
+    expected_err: str,
+) -> None:
+    write_mock_bin(
+        preflight_fixture.bin_dir, "backlog", 'echo "  TASK-1 - Something"'
+    )
+    fake = write_mock_bin(preflight_fixture.bin_dir, "drift.sh", body)
+    monkeypatch.setattr(preflight, "_DRIFT_SCRIPT", fake)
+    rc = _run_preflight(
+        preflight_fixture,
+        [str(preflight_fixture.ralph_sh), "false", "--verbose"],
+        monkeypatch,
+    )
+    captured = capsys.readouterr()
+    assert rc == 0
+    assert captured.out.endswith(
+        f"OK RALPH_PATH={preflight_fixture.ralph_sh}\n"
+    )
+    assert captured.err == expected_err

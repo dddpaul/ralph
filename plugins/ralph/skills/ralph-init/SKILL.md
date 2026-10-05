@@ -585,7 +585,7 @@ Detect PRD and brainstorm files created before the `design/` convention (TASK-10
 
 ### U2: Build File Status Table
 
-Compare each managed file against its current template. Assign one status per file:
+Compare each managed file against its current template by running `bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-init/scripts/managed-file-drift.sh check .` — the same script `/ralph-run`'s preflight runs before every loop, so upgrade and preflight report drift from one implementation. It prints one `<path>: outdated` or `<path>: missing` line per file below that is behind (`.claude/hooks/` per hook script) and exits 1, or exits 0 with no output; every file it does not name is **current**, or **skipped** under the gates below. Exit 2 is a usage or read error — stop and report it. Its file list is pinned against this list by `tests/python/test_managed_file_drift.py`, so a managed file added here must be added to the script's table as well. Assign one status per file:
 
 | Status | Meaning |
 |---|---|

@@ -5,6 +5,11 @@ checks the bash helper performs, in the same order. Single-line stdout on
 success ``OK RALPH_PATH=<path>`` or ``ERROR: <reason>`` on first failure;
 ``--verbose`` adds one ``check <name>: ...`` line per check.
 
+A last, report-only check runs ralph-init's ``managed-file-drift.sh`` against
+the project and prints one ``WARNING:`` line per managed file that is behind
+the installed plugin on stderr. It never changes the exit code: a project that
+missed an upgrade still runs, the operator is just told to upgrade it.
+
 Invariants the AC pins down explicitly:
 
 * Runs against the invoker's PWD — this module never calls ``os.chdir``.
@@ -34,6 +39,9 @@ _NON_NEG_INT = re.compile(r"^[0-9]+$")
 _TASK_NOT_FOUND = re.compile(r"^Task [0-9]+ not found\.$", re.MULTILINE)
 _STATE_RE = re.compile(r'"state":"([^"]*)"')
 _PID_RE = re.compile(r'"pid":([0-9]+)')
+# preflight.py → ralph/ → scripts/ → ralph-run/ → skills/ → the plugin root.
+_PLUGIN_ROOT = Path(__file__).resolve().parents[4]
+_DRIFT_SCRIPT = _PLUGIN_ROOT / "skills/ralph-init/scripts/managed-file-drift.sh"
 
 
 @dataclass(frozen=True)
@@ -323,6 +331,42 @@ def _check_usage(block_end_buffer_min: str, verbose: bool) -> int:
     return 0
 
 
+def _check_managed_drift(verbose: bool) -> None:
+    """Warn on stderr about managed files behind the plugin; never fail."""
+    env = {**os.environ, "CLAUDE_PLUGIN_ROOT": str(_PLUGIN_ROOT)}
+    try:
+        proc = subprocess.run(
+            ["bash", str(_DRIFT_SCRIPT), "check", "."],
+            capture_output=True,
+            text=True,
+            check=False,
+            env=env,
+        )
+    except OSError as exc:
+        proc = subprocess.CompletedProcess[str]([], 2, "", str(exc))
+    if proc.returncode == 0:
+        _verbose(verbose, "check managed_files: ok")
+        return
+    if proc.returncode == 1:
+        drifted = proc.stdout.splitlines()
+        _verbose(verbose, f"check managed_files: WARN ({len(drifted)} behind)")
+        for line in drifted:
+            print(
+                f"WARNING: ralph-init managed file behind the installed plugin — "
+                f"{line} (run the ralph-init upgrade)",
+                file=sys.stderr,
+            )
+        return
+    reasons = [
+        line
+        for line in proc.stderr.splitlines()
+        if line.strip() and "warning: setlocale" not in line
+    ]
+    reason = reasons[-1] if reasons else f"exit {proc.returncode}"
+    _verbose(verbose, f"check managed_files: WARN (check exited {proc.returncode})")
+    print(f"WARNING: could not check ralph-init managed files — {reason}", file=sys.stderr)
+
+
 def main(argv: list[str] | None = None) -> int:
     real_argv = sys.argv[1:] if argv is None else argv
     args = _parse_args(real_argv)
@@ -366,6 +410,9 @@ def main(argv: list[str] | None = None) -> int:
     rc = _check_usage(args.block_end_buffer_min, args.verbose)
     if rc != 0:
         return rc
+
+    # Check 7: managed files behind the plugin — report only, never aborts.
+    _check_managed_drift(args.verbose)
 
     print(f"OK RALPH_PATH={args.ralph_path}")
     return 0
