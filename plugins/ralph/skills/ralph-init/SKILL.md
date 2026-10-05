@@ -317,7 +317,7 @@ Read `templates/claude/settings.local.json` → write to `.claude/settings.local
 
 | Rule | Why not |
 |---|---|
-| `Bash(bash <claude-dir>/plugins/cache/dddpaul-ralph/ralph/*)` | matches, but a bare `*` crosses `/`: it auto-allows `bash` on every file in every cached plugin version (ralph.sh templates, patchers, the firewall script) and possibly on `ralph/../...` paths. That is reviewer rule R6's forbidden `Bash(bash:*)` in all but name |
+| `Bash(bash <claude-dir>/plugins/cache/dddpaul-ralph/ralph/*)` | matches, but a bare `*` crosses `/`: it auto-allows `bash` on every file in every cached plugin version (ralph.sh templates, patchers, the firewall script) and possibly on `ralph/../...` paths. That is an over-broad `Bash(bash:*)` in all but name: it lets the agent run any script under the plugin cache without a prompt |
 | `Bash(bash <claude-dir>/plugins/cache/dddpaul-ralph/ralph/:*)` | does not match — `:*` is a word-boundary prefix and cannot end mid-path |
 | `Bash(bash <claude-dir>/.../ralph/*/skills/.../utc-to-moscow.sh:*)` | does not match — mid-pattern wildcard |
 | `Bash(bash <claude-dir>/.../ralph/0.8.1/skills/.../utc-to-moscow.sh:*)` | matches, but dies at the next plugin bump — how earlier version-pinned rules went dead |
@@ -498,7 +498,7 @@ Run this manual smoke test once after any change to the init permission flow. It
 - ✅ **backlog / git / jq** helpers — no prompt. Covered by the template allowlist.
 - ⚠️ **Launch** (`nohup "${RALPH_CMD[@]}" > backlog/.ralph-launch.log 2>&1 & disown`) — **one** prompt. ralph-run Step 4 sets `dangerouslyDisableSandbox: true` on this call so the orchestrator gets full OS access (mktemp, /dev/fd, tee, docker); disabling the sandbox always prompts. This is the expected devcontainer bypass and the only prompt allowed to appear.
 
-If a helper prompts, check the Claude Code version first: builds before 2.1.280 may not auto-allow it, and the fix is upgrading. Then check that the invocation leads with `bash ${CLAUDE_PLUGIN_ROOT}/…` with no assignment in front, and that the helper is still read-only and workspace-confined. Do not add a helper allow-rule — Step 3.7a explains why every shape is either too broad (R6) or dies at the next plugin upgrade.
+If a helper prompts, check the Claude Code version first: builds before 2.1.280 may not auto-allow it, and the fix is upgrading. Then check that the invocation leads with `bash ${CLAUDE_PLUGIN_ROOT}/…` with no assignment in front, and that the helper is still read-only and workspace-confined. Do not add a helper allow-rule — Step 3.7a explains why every shape is either too broad (a bare `*` crosses `/` and auto-allows `bash` on every cached plugin file) or dies at the next plugin upgrade.
 
 ---
 

@@ -2,21 +2,9 @@
 
 These rules SUPPLEMENT the standard 8-item checklist in the task-reviewer agent (`plugins/ralph/agents/task-reviewer.md` or `~/.claude/agents/task-reviewer.md`). They do not replace it. Apply both. All rules use strict prohibitive language: violations are review failures, not suggestions.
 
+The review-conduct rules that used to be R1, R2, R9, R13, R14, R16 and R17 now ship as built-in rules in the agent itself, so they apply in every project — in `plugins/ralph/agents/task-reviewer.md`: R1 and R9 → `R-CORE-1`, R2 → `R-CORE-2`, R13 → `R-CORE-3`, R14 → `R-CORE-4`, R16 → `R-CORE-5`, R17 → `R-CORE-6`. Their numbers are retired, not reused: the remaining rules keep their IDs, because task notes and docs cite them.
+
 ---
-
-## R1 — Review the diff, not the working tree
-
-The source of truth for review is `git diff master..HEAD`. The reviewer MUST NOT base findings on `ls`, `find`, or any working-tree read. The working tree may contain ignored files, untracked artifacts, or copies of files that have been deleted from git but not from disk. A finding rooted in working-tree state — when the file is not present in the diff — is invalid and MUST be discarded.
-
-To confirm a file's presence in the project: `git ls-files <path>`. To check its history: `git log --all -- <path>`.
-
-## R2 — Every AC must be checked or explicitly deferred
-
-A task bound for "Done" MUST have every acceptance criterion either:
-- checked off (`- [x]`), or
-- explicitly marked deferred in the task notes with a stated reason and a follow-up plan.
-
-Silent unchecked ACs are a hard fail. The reviewer MUST cross-reference each AC against the diff and flag any that the implementer did not address. If an AC is impossible to verify in the current session (e.g. requires a fresh process — see R4), the deferral and its reason MUST appear in the task notes before "Done" is set.
 
 ## R3 — Agent files require valid YAML frontmatter
 
@@ -79,10 +67,6 @@ The `commit-msg-guard.sh` hook is the first line of defense. The reviewer is the
 
 Entries in `.claude/settings.json` under `hooks.<event>.<n>.hooks[].command` MUST point to a `.claude/hooks/<name>.sh` script. Inline bash blobs (multi-line strings, `bash -c "..."`, piped one-liners) are forbidden. The `if:` clause is the gate; the script is the implementation. One approach throughout the file. The reviewer MUST flag any inline command longer than a single script path.
 
-## R9 — Git is the truth, not the working tree
-
-When confirming a file's existence, history, or content in the project, the reviewer MUST use `git ls-files <path>`, `git log --all -- <path>`, and `git show <ref>:<path>`. The reviewer MUST NOT rely on `ls`, `find`, or `cat` of the working tree to make claims about what the project contains. Working-tree state can include ignored files, untracked host artifacts, and ghost copies of git-deleted files; none of these are part of the project.
-
 ## R10 — Do not bypass `master-branch-guard.sh`
 
 Edit/Write to any path outside `.claude/` requires a `task-*` branch. The `master-branch-guard.sh` hook enforces this. The reviewer MUST reject any diff or commit that:
@@ -130,42 +114,6 @@ For tasks whose deliverable is a markdown document (architecture docs, plans, sp
 
 The reviewer MUST reject the diff if the markdown deliverable contradicts itself, leaves an AC untraceable, or contains unresolved gaps. Stylistic polish is out of scope; logical integrity is in scope.
 
-## R13 — Rationalization is not exemption
-
-The reviewer MUST apply rules R1–R17 strictly. Task description, implementation notes, commit messages, and design narrative MUST NOT be treated as overriding a rule violation. If the diff violates a rule, the diff is rejected — even when the implementer claims the violation is intentional, by design, or pre-approved.
-
-The following excuses are **automatically rejected** when invoked to justify a rule violation:
-
-- *"intentional per design"*
-- *"pre-existing, not a new change"* (a file being modified is in scope; staleness inherited from prior commits is the right thing to fix during the modification)
-- *"users will fix when copying"* / *"users add it manually later"*
-- *"not in scope for this task"* (if the diff touches the file, the file's compliance is in scope)
-- *"by convention"* / *"matches existing pattern"* (a violation propagated by prior commits is still a violation)
-- *"the prior reviewer accepted this"*
-
-The ONLY legitimate way to relax a rule is to amend `.claude/task-reviewer-rules.md` itself via a separate task with explicit user approval. Until the rules file changes, the rules apply as written.
-
-This rule exists because TASK-92 shipped two defects that the reviewer waved through after accepting Ralph's post-hoc rationalizations — both verbatim from the above list. Future reviewers MUST apply the rules first and read narrative second.
-
-## R14 — Content preservation during moves
-
-When a file is moved or renamed via `git mv`, its content MUST be preserved verbatim unless the task explicitly authorizes content changes in its description or acceptance criteria. The reviewer MUST verify rename diffs show `similarity index 100%` (or near-100% with the deviation explicitly authorized by an AC).
-
-Forbidden during a move (without explicit AC authorization):
-
-- Stripping frontmatter
-- Adding frontmatter
-- Updating import paths or `cat`/`source` references
-- Fixing typos
-- Reformatting whitespace
-- Renaming internal symbols
-- Updating cross-references in the file's body
-- Any other in-flight content edit "while we're at it"
-
-If both a move AND content changes are needed, the task SHOULD describe both in its description and ACs (e.g. "AC #N: agents/foo.md uses the new path X for the user-global fallback"). Otherwise, the move is one commit and the content change is a separate commit on the same branch — never bundled silently. The reviewer MUST reject any rename diff with content drift that is not explicitly authorized.
-
-This rule exists because TASK-92's `git mv .claude/agents/task-reviewer.md → agents/task-reviewer.md` silently stripped the frontmatter and left a stale path inside the file. A 100%-similarity move would have caught both.
-
 ## R15 — PostToolUse hooks must emit JSON via hookSpecificOutput
 
 Hooks registered under `PostToolUse` in `.claude/settings.json` that need to deliver model-visible feedback MUST emit a single JSON object on stdout with the structure:
@@ -179,47 +127,3 @@ Raw stdout text — including text wrapped in `<system-reminder>` tags — is si
 When a hook has multiple feedback sections (e.g. deterministic issues AND an LLM rubric), it MUST combine them into a single `additionalContext` string separated by blank lines — not emit multiple JSON objects. The harness parses exactly one JSON object per hook invocation.
 
 This rule exists because TASK-100 wrapped validator output in `<system-reminder>` tags (correct format) but emitted them as raw stdout (wrong protocol). The model never received the feedback, and the smoke test only verified the script's stdout — not model receipt.
-
-## R16 — Task descriptions must not reference brainstorm files
-
-Tasks whose `-d` (description body) contains a path matching `design/.*-brainstorm\.md` MUST be rejected. The producer/consumer contract for brainstorm hand-offs is:
-
-- **Producer** (`.claude/brainstorm-rules.md` Save Design Conclusions): writes a named "Distilled for ralph-task" block inside the brainstorm or its addendum, containing Direction, Locked decisions with rationale, Scope cuts, Acceptance criteria sketch, Implementation checklist.
-- **Consumer** (`plugins/ralph/skills/ralph-task/SKILL.md` MUST rule #4): copies that block verbatim into the new task's `-d` and self-checks that no `design/.*-brainstorm\.md` reference leaks in.
-
-A task body that points at the brainstorm instead of inlining the distillation collapses the contract. Three failure modes follow: token cost (the implementer re-reads ~10K tokens every iteration), evolution mismatch (early-doc options superseded by late-doc addenda mislead the implementer), and review-independence collapse (`ralph-review` and the implementer both read the same doc, so the review degenerates to "Ralph copied the doc faithfully").
-
-To verify a diff, scan the post-change task files (any `backlog/tasks/*.md` whose `description:` body the diff touches):
-
-```bash
-git diff master..HEAD --name-only -- 'backlog/tasks/*.md' | while IFS= read -r f; do
-  grep -nE 'design/.*-brainstorm\.md' "$f" \
-    && echo "R16 violation: $f references a brainstorm file in its description"
-done
-```
-
-Any match is a hard fail. The fix is to replace the reference with the verbatim "Distilled for ralph-task" block from the source brainstorm and re-run the scan.
-
-**Excluded from R16:**
-
-- **Fenced code blocks** that quote a forbidden path for illustration (e.g. a regex pattern documented inside a rule body or skill spec) are still matched by the grep; reviewer judgment applies — flag only when the reference is presented as a directive ("see this file") rather than as a quoted example.
-- **Pre-existing Done tasks** (e.g., TASK-139, TASK-140) filed before the convention landed are historical artifacts. R16 applies to tasks newly created or whose `-d` body the diff modifies.
-
-This rule is project-specific and is NOT mirrored to `plugins/ralph/skills/ralph-init/templates/claude/task-reviewer-rules.md` — per project convention (see project memory `feedback_rules_not_in_ralph_init.md`), `task-reviewer-rules.md` is project-local content; each ralph-init bootstrap writes its own rules from scratch (or starts without any). Only the loading mechanism in the task-reviewer agent is templated; the rules content is not.
-
-## R17 — A changed external-tool default needs an invocation AC
-
-When the diff changes a default value that this repo passes to an external program, the task MUST carry at least one AC that **invokes that program with the new value and records the observed result** (the command run and its exit status or relevant output, captured in the AC check-off or the task's implementation notes). The reviewer MUST reject the diff if no such AC exists, or if the AC is checked but no observed result is recorded.
-
-Triggering cases:
-
-- **CLI flag defaults** — an argparse / getopts / shell-variable default forwarded as an argument to another program.
-- **Model ids** — any default model id handed to `claude`, the Agent SDK, or an API client.
-- **Image tags** — container or devcontainer base-image tags, and any other registry reference pulled by a tool.
-- **Version pins** — pinned versions of tools, packages, or CLIs that another step installs or runs.
-
-Static assertions — greps for the new string, doc-table rows, unit tests asserting the parsed default, lint and test gates — are **necessary but not sufficient**. They prove the repo *says* the new value; they cannot detect that the tool rejects it, requires a newer version, needs different auth, or accepts it and behaves differently. Those failure modes live outside this repo, so only running the tool can surface them. "Objectively pass/fail" is not the bar here: a grep AC is objectively pass/fail and still verifies nothing about the tool.
-
-If the tool cannot be invoked in the review environment (no credentials, no network, host-only binary), the AC MUST say so and record the exact command a human is to run before merge; the reviewer then treats the task as not mergeable until that result is recorded in the task notes. A silent omission is a hard fail.
-
-This rule exists because TASK-243 changed the orchestrator's `--model` default from `claude-opus-5` to `claude-opus-5-5` and passed **8 of 8 ACs** — every one a static assertion — and then **every Ralph run failed** 12 seconds after launch with `Claude Code 2.1.259 does not support this model; version 2.1.280 or newer is required`. The model id was correct; the client's version floor rejected it, and zero of four queued tasks ran.

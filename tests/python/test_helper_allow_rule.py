@@ -3,7 +3,7 @@
 ralph-init seeds nothing for the ralph-run and ralph-status helpers. On Claude
 Code 2.1.280 sandbox auto-allow approves them, and every rule shape that could
 cover them was measured as either too broad (a bare ``ralph/*`` crosses ``/``,
-which reviewer rule R6 forbids in effect) or dead at the next plugin bump
+an over-broad ``Bash(bash:*)`` in effect) or dead at the next plugin bump
 (version-pinned). Older projects still carry dead helper rules, which the
 upgrade flow strips.
 
@@ -95,7 +95,7 @@ def test_init_documents_why_no_helper_rule_is_seeded() -> None:
     text = init_text()
     assert "No allow-rule is seeded for the plugin helper scripts" in text
     assert "Do not add a helper rule" in text
-    assert "R6" in text
+    assert "a bare `*` crosses `/`" in text
     assert "{{CLAUDE_DIR}}" not in text
 
 

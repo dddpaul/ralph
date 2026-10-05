@@ -66,9 +66,9 @@ def test_checklist_and_instructions_point_at_the_evidence_rule() -> None:
 def test_findings_are_blocking_or_minor_and_rules_named_by_id() -> None:
     body = section("Findings Classification")
     assert "Classify every finding as **blocking** or **minor**" in body
-    assert "a violation of a rule from a loaded rules file" in body
+    assert "a violation of a built-in rule or of a rule from a loaded rules file" in body
     assert "**Minor:** style remarks not backed by a rule" in body
-    assert "Name every violated rule from a loaded rules file by its rule ID" in body
+    assert "Name every violated rule by its rule ID" in body
 
 
 def test_rubric_is_stated_as_fixed_formulas() -> None:

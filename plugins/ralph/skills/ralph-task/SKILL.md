@@ -95,7 +95,7 @@ Applies equally to creation ("one task or many?") and edit-deliberation ("add as
 | 0 | **Purpose-value** (highest) | One task = one user-visible deliverable. Intermediate artifacts (regenerated files, format conversions, mirror updates) are **ACs**, not tasks. Test: "If only step N shipped, would the user have anything they asked for?" |
 | 1 | One-PR | ~10 ACs soft cap. Beyond that, two purpose-values are bundled — split. |
 | 2 | Dependency | Cross-purpose-value reference → split + `--dep`. Same-purpose-value reference → keep together. |
-| 3 | Mirror (R11) | Mechanical mirror in parity location → same task. |
+| 3 | Mirror | Mechanical mirror in a location the project keeps in parity with the edited file (for example a template copy of a live file) → same task. |
 | 4 | Rollback | Partial merge breaks coherence → same task. |
 | 5 | Verification | Every AC objectively pass/fail (grep, test, `bash -n`, file existence). A task that changes a default passed to an external tool (CLI flag default, model id, image tag, version pin) also needs an AC that **invokes the tool with the new value and records the result** — static greps and parsed-default unit tests cannot see the tool reject it. |
 
@@ -141,7 +141,7 @@ If the grep matches, edit the task to remove the reference and inline the distil
 backlog task edit <id> -d "<verbatim Distilled for ralph-task block, no design/<slug>-brainstorm.md reference>"
 ```
 
-Re-run the grep until it reports OK. The same rule is enforced post-merge as `task-reviewer` rule R16 and surfaced as a soft warning by `ralph-review`; catching it here keeps the contract clean from the start.
+Re-run the grep until it reports OK. The same rule is enforced at review time, before merge, as the `task-reviewer` agent's built-in rule R-CORE-5 and surfaced as a soft warning by `ralph-review`; catching it here keeps the contract clean from the start.
 
 ---
 
