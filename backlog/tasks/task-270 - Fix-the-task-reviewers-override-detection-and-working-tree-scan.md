@@ -1,10 +1,10 @@
 ---
 id: TASK-270
 title: Fix the task-reviewer's override detection and working-tree scan
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-05 16:41'
-updated_date: '2026-10-05 17:01'
+updated_date: '2026-10-05 17:28'
 labels: []
 dependencies: []
 priority: high
@@ -95,7 +95,7 @@ R-INFRA-2: this task edits the agent, so its own review runs under the pre-chang
 - [x] #6 R-CORE-3's sentence on relaxing a built-in rule agrees with the Precedence section about which tiers may replace a built-in rule
 - [x] #7 TASK-263 AC #7 is checked, and TASK-263's notes record the 0.11.0 smoke-check output quoted in this task's description
 - [x] #8 TASK-262, TASK-263 and TASK-268 notes record their post-merge results from this task's description — the two re-review verdicts naming this task as the fix, and the 0.12.0 infra live check
-- [ ] #9 Gates: uv run ruff check . is clean, uv run pytest passes, LC_ALL=C node_modules/.bin/bats tests/unit passes, and tests/unit/task-reviewer-rules-loading.bats also passes on the macOS host under BSD userland
+- [x] #9 Gates: uv run ruff check . is clean, uv run pytest passes, LC_ALL=C node_modules/.bin/bats tests/unit passes, and tests/unit/task-reviewer-rules-loading.bats also passes on the macOS host under BSD userland
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -112,4 +112,8 @@ DEFERRED — AC #9 host half: BSD userland and /bin/bash 3.2 exist only on the m
 task-reviewer (ralph:task-reviewer, installed 0.12.0): APPROVED, SCORE 8 — 0 blocking, 2 minor: (1) an abbreviation like 'e.g. ' ends the sentence early, so later IDs are dropped (follows the documented sentence-end rule); (2) ';' and table-cell '|' do not end a sentence, so 'replaces R-CORE-6; see R-DOCS-2' also lists R-DOCS-2 (mitigated by 'Confirm each against the rule text'). Left as-is; candidates for a follow-up.
 
 Not marked Done and not merged: the description requires the AC #9 host half (BSD userland, /bin/bash 3.2) to pass before Done. Remaining steps on the host: run LC_ALL=C node_modules/.bin/bats tests/unit/task-reviewer-rules-loading.bats, record the output, check AC #9, then Done + Merge step 6 (bump-version.sh --auto bumps the plugin version, since plugins/ralph/agents/task-reviewer.md changed).
+
+Host verification (macOS, Darwin 24.6.0): /bin/bash 3.2.57 with /usr/bin/sed, BSD grep 2.6.0-FreeBSD and /usr/bin/awk on PATH — LC_ALL=C bats tests/unit/task-reviewer-rules-loading.bats: 44 ok, 0 not ok (override cases 18, 19, 25, 36, 39-42 included). Full host gates: uv run ruff check . clean; uv run pytest 808 passed, 2 skipped; LC_ALL=C node_modules/.bin/bats tests/unit 154 ok, 0 not ok (the settings.local.json R11 case that failed in the container passes on the host). R-INFRA-2 live check of the fixed agent follows push + /plugin update.
+
+Commit: `63cd829` - task-270: bump plugin version to 0.13.1 (patch)
 <!-- SECTION:NOTES:END -->
