@@ -1,10 +1,10 @@
 ---
 id: TASK-274
 title: Refresh the Claude block comment when early-claude-arg.sh moves the ARG
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-05 19:02'
-updated_date: '2026-10-05 19:11'
+updated_date: '2026-10-05 19:25'
 labels: []
 dependencies: []
 priority: low
@@ -48,7 +48,7 @@ When `patch` moves the ARG, it also replaces the comment lines between `# ---- C
 - [x] #3 A Dockerfile with any other comment between '# ---- Claude ----' and the ARG keeps that comment unchanged while the ARG still moves before the LABEL, and patch exits 0 — verified by a test
 - [x] #4 early-claude-arg.sh check still exits 0 on a Dockerfile whose ARG is already in place but carries the old npm-step comment — verified by a test
 - [x] #5 The U4 early-ARG offer in plugins/ralph/skills/ralph-init/SKILL.md states that the patch also refreshes the Claude block comment when it is the old text
-- [ ] #6 On the macOS host, tests/python/test_upgrade_early_claude_arg.py passes with /bin/bash 3.2 and /usr/bin sed, grep and awk first on PATH; the output is recorded in the task notes
+- [x] #6 On the macOS host, tests/python/test_upgrade_early_claude_arg.py passes with /bin/bash 3.2 and /usr/bin sed, grep and awk first on PATH; the output is recorded in the task notes
 - [x] #7 uv run ruff check . is clean, uv run pytest passes and LC_ALL=C node_modules/.bin/bats tests/unit passes
 <!-- AC:END -->
 
@@ -66,4 +66,8 @@ Gates: ruff clean; pytest 880 passed, 3 skipped; bats 153/154 — not ok 140 (R1
 Commit: `51326a8` - task-274: keep CRLF line endings on the refreshed Claude block comment
 
 Review 2 (task-reviewer): APPROVED, no findings. Correction: pytest count is 879 passed, 3 skipped (not 880). Left In Progress and unmerged on task-274: Done/bump/merge wait for the AC #6 macOS host run.
+
+AC #6 host (macOS): PATH=/usr/bin:/bin:$PATH gives bash=/bin/bash 3.2.57(1)-release and sed/grep/awk from /usr/bin. uv run pytest tests/python/test_upgrade_early_claude_arg.py: 32 passed, 1 skipped ('mawk not installed'; that case ran in the container). Real-file check: early-claude-arg.sh patch on the 39adcb5 Dockerfile.base assembled as the node flavour (the TASK-273 AC #9 fixture) exits 0, and its block from '# ---- Claude ----' through the npm RUN is identical to the current Dockerfile.base (diff empty). Host gates: uv run ruff check . clean; uv run pytest 878 passed, 4 skipped; LC_ALL=C node_modules/.bin/bats tests/unit 154 ok, 0 not ok.
+
+Commit: `a380e00` - task-274: bump plugin version to 0.14.1 (patch)
 <!-- SECTION:NOTES:END -->
