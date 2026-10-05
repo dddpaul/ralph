@@ -1,10 +1,10 @@
 ---
 id: TASK-268
 title: Ship the infrastructure reviewer rules as a plugin bundle
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-05 08:20'
-updated_date: '2026-10-05 09:03'
+updated_date: '2026-10-05 16:26'
 labels: []
 dependencies:
   - TASK-267
@@ -67,4 +67,8 @@ Commit: `14977c1` - task-268: restore naming-guard.sh's executable bit and cite 
 
 Review: ralph:task-reviewer CHANGES REQUESTED (1 blocking: naming-guard.sh lost its 100755 mode via sed -i on the masked .claude mount; 2 minor: remaining hook comments citing R5, bats header wrap) → fixed in 14977c1 → re-review APPROVED (0 blocking, 0 minor, SCORE 10) on git diff task-267..HEAD.
 NOT MERGED: task-268 is stacked on task-267, which is In Progress awaiting macOS host verification; merging now would land 267's unverified commits on master. Once task-267 is Done and merged: rebase task-268 onto master (or merge master in), re-run gates, run .claude/hooks/bump-version.sh --auto (shipped plugin files changed → minor bump expected), mark Done, merge --no-ff, bump-version.sh --tag. Then on the host after a plugin update + reload: run the task-reviewer agent in this repo and confirm its provenance shows 'tier shared infra: loaded' (deferred R-INFRA-2 check).
+
+Host gates (macOS, interactive session after the Ralph run, branch merged with master first so it carries TASK-267 Done and the 0.11.2 version): ruff clean; pytest 793 passed 2 skipped; bats tests/unit 148 ok, 0 not ok. The infra bundle carries 7 R-INFRA rules; .claude/task-reviewer-rules.md retains only R7, R11 and R12 with their original IDs. Live-agent check that the installed ralph:task-reviewer loads the infra bundle is deferred until this version is pushed and the plugin updated (R4).
+
+Commit: `ec48618` - task-268: bump plugin version to 0.12.0 (minor)
 <!-- SECTION:NOTES:END -->
