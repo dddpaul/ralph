@@ -130,6 +130,7 @@ END {
   if (bare(L[cs - 1]) == HEADER && lines_are(cs, at - 1, OLD_NPM) && lines_are(bs, be - 1, OLD_ARG))
     fresh = template_comment()
   else cs = at
+  if (L[be] ~ /\r$/) gsub(/\n/, "\r\n", fresh)
   for (i = 1; i <= NR; i++) {
     if (i == at) {
       if (fresh != "") printf "%s%s\n", fresh, L[be]

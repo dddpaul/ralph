@@ -371,3 +371,16 @@ def test_skill_md_says_the_patch_refreshes_the_old_comment() -> None:
         "The patch also refreshes the Claude block comment when it is the old text"
         in _upgrade_section()
     )
+
+
+def test_patch_keeps_crlf_line_endings(tmp_path: Path) -> None:
+    old = assemble_node(pre_271_template()).replace("\n", "\r\n")
+    path = tmp_path / "Dockerfile"
+    path.write_bytes(old.encode("utf-8"))
+    out = subprocess.run(
+        ["bash", str(SCRIPT), "patch", str(path)], capture_output=True, check=False
+    )
+    assert out.returncode == 0, out.stderr
+    text = out.stdout.decode("utf-8")
+    assert text.count("\n") == text.count("\r\n")
+    assert claude_block(text.replace("\r\n", "\n")) == claude_block(BASE)
