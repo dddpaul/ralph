@@ -4,7 +4,7 @@ title: 'Serve shared reviewer rules from the plugin, not per-project copies'
 status: Done
 assignee: []
 created_date: '2026-10-04 18:54'
-updated_date: '2026-10-05 06:12'
+updated_date: '2026-10-05 16:58'
 labels: []
 dependencies:
   - TASK-262
@@ -55,7 +55,7 @@ Provenance: the replace-not-add defect, the same-plugin-root requirement, the er
 - [x] #4 A missing or empty shipped bundle is surfaced as an error while an applicability gate evaluating false is reported as not-applied, and the two outcomes are distinguishable in the loader output — verified by one fixture of each
 - [x] #5 Whether the docs rules apply is decided by an explicit project setting rather than only by probing for a vault directory, and the behaviour when the setting is unset is documented in the agent file
 - [x] #6 The review report records the plugin version, the resolved bundle path, and any explicitly overridden rule IDs
-- [ ] #7 The test that exercises the extracted loader snippet models Markdown substitution rather than exporting an environment variable, and a smoke check invokes the real plugin agent to print the resolved bundle path with its output recorded in the task notes
+- [x] #7 The test that exercises the extracted loader snippet models Markdown substitution rather than exporting an environment variable, and a smoke check invokes the real plugin agent to print the resolved bundle path with its output recorded in the task notes
 - [x] #8 tests cover bundle content, tier selection, load order, override-by-rule-ID and load-error handling, and the bundle is not registered as a template-parity mirror in tests/unit/template-parity.bats
 - [x] #9 Gates: uv run ruff check . is clean, uv run pytest passes, and LC_ALL=C node_modules/.bin/bats tests/unit passes with no new failures relative to master
 <!-- AC:END -->
@@ -84,4 +84,16 @@ Review round 1 (CHANGES REQUESTED, 2 blocking): fixed — (1) SKILL.md 3.7c no l
 Review round 2: APPROVED (0 blocking, 1 minor wording remark on SKILL.md:361 appositive, left as is — SKILL.md 3.7c is rewritten by TASK-265). AC #7 smoke-check half remains DEFERRED to post-merge host verification as recorded above.
 
 Commit: `34d2146` - task-263: bump plugin version to 0.9.4 (patch)
+
+Post-merge smoke check (recorded by TASK-270): the installed 0.11.0 ralph:task-reviewer ran its own loader snippet unedited and printed:
+```text
+plugin version: 0.11.0
+docs bundle: /Users/paul/.claude/plugins/cache/dddpaul-ralph/ralph/0.11.0/skills/ralph-init/rules/task-reviewer-rules.docs.md
+project root: /Users/paul/Private/Projects/ai/ralph
+tier shared docs: not applied (docs_rules unset, no /Users/paul/Private/Projects/ai/ralph/.obsidian)
+tier project: loaded (/Users/paul/Private/Projects/ai/ralph/.claude/task-reviewer-rules.md)
+```
+The bundle path exists (8875 bytes) and no line carried an unsubstituted plugin-root or project-root reference, so Markdown substitution works in a live agent; AC #7 checked.
+
+Post-merge re-review under the agent's own new rules: CHANGES REQUESTED, SCORE 5, one blocking finding — override detection missed backticked, capitalised and multi-ID "replaces" forms. Fixed by TASK-270.
 <!-- SECTION:NOTES:END -->

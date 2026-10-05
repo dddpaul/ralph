@@ -78,7 +78,23 @@ elif [ -f "$PROJECT_SCRIPTS_SHIM" ]; then
 else shared_tier "shared infra" infra_rules "$INFRA_BUNDLE" off "no $PROJECT_SHIM or $PROJECT_SCRIPTS_SHIM"; fi
 optional_tier project "$PROJECT_RULES"
 OVERRIDES=$(printf '%s\n' "$CUSTOM_RULES" | awk '/<!--/ { c = 1 } !c { print } /-->/ { c = 0 }' \
-  | grep -oE 'replaces R(-[A-Z]+-)?[0-9]+' | sed 's/^replaces //' | sort -u | paste -s -d, - | sed 's/,/, /g')
+  | awk '
+    /^[ \t]*$/ || /^#/ || /^[ \t]*([-*+]|[0-9]+[.)])[ \t]/ { on = 0 }
+    { s = $0
+      while (s != "") {
+        if (!on) {
+          if (!match(tolower(s), /(^|[^a-z])replaces([^a-z]|$)/)) break
+          on = 1; s = substr(s, RSTART + RLENGTH - 1)
+        }
+        end = match(s, /[.!?]([ \t]|$)/) ? RSTART : 0
+        seg = end ? substr(s, 1, end - 1) : s
+        while (match(seg, /R(-[A-Z]+-)?[0-9]+/)) {
+          if (RSTART == 1 || substr(seg, RSTART - 1, 1) !~ /[A-Za-z0-9-]/) print substr(seg, RSTART, RLENGTH)
+          seg = substr(seg, RSTART + RLENGTH)
+        }
+        if (!end) break
+        on = 0; s = substr(s, end + 1)
+      } }' | sort -u | paste -s -d, - | sed 's/,/, /g')
 printf 'override references: %s\n' "${OVERRIDES:-none}"
 printf '%s\n' "----- rules -----" "$CUSTOM_RULES"
 ```
@@ -89,9 +105,9 @@ The loader output has one line per tier, and the three outcomes are distinct:
 - `absent (<path>)` or `not applied (<reason>)` — the tier does not apply here. This is normal and not an error: an optional file does not exist, or a shared bundle's setting (or its unset default) excludes this project.
 - `ERROR: …` — a **rules load error**: a shared bundle applies to this project but the bundle shipped with the plugin is missing or empty (a broken plugin install), the `docs_rules` or `infra_rules` value is invalid, the plugin manifest is unreadable, or the project root did not resolve. Report it under Rules provenance and count it as a blocking finding: a review that silently skips rules it was meant to apply cannot approve.
 
-`override references` lists every rule ID that a loaded rule names after the word "replaces" (HTML comments are skipped, so a managed header quoting an example is not counted). Confirm each against the rule text before recording it as overridden.
+`override references` lists every rule ID that a loaded rule names after the word "replaces" in the same sentence. "Replaces" matches in any letter case; an ID may be bare or in backticks (`R5`, `R-INFRA-3`), and every ID up to the end of the sentence is listed, so "replaces `R5`, `R-INFRA-3`" reports both. A sentence ends at `.`, `!` or `?` followed by a space or the line end, at a blank line, at a heading or at a new list item, so an ID named only in a following sentence is not listed. HTML comments are skipped, so a managed header quoting an example is not counted. Confirm each against the rule text before recording it as overridden.
 
-If any tier was loaded, report every applied tier at the top of the review:
+If any tier was loaded, report every applied tier in the Custom rules applied section, which follows Rules provenance in the Report Format:
 
 > **Custom rules applied from [tier list]:** followed by a brief summary of the rules from each tier.
 
@@ -144,7 +160,7 @@ Apply every rule strictly. The task description, implementation notes, commit me
 - *"by convention"* / *"matches existing pattern"* — a violation propagated by earlier commits is still a violation
 - *"the prior reviewer accepted this"*
 
-The only legitimate way to relax a rule is a change to a rules file, made by a separate task with explicit user approval; a built-in rule is relaxed by a project rule that names its ID as replaced (see Precedence). Apply the rules first and read the narrative second.
+The only legitimate way to relax a rule is a change to a rules file, made by a separate task with explicit user approval; a built-in rule is relaxed by a user-global, shared bundle or project rule that names its ID as replaced (see Precedence). Apply the rules first and read the narrative second.
 
 ### R-CORE-4 — Content preservation during moves
 
@@ -152,11 +168,11 @@ A file moved or renamed via `git mv` keeps its content verbatim unless the task'
 
 ### R-CORE-5 — Task descriptions must not reference brainstorm files
 
-A task whose description body contains a path matching `design/.*-brainstorm\.md` is rejected. A brainstorm hands off to a task by a distilled block — direction, locked decisions with rationale, scope cuts, an acceptance criteria sketch, an implementation checklist — copied verbatim into the task description. A task that points at the brainstorm instead makes every implementer iteration re-read it, lets superseded early options mislead, and lets the implementer and a later feature review read the same document, so the review stops being independent. Scan every task file whose description the diff creates or modifies:
+A task whose description body contains a path matching `design/.*-brainstorm\.md` is rejected. A brainstorm hands off to a task by a distilled block — direction, locked decisions with rationale, scope cuts, an acceptance criteria sketch, an implementation checklist — copied verbatim into the task description. A task that points at the brainstorm instead makes every implementer iteration re-read it, lets superseded early options mislead, and lets the implementer and a later feature review read the same document, so the review stops being independent. Scan every task file whose description the diff creates or modifies, reading its committed content at `HEAD` rather than the working-tree copy and skipping task files the diff deletes:
 
 ```bash
-git diff master..HEAD --name-only -- 'backlog/tasks/*.md' | while IFS= read -r f; do
-  grep -nE 'design/.*-brainstorm\.md' "$f" \
+git diff master..HEAD --name-only --diff-filter=d -- 'backlog/tasks/*.md' | while IFS= read -r f; do
+  git show HEAD:"$f" | grep -nE 'design/.*-brainstorm\.md' \
     && echo "R-CORE-5 violation: $f references a brainstorm file in its description"
 done
 ```
