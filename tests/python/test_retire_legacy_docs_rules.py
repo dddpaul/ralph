@@ -93,6 +93,7 @@ def test_agreed_copy_is_removed(project: Path, answer: str) -> None:
     assert not (project / COPY).exists()
     assert (project / ".claude").is_dir()
     assert run("check", str(project)).returncode == 0
+    assert run("retire", str(project), answer).stdout == "absent\n"
 
 
 def test_bundle_resolves_through_claude_plugin_root(

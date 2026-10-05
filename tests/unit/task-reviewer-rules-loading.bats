@@ -251,6 +251,7 @@ run_loader() {
   done
   run head -n 5 "$real"
   [[ "$output" == *"<!--"*"project rules belong in .claude/task-reviewer-rules.md"*"-->"* ]]
+  [[ "$output" != *overwritten* ]]
 }
 
 @test "loader against the real plugin root loads the shipped bundle and its version" {

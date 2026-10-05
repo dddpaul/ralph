@@ -9,7 +9,8 @@
 #       older shipped version or local edits — the two cannot be told apart).
 #   legacy-docs-rules.sh retire <project-dir> <answer>
 #       Removes the copy iff <answer> is y or yes (any case); any other answer,
-#       the empty one included, keeps it. Prints "removed" or "kept".
+#       the empty one included, keeps it. Prints "removed" or "kept" ("absent"
+#       when the answer is yes but there is no copy).
 #   Exit 2 = usage error or unreadable project directory.
 #
 # The task-reviewer agent reads the bundle from the plugin root and never this
@@ -39,8 +40,12 @@ file=$project/$COPY
 if [ "$1" = retire ]; then
   case $(printf '%s' "$3" | tr '[:upper:]' '[:lower:]') in
     y | yes)
-      rm -f -- "$file"
-      echo removed
+      if [ -e "$file" ]; then
+        rm -f -- "$file"
+        echo removed
+      else
+        echo absent
+      fi
       ;;
     *) echo kept ;;
   esac
