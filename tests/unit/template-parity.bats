@@ -64,12 +64,7 @@ ROWS
 # stale-entry test below closes that: every entry must still match something
 # on disk, so a blanket exemption cannot accumulate (TASK-230).
 non_mirrored_templates() {
-  # claude/task-reviewer-rules.docs.md becomes the managed
-  # .claude/task-reviewer-rules.docs.md only in Documentation / Mixed projects
-  # (those with .obsidian/). This repo is Code-only, so the live file never
-  # exists here; its managed-header contract is asserted by its own test below.
   cat <<'ROWS'
-claude/task-reviewer-rules.docs.md
 devcontainer/Dockerfile.base
 devcontainer/lang/
 obsidian/
@@ -451,27 +446,20 @@ EOF
 @test "R11: task-reviewer-rules.md is project-specific, so it has no mirror" {
   [ -f "$PROJECT_ROOT/.claude/task-reviewer-rules.md" ]
   [ ! -e "$TEMPLATES/claude/task-reviewer-rules.md" ]
-  # ralph-init ships the shared docs rules as a separate managed tier under a
-  # distinct name instead, so the absence above is a decision rather than an
-  # oversight, and the project file is never a copy of it.
-  [ -f "$TEMPLATES/claude/task-reviewer-rules.docs.md" ]
-  run diff "$PROJECT_ROOT/.claude/task-reviewer-rules.md" \
-           "$TEMPLATES/claude/task-reviewer-rules.docs.md"
-  [ "$status" -ne 0 ]
 }
 
-@test "R11: the docs rules template is a managed file pointing project rules elsewhere" {
-  tmpl="$TEMPLATES/claude/task-reviewer-rules.docs.md"
-  # The promises live in the first lines, where an owner opening the
-  # generated .claude/task-reviewer-rules.docs.md sees them first.
-  run head -n 5 "$tmpl"
-  [[ "$output" == *"Managed by ralph-init"* ]]
-  [[ "$output" == *"overwritten from the plugin template on every ralph-init upgrade"* ]]
-  [[ "$output" == *"project rules belong in .claude/task-reviewer-rules.md"* ]]
-  # This repo is Code-only (no .obsidian/), so the managed file must not exist
-  # here — a live copy would be an unregistered, unmanaged mirror.
-  [ ! -d "$PROJECT_ROOT/.obsidian" ]
-  [ ! -e "$PROJECT_ROOT/.claude/task-reviewer-rules.docs.md" ]
+@test "R11: the shared docs rules are a plugin bundle, not a template mirror" {
+  # The task-reviewer agent reads the bundle from the installed plugin root at
+  # review time, so it is runtime distribution, which parity cannot cover; its
+  # content, tiers, order, overrides and load errors are tested in
+  # task-reviewer-rules-loading.bats.
+  [ -s "$PROJECT_ROOT/plugins/ralph/skills/ralph-init/rules/task-reviewer-rules.docs.md" ]
+  [ ! -e "$TEMPLATES/claude/task-reviewer-rules.docs.md" ]
+  run grep -F 'task-reviewer-rules.docs.md' <<EOF
+$(registry)
+$(non_mirrored_templates)
+EOF
+  [ "$status" -eq 1 ]
 }
 
 @test "R11: plugin-bundled agents are distributed, not mirrored" {
