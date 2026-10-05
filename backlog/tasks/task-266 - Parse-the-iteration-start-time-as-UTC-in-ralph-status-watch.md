@@ -1,10 +1,10 @@
 ---
 id: TASK-266
 title: Parse the iteration start time as UTC in ralph-status-watch
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-05 06:32'
-updated_date: '2026-10-05 08:53'
+updated_date: '2026-10-05 10:00'
 labels: []
 dependencies: []
 priority: medium
@@ -34,8 +34,8 @@ Optional, not required: moving the conversion into a small helper script alongsi
 <!-- AC:BEGIN -->
 - [x] #1 The BSD branch of the timestamp conversion in plugins/ralph/skills/ralph-status-watch/SKILL.md parses the timestamp as UTC, matching the date -j -u -f form used by plugins/ralph/skills/ralph-status/scripts/utc-to-moscow.sh
 - [x] #2 A test extracts the conversion line from the shipped SKILL.md and runs it against a fixed timestamp under TZ=Europe/Moscow and TZ=America/New_York, asserting the same correct epoch in both zones
-- [ ] #3 The test fails against the current master version of the line under at least one non-UTC zone — record the observed failing epoch in the task notes
-- [ ] #4 The test passes on this macOS host, where the BSD branch is the one that runs, and the result is recorded in the task notes
+- [x] #3 The test fails against the current master version of the line under at least one non-UTC zone — record the observed failing epoch in the task notes
+- [x] #4 The test passes on this macOS host, where the BSD branch is the one that runs, and the result is recorded in the task notes
 - [x] #5 Gates: uv run ruff check . is clean, uv run pytest passes, and LC_ALL=C node_modules/.bin/bats tests/unit passes with no new failures relative to master
 <!-- AC:END -->
 
@@ -53,4 +53,8 @@ Container run (Linux, GNU date 9.1, no BSD date): tests/python/test_status_watch
 PENDING host verification (cannot run in the Linux container): AC #3 - on macOS, run the BSD test against the master line (restore master's SKILL.md) under TZ=Europe/Moscow and record the failing epoch (task body predicts 1791170499); AC #4 - on macOS run uv run pytest tests/python/test_status_watch_utc_parse.py -v and confirm the 2 BSD tests PASS (not skip). Task left In Progress, branch task-266 not merged until then.
 
 Review: task-reviewer APPROVED (0 blocking, 0 minor). Not marked Done and not merged: the task requires AC #3/#4 on the macOS host first. To finish on host: verify #3/#4, check them off, then run Task Lifecycle steps 5-6 (bump-version --auto, merge, --tag).
+
+Host verification (macOS, BSD date, interactive session after the Ralph run, branch merged with master first): AC #4 tests/python/test_status_watch_utc_parse.py 5 passed on the host, where the BSD date -j branch is the one that runs. AC #3 with master's SKILL.md line swapped in: the static -u assertion fails and the Europe/Moscow case returns 1791170499 instead of 1791181299 — the exact 10800 s offset measured at filing; file restored afterwards. Gates on the host: ruff clean; pytest 776 passed 2 skipped; bats tests/unit 138 ok, 0 not ok.
+
+Commit: `4da4db1` - task-266: bump plugin version to 0.11.2 (patch)
 <!-- SECTION:NOTES:END -->
