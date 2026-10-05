@@ -391,3 +391,87 @@ run_loader() {
   [ "$(printf '%s\n' "$output" | grep -c '^## R-INFRA-')" -eq 7 ]
   [[ "$output" == *"override references: none"* ]]
 }
+
+# Run the loader with project rules $1 and print its override references line.
+override_line() {
+  printf '%s\n' "$1" > "$WORK/.claude/task-reviewer-rules.md"
+  run_loader
+  printf '%s\n' "$output" | grep '^override references:'
+}
+
+@test "override detection accepts bare, backticked and capitalised forms" {
+  [ "$(override_line '## R-LOCAL-1: x, replaces R-DOCS-4')" = "override references: R-DOCS-4" ]
+  [ "$(override_line '## R-LOCAL-1: x, replaces `R-DOCS-4`')" = "override references: R-DOCS-4" ]
+  [ "$(override_line 'Replaces R-DOCS-4.')" = "override references: R-DOCS-4" ]
+  [ "$(override_line 'This rule REPLACES R-DOCS-4 here.')" = "override references: R-DOCS-4" ]
+}
+
+@test "override detection lists every ID in the replacing sentence" {
+  [ "$(override_line 'This rule replaces R5 and R-INFRA-3')" = "override references: R-INFRA-3, R5" ]
+  [ "$(override_line 'This rule replaces `R5`, `R-INFRA-3`.')" = "override references: R-INFRA-3, R5" ]
+  # A sentence may wrap across lines.
+  [ "$(override_line "$(printf 'This rule replaces R5\nand R-INFRA-3.')")" = "override references: R-INFRA-3, R5" ]
+}
+
+@test "override detection ignores IDs in a following sentence, paragraph, heading or list item" {
+  [ "$(override_line 'This rule replaces R5. See R-DOCS-2 for context.')" = "override references: R5" ]
+  [ "$(override_line "$(printf 'Replaces R5\n\nSee R-DOCS-2')")" = "override references: R5" ]
+  [ "$(override_line "$(printf -- '- replaces R5\n- see R-DOCS-2')")" = "override references: R5" ]
+  [ "$(override_line "$(printf '## R-LOCAL-1: x (replaces R5)\n## R-LOCAL-2: see R-DOCS-2')")" = "override references: R5" ]
+  [ "$(override_line 'Two sentences. This one names R-DOCS-2 and replaces nothing')" = "override references: none" ]
+  [ "$(override_line 'It replaces PR5 nowhere.')" = "override references: none" ]
+}
+
+@test "agent describes the override forms it recognises" {
+  grep -q '"Replaces" matches in any letter case; an ID may be bare or in backticks' "$AGENT"
+  grep -q 'an ID named only in a following sentence is not listed' "$AGENT"
+}
+
+# Run the R-CORE-5 scan extracted from the agent in git repo $1.
+run_core5_scan() {
+  extract_snippet "$AGENT" "### R-CORE-5" > "$WORK/core5.sh"
+  run bash -c 'cd "$1" && bash "$2" 2>&1' _ "$1" "$WORK/core5.sh"
+}
+
+# Create a git repo with a master branch holding task-1 and task-2, and a
+# task branch checked out.
+make_task_repo() {
+  local repo
+  repo="$(make_temp_dir)"
+  git -C "$repo" init -q -b master
+  git -C "$repo" config user.email t@t; git -C "$repo" config user.name t
+  mkdir -p "$repo/backlog/tasks"
+  echo "clean" > "$repo/backlog/tasks/task-1.md"
+  echo "clean" > "$repo/backlog/tasks/task-2.md"
+  git -C "$repo" add -A; git -C "$repo" commit -qm base
+  git -C "$repo" checkout -qb task-1
+  printf '%s\n' "$repo"
+}
+
+@test "R-CORE-5 scan reads HEAD, not the working tree, and skips deleted task files" {
+  repo="$(make_task_repo)"
+  echo "see design/x-brainstorm.md" > "$repo/backlog/tasks/task-1.md"
+  git -C "$repo" commit -qam bad
+  git -C "$repo" rm -q backlog/tasks/task-2.md; git -C "$repo" commit -qm del
+  run_core5_scan "$repo"
+  [[ "$output" == *"R-CORE-5 violation: backlog/tasks/task-1.md"* ]]
+  [[ "$output" != *task-2* ]]
+  [[ "$output" != *fatal* ]]
+  # A working-tree fix that is not committed does not hide the violation.
+  echo "clean" > "$repo/backlog/tasks/task-1.md"
+  run_core5_scan "$repo"
+  [[ "$output" == *"R-CORE-5 violation: backlog/tasks/task-1.md"* ]]
+  # A committed fix clears it, and an uncommitted bad edit does not raise one.
+  git -C "$repo" commit -qam fix
+  echo "see design/x-brainstorm.md" > "$repo/backlog/tasks/task-1.md"
+  run_core5_scan "$repo"
+  [ "$output" = "" ]
+}
+
+@test "R-CORE-5 scan has no working-tree grep" {
+  extract_snippet "$AGENT" "### R-CORE-5" > "$WORK/core5.sh"
+  grep -qF 'git show HEAD:"$f" | grep -nE' "$WORK/core5.sh"
+  grep -qF -- '--diff-filter=d' "$WORK/core5.sh"
+  run grep -E 'grep [^|]*"\$f"' "$WORK/core5.sh"
+  [ "$status" -eq 1 ]
+}
