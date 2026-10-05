@@ -1,10 +1,10 @@
 ---
 id: TASK-271
 title: Narrow the devcontainer sudoers rule to the exact chown postCreateCommand runs
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-05 16:51'
-updated_date: '2026-10-05 17:19'
+updated_date: '2026-10-05 17:31'
 labels:
   - 'feature:ralph-init'
 dependencies: []
@@ -74,7 +74,7 @@ If anything is unclear or any check fails: STOP and ask the user. Do NOT start w
 - [x] #2 The sudoers RUN step ends with visudo -cf /etc/sudoers.d/node-firewall, so a malformed rule fails the image build
 - [x] #3 .devcontainer/Dockerfile carries the same narrowed line and tests/unit/template-parity.bats passes
 - [x] #4 tests/python/test_devcontainer_sudoers.py fails on the bare /bin/chown form and on an unescaped node:node, and passes on the narrowed line
-- [ ] #5 On a host with Docker, a freshly built devcontainer starts with postCreateCommand succeeding; inside it sudo -n chown node:node /workspace/.venv exits 0 and sudo -n chown node /usr/local/bin/init-firewall.sh is refused; the sudo -l output is recorded in the task notes
+- [x] #5 On a host with Docker, a freshly built devcontainer starts with postCreateCommand succeeding; inside it sudo -n chown node:node /workspace/.venv exits 0 and sudo -n chown node /usr/local/bin/init-firewall.sh is refused; the sudo -l output is recorded in the task notes
 - [x] #6 uv run pytest and uv run ruff check . pass
 - [x] #7 A proposed follow-up task for upgrade-time detection and patching of existing projects' assembled Dockerfile is recorded in the task notes
 <!-- AC:END -->
@@ -93,4 +93,8 @@ AC #5 deferred to a Docker host: this Ralph run is inside the devcontainer (no d
 task-reviewer (ralph:task-reviewer, installed 0.12.0): first pass CHANGES REQUESTED (AC #7 proposal and AC #5 deferral note missing from notes) → added → re-review APPROVED, SCORE 10, 0 blocking, 0 minor.
 
 Not marked Done and not merged: AC #5 is the only proof that sudo still allows the postCreateCommand chown under the narrowed rule; merging unverified could break postCreateCommand for every newly scaffolded project. Remaining steps on the host: run the AC #5 check above, record the output and check AC #5, then Done + Merge step 6 (bump-version.sh --auto bumps the plugin version, since Dockerfile.base and ralph-init SKILL.md changed).
+
+Host verification (macOS, Docker): devcontainer up --workspace-folder /Users/paul/Private/Projects/ai/ralph --remove-existing-container rebuilt the image and replaced Ralph's container (2a5e939ce3f9 -> 76d8b0f97391); outcome success. Build step 13/13 ran the narrowed RUN; visudo -cf printed '/etc/sudoers.d/node-firewall: parsed OK'. postCreateCommand succeeded (log moved on to postStartCommand; /workspace/.venv is node:node; safe.directory=/workspace set). Inside the container as node: sudo -n chown node:node /workspace/.venv exit 0; sudo -n chown node /usr/local/bin/init-firewall.sh refused ('sudo: a password is required', exit 1); chown root:root and chown -R node:node on .venv also refused. sudo -n -l: 'Matching Defaults entries for node: env_reset, mail_badpass, secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin, use_pty. User node may run the following commands: (root) NOPASSWD: /usr/local/bin/init-firewall.sh, /bin/chown node\:node /workspace/.venv'. Host gates after merging master (0.13.1): uv run ruff check . clean; uv run pytest 820 passed, 2 skipped; LC_ALL=C bats tests/unit 154 ok, 0 not ok; grep for a bare /bin/chown rule finds none.
+
+Commit: `4fb019a` - task-271: bump plugin version to 0.13.2 (patch)
 <!-- SECTION:NOTES:END -->
