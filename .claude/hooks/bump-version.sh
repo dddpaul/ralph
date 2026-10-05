@@ -35,7 +35,7 @@
 # local bump guarantees HEAD > master >= origin — the guard passes with no
 # network fetch, no staleness, and per-task semantic increments.
 #
-# Portability (R5): POSIX case-glob, BRE sed, `sort -V` (GNU + modern BSD),
+# Portability (R-INFRA-3): POSIX case-glob, BRE sed, `sort -V` (GNU + modern BSD),
 # awk match/substr for the in-place edit — no GNU-only sed addresses, no
 # grep -P, no readlink -f.
 

@@ -26,7 +26,7 @@ TITLE_MAX=100
 cmd=$(jq -r '.tool_input.command')
 
 # Extract the first double- or single-quoted string after a command prefix.
-# $1 = POSIX BRE matching the prefix (kept BRE for BSD/GNU sed parity, R5).
+# $1 = POSIX BRE matching the prefix (kept BRE for BSD/GNU sed parity, R-INFRA-3).
 extract_quoted() {
   prefix="$1"
   out=$(printf '%s' "$cmd" | sed -n "s/^${prefix}[[:space:]]*\"\([^\"]*\)\".*/\1/p")

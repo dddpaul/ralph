@@ -1,7 +1,8 @@
 #!/usr/bin/env bats
-# task-reviewer rule tiers: the agent loads user-global, the shared docs bundle
-# shipped in the plugin, and project rules additively in that order; ralph-init
-# upgrade hints at project-file headings that duplicate the shipped docs rules.
+# task-reviewer rule tiers: the agent loads user-global, the shared docs and
+# infra bundles shipped in the plugin, and project rules additively in that
+# order; ralph-init upgrade hints at project-file headings that duplicate the
+# shipped docs rules.
 #
 # Both snippets are extracted from the shipped files and run as-is against
 # fixtures, so the test follows the documented code rather than a copy of it.
@@ -39,6 +40,8 @@ setup() {
   printf '{\n  "name": "ralph",\n  "version": "7.8.9"\n}\n' > "$PLUGIN/.claude-plugin/plugin.json"
   BUNDLE="$PLUGIN/skills/ralph-init/rules/task-reviewer-rules.docs.md"
   printf '<!-- header: for example "replaces R-DOCS-3" -->\n\nDOCS-RULE\n' > "$BUNDLE"
+  INFRA="$PLUGIN/skills/ralph-init/rules/task-reviewer-rules.infra.md"
+  printf '<!-- header: for example "replaces R-INFRA-3" -->\n\n## R-INFRA-3: INFRA-RULE\n' > "$INFRA"
   RAW_LOADER="$WORK/loader.raw.sh"
   extract_snippet "$AGENT" "## Custom Rules Loading" > "$RAW_LOADER"
   HINTER="$WORK/hinter.sh"
@@ -164,7 +167,7 @@ run_loader() {
   run_loader
   [ "$status" -eq 0 ]
   [[ "$output" == *"tier shared docs: ERROR: shipped bundle missing or empty ($BUNDLE)"* ]]
-  [[ "$output" != *"not applied"* ]]
+  [[ "$output" != *"tier shared docs: not applied"* ]]
 }
 
 @test "an empty shipped bundle is a load error" {
@@ -201,7 +204,8 @@ run_loader() {
   run_loader
   [ "${lines[0]}" = "plugin version: 7.8.9" ]
   [ "${lines[1]}" = "docs bundle: $BUNDLE" ]
-  [ "${lines[2]}" = "project root: $WORK" ]
+  [ "${lines[2]}" = "infra bundle: $INFRA" ]
+  [ "${lines[3]}" = "project root: $WORK" ]
 }
 
 @test "override references list rule IDs a loaded rule replaces, skipping HTML comments" {
@@ -296,4 +300,94 @@ run_loader() {
   run bash -c 'cd "$1" && bash "$2"' _ "$WORK" "$HINTER"
   [ "$status" -eq 0 ]
   [ -z "$output" ]
+}
+
+@test "loader reads the infra bundle through the quoted braced plugin-root reference" {
+  grep -qF '"${CLAUDE_PLUGIN_ROOT}"/skills/ralph-init/rules/task-reviewer-rules.infra.md' "$RAW_LOADER"
+}
+
+@test "infra_rules=on loads the infra bundle between the docs and project tiers" {
+  printf 'docs_rules=on\ninfra_rules=on\n' > "$WORK/.claude/task-reviewer.conf"
+  echo "PROJECT-RULE" > "$WORK/.claude/task-reviewer-rules.md"
+  run_loader
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"tier shared docs: loaded"*"tier shared infra: loaded ($INFRA)"*"tier project: loaded"* ]]
+  [[ "$output" == *DOCS-RULE*INFRA-RULE*PROJECT-RULE* ]]
+  [[ "$output" != *ERROR* ]]
+}
+
+@test "infra_rules=off excludes the infra bundle even with a ralph.sh shim" {
+  : > "$WORK/ralph.sh"
+  printf 'infra_rules=on\ninfra_rules=off\n' > "$WORK/.claude/task-reviewer.conf"
+  run_loader
+  [[ "$output" == *"tier shared infra: not applied (infra_rules=off in $WORK/.claude/task-reviewer.conf)"* ]]
+  [[ "$output" != *INFRA-RULE* ]]
+}
+
+@test "unset infra_rules applies the bundle iff a ralph.sh shim is at the root or scripts/ralph/" {
+  run_loader
+  [[ "$output" == *"tier shared infra: not applied (infra_rules unset, no $WORK/ralph.sh or $WORK/scripts/ralph/ralph.sh)"* ]]
+  [[ "$output" != *INFRA-RULE* ]]
+  : > "$WORK/ralph.sh"
+  run_loader
+  [[ "$output" == *"tier shared infra: loaded ($INFRA)"* ]]
+  [[ "$output" == *INFRA-RULE* ]]
+  rm "$WORK/ralph.sh"
+  mkdir -p "$WORK/scripts/ralph"
+  : > "$WORK/scripts/ralph/ralph.sh"
+  run_loader
+  [[ "$output" == *"tier shared infra: loaded ($INFRA)"* ]]
+  [[ "$output" == *INFRA-RULE* ]]
+}
+
+@test "an invalid infra_rules value is a load error, not a fallback to the shim check" {
+  : > "$WORK/ralph.sh"
+  echo "infra_rules=yes" > "$WORK/.claude/task-reviewer.conf"
+  run_loader
+  [[ "$output" == *'tier shared infra: ERROR: invalid infra_rules value "yes"'* ]]
+  [[ "$output" != *INFRA-RULE* ]]
+  echo "infra_rules=on # pinned" > "$WORK/.claude/task-reviewer.conf"
+  run_loader
+  [[ "$output" == *'tier shared infra: ERROR: invalid infra_rules value "on # pinned"'* ]]
+}
+
+@test "a missing or empty infra bundle that applies is a load error" {
+  : > "$WORK/ralph.sh"
+  rm "$INFRA"
+  run_loader
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"tier shared infra: ERROR: shipped bundle missing or empty ($INFRA); applies by infra_rules unset, $WORK/ralph.sh exists"* ]]
+  : > "$INFRA"
+  echo "infra_rules=on" > "$WORK/.claude/task-reviewer.conf"
+  run_loader
+  [[ "$output" == *"tier shared infra: ERROR: shipped bundle missing or empty ($INFRA); applies by infra_rules=on"* ]]
+}
+
+@test "the infra setting does not leak into the docs gate" {
+  printf 'infra_rules=on\n' > "$WORK/.claude/task-reviewer.conf"
+  run_loader
+  [[ "$output" == *"tier shared docs: not applied (docs_rules unset, no $WORK/.obsidian)"* ]]
+  [[ "$output" == *"tier shared infra: loaded"* ]]
+}
+
+@test "a project rule replacing an R-INFRA rule is reported under override references" {
+  echo "infra_rules=on" > "$WORK/.claude/task-reviewer.conf"
+  printf '## R-LOCAL-1: hooks may be inline (replaces R-INFRA-5)\n' > "$WORK/.claude/task-reviewer-rules.md"
+  run_loader
+  # The bundle header names R-INFRA-3 inside an HTML comment; only the project rule counts.
+  [ "$(printf '%s\n' "$output" | grep '^override references:')" = "override references: R-INFRA-5" ]
+  [[ "$output" == *"tier shared infra: loaded"* ]]
+}
+
+@test "agent documents the infra_rules setting and its unset default" {
+  grep -q 'a line `infra_rules=on` or `infra_rules=off` in `.claude/task-reviewer.conf`' "$AGENT"
+  grep -q 'a `ralph.sh` shim at the project root or at `scripts/ralph/ralph.sh`' "$AGENT"
+}
+
+@test "loader against the real plugin root loads the shipped infra bundle" {
+  echo "infra_rules=on" > "$WORK/.claude/task-reviewer.conf"
+  run_loader "$PROJECT_ROOT/plugins/ralph"
+  [[ "$output" == *"tier shared infra: loaded ($PROJECT_ROOT/plugins/ralph/skills/ralph-init/rules/task-reviewer-rules.infra.md)"* ]]
+  [ "$(printf '%s\n' "$output" | grep -c '^## R-INFRA-')" -eq 7 ]
+  [[ "$output" == *"override references: none"* ]]
 }

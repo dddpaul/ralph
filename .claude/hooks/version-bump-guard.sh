@@ -24,7 +24,7 @@
 # file, and the first push (remote sha all-zeros). The guard enforces
 # monotonic-only (any strictly-greater version), NOT a specific increment size.
 #
-# Portability (R5): POSIX case-glob matching, BRE sed parse, and `sort -V`
+# Portability (R-INFRA-3): POSIX case-glob matching, BRE sed parse, and `sort -V`
 # (available on both GNU and modern BSD/macOS sort) — no grep -P, no GNU-only
 # flags.
 
