@@ -3,10 +3,10 @@ id: TASK-272
 title: >-
   Declare CLAUDE_CODE_VERSION next to the npm step so a version bump rebuilds
   only the image tail
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-05 17:21'
-updated_date: '2026-10-05 18:01'
+updated_date: '2026-10-05 18:12'
 labels:
   - 'feature:ralph-init'
 dependencies: []
@@ -69,7 +69,7 @@ If anything is unclear or any check fails: STOP and ask the user. Do NOT start w
 - [x] #2 The npm-step comment in Dockerfile.base no longer claims the bump changes only this layer's cache key; it states that the bump re-runs this step and those after it
 - [x] #3 tests/python/test_devcontainer_claude_code_pin.py fails on a Dockerfile with a RUN between the ARG and the npm RUN, passes on the moved template, and tests/unit/template-parity.bats passes
 - [x] #4 The SKILL.md Upgrade Mode step that patches an existing Dockerfile for the version pin places the ARG immediately before the LABEL dev.ralph.claude-code-version line
-- [ ] #5 On a host with Docker, the node-flavour Dockerfile assembled from the template is built twice with two different concrete CLAUDE_CODE_VERSION values; the second build log shows every step before the LABEL/npm step as CACHED, and the log excerpt is recorded in the task notes
+- [x] #5 On a host with Docker, the node-flavour Dockerfile assembled from the template is built twice with two different concrete CLAUDE_CODE_VERSION values; the second build log shows every step before the LABEL/npm step as CACHED, and the log excerpt is recorded in the task notes
 - [x] #6 uv run pytest and uv run ruff check . pass
 - [x] #7 A proposed follow-up for upgrade-time detection of the early ARG in already-assembled project Dockerfiles is recorded in the task notes
 <!-- AC:END -->
@@ -88,4 +88,8 @@ Proposed follow-up task (AC #7, not created here): 'Detect and patch the early C
 task-reviewer (ralph:task-reviewer, installed 0.12.0): APPROVED, SCORE 10, 0 blocking, 0 minor.
 
 Not marked Done and not merged: AC #5 is unchecked until a Docker host proves the cache behaviour. Host steps: assemble the node-flavour Dockerfile from the template (or use .devcontainer/Dockerfile), then run 'docker buildx build --progress=plain --build-arg CLAUDE_CODE_VERSION=2.1.283 --build-arg UV_VERSION=<pin> --build-arg TZ=UTC -f <Dockerfile> .devcontainer' and again with a different concrete CLAUDE_CODE_VERSION (e.g. 2.1.282); in the second log every step before the LABEL/npm step must show CACHED. Paste the excerpt here, check AC #5, then Done + Merge step 6 (bump-version.sh --auto bumps the plugin version, since Dockerfile.base and ralph-init SKILL.md changed).
+
+AC #5 host verification (macOS, Docker buildx): assembled the node flavour from the task-272 template exactly as ralph-init does (Dockerfile.base with {{LANGUAGE_STAGE}}/{{LANGUAGE_INSTALL}} replaced by lang/Dockerfile.lang.node and lang/Dockerfile.install.node; context = that Dockerfile + init-firewall.sh). Build 1: docker buildx build --progress=plain --build-arg CLAUDE_CODE_VERSION=2.1.283 --build-arg UV_VERSION=0.12.19 --build-arg TZ=UTC — exit 0, every step 2/12-12/12 ran. Build 2, same command with CLAUDE_CODE_VERSION=2.1.284 — exit 0, image label dev.ralph.claude-code-version=2.1.284. Build 2 log excerpt: '#8 [stage-1  2/12] RUN apt-get update && apt-get install ... #8 CACHED' / '#11 [stage-1  3/12] RUN mkdir -p /usr/local/share/npm-global ... #11 CACHED' / '#9 [stage-1  4/12] RUN SNIPPET=... #9 CACHED' / '#12 [stage-1  5/12] RUN mkdir -p /workspace /home/node/.claude ... #12 CACHED' / '#10 [stage-1  6/12] WORKDIR /workspace #10 CACHED' / '#13 [stage-1  7/12] RUN sh -c "$(wget -O- .../zsh-in-docker.sh)" ... #13 CACHED' / '#14 [stage-1  8/12] RUN { echo "2.1.284" | grep -Eqx ... npm install -g @anthropic-ai/claude-code@2.1.284 ... DONE 23.9s', then 9/12-12/12 re-ran (COPY uv 0.9s, uv python install 7.4s, COPY firewall 0.1s, sudoers 0.2s). Step 1/12 (FROM node:20@sha256:8f693e...) printed 'resolve ... 0.2s done / DONE 0.3s' in build 2 (it printed CACHED in build 1): a digest resolve of the local base image with no layer pull — not a build step, nothing rebuilt. So a bump re-runs the npm step and those after it, nothing before it. Placement check on the host: master's Dockerfile.base -> 'RUN between the ARG and the npm RUN rebuilds on every bump: [RUN apt-get update ...]'; task-272 Dockerfile.base and the assembled node file -> OK. Host gates: uv run ruff check . clean; uv run pytest 823 passed, 2 skipped (pin test 22 passed); LC_ALL=C node_modules/.bin/bats tests/unit 154 ok, 0 not ok.
+
+Commit: `52554f2` - task-272: bump plugin version to 0.13.3 (patch)
 <!-- SECTION:NOTES:END -->
