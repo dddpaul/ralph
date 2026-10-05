@@ -4,7 +4,7 @@ title: Ship portable review-conduct rules in the task-reviewer agent
 status: Done
 assignee: []
 created_date: '2026-10-04 18:53'
-updated_date: '2026-10-05 05:58'
+updated_date: '2026-10-05 16:58'
 labels: []
 dependencies: []
 priority: medium
@@ -70,4 +70,6 @@ Commit: `4b11e68` - task-262: say the three loading tiers are rules files, not a
 task-reviewer (ralph:task-reviewer) APPROVED, SCORE 9: 0 blocking, 1 minor (agent line 13 said 'Rules come in three tiers' though built-ins are a fourth, more general tier) - fixed to 'Rules files come in three tiers'. Final gates: ruff clean, pytest 719 passed, bats only pre-existing #104.
 
 Commit: `04ee088` - task-262: bump plugin version to 0.9.3 (patch)
+
+Post-merge re-review under the agent's own new rules (recorded by TASK-270): CHANGES REQUESTED, SCORE 5, one blocking finding — the R-CORE-5 scan grepped the working-tree copy of task files, which R-CORE-1 forbids, and failed on task files the diff deletes. Fixed by TASK-270.
 <!-- SECTION:NOTES:END -->

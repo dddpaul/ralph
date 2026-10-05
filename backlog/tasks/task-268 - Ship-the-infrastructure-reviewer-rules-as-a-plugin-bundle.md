@@ -4,7 +4,7 @@ title: Ship the infrastructure reviewer rules as a plugin bundle
 status: Done
 assignee: []
 created_date: '2026-10-05 08:20'
-updated_date: '2026-10-05 16:26'
+updated_date: '2026-10-05 16:58'
 labels: []
 dependencies:
   - TASK-267
@@ -71,4 +71,6 @@ NOT MERGED: task-268 is stacked on task-267, which is In Progress awaiting macOS
 Host gates (macOS, interactive session after the Ralph run, branch merged with master first so it carries TASK-267 Done and the 0.11.2 version): ruff clean; pytest 793 passed 2 skipped; bats tests/unit 148 ok, 0 not ok. The infra bundle carries 7 R-INFRA rules; .claude/task-reviewer-rules.md retains only R7, R11 and R12 with their original IDs. Live-agent check that the installed ralph:task-reviewer loads the infra bundle is deferred until this version is pushed and the plugin updated (R4).
 
 Commit: `ec48618` - task-268: bump plugin version to 0.12.0 (minor)
+
+Post-merge live check (recorded by TASK-270): after the plugin update the installed 0.12.0 agent printed `plugin version: 0.12.0` and `tier shared infra: loaded (/Users/paul/.claude/plugins/cache/dddpaul-ralph/ralph/0.12.0/skills/ralph-init/rules/task-reviewer-rules.infra.md)`; both installed bundles are byte-identical to master.
 <!-- SECTION:NOTES:END -->
