@@ -25,7 +25,7 @@ Without frontmatter, `subagent_type=<name>` is never registered in the Agent enu
 
 The Agent enum is fixed at session start. If the diff adds or modifies frontmatter under `agents/*.md`, `.claude/agents/*.md`, or `~/.claude/agents/*.md`, any AC of the form "verify the agent is callable as `subagent_type=...`" MUST be marked deferred to a fresh session in the task notes. The reviewer MUST NOT accept claims of mid-session verification for newly-registered subagent types.
 
-## R5 — Shell scripts must work on both GNU and BSD tools
+## R5 — Shell scripts must work on both GNU and BSD tools and parse under bash 3.2
 
 Scripts under `.claude/hooks/`, `scripts/`, `skills/*/scripts/`, and `ralph.sh` run on both macOS (BSD coreutils) and Linux/devcontainer (GNU coreutils). The reviewer MUST flag known incompatibilities, including but not limited to:
 
@@ -37,6 +37,13 @@ Scripts under `.claude/hooks/`, `scripts/`, `skills/*/scripts/`, and `ralph.sh` 
 - `find -regex` argument ordering (BSD silently skips longer alternatives placed second; longest must come first)
 - `readlink -f` (GNU only)
 - `xargs -r` (GNU only)
+
+macOS system bash is GNU bash 3.2 (`/bin/bash`), and a `bash` resolved through PATH on a default Mac is that 3.2, so every script MUST also parse under it. The Linux devcontainer runs bash 5 and cannot see a 3.2-only syntax error, so the reviewer MUST flag bash 4+ syntax, including but not limited to:
+
+- a case pattern without the leading `(` inside `$( ... )` — bash 3.2 reads its `)` as the end of the substitution; write `(pattern)` or move the loop into a function
+- associative arrays (`declare -A`), `mapfile` / `readarray`, `${var,,}` / `${var^^}` case conversion, `;&` / `;;&` case fall-through, `|&`, `&>>`, and `coproc`
+
+`tests/python/test_bash32_syntax.py` runs `/bin/bash -n` over every tracked shell script when `/bin/bash` is bash 3.x.
 
 When in doubt, prefer POSIX-compliant constructs.
 
