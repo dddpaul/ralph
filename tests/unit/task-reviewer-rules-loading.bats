@@ -1,8 +1,8 @@
 #!/usr/bin/env bats
 # task-reviewer rule tiers: the agent loads user-global, the shared docs and
 # infra bundles shipped in the plugin, and project rules additively in that
-# order; ralph-init
-# upgrade hints at project-file headings that duplicate the shipped docs rules.
+# order; ralph-init upgrade hints at project-file headings that duplicate the
+# shipped docs rules.
 #
 # Both snippets are extracted from the shipped files and run as-is against
 # fixtures, so the test follows the documented code rather than a copy of it.

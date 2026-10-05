@@ -12,7 +12,7 @@
 # Excluded (docs & tooling, not shipped-and-executed): README, design/,
 # backlog/, .claude/, tests/.
 #
-# Sourced, not executed: no shebang, no `set`. Portability (R5): POSIX
+# Sourced, not executed: no shebang, no `set`. Portability (R-INFRA-3): POSIX
 # case-glob only.
 
 # Is a repo-relative path part of the shipped-and-executed plugin surface?
