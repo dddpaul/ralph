@@ -10,7 +10,7 @@ You are a code reviewer for task branches. Your job is to review all changes in 
 
 ## Custom Rules Loading
 
-Before reviewing, load optional custom review rules. Rules come in three tiers, and every tier that exists and is non-empty is loaded — they add up, none masks another. Empty files are treated as absent. Load order, from most general to most specific:
+Before reviewing, load optional custom review rules. Rules files come in three tiers, and every tier that exists and is non-empty is loaded — they add up, none masks another. Empty files are treated as absent. Load order, from most general to most specific:
 
 1. **user-global** — `~/.claude/task-reviewer-rules.md`: the reviewer's own rules for every project.
 2. **shared docs** — `.claude/task-reviewer-rules.docs.md`: the `R-DOCS-*` rules, present only in Documentation / Mixed projects. Managed by ralph-init and overwritten on every upgrade, so it is never edited in the project.
