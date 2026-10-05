@@ -1,10 +1,10 @@
 ---
 id: TASK-261
 title: Make the pre-commit NFD guard tests filesystem-independent
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-04 18:41'
-updated_date: '2026-10-05 08:48'
+updated_date: '2026-10-05 09:54'
 labels: []
 dependencies: []
 priority: medium
@@ -52,12 +52,12 @@ Scope and parity, checked: tests are NOT mirrored into the ralph-init templates 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Both NFD/NFC collision tests pass on a macOS APFS host: LC_ALL=C node_modules/.bin/bats tests/unit/pre-commit-hook.bats reports 0 failures and 0 skipped
+- [x] #1 Both NFD/NFC collision tests pass on a macOS APFS host: LC_ALL=C node_modules/.bin/bats tests/unit/pre-commit-hook.bats reports 0 failures and 0 skipped
 - [x] #2 Neither of the two tests creates a working-tree file for the NFC or NFD name — grep over tests/unit/pre-commit-hook.bats finds no shell redirect into $NFC_NAME or $NFD_NAME inside those two test bodies
 - [x] #3 Both tests still assert the hook's observable contract: exit status 1 and BLOCKED in the output
 - [x] #4 The tests still fail when the guard is broken: temporarily removing the normalization comparison from plugins/ralph/skills/ralph-init/templates/git-hooks/pre-commit makes both tests fail, the mutation is reverted afterwards, and the observed result is recorded in the task notes
 - [x] #5 The guard itself is unchanged: git diff master..HEAD -- plugins/ralph/skills/ralph-init/templates/git-hooks/pre-commit is empty
-- [ ] #6 Gates: uv run ruff check . is clean, uv run pytest passes, and LC_ALL=C node_modules/.bin/bats tests/unit passes on the host with no failures
+- [x] #6 Gates: uv run ruff check . is clean, uv run pytest passes, and LC_ALL=C node_modules/.bin/bats tests/unit passes on the host with no failures
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -78,4 +78,6 @@ Container verification (Linux; /workspace is the macOS bind mount, which collaps
 HOST VERIFICATION STILL OWED (task execution constraint): AC #1 and AC #6 proved only by proxy on the bind mount. On the host: LC_ALL=C node_modules/.bin/bats tests/unit/pre-commit-hook.bats (expect 0 failures, 0 skipped); uv run ruff check .; uv run pytest; LC_ALL=C node_modules/.bin/bats tests/unit.
 
 Review: ralph:task-reviewer APPROVED (0 blocking, 0 minor, score 10); reviewer independently reproduced the proxy results. Reviewer caveat for AC #6: bats test 124 (R11 settings.local.json shape) fails because the git-ignored .claude/settings.local.json on the shared volume carries an 'attribution' key the template lacks — the host run will likely fail it too until that local file is reconciled; unrelated to this diff. Left In Progress and unmerged on branch task-261 per the execution constraint. On the host: run the AC #1/#6 commands, check AC #1/#6, mark Done, then Merge (bump-version --auto will no-op: no shipped plugins/ralph/** file changed).
+
+Host verification (macOS APFS, interactive session after the Ralph run, branch merged with master first to include TASK-267's bash 3.2 fix): AC #1 LC_ALL=C bats tests/unit/pre-commit-hook.bats -> 13 ok, 0 not ok, 0 skipped; both collision tests (ok 2, ok 3) now pass on the normalization-insensitive volume. AC #6 gates on the host: ruff clean; pytest 771 passed 2 skipped; bats tests/unit 138 ok, 0 not ok — the first fully green host run, since tests 34/35 were the last host-only failures. Ralph's proxy (TMPDIR on the APFS-backed bind mount) matched the host.
 <!-- SECTION:NOTES:END -->
