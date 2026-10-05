@@ -4,7 +4,7 @@ title: Fix the task-reviewer's override detection and working-tree scan
 status: In Progress
 assignee: []
 created_date: '2026-10-05 16:41'
-updated_date: '2026-10-05 16:58'
+updated_date: '2026-10-05 17:01'
 labels: []
 dependencies: []
 priority: high
@@ -108,4 +108,8 @@ Commit: `b4691f4` - task-270: detect overrides in every replaces form and scan c
 Gates in the Linux container: uv run ruff check . clean; uv run pytest 807 passed, 3 skipped; LC_ALL=C bats tests/unit 153 ok, 1 not ok — 'R11: settings.local.json keeps the template's JSON shape', which reads the git-ignored machine-local .claude/settings.local.json and fails identically on master with this diff stashed (environment, not this change). The six new bats cases fail against master's agent (verified by pointing AGENT at git show master:...) and pass on the branch. The container awk is mawk, so the override pipeline already runs on a non-GNU awk; it uses only POSIX awk (match/substr/tolower, no gensub/IGNORECASE/[[:class:]]) and no sed case-insensitive flag.
 
 DEFERRED — AC #9 host half: BSD userland and /bin/bash 3.2 exist only on the macOS host; the one-true-awk source could not be fetched from the container. Before Done, run on the host: LC_ALL=C node_modules/.bin/bats tests/unit/task-reviewer-rules-loading.bats and record the result here. R-INFRA-2: a live check of the fixed agent needs a push and plugin update; deferred to after merge.
+
+task-reviewer (ralph:task-reviewer, installed 0.12.0): APPROVED, SCORE 8 — 0 blocking, 2 minor: (1) an abbreviation like 'e.g. ' ends the sentence early, so later IDs are dropped (follows the documented sentence-end rule); (2) ';' and table-cell '|' do not end a sentence, so 'replaces R-CORE-6; see R-DOCS-2' also lists R-DOCS-2 (mitigated by 'Confirm each against the rule text'). Left as-is; candidates for a follow-up.
+
+Not marked Done and not merged: the description requires the AC #9 host half (BSD userland, /bin/bash 3.2) to pass before Done. Remaining steps on the host: run LC_ALL=C node_modules/.bin/bats tests/unit/task-reviewer-rules-loading.bats, record the output, check AC #9, then Done + Merge step 6 (bump-version.sh --auto bumps the plugin version, since plugins/ralph/agents/task-reviewer.md changed).
 <!-- SECTION:NOTES:END -->
