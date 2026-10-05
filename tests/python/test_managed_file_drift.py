@@ -10,10 +10,12 @@ against U2's.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -201,3 +203,157 @@ def test_oracle_matches_the_script_list() -> None:
 
 def test_upgrade_runs_the_same_script() -> None:
     assert "skills/ralph-init/scripts/managed-file-drift.sh check ." in u2_section()
+
+
+MERGE = SKILL_DIR / "scripts/merge-runargs.sh"
+PPTX_RULES = ["Bash(python scripts/office/soffice.py:*)", "Bash(pdftoppm:*)"]
+SHM = '"--shm-size=1g"'
+
+
+def jq(filter_: str, file: Path, *args: str) -> None:
+    """Rewrite ``file`` in place through ``jq``, as Upgrade U4 does."""
+    out = subprocess.run(["jq", *args, filter_, str(file)], capture_output=True, text=True, check=True).stdout
+    file.write_text(out)
+
+
+def u4_settings_local(project: Path) -> None:
+    """U4 for a Documentation / Mixed project: overwrite, Step 3.7b pptx merge, dead-rule strip."""
+    file = project / ".claude/settings.local.json"
+    shutil.copyfile(MANAGED[".claude/settings.local.json"], file)
+    p1, p2 = PPTX_RULES
+    merge = ".permissions.allow = ((.permissions.allow // []) + [$p1, $p2] | unique)"
+    jq(merge, file, "--arg", "p1", p1, "--arg", "p2", p2)
+    dead = r"/\.claude/skills/ralph-(run|status)/|/plugins/cache/[^/]+/ralph/[0-9]+\.[0-9]+\.[0-9]+/"
+    jq(".permissions.allow = ((.permissions.allow // []) | map(select(test($re) | not)))", file, "--arg", "re", dead)
+
+
+def u4_devcontainer(project: Path) -> None:
+    """U4's devcontainer.json overwrite: the template merged with the project's runArgs."""
+    file = project / ".devcontainer/devcontainer.json"
+    merged = subprocess.run(
+        ["bash", str(MERGE), str(MANAGED[".devcontainer/devcontainer.json"]), str(file)],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    file.write_text(merged)
+
+
+def runargs_line(file: Path) -> str:
+    (line,) = [ln for ln in file.read_text().splitlines() if '"runArgs":' in ln]
+    return line
+
+
+def add_runarg(file: Path, element: str) -> None:
+    line = runargs_line(file)
+    file.write_text(file.read_text().replace(line, line.replace("],", f", {element}],")))
+
+
+@pytest.mark.skipif(shutil.which("jq") is None, reason="Upgrade U4 merges settings.local.json with jq")
+def test_settings_local_after_u4_pptx_merge_is_current(project: Path) -> None:
+    file = project / ".claude/settings.local.json"
+    file.write_text('{"permissions": {"allow": ["Bash(old:*)"]}}\n')
+    assert run("check", str(project)).stdout == ".claude/settings.local.json: outdated\n"
+    u4_settings_local(project)
+    allow = json.loads(file.read_text())["permissions"]["allow"]
+    assert set(PPTX_RULES) <= set(allow)
+    assert file.read_bytes() != MANAGED[".claude/settings.local.json"].read_bytes()
+    result = run("check", str(project))
+    assert (result.returncode, result.stdout) == (0, "")
+
+
+@pytest.mark.skipif(shutil.which("jq") is None, reason="the allow rule needs jq")
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        pytest.param(lambda s: s["permissions"]["allow"].remove("Bash(git status:*)"), id="template-rule-dropped"),
+        pytest.param(lambda s: s["sandbox"].update(enabled=False), id="sandbox-flipped"),
+        pytest.param(lambda s: s.update(model="opus"), id="key-added"),
+        pytest.param(lambda s: s["permissions"].update(deny=["Bash(rm:*)"]), id="permissions-key-added"),
+        pytest.param(lambda s: s["attribution"].pop("pr"), id="key-removed"),
+    ],
+)
+def test_settings_local_containment_still_catches_drift(project: Path, mutate: Callable[[dict], object]) -> None:
+    file = project / ".claude/settings.local.json"
+    settings = json.loads(file.read_text())
+    settings["permissions"]["allow"] += PPTX_RULES
+    file.write_text(json.dumps(settings, indent=2) + "\n")
+    assert run("check", str(project)).returncode == 0
+    mutate(settings)
+    file.write_text(json.dumps(settings, indent=2) + "\n")
+    result = run("check", str(project))
+    assert (result.returncode, result.stdout) == (1, ".claude/settings.local.json: outdated\n")
+
+
+def test_settings_local_without_jq_falls_back_to_exact(project: Path, tmp_path: Path) -> None:
+    file = project / ".claude/settings.local.json"
+    settings = json.loads(file.read_text())
+    settings["permissions"]["allow"] += PPTX_RULES
+    file.write_text(json.dumps(settings, indent=2) + "\n")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    for tool in ("bash", "cat", "cmp", "cut", "grep", "awk", "sed", "head", "tail", "dirname"):
+        (bin_dir / tool).symlink_to(shutil.which(tool) or f"/usr/bin/{tool}")
+    result = run("check", str(project), env={"PATH": str(bin_dir)})
+    assert (result.returncode, result.stdout) == (1, ".claude/settings.local.json: outdated\n")
+
+
+def test_u4_keeps_project_runargs_and_check_calls_it_current(project: Path) -> None:
+    file = project / ".devcontainer/devcontainer.json"
+    template_line = runargs_line(file)
+    file.write_text(file.read_text().replace('"remoteUser": "node"', '"remoteUser": "root"'))
+    add_runarg(file, SHM)
+    assert run("check", str(project)).stdout == ".devcontainer/devcontainer.json: outdated\n"
+    u4_devcontainer(project)
+    assert SHM in runargs_line(file)
+    assert runargs_line(file) == template_line.replace("],", f", {SHM}],")
+    assert '"remoteUser": "node"' in file.read_text()
+    result = run("check", str(project))
+    assert (result.returncode, result.stdout) == (0, "")
+    before = file.read_bytes()
+    u4_devcontainer(project)
+    assert file.read_bytes() == before
+
+
+def test_u4_on_a_current_template_copy_is_a_no_op(project: Path) -> None:
+    file = project / ".devcontainer/devcontainer.json"
+    u4_devcontainer(project)
+    assert file.read_bytes() == MANAGED[".devcontainer/devcontainer.json"].read_bytes()
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        pytest.param(lambda t: t.replace('"--cap-add=NET_RAW", ', ""), id="template-element-dropped"),
+        pytest.param(lambda t: t.replace('"remoteUser": "node"', '"remoteUser": "root"'), id="other-field"),
+        pytest.param(lambda t: t.replace('"waitFor": "postStartCommand"', '"waitFor": "x"'), id="last-field"),
+        pytest.param(lambda t: t.replace('"runArgs": [', '"runArgs": [\n    '), id="multi-line-runargs"),
+    ],
+)
+def test_runargs_containment_still_catches_drift(project: Path, mutate: Callable[[str], str]) -> None:
+    file = project / ".devcontainer/devcontainer.json"
+    add_runarg(file, SHM)
+    assert run("check", str(project)).returncode == 0
+    text = file.read_text()
+    assert mutate(text) != text
+    file.write_text(mutate(text))
+    result = run("check", str(project))
+    assert (result.returncode, result.stdout) == (1, ".devcontainer/devcontainer.json: outdated\n")
+
+
+def test_reordered_template_runargs_are_outdated(project: Path) -> None:
+    file = project / ".devcontainer/devcontainer.json"
+    admin, raw = '"--cap-add=NET_ADMIN"', '"--cap-add=NET_RAW"'
+    file.write_text(file.read_text().replace(f"{admin}, {raw}", f"{raw}, {admin}"))
+    assert run("check", str(project)).stdout == ".devcontainer/devcontainer.json: outdated\n"
+
+
+def test_skill_documents_project_runargs_and_the_merged_overwrite() -> None:
+    text = SKILL_MD.read_text("utf-8")
+    u4 = text[text.index("### U4: Apply Updates") : text.index("### U5")]
+    assert "**Project `runArgs` in `devcontainer.json`:**" in u4
+    assert "skills/ralph-init/scripts/merge-runargs.sh" in u4
+    assert "overwrite from `templates/devcontainer/devcontainer.json`." not in u4
+    u2 = u2_section()
+    assert "exact content match against `templates/claude/settings.local.json`" not in u2
+    assert "merge-runargs.sh" in u2
