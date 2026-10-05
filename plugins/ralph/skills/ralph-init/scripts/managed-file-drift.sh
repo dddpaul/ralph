@@ -22,6 +22,12 @@
 #               a project file without that line is outdated.
 #   hooks     — every templates/claude/hooks/*-guard.sh and task-validator.sh
 #               must match .claude/hooks/<name>.sh.
+#   allow     — JSON equal to the template once permissions.allow is set
+#               aside, and that array holds every template rule; added rules
+#               (the pptx helpers Upgrade U4 merges in) are not drift. Without
+#               jq on PATH the rule falls back to exact.
+#   runargs   — byte-identical to merge-runargs.sh's output for the file: the
+#               template with the file's own extra "runArgs" elements kept.
 #
 # Gates skip a row silently: "devcontainer" without a .devcontainer/ directory,
 # "git" without a .git/ directory.
@@ -46,8 +52,8 @@ CLAUDE.md|skills/ralph-init/templates/root/CLAUDE.md|above:## Project-Specific|-
 .git/hooks/pre-commit|skills/ralph-init/templates/git-hooks/pre-commit|exact|git
 .claude/settings.json|skills/ralph-init/templates/claude/settings.json|exact|-
 .claude/hooks/|skills/ralph-init/templates/claude/hooks/|hooks|-
-.claude/settings.local.json|skills/ralph-init/templates/claude/settings.local.json|exact|-
-.devcontainer/devcontainer.json|skills/ralph-init/templates/devcontainer/devcontainer.json|exact|devcontainer
+.claude/settings.local.json|skills/ralph-init/templates/claude/settings.local.json|allow|-
+.devcontainer/devcontainer.json|skills/ralph-init/templates/devcontainer/devcontainer.json|runargs|devcontainer
 .devcontainer/init-firewall.sh|skills/ralph-init/templates/devcontainer/init-firewall.sh|exact|devcontainer
 .claude/brainstorm-rules.md|skills/ralph-init/templates/claude/brainstorm-rules.md|above:## Project additions|-
 .devcontainer/container-settings.local.json|skills/ralph-init/templates/devcontainer/container-settings.local.json|exact|devcontainer
@@ -59,6 +65,15 @@ above() {
   awk -v h="$1" '$0 == h { exit } { print }' "$2"
 }
 
+# Succeed when settings file $1 matches template $2 under the allow rule.
+allow_current() {
+  command -v jq >/dev/null 2>&1 || { cmp -s "$1" "$2"; return; }
+  jq -en --slurpfile p "$1" --slurpfile t "$2" '
+    ($p[0] | del(.permissions.allow)) == ($t[0] | del(.permissions.allow))
+    and (($t[0].permissions.allow // []) - ($p[0].permissions.allow // []) == [])
+  ' >/dev/null 2>&1
+}
+
 # Compare project file $1 with template $2 under rule $3; print a drift line.
 compare() {
   local path=$1 tmpl=$2 rule=$3 file=$project/$1
@@ -67,6 +82,10 @@ compare() {
     echo "$path: missing"
   elif [ "$rule" = exact ]; then
     cmp -s "$file" "$tmpl" || echo "$path: outdated"
+  elif [ "$rule" = allow ]; then
+    allow_current "$file" "$tmpl" || echo "$path: outdated"
+  elif [ "$rule" = runargs ]; then
+    cmp -s "$file" <(bash "$here/merge-runargs.sh" "$tmpl" "$file") || echo "$path: outdated"
   else
     local heading=${rule#above:}
     if ! grep -Fxq -- "$heading" "$file" || ! cmp -s <(above "$heading" "$file") <(above "$heading" "$tmpl"); then
