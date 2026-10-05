@@ -146,7 +146,6 @@ backlog/.ralph-heartbeat
 .claude/*
 !.claude/settings.json
 !.claude/task-reviewer-rules.md
-!.claude/task-reviewer-rules.docs.md
 !.claude/brainstorm-rules.md
 !.claude/hooks/
 
@@ -354,14 +353,6 @@ jq --arg p1 "$PPTX1" --arg p2 "$PPTX2" \
 
 Both rules use single-quoted bash strings: there is no `$HOME` to expand, so the literal characters must be preserved verbatim.
 
-### 3.7c Write docs reviewer rules to `.claude/task-reviewer-rules.docs.md` (Documentation / Mixed only)
-
-**Gate:** run this sub-step **only when `project_type ∈ {Documentation, Mixed}`** (Q0 answer B or C). For **Code-only** projects (Q0 answer A), skip entirely — print `[skip] 3.7c docs reviewer rules (Code-only project)` and proceed to Step 3.8. This gate is what keeps Code-only projects free of the docs reviewer rule (Code-only vaults have no `[[…]]` links, so the rule would be noise).
-
-Documentation / Mixed projects keep their canonical `.md` documents in an Obsidian vault (Step 3.9), so wiki-links between them must resolve. Read `rules/task-reviewer-rules.docs.md` → write to `.claude/task-reviewer-rules.docs.md` (create the `.claude/` directory if it does not exist). This is a legacy in-project copy of the shared `R-DOCS-*` rules, kept until ralph-init stops writing it — among them `R-DOCS-1`, whose source of truth is the "Obsidian cross-link convention" section that Step 3.2 appended to `CLAUDE.md` (from `CLAUDE.conventions.docs.md`) — the rule points at that section rather than restating it, so the two never drift.
-
-`.claude/task-reviewer-rules.docs.md` is a **managed** file: its header says it is overwritten on every upgrade, and Upgrade (U2 item 15) rewrites it from the template, so write it unconditionally here as well. Do NOT write the template into `.claude/task-reviewer-rules.md` — that file is project-owned: Init never creates or edits it, and the project adds its own rules there. The `task-reviewer` agent itself does not read this copy: it loads the shared rules straight from the plugin's `rules/task-reviewer-rules.docs.md` (enabled per project by `docs_rules` in `.claude/task-reviewer.conf`, defaulting to the `.obsidian/` check), additively with the user-global and project tiers, so the shared rules and the project's rules stay in separate files and rule updates reach the project with the plugin update.
-
 ### 3.8 `.claude/brainstorm-rules.md`
 Read `templates/claude/brainstorm-rules.md` → write to `.claude/brainstorm-rules.md`. Skip if file already exists (same skip-if-exists policy as other init files in Step 3).
 
@@ -436,7 +427,6 @@ Files created:
   .claude/hooks/             - Hook scripts referenced by settings.json
   .claude/settings.local.json - Claude Code permissions
   .claude/brainstorm-rules.md - Phase 3/4 brainstorm rules (section-aware merge on upgrade)
-  .claude/task-reviewer-rules.docs.md - (if Documentation/Mixed) shared docs task-reviewer rules (managed, overwritten on upgrade)
   .devcontainer/        - (if applicable) Sandboxed execution environment
   .obsidian/            - (if Documentation/Mixed) Obsidian vault configuration
 
@@ -560,10 +550,10 @@ This step fires before any file reads, so a refusal has no side effects.
 
 Detect PRD and brainstorm files created before the `design/` convention (TASK-102) and offer to relocate them.
 
-**This step is silent when no legacy files exist** — print nothing, proceed directly to U2.
+**This step is silent when no legacy files exist** — print nothing, proceed directly to U1.7.
 
 1. Glob for `tasks/prd-*.md` and `tasks/brainstorm-*.md`.
-2. If no matches, skip silently to U2.
+2. If no matches, skip silently to U1.7.
 3. If matches exist, ensure `design/` directory exists (`mkdir -p design`).
 4. For each matched file, extract `<name>` from the filename pattern and propose the move:
 
@@ -580,6 +570,24 @@ Detect PRD and brainstorm files created before the `design/` convention (TASK-10
    - On **N** (default): leave the file alone, print `  skipped (user)`.
 
 5. After processing all files, print a one-line summary: `Legacy migration: <moved> moved, <skipped> skipped.`
+
+---
+
+### U1.7: Legacy Shared Reviewer Rules Copy
+
+Earlier ralph-init versions wrote the shared `R-DOCS-*` rules into Documentation / Mixed projects as `.claude/task-reviewer-rules.docs.md` and overwrote it on every upgrade. The `task-reviewer` agent now reads those rules from the plugin and never this copy, so the file is inert: upgrade no longer writes it, checks it or lists it in the status table. A project that keeps it is unaffected at review time. A copy that is still there may be pristine, an older shipped version or carry local edits, so it is reported and removed only when the operator agrees — never unconditionally.
+
+**This step is silent when the file does not exist** — print nothing, proceed directly to U2.
+
+1. Run `bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-init/scripts/legacy-docs-rules.sh check .`. Exit 0 (no output) means there is no copy — skip silently to U2. Exit 2 is a usage or read error — stop and report it.
+2. On exit 1, print its output line, which says whether the copy matches the rules shipped in the installed plugin or differs from them, then ask:
+   ```
+   .claude/task-reviewer-rules.docs.md is no longer read by the task-reviewer agent. Remove it? [y/N]
+   ```
+   When it differs, show `diff -u` against `${CLAUDE_PLUGIN_ROOT}/skills/ralph-init/rules/task-reviewer-rules.docs.md` before asking, so the owner sees any local edits first — project rules belong in `.claude/task-reviewer-rules.md`.
+3. Pass the answer through verbatim: `bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-init/scripts/legacy-docs-rules.sh retire . '<answer>'`. It removes the file only for `y` / `yes` and keeps it for anything else, the empty answer included. Carry its output into the U5 summary as `.claude/task-reviewer-rules.docs.md  removed (legacy)` or `kept (legacy, user)`.
+
+The removal is an unstaged deletion when the file was committed; the `!.claude/task-reviewer-rules.docs.md` re-include line older versions appended to `.gitignore` stays (`.gitignore` is append-only) and is harmless.
 
 ---
 
@@ -610,8 +618,7 @@ Compare each managed file against its current template by running `bash ${CLAUDE
 12. **`.devcontainer/Dockerfile`** — always **skipped** (assembled from fragments, cannot diff meaningfully). It is still **checked**, not silently passed over: run `bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-init/scripts/stale-runtime-copy.sh check .devcontainer/Dockerfile`. Exit 0 keeps the plain `skipped (assembled)`; exit 1 means the file still copies a foreign interpreter over `/usr/local` — status **skipped (assembled; stale runtime copy)**, and U4 offers the in-place patch. Then, independently, run `bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-init/scripts/floating-uv-copy.sh check .devcontainer/Dockerfile`. Exit 1 means uv is still copied from a floating tag (the pre-TASK-251 `COPY --from=ghcr.io/astral-sh/uv:latest`, not the `ghcr.io/astral-sh/uv:${UV_VERSION}` stage) — status **skipped (assembled; floating uv copy)**, and U4 offers the uv pin patch. This check reads the Dockerfile alone, never `devcontainer.json`'s status, so a project that declined the uv patch on an earlier run is flagged again on every later one. Both conditions can hold; join them uv first — **skipped (assembled; floating uv copy; stale runtime copy)**. The file is never added to the mirror registry: it is patched in place, not re-synced.
 13. **`.gitignore`** — always **skipped** (append-only logic in init flow)
 14. **`.claude/brainstorm-rules.md`** — managed via section-aware merge: pre-heading content is regenerated from `templates/claude/brainstorm-rules.md`; the `## Project additions` heading and everything below it are preserved verbatim. Status is **current** when the pre-heading region matches the template byte-for-byte; **outdated** when it differs; **missing** when the file does not exist (would be created from template).
-15. **`.claude/task-reviewer-rules.docs.md`** — Documentation / Mixed only (detect via an existing `.obsidian/` directory). A managed file: exact content match against `rules/task-reviewer-rules.docs.md`, overwritten from the template on every upgrade. Status is **current** when it matches, **outdated** when it differs, **missing** when absent (every project scaffolded before this file existed), **skipped (Code-only)** when no `.obsidian/` directory is present. The project-owned `.claude/task-reviewer-rules.md` is **never** checked, created or touched by upgrade.
-16. **`.devcontainer/container-settings.local.json`** — exact content match against `templates/devcontainer/container-settings.local.json`. If `.devcontainer/` directory does not exist, status is **skipped**; if the directory exists but the file does not (every project that predates this scheme), status is **missing** and U4 creates it. It must be created whenever `.devcontainer/devcontainer.json` is updated: the new mount binds this file, and a missing bind source makes Docker materialize a directory at the source path, breaking container creation.
+15. **`.devcontainer/container-settings.local.json`** — exact content match against `templates/devcontainer/container-settings.local.json`. If `.devcontainer/` directory does not exist, status is **skipped**; if the directory exists but the file does not (every project that predates this scheme), status is **missing** and U4 creates it. It must be created whenever `.devcontainer/devcontainer.json` is updated: the new mount binds this file, and a missing bind source makes Docker materialize a directory at the source path, breaking container creation.
 
 ---
 
@@ -632,7 +639,6 @@ CLAUDE.md (generic section)                  current
 .claude/hooks/                               current
 .claude/settings.local.json                  current
 .claude/brainstorm-rules.md                  outdated
-.claude/task-reviewer-rules.docs.md          skipped (Code-only)
 .devcontainer/devcontainer.json              skipped (no .devcontainer/)
 .devcontainer/init-firewall.sh               skipped (no .devcontainer/)
 .devcontainer/container-settings.local.json  skipped (no .devcontainer/)
@@ -704,14 +710,14 @@ For each file the user approved:
   3. **If the heading is present:** split the existing file at that line. The heading + everything below is the **user block** (preserved verbatim). Read `templates/claude/brainstorm-rules.md` and take everything **above** the same `## Project additions` heading — this is the **template block**. Write: template block + user block (concatenated, no extra blank lines between them).
   4. **If the heading is absent** (legacy file lacking the convention): one-time migration. Treat the entire existing file as user content. Write: template block (everything above `## Project additions` in the template) + the template's `## Project additions` heading + HTML comment + the existing file content appended verbatim below the heading.
   5. Write the merged result back to `.claude/brainstorm-rules.md`.
-- **`.claude/task-reviewer-rules.docs.md`** (Documentation / Mixed only — detect via an existing `.obsidian/` directory): **overwrite from `rules/task-reviewer-rules.docs.md` on every upgrade** (create it when missing). It is managed by ralph-init, so local edits are not preserved — its header tells the owner that project rules belong in `.claude/task-reviewer-rules.md`. Code-only projects have no `.obsidian/` directory and are skipped.
-- **`.claude/task-reviewer-rules.md`** — project-owned: upgrade **never** creates, edits or overwrites it. One read-only check, Documentation / Mixed only: projects initialized before the managed file existed got `R-DOCS-1..3` copied into this file, so after writing the managed file, print a hint for every `## ` heading of the project file that also appears verbatim in `.claude/task-reviewer-rules.docs.md`:
+- **`.claude/task-reviewer-rules.md`** — project-owned: upgrade **never** creates, edits or overwrites it. One read-only check, Documentation / Mixed only: early projects got `R-DOCS-1..3` copied into this file, so print a hint for every `## ` heading of the project file that also appears verbatim in the shared rules shipped in the plugin:
 
   ```bash
-  if [ -f .claude/task-reviewer-rules.md ] && [ -f .claude/task-reviewer-rules.docs.md ]; then
+  bundle="${CLAUDE_PLUGIN_ROOT}"/skills/ralph-init/rules/task-reviewer-rules.docs.md
+  if [ -f .claude/task-reviewer-rules.md ] && [ -f "$bundle" ]; then
     grep '^## ' .claude/task-reviewer-rules.md | while IFS= read -r heading; do
-      if grep -Fxq -- "$heading" .claude/task-reviewer-rules.docs.md; then
-        printf 'hint: .claude/task-reviewer-rules.md repeats "%s" from the managed .claude/task-reviewer-rules.docs.md; delete the duplicate from the project file\n' "$heading"
+      if grep -Fxq -- "$heading" "$bundle"; then
+        printf 'hint: .claude/task-reviewer-rules.md repeats "%s" from the shared rules shipped in the plugin; delete the duplicate from the project file\n' "$heading"
       fi
     done
   fi
@@ -846,7 +852,6 @@ Ralph upgrade complete!
   .claude/hooks/                    current
   .claude/settings.local.json       current
   .claude/brainstorm-rules.md       updated
-  .claude/task-reviewer-rules.docs.md skipped (Code-only)
   .devcontainer/devcontainer.json   skipped (no .devcontainer/)
   .devcontainer/init-firewall.sh    skipped (no .devcontainer/)
   .devcontainer/Dockerfile          skipped (assembled)

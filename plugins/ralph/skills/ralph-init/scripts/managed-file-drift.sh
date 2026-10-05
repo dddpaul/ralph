@@ -24,7 +24,7 @@
 #               must match .claude/hooks/<name>.sh.
 #
 # Gates skip a row silently: "devcontainer" without a .devcontainer/ directory,
-# "obsidian" without .obsidian/ (Code-only), "git" without a .git/ directory.
+# "git" without a .git/ directory.
 # .devcontainer/Dockerfile (assembled) and .gitignore (append-only) are never
 # compared. Project-owned files — .claude/task-reviewer-rules.md above all —
 # are not in the table and are never read.
@@ -50,7 +50,6 @@ CLAUDE.md|skills/ralph-init/templates/root/CLAUDE.md|above:## Project-Specific|-
 .devcontainer/devcontainer.json|skills/ralph-init/templates/devcontainer/devcontainer.json|exact|devcontainer
 .devcontainer/init-firewall.sh|skills/ralph-init/templates/devcontainer/init-firewall.sh|exact|devcontainer
 .claude/brainstorm-rules.md|skills/ralph-init/templates/claude/brainstorm-rules.md|above:## Project additions|-
-.claude/task-reviewer-rules.docs.md|skills/ralph-init/rules/task-reviewer-rules.docs.md|exact|obsidian
 .devcontainer/container-settings.local.json|skills/ralph-init/templates/devcontainer/container-settings.local.json|exact|devcontainer
 ROWS
 }
@@ -100,7 +99,6 @@ report=$(
     case $gate in
       git) [ -d "$project/.git" ] || continue ;;
       devcontainer) [ -d "$project/.devcontainer" ] || continue ;;
-      obsidian) [ -d "$project/.obsidian" ] || continue ;;
     esac
     if [ "$rule" = hooks ]; then
       for hook in "$root/$tmpl"*-guard.sh "$root/${tmpl}task-validator.sh"; do

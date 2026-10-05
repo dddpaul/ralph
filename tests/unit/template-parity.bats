@@ -448,20 +448,6 @@ EOF
   [ ! -e "$TEMPLATES/claude/task-reviewer-rules.md" ]
 }
 
-@test "R11: the shared docs rules are a plugin bundle, not a template mirror" {
-  # The task-reviewer agent reads the bundle from the installed plugin root at
-  # review time, so it is runtime distribution, which parity cannot cover; its
-  # content, tiers, order, overrides and load errors are tested in
-  # task-reviewer-rules-loading.bats.
-  [ -s "$PROJECT_ROOT/plugins/ralph/skills/ralph-init/rules/task-reviewer-rules.docs.md" ]
-  [ ! -e "$TEMPLATES/claude/task-reviewer-rules.docs.md" ]
-  run grep -F 'task-reviewer-rules.docs.md' <<EOF
-$(registry)
-$(non_mirrored_templates)
-EOF
-  [ "$status" -eq 1 ]
-}
-
 @test "R11: plugin-bundled agents are distributed, not mirrored" {
   [ ! -e "$TEMPLATES/claude/agents" ]
   agents=0

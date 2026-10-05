@@ -1,6 +1,6 @@
 # Task reviewer rules (Documentation projects)
 
-<!-- Managed by ralph-init: this file is overwritten from the plugin template on every ralph-init upgrade. Do not edit it here — project rules belong in .claude/task-reviewer-rules.md, which ralph-init never touches. A project rule that names a rule ID from this file (for example "replaces R-DOCS-3") overrides that rule. -->
+<!-- Shipped with the ralph plugin: the task-reviewer agent reads these rules from the plugin and ralph-init does not copy them into projects; project rules belong in .claude/task-reviewer-rules.md, which ralph-init never touches. A project rule that names a rule ID from this file (for example "replaces R-DOCS-3") overrides that rule. -->
 
 ## R-DOCS-1: Obsidian cross-link convention
 
