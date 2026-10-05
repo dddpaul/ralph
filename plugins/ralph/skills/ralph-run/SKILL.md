@@ -92,9 +92,11 @@ When `tasks` is set, append `--tasks <ids>` to the preflight command.
 
 When `block_end_buffer_min > 0`, append `--block-end-buffer-min <N>` to the preflight command.
 
-If the output starts with `OK`, parse `RALPH_PATH` from the output (format: `OK RALPH_PATH=<path>`) and proceed to Step 4.
+If the output has a line starting with `OK`, parse `RALPH_PATH` from it (format: `OK RALPH_PATH=<path>`) and proceed to Step 4 — `WARNING:` lines may precede it.
 
-If the output starts with `ERROR:`, report the message verbatim to the user and stop.
+If the output has a line starting with `ERROR:`, report the message verbatim to the user and stop.
+
+Preflight also prints one `WARNING: ralph-init managed file behind the installed plugin — <path>: outdated|missing` line on stderr per ralph-init managed file (`ralph.sh`, `CLAUDE.md`'s generic section, git hooks, `.claude/hooks/`, …) whose content differs from the installed plugin's template, from ralph-init's `managed-file-drift.sh`. When the check itself cannot run it prints `WARNING: could not check ralph-init managed files — <reason>` instead. These never abort: relay them to the user once, recommend running the ralph-init upgrade after this run (or, for the second form, report the reason), and proceed to Step 4.
 
 ---
 
