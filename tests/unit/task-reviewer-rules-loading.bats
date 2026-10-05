@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 # task-reviewer rule tiers: the agent loads user-global, the shared docs bundle
 # shipped in the plugin, and project rules additively in that order; ralph-init
-# upgrade hints at project-file headings that duplicate the managed docs file.
+# upgrade hints at project-file headings that duplicate the shipped docs rules.
 #
 # Both snippets are extracted from the shipped files and run as-is against
 # fixtures, so the test follows the documented code rather than a copy of it.
@@ -42,7 +42,9 @@ setup() {
   RAW_LOADER="$WORK/loader.raw.sh"
   extract_snippet "$AGENT" "## Custom Rules Loading" > "$RAW_LOADER"
   HINTER="$WORK/hinter.sh"
-  extract_snippet "$SKILL" '- **`.claude/task-reviewer-rules.md`** — project-owned' > "$HINTER"
+  extract_snippet "$SKILL" '- **`.claude/task-reviewer-rules.md`** — project-owned' > "$WORK/hinter.raw.sh"
+  hinter="$(cat "$WORK/hinter.raw.sh")"
+  printf '%s\n' "${hinter//'${CLAUDE_PLUGIN_ROOT}'/$PLUGIN}" > "$HINTER"
 }
 
 # Model Claude Code's Markdown substitution: replace the literal braced
@@ -104,9 +106,12 @@ run_loader() {
 }
 
 @test "a shared docs copy left in the project is inert" {
+  # An un-upgraded Documentation / Mixed project: vault, legacy copy, no conf.
+  mkdir "$WORK/.obsidian"
   echo "STALE-COPY" > "$WORK/.claude/task-reviewer-rules.docs.md"
-  echo "docs_rules=on" > "$WORK/.claude/task-reviewer.conf"
   run_loader
+  [ "$status" -eq 0 ]
+  [[ "$output" != *ERROR:* ]]
   [[ "$output" == *DOCS-RULE* ]]
   [[ "$output" != *STALE-COPY* ]]
 }
@@ -268,9 +273,12 @@ run_loader() {
   grep -q 'the rule IDs explicitly overridden by a loaded rule' "$AGENT"
 }
 
-@test "upgrade hint names each project heading duplicated in the managed file" {
+@test "upgrade hint names each project heading duplicated in the shipped docs rules" {
   [ -s "$HINTER" ]
-  printf '# T\n\n## R-DOCS-1: A\n\n## R-DOCS-2: B\n' > "$WORK/.claude/task-reviewer-rules.docs.md"
+  grep -qF '"${CLAUDE_PLUGIN_ROOT}"/skills/ralph-init/rules/task-reviewer-rules.docs.md' "$WORK/hinter.raw.sh"
+  printf '# T\n\n## R-DOCS-1: A\n\n## R-DOCS-2: B\n' > "$BUNDLE"
+  # A legacy project copy is not what the hint reads.
+  printf '## R-LOCAL-1: mine\n' > "$WORK/.claude/task-reviewer-rules.docs.md"
   printf '# P\n\n## R-DOCS-1: A\n\n## R-LOCAL-1: mine\n' > "$WORK/.claude/task-reviewer-rules.md"
   run bash -c 'cd "$1" && bash "$2"' _ "$WORK" "$HINTER"
   [ "$status" -eq 0 ]
@@ -279,7 +287,7 @@ run_loader() {
 }
 
 @test "upgrade hint is silent without overlap or without a project file" {
-  printf '## R-DOCS-1: A\n' > "$WORK/.claude/task-reviewer-rules.docs.md"
+  printf '## R-DOCS-1: A\n' > "$BUNDLE"
   run bash -c 'cd "$1" && bash "$2"' _ "$WORK" "$HINTER"
   [ "$status" -eq 0 ]
   [ -z "$output" ]

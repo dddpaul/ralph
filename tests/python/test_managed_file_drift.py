@@ -36,7 +36,6 @@ MANAGED = {
     ".claude/settings.json": TEMPLATES / "claude/settings.json",
     ".claude/settings.local.json": TEMPLATES / "claude/settings.local.json",
     ".claude/brainstorm-rules.md": TEMPLATES / "claude/brainstorm-rules.md",
-    ".claude/task-reviewer-rules.docs.md": SKILL_DIR / "rules/task-reviewer-rules.docs.md",
     ".devcontainer/devcontainer.json": TEMPLATES / "devcontainer/devcontainer.json",
     ".devcontainer/init-firewall.sh": TEMPLATES / "devcontainer/init-firewall.sh",
     ".devcontainer/container-settings.local.json": TEMPLATES
@@ -84,7 +83,6 @@ def test_current_project_is_clean(project: Path) -> None:
         ".claude/hooks/naming-guard.sh",
         ".claude/settings.local.json",
         ".devcontainer/init-firewall.sh",
-        ".claude/task-reviewer-rules.docs.md",
     ],
 )
 def test_modified_managed_file_is_named(project: Path, path: str) -> None:
@@ -137,10 +135,16 @@ def test_project_owned_files_are_never_reported(project: Path) -> None:
     assert (result.returncode, result.stdout) == (0, "")
 
 
+def test_legacy_shared_rules_copy_is_not_managed(project: Path) -> None:
+    (project / ".claude/task-reviewer-rules.docs.md").write_text("# local edit\n")
+    result = run("check", str(project))
+    assert (result.returncode, result.stdout) == (0, "")
+
+
 def test_gated_rows_are_skipped_without_their_directory(tmp_path: Path) -> None:
     project = tmp_path / "code-only"
     for path, template in MANAGED.items():
-        if path.startswith((".git/", ".devcontainer/", ".claude/task-reviewer-rules.docs")):
+        if path.startswith((".git/", ".devcontainer/")):
             continue
         (project / path).parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(template, project / path)
@@ -180,12 +184,13 @@ def u2_section() -> str:
 
 def test_managed_list_matches_upgrade_status_table() -> None:
     entries = re.findall(r"^\d+\. \*\*`([^`]+)`\*\*(.*)$", u2_section(), re.MULTILINE)
-    assert len(entries) >= 16
+    assert len(entries) >= 15
     u2 = [path for path, rest in entries if "always **skipped**" not in rest]
     script = run("list").stdout.splitlines()
     assert len(script) == len(set(script))
     assert set(script) == set(u2)
     assert ".claude/task-reviewer-rules.md" not in script
+    assert ".claude/task-reviewer-rules.docs.md" not in script
 
 
 def test_oracle_matches_the_script_list() -> None:
