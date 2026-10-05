@@ -16,6 +16,17 @@ LENGTH_GUARD="$PROJECT_ROOT/plugins/ralph/skills/ralph-init/templates/claude/hoo
 NFC_NAME=$(python3 -c 'import unicodedata, sys; sys.stdout.write(unicodedata.normalize("NFC", "й.md"))')
 NFD_NAME=$(python3 -c 'import unicodedata, sys; sys.stdout.write(unicodedata.normalize("NFD", "й.md"))')
 
+# Stage a path through git plumbing: no file is ever written to the working
+# tree. The NFC/NFD pair has to exist as two distinct index entries, and a
+# normalization-collapsing volume (macOS APFS) merges two such files into one —
+# so building the fixture on disk is impossible there, while plumbing works
+# everywhere.
+stage_plumbed() {
+  local blob
+  blob=$(printf '%s\n' "$2" | git hash-object -w --stdin)
+  git update-index --add --cacheinfo "100644,$blob,$1"
+}
+
 setup() {
   TEST_DIR="$(make_temp_dir)"
   cd "$TEST_DIR"
@@ -46,12 +57,10 @@ teardown() {
 }
 
 @test "pre-commit: blocks staging NFD form when NFC exists at HEAD" {
-  echo nfc > "$NFC_NAME"
-  git add "$NFC_NAME"
+  stage_plumbed "$NFC_NAME" nfc
   git commit -q -m "add NFC form"
 
-  echo nfd > "$NFD_NAME"
-  git add "$NFD_NAME"
+  stage_plumbed "$NFD_NAME" nfd
 
   run bash "$HOOK"
   [ "$status" -eq 1 ]
@@ -59,12 +68,10 @@ teardown() {
 }
 
 @test "pre-commit: blocks staging NFC form when NFD exists at HEAD" {
-  echo nfd > "$NFD_NAME"
-  git add "$NFD_NAME"
+  stage_plumbed "$NFD_NAME" nfd
   git commit -q -m "add NFD form"
 
-  echo nfc > "$NFC_NAME"
-  git add "$NFC_NAME"
+  stage_plumbed "$NFC_NAME" nfc
 
   run bash "$HOOK"
   [ "$status" -eq 1 ]
@@ -183,17 +190,6 @@ echo "python3: /lib/libm.so.6: version \`GLIBC_2.38' not found" >&2
 exit 1
 STUB
   chmod +x stub/python3
-}
-
-# Stage a path through git plumbing: no file is ever written to the working
-# tree. The NFC/NFD pair has to exist as two distinct index entries, and a
-# normalization-collapsing volume (macOS APFS) merges two such files into one —
-# so building the fixture on disk is impossible there, while plumbing works
-# everywhere.
-stage_plumbed() {
-  local blob
-  blob=$(printf '%s\n' "$2" | git hash-object -w --stdin)
-  git update-index --add --cacheinfo "100644,$blob,$1"
 }
 
 @test "pre-commit: still BLOCKS an NFD duplicate when python3 in PATH cannot start" {
