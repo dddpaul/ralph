@@ -10,6 +10,7 @@ against U2's.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -357,3 +358,158 @@ def test_skill_documents_project_runargs_and_the_merged_overwrite() -> None:
     u2 = u2_section()
     assert "exact content match against `templates/claude/settings.local.json`" not in u2
     assert "merge-runargs.sh" in u2
+
+
+# TASK-275: the accept file records reviewed, deliberate differences by content hash.
+ACCEPT = ".claude/managed-file-drift.accept"
+
+
+def accept(project: Path, path: str) -> str:
+    """Return the accept line the script prints for ``path``, asserting success."""
+    result = run("accept", str(project), path)
+    assert (result.returncode, result.stderr) == (0, "")
+    return result.stdout
+
+
+def edit_above_heading(file: Path) -> None:
+    file.write_text("local deviation above the heading\n" + file.read_text())
+
+
+def test_accepted_difference_is_not_reported(project: Path) -> None:
+    edit_above_heading(project / "CLAUDE.md")
+    with (project / ".git/hooks/post-commit").open("a") as f:
+        f.write("# local nudge\n")
+    assert run("check", str(project)).returncode == 1
+    lines = accept(project, "CLAUDE.md") + accept(project, ".git/hooks/post-commit")
+    (project / ACCEPT).write_text(f"# reviewed\n\n{lines}   \n")
+    result = run("check", str(project))
+    assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
+
+
+def test_accept_line_hashes_the_compared_bytes(project: Path) -> None:
+    file = project / ".claude/hooks/naming-guard.sh"
+    file.write_bytes(b"#!/bin/sh\n")
+    template = hashlib.sha256(MANAGED[".claude/hooks/naming-guard.sh"].read_bytes()).hexdigest()
+    local = hashlib.sha256(b"#!/bin/sh\n").hexdigest()
+    expected = f".claude/hooks/naming-guard.sh template={template} project={local}\n"
+    assert accept(project, ".claude/hooks/naming-guard.sh") == expected
+
+
+def test_template_change_voids_the_acceptance(project: Path, tmp_path: Path) -> None:
+    with (project / "ralph.sh").open("a") as f:
+        f.write("# local edit\n")
+    (project / ACCEPT).write_text(accept(project, "ralph.sh"))
+    plugin = tmp_path / "plugin"
+    shutil.copytree(SKILL_DIR, plugin / "skills/ralph-init")
+    assert run("check", str(project), env={"CLAUDE_PLUGIN_ROOT": str(plugin)}).returncode == 0
+    with (plugin / "skills/ralph-init/templates/root/ralph.sh").open("a") as f:
+        f.write("# newer plugin\n")
+    result = run("check", str(project), env={"CLAUDE_PLUGIN_ROOT": str(plugin)})
+    assert (result.returncode, result.stdout) == (1, "ralph.sh: outdated\n")
+
+
+def test_project_change_voids_the_acceptance(project: Path) -> None:
+    file = project / ".devcontainer/init-firewall.sh"
+    with file.open("a") as f:
+        f.write("# local edit\n")
+    (project / ACCEPT).write_text(accept(project, ".devcontainer/init-firewall.sh"))
+    assert run("check", str(project)).returncode == 0
+    with file.open("a") as f:
+        f.write("# another edit\n")
+    result = run("check", str(project))
+    assert (result.returncode, result.stdout) == (1, ".devcontainer/init-firewall.sh: outdated\n")
+
+
+def test_claude_md_acceptance_covers_only_the_generic_section(project: Path) -> None:
+    file = project / "CLAUDE.md"
+    edit_above_heading(file)
+    (project / ACCEPT).write_text(accept(project, "CLAUDE.md"))
+    with file.open("a") as f:
+        f.write("\nproject-owned addition below the heading\n")
+    assert run("check", str(project)).returncode == 0
+    edit_above_heading(file)
+    result = run("check", str(project))
+    assert (result.returncode, result.stdout) == (1, "CLAUDE.md: outdated\n")
+
+
+@pytest.mark.parametrize(
+    ("path", "reason"),
+    [
+        ("README.md", "not a managed path"),
+        (".claude/task-reviewer-rules.md", "not a managed path"),
+        (".claude/hooks/", "not a managed path"),
+        ("ralph.sh", "nothing to accept"),
+        (".claude/hooks/naming-guard.sh", "nothing to accept"),
+    ],
+)
+def test_accept_refuses_unmanaged_or_current_paths(project: Path, path: str, reason: str) -> None:
+    result = run("accept", str(project), path)
+    assert (result.returncode, result.stdout) == (2, "")
+    assert reason in result.stderr
+
+
+def test_accept_refuses_a_missing_path(project: Path) -> None:
+    (project / "refine.sh").unlink()
+    result = run("accept", str(project), "refine.sh")
+    assert (result.returncode, result.stdout) == (2, "")
+    assert "missing" in result.stderr
+
+
+def test_accept_never_writes_the_accept_file(project: Path) -> None:
+    with (project / "ralph.sh").open("a") as f:
+        f.write("# local edit\n")
+    accept(project, "ralph.sh")
+    assert not (project / ACCEPT).exists()
+    (project / ACCEPT).write_text("# mine\n")
+    accept(project, "ralph.sh")
+    assert (project / ACCEPT).read_text() == "# mine\n"
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        "ralph.sh template=abc project=def",
+        "ralph.sh",
+        f"ralph.sh project={'0' * 64} template={'0' * 64}",
+        f"ralph.sh  template={'0' * 64} project={'0' * 64}",
+        f"ralph.sh template={'0' * 64} project={'0' * 64}\r",
+    ],
+)
+def test_malformed_accept_line_exits_2_naming_file_and_line(project: Path, bad: str) -> None:
+    (project / ACCEPT).write_text(f"# header\n\n{bad}\n")
+    result = run("check", str(project))
+    assert (result.returncode, result.stdout) == (2, "")
+    assert f"{project}/{ACCEPT}:3:" in result.stderr
+
+
+def test_accept_usage_errors_exit_2(project: Path) -> None:
+    for args in (("accept",), ("accept", str(project)), ("accept", str(project), "ralph.sh", "extra")):
+        result = run(*args)
+        assert (result.returncode, result.stdout) == (2, "")
+
+
+def test_this_repo_accepts_its_governance_deviations() -> None:
+    lines = [ln for ln in (REPO_ROOT / ACCEPT).read_text().splitlines() if ln and not ln.startswith("#")]
+    assert sorted(ln.split()[0] for ln in lines) == [".git/hooks/post-commit", "CLAUDE.md"]
+
+
+@pytest.mark.parametrize("hasher", ["shasum", "sha256sum"])
+def test_accept_line_is_the_same_with_either_hasher(project: Path, tmp_path: Path, hasher: str) -> None:
+    if shutil.which(hasher) is None:
+        pytest.skip(f"{hasher} is not installed")
+    edit_above_heading(project / "CLAUDE.md")
+    expected = accept(project, "CLAUDE.md")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    for tool in ("bash", "cat", "cmp", "cut", "grep", "awk", "dirname", "perl", hasher):
+        if found := shutil.which(tool):
+            (bin_dir / tool).symlink_to(found)
+    result = run("accept", str(project), "CLAUDE.md", env={"PATH": str(bin_dir)})
+    assert (result.returncode, result.stdout) == (0, expected)
+
+
+def test_ralph_run_documents_the_accept_file() -> None:
+    text = (PLUGIN_ROOT / "skills/ralph-run/SKILL.md").read_text("utf-8")
+    assert "`<project>/.claude/managed-file-drift.accept`" in text
+    assert "`<path> template=<sha256> project=<sha256>`" in text
+    assert "skills/ralph-init/scripts/managed-file-drift.sh accept . <path>" in text

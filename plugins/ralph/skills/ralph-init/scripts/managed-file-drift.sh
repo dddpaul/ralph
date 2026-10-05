@@ -5,10 +5,15 @@
 #   managed-file-drift.sh check <project-dir>
 #       Prints one "<path>: outdated" or "<path>: missing" line per managed file
 #       whose content differs from the shipped template, or that is absent.
-#       Exit 0 = clean, 1 = drift found.
+#       An "outdated" path accepted in <project-dir>/.claude/managed-file-drift.accept
+#       (see below) is not reported. Exit 0 = clean, 1 = drift found.
+#   managed-file-drift.sh accept <project-dir> <path>
+#       Prints the accept-file line for the current contents of an outdated
+#       managed path. It never writes the accept file; append the line yourself.
 #   managed-file-drift.sh list
 #       Prints the managed paths, one per line, in the Upgrade U2 order.
-#   Exit 2 = usage error, unreadable project directory or template tree.
+#   Exit 2 = usage error, unreadable project directory or template tree,
+#   malformed accept-file line, or an accept path that is unmanaged or not outdated.
 #
 # The comparison is content only — a project records no ralph-init version, and
 # a stamp would claim what a diff shows. Templates come from
@@ -34,10 +39,19 @@
 # .devcontainer/Dockerfile (assembled) and .gitignore (append-only) are never
 # compared. Project-owned files — .claude/task-reviewer-rules.md above all —
 # are not in the table and are never read.
+#
+# The accept file records reviewed, deliberate differences, one line per path:
+#
+#   <path> template=<sha256> project=<sha256>
+#
+# Blank lines and "#" comments are allowed. Each hash covers exactly the bytes
+# the path's rule compares — the whole file, except the lines above <h> for
+# above:<h> — so the acceptance lapses, and the path is reported again, as soon
+# as either side changes. A missing path is always reported.
 set -euo pipefail
 
 usage() {
-  echo "usage: managed-file-drift.sh check <project-dir> | list" >&2
+  echo "usage: managed-file-drift.sh check <project-dir> | accept <project-dir> <path> | list" >&2
   exit 2
 }
 
@@ -74,24 +88,98 @@ allow_current() {
   ' >/dev/null 2>&1
 }
 
-# Compare project file $1 with template $2 under rule $3; print a drift line.
-compare() {
+# Print "missing" or "outdated" when project file $1 differs from template $2
+# under rule $3; print nothing when it is current.
+state() {
   local path=$1 tmpl=$2 rule=$3 file=$project/$1
   [ -r "$tmpl" ] || { echo "managed-file-drift: cannot read $tmpl" >&2; exit 2; }
   if [ ! -e "$file" ]; then
-    echo "$path: missing"
+    echo missing
   elif [ "$rule" = exact ]; then
-    cmp -s "$file" "$tmpl" || echo "$path: outdated"
+    cmp -s "$file" "$tmpl" || echo outdated
   elif [ "$rule" = allow ]; then
-    allow_current "$file" "$tmpl" || echo "$path: outdated"
+    allow_current "$file" "$tmpl" || echo outdated
   elif [ "$rule" = runargs ]; then
-    cmp -s "$file" <(bash "$here/merge-runargs.sh" "$tmpl" "$file") || echo "$path: outdated"
+    cmp -s "$file" <(bash "$here/merge-runargs.sh" "$tmpl" "$file") || echo outdated
   else
     local heading=${rule#above:}
     if ! grep -Fxq -- "$heading" "$file" || ! cmp -s <(above "$heading" "$file") <(above "$heading" "$tmpl"); then
-      echo "$path: outdated"
+      echo outdated
     fi
   fi
+}
+
+# SHA-256 of stdin, hex only: shasum on macOS, sha256sum on GNU systems.
+sha256() {
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 | cut -d' ' -f1
+  elif command -v sha256sum >/dev/null 2>&1; then
+    sha256sum | cut -d' ' -f1
+  else
+    echo "managed-file-drift: neither shasum nor sha256sum is on PATH" >&2
+    exit 2
+  fi
+}
+
+# Hash the bytes of file $1 that rule $2 compares.
+digest() {
+  case $2 in
+    (above:*) above "${2#above:}" "$1" | sha256 ;;
+    (*) sha256 <"$1" ;;
+  esac
+}
+
+# Print the accept-file line for project path $1, template $2 and rule $3.
+accept_line() {
+  local t p
+  t=$(digest "$2" "$3") || exit 2
+  p=$(digest "$project/$1" "$3") || exit 2
+  echo "$1 template=$t project=$p"
+}
+
+# Print a drift line for project path $1 unless it is current or accepted.
+compare() {
+  local s line
+  s=$(state "$@") || exit 2
+  [ -n "$s" ] || return 0
+  if [ "$s" = outdated ] && [ -n "$accepted" ]; then
+    line=$(accept_line "$@") || exit 2
+    printf '%s\n' "$accepted" | grep -Fxq -- "$line" && return 0
+  fi
+  echo "$1: $s"
+}
+
+# Print the accept file's entries; exit 2 naming the first malformed line.
+load_accepted() {
+  local file=$project/.claude/managed-file-drift.accept line n=0
+  [ -e "$file" ] || return 0
+  [ -r "$file" ] || { echo "managed-file-drift: cannot read $file" >&2; exit 2; }
+  while IFS= read -r line || [ -n "$line" ]; do
+    n=$((n + 1))
+    case $line in (*[![:space:]]*) ;; (*) continue ;; esac
+    case ${line#"${line%%[![:space:]]*}"} in ('#'*) continue ;; esac
+    if ! printf '%s\n' "$line" | grep -Eq '^[^[:space:]]+ template=[0-9a-f]{64} project=[0-9a-f]{64}$'; then
+      echo "managed-file-drift: $file:$n: malformed line, want '<path> template=<sha256> project=<sha256>'" >&2
+      exit 2
+    fi
+    printf '%s\n' "$line"
+  done <"$file"
+}
+
+# Print "<template>|<rule>" for managed project path $1; fail when unmanaged.
+lookup() {
+  local path tmpl rule gate hook
+  while IFS='|' read -r path tmpl rule gate; do
+    if [ "$rule" = hooks ]; then
+      for hook in "$root/$tmpl"*-guard.sh "$root/${tmpl}task-validator.sh"; do
+        [ "$1" = "$path${hook##*/}" ] && { echo "$hook|exact"; return 0; }
+      done
+    elif [ "$1" = "$path" ]; then
+      echo "$root/$tmpl|$rule"
+      return 0
+    fi
+  done < <(table)
+  return 1
 }
 
 [ $# -ge 1 ] || usage
@@ -102,6 +190,7 @@ case $1 in
     exit 0
     ;;
   check) [ $# -eq 2 ] || usage ;;
+  accept) [ $# -eq 3 ] || usage ;;
   *) usage ;;
 esac
 project=${2%/}
@@ -113,6 +202,19 @@ root=${CLAUDE_PLUGIN_ROOT:-$here/../../..}
   exit 2
 }
 
+if [ "$1" = accept ]; then
+  found=$(lookup "$3") || { echo "managed-file-drift: $3 is not a managed path" >&2; exit 2; }
+  tmpl=${found%|*} rule=${found##*|}
+  s=$(state "$3" "$tmpl" "$rule") || exit 2
+  case $s in
+    (outdated) accept_line "$3" "$tmpl" "$rule" ;;
+    (missing) echo "managed-file-drift: $3 is missing; only an outdated file can be accepted" >&2; exit 2 ;;
+    (*) echo "managed-file-drift: $3 matches the template; there is nothing to accept" >&2; exit 2 ;;
+  esac
+  exit 0
+fi
+
+accepted=$(load_accepted) || exit 2
 report=$(
   table | while IFS='|' read -r path tmpl rule gate; do
     case $gate in
