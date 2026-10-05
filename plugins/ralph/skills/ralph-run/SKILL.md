@@ -98,6 +98,8 @@ If the output has a line starting with `ERROR:`, report the message verbatim to 
 
 Preflight also prints one `WARNING: ralph-init managed file behind the installed plugin — <path>: outdated|missing` line on stderr per ralph-init managed file (`ralph.sh`, `CLAUDE.md`'s generic section, git hooks, `.claude/hooks/`, …) whose content differs from the installed plugin's template, from ralph-init's `managed-file-drift.sh`. When the check itself cannot run it prints `WARNING: could not check ralph-init managed files — <reason>` instead. These never abort: relay them to the user once, recommend running the ralph-init upgrade after this run (or, for the second form, report the reason), and proceed to Step 4.
 
+A deliberate, reviewed difference can be accepted so it stops warning: list it in `<project>/.claude/managed-file-drift.accept`, one `<path> template=<sha256> project=<sha256>` line per path (blank lines and `#` comments allowed). Get the line from `bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-init/scripts/managed-file-drift.sh accept . <path>` and append it yourself — the subcommand only prints it, and exits 2 for a path that is unmanaged, missing or already current. Each hash covers exactly what the check compares (for `CLAUDE.md`, only the lines above `## Project-Specific`), so the warning returns as soon as either the template or the project file changes — notably after a plugin release that touches the template. A malformed line turns into the `could not check` warning naming the file and line number. A project that ignores `.claude/*` needs a `!.claude/managed-file-drift.accept` line in `.gitignore` to commit the file.
+
 ---
 
 ## Step 4: Launch
