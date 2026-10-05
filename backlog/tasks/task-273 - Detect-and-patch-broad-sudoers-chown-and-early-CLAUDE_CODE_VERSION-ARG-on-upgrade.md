@@ -3,10 +3,10 @@ id: TASK-273
 title: >-
   Detect and patch the broad sudoers chown and the early CLAUDE_CODE_VERSION ARG
   in assembled Dockerfiles on upgrade
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-05 18:16'
-updated_date: '2026-10-05 18:34'
+updated_date: '2026-10-05 18:38'
 labels: []
 dependencies: []
 priority: medium
@@ -77,8 +77,8 @@ git show 39adcb5:plugins/ralph/skills/ralph-init/templates/devcontainer/Dockerfi
 - [x] #5 The pre-TASK-271 template (git show 39adcb5:…/Dockerfile.base) with both patches applied passes placement_problems() from test_devcontainer_claude_code_pin.py and the grant checks of test_devcontainer_sudoers.py — verified by a test
 - [x] #6 plugins/ralph/skills/ralph-init/SKILL.md Upgrade Mode runs both checks in U2 row 12, offers each patch confirm-only in U4 (early-ARG offer skipped when the version-pin patch already placed the ARG), and documents the U5 labels in the order version pin, claude arg, uv pin, runtime copy, sudoers
 - [x] #7 The U5 summary text tells the user to rebuild the image when either patch was written, and states that moving the ARG costs one full rebuild after which a bump rebuilds only the tail
-- [ ] #8 On the macOS host, both new pytest files and tests/python/test_bash32_syntax.py pass with /bin/bash 3.2 and /usr/bin sed, grep and awk first on PATH; the output is recorded in the task notes
-- [ ] #9 On the macOS host, the 39adcb5 template assembled as the node flavour and patched by both scripts builds with docker buildx, and docker run --rm --user node <image> sudo -n -l lists exactly init-firewall.sh and /bin/chown node\:node /workspace/.venv; the output is recorded in the task notes
+- [x] #8 On the macOS host, both new pytest files and tests/python/test_bash32_syntax.py pass with /bin/bash 3.2 and /usr/bin sed, grep and awk first on PATH; the output is recorded in the task notes
+- [x] #9 On the macOS host, the 39adcb5 template assembled as the node flavour and patched by both scripts builds with docker buildx, and docker run --rm --user node <image> sudo -n -l lists exactly init-firewall.sh and /bin/chown node\:node /workspace/.venv; the output is recorded in the task notes
 - [x] #10 uv run ruff check . is clean, uv run pytest passes and LC_ALL=C node_modules/.bin/bats tests/unit passes
 <!-- AC:END -->
 
@@ -94,4 +94,8 @@ Commit: `3c2929f` - task-273: list every patch-by-hand reason of the sudoers pat
 Review: ralph:task-reviewer APPROVED (score 8), 0 blocking. Minor 2 fixed (SKILL.md now lists all exit-3 reasons of the sudoers patch). Minor 1 kept on purpose: a postCreateCommand that is not a one-line string (e.g. array form) exits 3 even without sudo — conservative, and U4 runs the patch after devcontainer.json is rewritten to the template's string form. Gates in container: uv run ruff check . clean; uv run pytest 870 passed, 3 skipped; bats tests/unit 154 tests, only #140 (settings.local.json shape) fails, caused by this checkout's local .claude/settings.local.json — reviewer confirmed 0 failures in a clean worktree at HEAD and on master.
 
 Not marked Done and not merged: AC #8 and #9 need the macOS host (no BSD userland, /bin/bash 3.2 or docker in the container). Host steps: (8) PATH=/usr/bin:/bin:$PATH BASH32_SYNTAX_SHELL=/bin/bash uv run pytest tests/python/test_upgrade_broad_sudoers_chown.py tests/python/test_upgrade_early_claude_arg.py tests/python/test_bash32_syntax.py (confirm 'bash' resolves to /bin/bash 3.2 and awk/sed/grep to /usr/bin); (9) git show 39adcb5:plugins/ralph/skills/ralph-init/templates/devcontainer/Dockerfile.base, replace {{LANGUAGE_STAGE}}/{{LANGUAGE_INSTALL}} with lang/Dockerfile.lang.node / Dockerfile.install.node, run early-claude-arg.sh patch then broad-sudoers-chown.sh patch <file> templates/devcontainer/devcontainer.json, build with docker buildx (--build-arg CLAUDE_CODE_VERSION=<pin> UV_VERSION=<pin> TZ=UTC, context with init-firewall.sh), then docker run --rm --user node <image> sudo -n -l must list exactly /usr/local/bin/init-firewall.sh and /bin/chown node\:node /workspace/.venv. Record both outputs here, check AC #8/#9, then Done + Merge step 6 (bump-version.sh --auto will bump: shipped plugins/ralph files changed).
+
+AC #8 host (macOS): PATH=/usr/bin:/bin:$PATH puts bash=/bin/bash 3.2.57(1)-release, sed/grep/awk=/usr/bin (BSD grep 2.6.0-FreeBSD) first. uv run pytest -v tests/python/test_upgrade_broad_sudoers_chown.py tests/python/test_upgrade_early_claude_arg.py tests/python/test_bash32_syntax.py: 48 passed, 2 skipped (both test_detector_runs_under_mawk — mawk not installed on the host; they ran in the container). test_bash32_syntax scans every git-tracked *.sh, including both new scripts; /bin/bash -n on each also passes. AC #9 host (Docker): git show 39adcb5 of Dockerfile.base + lang/Dockerfile.lang.node + lang/Dockerfile.install.node + init-firewall.sh, assembled as ralph-init does. On that old file early-claude-arg.sh check -> exit 1 ('line 33: ARG CLAUDE_CODE_VERSION is declared 5 RUN step(s) above the npm RUN on line 110') and broad-sudoers-chown.sh check -> exit 1 ('line 135: sudoers grant to node allows /bin/chown with any arguments'). early-claude-arg.sh patch (exit 0) then broad-sudoers-chown.sh patch <file> templates/devcontainer/devcontainer.json (exit 0); both checks then exit 0; the diff only moves the ARG + its comment paragraph before the LABEL and narrows the grant + appends visudo -cf. docker buildx build --build-arg CLAUDE_CODE_VERSION=2.1.283 --build-arg UV_VERSION=0.12.19 --build-arg TZ=UTC: exit 0 (11 steps CACHED from the identical TASK-272 node build, including the sudoers step, whose visudo printed '/etc/sudoers.d/node-firewall: parsed OK' there). docker run --rm --user node <image> sudo -n -l: 'User node may run the following commands: (root) NOPASSWD: /usr/local/bin/init-firewall.sh, /bin/chown node\:node /workspace/.venv'; sudo -n chown node:node /workspace/.venv exit 0, sudo -n chown node /usr/local/bin/init-firewall.sh exit 1 ('a password is required'). Cosmetic, outside the AC: the patched old file keeps its pre-TASK-272 npm-step comment ('Bumping CLAUDE_CODE_VERSION changes this layer's cache key...') directly above the moved comment paragraph. Host gates: uv run ruff check . clean; uv run pytest 869 passed, 4 skipped; LC_ALL=C node_modules/.bin/bats tests/unit 154 ok, 0 not ok.
+
+Commit: `8cb875d` - task-273: bump plugin version to 0.14.0 (minor)
 <!-- SECTION:NOTES:END -->
