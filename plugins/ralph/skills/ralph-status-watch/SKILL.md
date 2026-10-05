@@ -53,7 +53,7 @@ Extract from the JSON (using grep/pattern matching, no jq):
 
 Convert `iteration_started_at` to epoch for comparison:
 ```bash
-date -d "<iteration_started_at>" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "<iteration_started_at>" +%s 2>/dev/null
+date -d "<iteration_started_at>" +%s 2>/dev/null || date -j -u -f "%Y-%m-%dT%H:%M:%SZ" "<iteration_started_at>" +%s 2>/dev/null
 ```
 
 ---
