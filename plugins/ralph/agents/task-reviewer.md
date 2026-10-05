@@ -16,7 +16,7 @@ Before reviewing, load optional custom review rules. Rules come in three tiers, 
 2. **shared docs** — the `R-DOCS-*` rules bundle shipped inside this plugin at `skills/ralph-init/rules/task-reviewer-rules.docs.md`. It is read from the plugin root this agent was loaded from, so the agent and the rules always come from the same plugin version; a copy of the rules inside a project is never read.
 3. **project** — `.claude/task-reviewer-rules.md` at the project root: rules owned by this project. ralph-init never writes it. Loaded when it exists and is non-empty.
 
-**Whether the shared docs rules apply** is an explicit project setting: a line `docs_rules=on` or `docs_rules=off` in `.claude/task-reviewer.conf` at the project root (the last such line wins). When the setting is unset — no file, or no `docs_rules` line — the rules apply if and only if the project root has an `.obsidian/` vault directory, which is how Documentation / Mixed projects were recognised before the setting existed. Any other value is a load error.
+**Whether the shared docs rules apply** is an explicit project setting: a line `docs_rules=on` or `docs_rules=off` in `.claude/task-reviewer.conf` at the project root (the last `docs_rules` line wins). When the setting is unset — no file, or no `docs_rules` line — the rules apply if and only if the project root has an `.obsidian/` vault directory, which is how Documentation / Mixed projects were recognised before the setting existed. Any other value — a trailing comment, an empty value, anything but `on` or `off` — is a load error, never a silent fallback to the vault check.
 
 The paths in the snippet below are written with Claude Code's plugin-root and project-root references, which Claude Code replaces with absolute paths when it loads this file, so the snippet you run already carries absolute paths and works from any working directory. Those references are not shell environment variables — run the snippet exactly as shown and do not look them up in the environment. If the project root did not resolve, the loader reports a load error instead of silently skipping the project tier.
 
@@ -44,15 +44,18 @@ if [ -n "$PROJECT_DIR" ] && [ -d "$PROJECT_DIR" ]; then printf 'project root: %s
 else printf 'project root: ERROR: unresolved (%s)\n' "$PROJECT_RULES"; fi
 optional_tier user-global "$HOME/.claude/task-reviewer-rules.md"
 DOCS_RULES=""
-if [ -f "$PROJECT_CONF" ]; then
-  DOCS_RULES=$(sed -n 's/^[[:space:]]*docs_rules[[:space:]]*=[[:space:]]*\([^[:space:]]*\)[[:space:]]*$/\1/p' "$PROJECT_CONF" | tail -n 1)
+DOCS_SET=""
+if [ -f "$PROJECT_CONF" ] && grep -q '^[[:space:]]*docs_rules[[:space:]]*=' "$PROJECT_CONF"; then
+  DOCS_SET=1
+  DOCS_RULES=$(sed -n 's/^[[:space:]]*docs_rules[[:space:]]*=[[:space:]]*//p' "$PROJECT_CONF" | tail -n 1 | sed 's/[[:space:]]*$//')
 fi
-case "$DOCS_RULES" in
-  on) DOCS_GATE="docs_rules=on" ;;
-  off) DOCS_GATE="" DOCS_REASON="docs_rules=off in $PROJECT_CONF" ;;
-  "") if [ -d "$PROJECT_VAULT" ]; then DOCS_GATE="docs_rules unset, $PROJECT_VAULT exists"
-      else DOCS_GATE="" DOCS_REASON="docs_rules unset, no $PROJECT_VAULT"; fi ;;
-  *) DOCS_GATE="" DOCS_REASON="" ;;
+DOCS_GATE="" DOCS_REASON=""
+case "$DOCS_SET:$DOCS_RULES" in
+  1:on) DOCS_GATE="docs_rules=on" ;;
+  1:off) DOCS_REASON="docs_rules=off in $PROJECT_CONF" ;;
+  1:*) ;;
+  *) if [ -d "$PROJECT_VAULT" ]; then DOCS_GATE="docs_rules unset, $PROJECT_VAULT exists"
+     else DOCS_REASON="docs_rules unset, no $PROJECT_VAULT"; fi ;;
 esac
 if [ -n "$DOCS_GATE" ]; then
   if [ -s "$DOCS_BUNDLE" ]; then load_tier "shared docs" "$DOCS_BUNDLE"

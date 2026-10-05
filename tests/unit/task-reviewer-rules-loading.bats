@@ -136,6 +136,18 @@ run_loader() {
   [[ "$output" == *DOCS-RULE* ]]
 }
 
+@test "a docs_rules line with a trailing comment or an empty value is a load error, not a fallback" {
+  mkdir "$WORK/.obsidian"
+  echo "docs_rules=off # pinned" > "$WORK/.claude/task-reviewer.conf"
+  run_loader
+  [[ "$output" == *'tier shared docs: ERROR: invalid docs_rules value "off # pinned"'* ]]
+  [[ "$output" != *DOCS-RULE* ]]
+  echo "docs_rules=" > "$WORK/.claude/task-reviewer.conf"
+  run_loader
+  [[ "$output" == *'tier shared docs: ERROR: invalid docs_rules value ""'* ]]
+  [[ "$output" != *DOCS-RULE* ]]
+}
+
 @test "agent documents the docs_rules setting and its unset default" {
   grep -q 'a line `docs_rules=on` or `docs_rules=off` in `.claude/task-reviewer.conf`' "$AGENT"
   grep -q 'When the setting is unset' "$AGENT"
