@@ -6,7 +6,9 @@ value misses the cache for every ``RUN`` after its declaration, so the early
 ``ARG`` rebuilt the whole image on every Claude Code bump. ``ralph upgrade``
 never re-assembles ``.devcontainer/Dockerfile``, so older projects keep the
 early ``ARG``. ``scripts/early-claude-arg.sh`` finds it (``check``) and prints
-the file with the ``ARG`` moved (``patch``); SKILL.md writes it only on a yes.
+the file with the ``ARG`` moved (``patch``), refreshing the pre-TASK-272 Claude
+block comment from the shipped template (TASK-274); SKILL.md writes it only on
+a yes.
 
 The detector is run against ``placement_problems()`` from
 test_devcontainer_claude_code_pin.py, and the pre-TASK-271 template is put
@@ -217,6 +219,9 @@ def test_detector_runs_under_mawk(tmp_path: Path) -> None:
         0,
         BASE.replace(ARG + LABEL, OLD_COMMENT + ARG + LABEL, 1),
     )
+    refreshed = run("patch", write(tmp_path, assemble_node(pre_271_template())), env)
+    assert refreshed.returncode == 0, refreshed.stderr
+    assert claude_block(refreshed.stdout) == claude_block(BASE)
 
 
 def pre_271_template() -> str:
@@ -288,3 +293,81 @@ def test_skill_md_tells_the_user_to_rebuild() -> None:
     summary = upgrade[upgrade.index("### U5: Summary") :]
     assert "/ralph-run rebuild=true" in summary
     assert "first rebuild redoes every step once" in summary
+
+
+# The pre-TASK-272 comment under "# ---- Claude ----", verbatim (TASK-274).
+OLD_NPM_COMMENT = (
+    "# Bumping CLAUDE_CODE_VERSION changes this layer's cache key, so the next\n"
+    "# build reinstalls; the label lets `docker image inspect` report the version.\n"
+)
+HEADER = "# ---- Claude ----\n"
+
+
+def claude_block(text: str) -> str:
+    """From the Claude header through the line ending the npm RUN."""
+    start = text.index(HEADER)
+    end = text.index("\n", text.index("claude --version", start)) + 1
+    return text[start:end]
+
+
+def test_patch_refreshes_the_pre_272_claude_comment(tmp_path: Path) -> None:
+    old = assemble_node(pre_271_template())
+    assert claude_block(old).startswith(HEADER + OLD_NPM_COMMENT + LABEL)
+    out = run("patch", write(tmp_path, old))
+    assert out.returncode == 0, out.stderr
+    assert claude_block(out.stdout) == claude_block(BASE)
+    assert OLD_NPM_COMMENT not in out.stdout and OLD_COMMENT not in out.stdout
+
+
+@pytest.mark.parametrize(
+    ("old_npm", "old_arg"),
+    [
+        ("# project note\n", OLD_COMMENT),
+        (OLD_NPM_COMMENT, OLD_COMMENT.replace("refuses one.", "refuses it.")),
+        (OLD_NPM_COMMENT + "# project note\n", OLD_COMMENT),
+        ("# project note\n" + OLD_NPM_COMMENT, OLD_COMMENT),
+    ],
+    ids=("other-npm-comment", "other-arg-comment", "note-after", "note-before"),
+)
+def test_patch_keeps_any_other_claude_comment(
+    tmp_path: Path, old_npm: str, old_arg: str
+) -> None:
+    old = (
+        assemble_node(pre_271_template())
+        .replace(HEADER + OLD_NPM_COMMENT, HEADER + old_npm, 1)
+        .replace(OLD_COMMENT + ARG, old_arg + ARG, 1)
+    )
+    out = run("patch", write(tmp_path, old))
+    assert out.returncode == 0, out.stderr
+    assert claude_block(out.stdout).startswith(HEADER + old_npm + old_arg + ARG + LABEL)
+    assert placement(out.stdout) == []
+
+
+def test_check_ignores_an_old_comment_over_a_placed_arg(tmp_path: Path) -> None:
+    current = claude_block(BASE)
+    comment = current[len(HEADER) : current.index(ARG)]
+    old = BASE.replace(HEADER + comment, HEADER + OLD_NPM_COMMENT + OLD_COMMENT, 1)
+    assert old != BASE
+    out = run("check", write(tmp_path, old))
+    assert (out.returncode, out.stdout) == (0, ""), out.stderr
+
+
+def test_patch_needs_the_shipped_template(tmp_path: Path) -> None:
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    lone = scripts / SCRIPT.name
+    shutil.copy(SCRIPT, lone)
+    path = write(tmp_path, assemble_node(pre_271_template()))
+    out = run("patch", path, script=lone)
+    assert (out.returncode, out.stdout) == (2, ""), out.stderr
+    assert "Dockerfile.base" in out.stderr
+    # A comment patch leaves untouched still moves the ARG without the template.
+    moved = run("patch", write(tmp_path, early(BASE), "Dockerfile.early"), script=lone)
+    assert moved.returncode == 0, moved.stderr
+
+
+def test_skill_md_says_the_patch_refreshes_the_old_comment() -> None:
+    assert (
+        "The patch also refreshes the Claude block comment when it is the old text"
+        in _upgrade_section()
+    )

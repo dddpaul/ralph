@@ -23,6 +23,12 @@
 # LABEL). It refuses (exit 3) an ARG with a default — the pre-pin layout the
 # upgrade's version-pin patch rewrites — an ARG declared more than once in the
 # final stage, a missing npm RUN, and a RUN between the LABEL and the npm RUN.
+#
+# When the comment lines between "# ---- Claude ----" and the moved ARG would
+# be exactly the two pre-TASK-272 paragraphs (the npm-step one, then the moved
+# "No default on purpose" one), patch prints the comment block of the shipped
+# Dockerfile.base in their place, read at run time before anything is printed.
+# Any other comment there is kept as it is.
 set -euo pipefail
 
 usage() {
@@ -34,6 +40,8 @@ mode=$1
 file=$2
 case $mode in check | patch) ;; *) usage ;; esac
 [ -r "$file" ] || { echo "early-claude-arg: cannot read $file" >&2; exit 2; }
+here=$(cd "$(dirname "$0")" && pwd)
+base=$here/../templates/devcontainer/Dockerfile.base
 
 # shellcheck disable=SC2016  # $-fields belong to awk, not the shell
 prog='
@@ -41,6 +49,35 @@ function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t\r]+$/, "", s); return s }
 function blank(s) { return s ~ /^[ \t\r]*$/ }
 function keyword(i,   w) { w = trim(IT[i]); sub(/[ \t].*$/, "", w); return toupper(w) }
 function by_hand(why) { print "early-claude-arg: " why "; patch by hand" > "/dev/stderr"; exit 3 }
+function bare(s) { sub(/\r$/, "", s); return s }
+# The comment lines of the shipped template between the Claude header and the ARG.
+function template_comment(   line, out, on, rc) {
+  out = ""; on = 0
+  while ((rc = (getline line < base)) > 0) {
+    if (line == HEADER) { on = 1; continue }
+    if (!on) continue
+    if (line ~ /^ARG CLAUDE_CODE_VERSION$/) { close(base); if (out != "") return out; break }
+    if (line !~ /^#/) break
+    out = out line "\n"
+  }
+  close(base)
+  print "early-claude-arg: cannot read the Claude block comment from " base > "/dev/stderr"; exit 2
+}
+# 1 when lines s..e are exactly the newline-joined text t.
+function lines_are(s, e, t,   k, x) {
+  x = ""
+  for (k = s; k <= e; k++) x = x bare(L[k]) "\n"
+  return s >= 1 && x == t
+}
+BEGIN {
+  HEADER = "# ---- Claude ----"
+  OLD_NPM = "# Bumping CLAUDE_CODE_VERSION changes this layer'"'"'s cache key, so the next\n" \
+    "# build reinstalls; the label lets `docker image inspect` report the version.\n"
+  OLD_ARG = "# No default on purpose: the version comes from devcontainer.json build.args,\n" \
+    "# a concrete X.Y.Z. A floating tag like `latest` is resolved once and then\n" \
+    "# frozen in the layer cache, so the image silently ages; the npm step below\n" \
+    "# refuses one.\n"
+}
 {
   L[NR] = $0
   line = $0; sub(/\r$/, "", line)
@@ -87,11 +124,20 @@ END {
   # Drop one of the two blank lines the removal would leave next to each other.
   drop = ((bs == 1 || blank(L[bs - 1])) && be < NR && blank(L[be + 1])) ? be + 1 : 0
   at = IS[target]
+  # The two pre-TASK-272 paragraphs would meet under the Claude header: print
+  # the template comment instead of both (cs..at-1 and bs..be-1).
+  cs = at - 2; fresh = ""
+  if (bare(L[cs - 1]) == HEADER && lines_are(cs, at - 1, OLD_NPM) && lines_are(bs, be - 1, OLD_ARG))
+    fresh = template_comment()
+  else cs = at
   for (i = 1; i <= NR; i++) {
-    if (i == at) for (k = bs; k <= be; k++) print L[k]
-    if ((i >= bs && i <= be) || i == drop) continue
+    if (i == at) {
+      if (fresh != "") printf "%s%s\n", fresh, L[be]
+      else for (k = bs; k <= be; k++) print L[k]
+    }
+    if ((i >= bs && i <= be) || i == drop || (i >= cs && i < at)) continue
     print L[i]
   }
 }
 '
-exec awk -v mode="$mode" "$prog" "$file"
+exec awk -v mode="$mode" -v base="$base" "$prog" "$file"
