@@ -2,61 +2,11 @@
 
 These rules SUPPLEMENT the standard 8-item checklist in the task-reviewer agent (`plugins/ralph/agents/task-reviewer.md` or `~/.claude/agents/task-reviewer.md`). They do not replace it. Apply both. All rules use strict prohibitive language: violations are review failures, not suggestions.
 
-The review-conduct rules that used to be R1, R2, R9, R13, R14, R16 and R17 now ship as built-in rules in the agent itself, so they apply in every project — in `plugins/ralph/agents/task-reviewer.md`: R1 and R9 → `R-CORE-1`, R2 → `R-CORE-2`, R13 → `R-CORE-3`, R14 → `R-CORE-4`, R16 → `R-CORE-5`, R17 → `R-CORE-6`. Their numbers are retired, not reused: the remaining rules keep their IDs, because task notes and docs cite them.
+The review-conduct rules that used to be R1, R2, R9, R13, R14, R16 and R17 now ship as built-in rules in the agent itself, so they apply in every project — in `plugins/ralph/agents/task-reviewer.md`: R1 and R9 → `R-CORE-1`, R2 → `R-CORE-2`, R13 → `R-CORE-3`, R14 → `R-CORE-4`, R16 → `R-CORE-5`, R17 → `R-CORE-6`. The infrastructure rules that used to be R3, R4, R5, R6, R8, R10 and R15 cover files ralph-init installs in every project, so they now ship as the plugin's shared infra bundle — `plugins/ralph/skills/ralph-init/rules/task-reviewer-rules.infra.md`, which the agent loads here because this repository has `ralph.sh` at its root: R3 → `R-INFRA-1`, R4 → `R-INFRA-2`, R5 → `R-INFRA-3`, R6 → `R-INFRA-4`, R8 → `R-INFRA-5`, R10 → `R-INFRA-6`, R15 → `R-INFRA-7`.
+
+Their numbers are retired, not reused: the remaining rules keep their IDs, because task notes and docs cite them.
 
 ---
-
-## R3 — Agent files require valid YAML frontmatter
-
-Any change that creates or modifies a file under `agents/` (top-level), `.claude/agents/` (project-local), or `~/.claude/agents/` (user-global) MUST include valid YAML frontmatter at the top of the file with at least:
-
-```yaml
----
-name: <filename-stem>      # MUST match the filename without .md
-description: <one-line>    # used by Claude Code to route subagent_type
----
-```
-
-Without frontmatter, `subagent_type=<name>` is never registered in the Agent enum and any caller silently falls back to `general-purpose`. The reviewer MUST reject any agent file lacking frontmatter, even if the rest of the prompt body is well-formed.
-
-**No exception applies for files being moved, renamed, or refactored** — `git mv` preserves content, and the post-move file is still an agent file under R3's scope. Task notes, commit messages, or design narrative claiming *"frontmatter added by user later"*, *"intentional omission"*, *"frontmatter optional in distribution form"*, or similar MUST NOT be accepted as exceptions. The frontmatter MUST be present in the post-diff file, period. (TASK-92 shipped without frontmatter behind the rationale "users add frontmatter when copying" — that is exactly the kind of post-hoc excuse this clause forbids.)
-
-## R4 — Frontmatter changes do not take effect mid-session
-
-The Agent enum is fixed at session start. If the diff adds or modifies frontmatter under `agents/*.md`, `.claude/agents/*.md`, or `~/.claude/agents/*.md`, any AC of the form "verify the agent is callable as `subagent_type=...`" MUST be marked deferred to a fresh session in the task notes. The reviewer MUST NOT accept claims of mid-session verification for newly-registered subagent types.
-
-## R5 — Shell scripts must work on both GNU and BSD tools and parse under bash 3.2
-
-Scripts under `.claude/hooks/`, `scripts/`, `skills/*/scripts/`, and `ralph.sh` run on both macOS (BSD coreutils) and Linux/devcontainer (GNU coreutils). The reviewer MUST flag known incompatibilities, including but not limited to:
-
-- BRE-vs-ERE alternation in `sed` / `grep` without `-E`
-- `sed -i` without an empty-string argument (BSD requires `sed -i ''`, GNU requires `sed -i`)
-- `date -d ...` (GNU only) or `date -j ...` (BSD only) without a portable fallback
-- `grep -P` / PCRE features (not available on BSD)
-- `mktemp` template differences (`-t` semantics differ)
-- `find -regex` argument ordering (BSD silently skips longer alternatives placed second; longest must come first)
-- `readlink -f` (GNU only)
-- `xargs -r` (GNU only)
-
-macOS system bash is GNU bash 3.2 (`/bin/bash`), and a `bash` resolved through PATH on a default Mac is that 3.2, so every script MUST also parse under it. The Linux devcontainer runs bash 5 and cannot see a 3.2-only syntax error, so the reviewer MUST flag bash 4+ syntax, including but not limited to:
-
-- a case pattern without the leading `(` inside `$( ... )` — bash 3.2 reads its `)` as the end of the substitution; write `(pattern)` or move the loop into a function
-- associative arrays (`declare -A`), `mapfile` / `readarray`, `${var,,}` / `${var^^}` case conversion, `;&` / `;;&` case fall-through, `|&`, `&>>`, and `coproc`
-
-`tests/python/test_bash32_syntax.py` runs `/bin/bash -n` over every tracked shell script when `/bin/bash` is bash 3.x.
-
-When in doubt, prefer POSIX-compliant constructs.
-
-## R6 — No over-broad shell permission rules
-
-`.claude/settings.local.json` MUST NOT grant broad shell permissions. The following patterns are forbidden:
-
-- `Bash(bash:*)`
-- `Bash(sh:*)`
-- `Bash(*)`
-- Any rule of the form `Bash(<interpreter>:*)` where `<interpreter>` can execute arbitrary code
-
-The reviewer MUST require narrow rules of the form `Bash(bash <absolute-script-path>:*)`. If a single permission prompt is annoying, the fix is to extract the inline blob into a script and add a narrow allowlist entry — NOT to widen the allowlist.
 
 ## R7 — No AI-attribution trailers in commits
 
@@ -69,20 +19,6 @@ Commit messages, PR bodies, and any template that generates commit messages MUST
 - `🤖 Generated with` or any emoji-prefixed AI attribution
 
 The `commit-msg-guard.sh` hook is the first line of defense. The reviewer is the second: any diff that introduces such a trailer (in a script, prompt, or template) MUST be rejected.
-
-## R8 — Hook commands reference scripts, not inline bash
-
-Entries in `.claude/settings.json` under `hooks.<event>.<n>.hooks[].command` MUST point to a `.claude/hooks/<name>.sh` script. Inline bash blobs (multi-line strings, `bash -c "..."`, piped one-liners) are forbidden. The `if:` clause is the gate; the script is the implementation. One approach throughout the file. The reviewer MUST flag any inline command longer than a single script path.
-
-## R10 — Do not bypass `master-branch-guard.sh`
-
-Edit/Write to any path outside `.claude/` requires a `task-*` branch. The `master-branch-guard.sh` hook enforces this. The reviewer MUST reject any diff or commit that:
-
-- was committed directly to `master` and touches files outside `.claude/`
-- used `dangerouslyDisableSandbox: true` to bypass the master-branch guard
-- was created by disabling, renaming, or temporarily removing the guard hook
-
-The correct workflow is `git checkout -b task-N` BEFORE the first edit. Sandbox bypass is reserved for tools that the sandbox blocks for unrelated reasons (e.g. `nohup`, `mktemp` in `/tmp`), never for circumventing project hooks.
 
 ## R11 — Template parity
 
@@ -121,16 +57,3 @@ For tasks whose deliverable is a markdown document (architecture docs, plans, sp
 
 The reviewer MUST reject the diff if the markdown deliverable contradicts itself, leaves an AC untraceable, or contains unresolved gaps. Stylistic polish is out of scope; logical integrity is in scope.
 
-## R15 — PostToolUse hooks must emit JSON via hookSpecificOutput
-
-Hooks registered under `PostToolUse` in `.claude/settings.json` that need to deliver model-visible feedback MUST emit a single JSON object on stdout with the structure:
-
-```json
-{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"<text>"}}
-```
-
-Raw stdout text — including text wrapped in `<system-reminder>` tags — is silently dropped by the Claude Code harness and never reaches the model. The reviewer MUST reject any PostToolUse hook that uses `printf`, `echo`, or any other mechanism to emit raw text intended for the model, even if the text is correctly formatted as XML tags.
-
-When a hook has multiple feedback sections (e.g. deterministic issues AND an LLM rubric), it MUST combine them into a single `additionalContext` string separated by blank lines — not emit multiple JSON objects. The harness parses exactly one JSON object per hook invocation.
-
-This rule exists because TASK-100 wrapped validator output in `<system-reminder>` tags (correct format) but emitted them as raw stdout (wrong protocol). The model never received the feedback, and the smoke test only verified the script's stdout — not model receipt.

@@ -56,7 +56,7 @@ MOVED_TITLES = [
     "A changed external-tool default needs an invocation AC",
 ]
 RETIRED_IDS = ["R1", "R2", "R9", "R13", "R14", "R16", "R17"]
-KEPT_IDS = ["R3", "R4", "R5", "R6", "R7", "R8", "R10", "R11", "R12", "R15"]
+KEPT_IDS = ["R7", "R11", "R12"]
 
 
 def flat(text: str) -> str:
@@ -113,7 +113,7 @@ def test_moved_rules_are_gone_from_project_file() -> None:
         assert not any(h.startswith(f"## {rule_id} ") for h in headings), rule_id
 
 
-def test_project_file_keeps_project_and_infrastructure_rules() -> None:
+def test_project_file_keeps_project_rules() -> None:
     headings = [
         line
         for line in PROJECT_RULES.read_text("utf-8").splitlines()
