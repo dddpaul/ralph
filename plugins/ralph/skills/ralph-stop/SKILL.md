@@ -37,7 +37,7 @@ The clean-drain guarantee above was verified empirically against the **exact Ste
 
 The in-container agent (`claude -p`) runs in the container's **separate PID namespace**, invisible to the host `pkill`/`kill`. When its `docker exec -i` client is killed, the agent is orphaned but keeps its work intact — its parent (the `docker exec` shim) lived outside the container's PID namespace, so the container's own `ps` reports the survivor reparented with `PPID 0` — and it drains to completion: it committed the task, marked it Done, merged `--no-ff` to master, and deleted the branch — leaving a **clean working tree, no partial diff**. So loop.py's `_SignalInstaller` SIGTERM-forwarding (the TASK-160 parity closer) reaches only the proxy, never the PID-isolated agent — which is exactly why the graceful drain holds under this documented path. (Force-killing the client's `docker exec` peer, or adding `-t`/`--sig-proxy`, would break this; hence the anti-pattern warning above.)
 
-Note: ralph-stop is a plugin skill, not a bootstrap-seeded template, so there is NO R11 template-parity pair to also edit — single file change. The installed plugin-cache copy updates on next plugin reinstall; only the repo source is edited here.
+Note: ralph-stop is a plugin skill, not a bootstrap-seeded template, so it has NO ralph-init template copy to keep in step with it — single file change. The installed plugin-cache copy updates on next plugin reinstall; only the repo source is edited here.
 
 ---
 
