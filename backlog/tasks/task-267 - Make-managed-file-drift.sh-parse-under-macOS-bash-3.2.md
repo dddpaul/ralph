@@ -1,10 +1,10 @@
 ---
 id: TASK-267
 title: Make managed-file-drift.sh parse under macOS bash 3.2
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-05 08:16'
-updated_date: '2026-10-05 08:43'
+updated_date: '2026-10-05 09:43'
 labels: []
 dependencies: []
 priority: high
@@ -52,11 +52,11 @@ Execution constraint. The defect, the regression proof and the guard are only ob
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 /bin/bash -n plugins/ralph/skills/ralph-init/scripts/managed-file-drift.sh succeeds on the macOS host, where /bin/bash is GNU bash 3.2
-- [ ] #2 plugins/ralph/skills/ralph-run/tests/test_preflight.py::test_managed_file_drift_warns_without_aborting passes on the macOS host, with the drift report rather than the could-not-check warning
-- [ ] #3 A test runs /bin/bash -n over every git-tracked shell script, including the git-hook templates and the live .claude/hooks scripts, when /bin/bash reports major version 3, and skips with an explicit reason otherwise; it fails against master's version of managed-file-drift.sh on this host, with that result recorded in the task notes
+- [x] #1 /bin/bash -n plugins/ralph/skills/ralph-init/scripts/managed-file-drift.sh succeeds on the macOS host, where /bin/bash is GNU bash 3.2
+- [x] #2 plugins/ralph/skills/ralph-run/tests/test_preflight.py::test_managed_file_drift_warns_without_aborting passes on the macOS host, with the drift report rather than the could-not-check warning
+- [x] #3 A test runs /bin/bash -n over every git-tracked shell script, including the git-hook templates and the live .claude/hooks scripts, when /bin/bash reports major version 3, and skips with an explicit reason otherwise; it fails against master's version of managed-file-drift.sh on this host, with that result recorded in the task notes
 - [x] #4 R5 in .claude/task-reviewer-rules.md names macOS system bash 3.2 as a syntax target alongside the GNU and BSD tool differences it already covers
-- [ ] #5 Gates on the macOS host: uv run ruff check . is clean, uv run pytest passes, and LC_ALL=C node_modules/.bin/bats tests/unit passes with no failures other than pre-commit-hook.bats tests 34 and 35, which TASK-261 tracks
+- [x] #5 Gates on the macOS host: uv run ruff check . is clean, uv run pytest passes, and LC_ALL=C node_modules/.bin/bats tests/unit passes with no failures other than pre-commit-hook.bats tests 34 and 35, which TASK-261 tracks
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -78,4 +78,8 @@ Container verification (Linux, /bin/bash 5.2): built GNU bash 3.2.57 from the GN
 HOST VERIFICATION STILL OWED (task execution constraint): AC #1, AC #3's failing-against-master half on real /bin/bash, and AC #5 have been proved against a source-built bash 3.2.57 in the container, not on the macOS host. Re-run on the host: /bin/bash -n plugins/ralph/skills/ralph-init/scripts/managed-file-drift.sh; uv run pytest; LC_ALL=C node_modules/.bin/bats tests/unit.
 
 Review: ralph:task-reviewer APPROVED (0 blocking, 0 minor, score 10), host-only ACs verified by proxy against /tmp/bash32. Left In Progress and unmerged on branch task-267: the task's execution constraint requires the host re-run before Done. On the host: check AC #1/#2/#3/#5 after the re-run, then mark Done and run the Merge step (bump-version --auto will bump: managed-file-drift.sh is shipped).
+
+Host verification (macOS, interactive session after the Ralph run): AC #1 /bin/bash -n managed-file-drift.sh passes under GNU bash 3.2.57 (arm64-apple-darwin24). AC #2 test_managed_file_drift_warns_without_aborting: 1 passed on the host. AC #3 tests/python/test_bash32_syntax.py: 2 passed with the fix; with master's managed-file-drift.sh swapped in it fails with 'line 100: syntax error near unexpected token ;;' on the real /bin/bash, file restored afterwards. AC #5 gates on the host: ruff clean; pytest 771 passed 2 skipped; bats tests/unit 136 ok, only not-ok 34 and 35 (pre-commit NFD/NFC, tracked by TASK-261). Ralph's container proxy against a source-built bash 3.2.57 matched the host on every point.
+
+Commit: `932d7b8` - task-267: bump plugin version to 0.11.1 (patch)
 <!-- SECTION:NOTES:END -->
