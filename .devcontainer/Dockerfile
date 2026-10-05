@@ -144,7 +144,8 @@ RUN { echo "${UV_VERSION}" | grep -Eqx '[0-9]+\.[0-9]+\.[0-9]+' \
 COPY init-firewall.sh /usr/local/bin/
 USER root
 RUN chmod +x /usr/local/bin/init-firewall.sh \
- && echo "node ALL=(root) NOPASSWD: /usr/local/bin/init-firewall.sh, /bin/chown" > /etc/sudoers.d/node-firewall \
- && chmod 0440 /etc/sudoers.d/node-firewall
+ && echo "node ALL=(root) NOPASSWD: /usr/local/bin/init-firewall.sh, /bin/chown node\:node /workspace/.venv" > /etc/sudoers.d/node-firewall \
+ && chmod 0440 /etc/sudoers.d/node-firewall \
+ && visudo -cf /etc/sudoers.d/node-firewall
 
 USER node
