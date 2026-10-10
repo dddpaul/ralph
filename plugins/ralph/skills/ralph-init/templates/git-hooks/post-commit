@@ -1,11 +1,12 @@
 #!/bin/bash
 
-# Skip if only backlog files changed (avoid noise on task-only commits)
-CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r HEAD)
-if echo "$CHANGED_FILES" | grep -qE '^backlog/'; then
-    if ! echo "$CHANGED_FILES" | grep -qvE '^backlog/'; then
-        exit 0
-    fi
+# Skip if only task files changed (avoid noise on status/AC/notes commits).
+# Task files live under backlog/tasks/ (archive/ and completed/ hold moved ones);
+# changes to backlog/docs/, decisions/, drafts/ or outside backlog/ are task
+# work and get a Commit line. quotepath=off keeps non-ASCII names unquoted.
+CHANGED_FILES=$(git -c core.quotepath=off diff-tree --no-commit-id --name-only -r HEAD)
+if [ -n "$CHANGED_FILES" ] && ! echo "$CHANGED_FILES" | grep -qvE '^backlog/(tasks|archive|completed)/'; then
+    exit 0
 fi
 
 BRANCH_NAME=$(git symbolic-ref --short HEAD 2>/dev/null)

@@ -2,4 +2,4 @@
 # CLAUDE.md: Task Lifecycle step 6 adds the bump-version.sh --auto / --tag steps.
 # post-commit: adds the TASK-217 bump-version.sh --nudge call.
 CLAUDE.md template=a6ce6e51b46cc299abb009d00555fe4870073e9ac1dbdd607fa2ae0f9d501432 project=24cc27299d16283adc468a99c9f8df3162ca3a6222f4b0c624618b69c9692587
-.git/hooks/post-commit template=e1084656a68aef15169bb80b4dc1cf9d23c7b5caf73943ced3387236ca59bd01 project=010ea4bacd9433dc3b01f8dccec1f11cfa7675d381a3a8b76d6176a081c571ae
+.git/hooks/post-commit template=aa7b7918ce5e5a3bff120e90b3d092b0a3f9554b02aa6c8b5ca35568670e5e51 project=e7bc0dc383dc90c19bac95f06352b5fb69dab7aa76509b873f2df1616caacd26
