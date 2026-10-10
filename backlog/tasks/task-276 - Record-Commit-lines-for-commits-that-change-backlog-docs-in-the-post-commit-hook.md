@@ -3,10 +3,10 @@ id: TASK-276
 title: >-
   Record Commit lines for commits that change backlog docs in the post-commit
   hook
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-08 06:10'
-updated_date: '2026-10-10 06:59'
+updated_date: '2026-10-10 07:19'
 labels:
   - 'feature:ralph-init'
 dependencies: []
@@ -77,8 +77,8 @@ If anything is unclear or any check fails: STOP and ask the user. Do NOT start w
 - [x] #3 Живой .git/hooks/post-commit обновлён, и bats tests/unit/template-parity.bats проходит
 - [x] #4 Версия плагина в plugins/ralph/.claude-plugin/plugin.json поднята по принятой схеме, bats tests/unit/version-bump-guard.bats проходит
 - [x] #5 uv run pytest и uv run ruff check . проходят
-- [ ] #6 На хосте macOS: uv run pytest tests/python/test_bash32_syntax.py проходит без skip (/bin/bash 3.2), и LC_ALL=C node_modules/.bin/bats tests/unit/post-commit-hook.bats проходит с /usr/bin первым в PATH (BSD grep/sed/awk); вывод записан в заметки задачи
-- [ ] #7 Строка .git/hooks/post-commit в .claude/managed-file-drift.accept пересоздана командой bash plugins/ralph/skills/ralph-init/scripts/managed-file-drift.sh accept . .git/hooks/post-commit, и на хосте macOS bash plugins/ralph/skills/ralph-init/scripts/managed-file-drift.sh check . завершается с кодом 0 без вывода; вывод записан в заметки задачи
+- [x] #6 На хосте macOS: uv run pytest tests/python/test_bash32_syntax.py проходит без skip (/bin/bash 3.2), и LC_ALL=C node_modules/.bin/bats tests/unit/post-commit-hook.bats проходит с /usr/bin первым в PATH (BSD grep/sed/awk); вывод записан в заметки задачи
+- [x] #7 Строка .git/hooks/post-commit в .claude/managed-file-drift.accept пересоздана командой bash plugins/ralph/skills/ralph-init/scripts/managed-file-drift.sh accept . .git/hooks/post-commit, и на хосте macOS bash plugins/ralph/skills/ralph-init/scripts/managed-file-drift.sh check . завершается с кодом 0 без вывода; вывод записан в заметки задачи
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -95,4 +95,6 @@ Commit: `7f88197` - task-276: bump plugin version to 0.14.3 (patch)
 Gates (container): ruff clean; pytest 900 passed, 3 skipped, 1 failed — test_shared_plugin_registries_hold_no_container_rooted_path fails because the shared /Users/paul/.claude/plugins/known_marketplaces.json currently records /home/node paths (machine state, independent of this diff). LC_ALL=C bats tests/unit in a clean detached worktree of task-276: 1..160, no 'not ok' (in /workspace only R11 settings.local.json fails — the known container virtiofs mount baseline, TASK-275). post-commit-hook.bats against the master hook: 3/6 fail (non-ASCII task file, docs+tasks, docs-only), against the new hook 6/6 pass. Hook also reads diff-tree with core.quotepath=off: without it a non-ASCII task filename is octal-quoted, does not match ^backlog/, and the task-only commit was recorded. Accept line for .git/hooks/post-commit regenerated via managed-file-drift.sh accept (container sha256sum); container check . now prints only the .claude/settings.local.json baseline line. Version bumped to 0.14.3 via bump-version.sh --auto. Host commands for AC #6/#7: PATH=/usr/bin:/bin:$PATH uv run pytest tests/python/test_bash32_syntax.py ; PATH=/usr/bin:/bin:$PATH LC_ALL=C node_modules/.bin/bats tests/unit/post-commit-hook.bats ; bash plugins/ralph/skills/ralph-init/scripts/managed-file-drift.sh check . ; echo rc=$?
 
 Review 1 (task-reviewer): APPROVED, 0 blocking / 0 minor. Left In Progress and unmerged on task-276: Done and merge wait for the AC #6 and AC #7 macOS host runs (commands above).
+
+AC #6 host (macOS): PATH=/usr/bin:/bin:$PATH gives bash=/bin/bash 3.2.57(1)-release and grep/sed/awk from /usr/bin. uv run pytest -v tests/python/test_bash32_syntax.py: 2 passed, none skipped. LC_ALL=C bats tests/unit/post-commit-hook.bats: 1..6, ok 1-6 (tasks-only, non-ASCII task file and archive-only commits record no Commit line; docs+tasks, docs-only and outside-backlog commits record one). AC #7 host: bash plugins/ralph/skills/ralph-init/scripts/managed-file-drift.sh check . -> exit 0, no output; the committed .git/hooks/post-commit accept line equals the accept subcommand's output (template=aa7b7918..., project=e7bc0dc3...). Host gates: ruff clean; LC_ALL=C bats tests/unit 160 ok, 0 not ok; uv run pytest first run 899 passed, 1 failed — test_shared_plugin_registries_hold_no_container_rooted_path, because the host's ~/.claude/plugins/known_marketplaces.json held 11 /home/node installLocations (written at 06:21Z, before this run, by the claude-skills devcontainer, which still runs with CLAUDE_CONFIG_DIR=/home/node/.claude; the test file is untouched by this diff). With the user's approval the registry was repaired per ralph-init SKILL.md (every /home/node/.claude/ prefix rewritten to /Users/paul/.claude/, backup at ~/.claude/plugins/known_marketplaces.json.bak-20261010, all install locations exist); re-run: uv run pytest 900 passed, 4 skipped.
 <!-- SECTION:NOTES:END -->
