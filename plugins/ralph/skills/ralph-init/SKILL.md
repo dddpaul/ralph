@@ -649,7 +649,7 @@ CLAUDE.md (generic section)                  current
 **For outdated files, show details:**
 
 - **`ralph.sh`**, **`refine.sh`**, **`.git/hooks/post-commit`**, **`.git/hooks/commit-msg`**, and **`.git/hooks/pre-commit`**: show a plain language summary of what changed (e.g. "Template adds --model flag support and fixes timeout handling"). Read both versions and describe the meaningful differences — do not dump raw diffs for these files.
-- **`.claude/settings.json`**: show the unified diff (`diff -u`) because the project may have custom hooks the user wants to preserve.
+- **`.claude/settings.json`**: show the unified diff (`diff -u`) because the project may have custom hooks the user wants to preserve. If the diff shows extra hook entries of the project's own, tell the user to convert each `command` to the `"$CLAUDE_PROJECT_DIR"/.claude/hooks/<name>.sh` form the template uses. Claude Code runs hook commands from the session's current directory, so a relative `.claude/hooks/<name>.sh` fails with "No such file or directory" after any `cd <subdir>`, and the guard is silently skipped.
 - **`.claude/settings.local.json`**: show the unified diff (`diff -u`) because the project may have custom permissions the user wants to preserve.
 - **`CLAUDE.md`**: show a plain language summary of what changed in the generic section (above `## Project-Specific`).
 - **`.claude/brainstorm-rules.md`**: show a plain language summary of what changed in the Ralph-managed region (above `## Project additions`).
