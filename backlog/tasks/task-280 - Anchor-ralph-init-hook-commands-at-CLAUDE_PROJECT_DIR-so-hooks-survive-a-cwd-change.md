@@ -6,7 +6,7 @@ title: >-
 status: Done
 assignee: []
 created_date: '2026-10-18 08:40'
-updated_date: '2026-10-18 09:07'
+updated_date: '2026-10-18 09:37'
 labels:
   - 'feature:ralph-init'
 dependencies: []
@@ -105,4 +105,6 @@ Commit: `014c06b` - task-280: anchor hook commands at "$CLAUDE_PROJECT_DIR" so h
 Correction to the AC7 note: the master baseline is 8 failures = bump-version nudge x2, filename-length-guard 125-byte x1, task-reviewer-rules-loading x4, R-CORE-5 scan x1 (not loader x5). Review: ralph:task-reviewer APPROVED, 0 blocking, 1 minor. The minor finding is that npm test does not literally pass in the container, so AC7 rests on the master-baseline comparison; a host npm test run was not done.
 
 Commit: `c5fa5db` - task-280: bump plugin version to 0.14.4 (patch)
+
+Host re-check (macOS /bin/sh, after merge in 0.14.4): from plugins/ with CLAUDE_PROJECT_DIR=/Users/paul/Private/Projects/ai/ralph and a sample Bash hook JSON on stdin, every distinct command in .claude/settings.json exits 0 — "$CLAUDE_PROJECT_DIR"/.claude/hooks/{commit-msg-guard,commit-prefix-guard,master-branch-guard,naming-guard,notes-guard,task-validator}.sh; control: the old relative .claude/hooks/commit-msg-guard.sh from plugins/ exits 127. Host gates on master 0.14.7: ruff clean, pytest 912 passed/4 skipped, LC_ALL=C bats tests/unit 169 ok/0 not ok.
 <!-- SECTION:NOTES:END -->

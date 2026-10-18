@@ -4,7 +4,7 @@ title: Map host.docker.internal to the host gateway in the devcontainer runArgs
 status: Done
 assignee: []
 created_date: '2026-10-17 15:52'
-updated_date: '2026-10-18 09:11'
+updated_date: '2026-10-18 09:37'
 labels:
   - 'feature:ralph-init'
 dependencies: []
@@ -61,7 +61,7 @@ If anything is unclear or any check fails: STOP and ask the user. Do NOT start w
 - [x] #1 runArgs in plugins/ralph/skills/ralph-init/templates/devcontainer/devcontainer.json contains --add-host=host.docker.internal:host-gateway alongside --cap-add=NET_ADMIN and --cap-add=NET_RAW (grep)
 - [x] #2 .devcontainer/devcontainer.json carries the same runArgs entry, keeping template parity
 - [x] #3 A pytest test pins the runArg in both files, and uv run pytest passes
-- [ ] #4 devcontainer up --workspace-folder . on the developer's host succeeds with the new runArgs, postStartCommand's firewall verification passes, and the in-container output of getent hosts host.docker.internal is recorded in the task notes
+- [x] #4 devcontainer up --workspace-folder . on the developer's host succeeds with the new runArgs, postStartCommand's firewall verification passes, and the in-container output of getent hosts host.docker.internal is recorded in the task notes
 - [x] #5 plugins/ralph/skills/ralph-init/SKILL.md no longer carries the colima caveat and states that a Linux host must serve the proxy on 3128 reachable from the docker bridge (grep)
 - [x] #6 uv run ruff check . passes
 <!-- AC:END -->
@@ -78,4 +78,6 @@ PENDING HOST-SIDE VERIFICATION (AC #4) - not checked off blind. devcontainer up 
 Done: runArgs in .devcontainer/devcontainer.json and the ralph-init template (still byte-identical) now read ["--cap-add=NET_ADMIN", "--cap-add=NET_RAW", "--add-host=host.docker.internal:host-gateway"]. The array stays on one line so merge-runargs.sh keeps merging it in Upgrade U4, and a whole-line comment above it says why. New tests/python/test_devcontainer_host_gateway.py runs on both copies and checks: the runArg is present exactly once, both caps are kept, the array is one line, the comment explains it, the proxy and MCP gateway vars still name host.docker.internal, and a mutation that drops the runArg is caught. In ralph-init SKILL.md the colima caveat is replaced by a note on what the runArg does on Docker Desktop, colima and Linux engines; the note says U4 carries the element into existing projects and states the Linux-host prerequisite: the Squid proxy on 3128 must be reachable from the docker bridge (docker0 gateway address or 0.0.0.0). uv run pytest: 913 passed, 3 skipped. uv run ruff check .: clean. task-reviewer: APPROVED, deferral of AC #4 accepted.
 
 Commit: `f3e4384` - task-277: bump plugin version to 0.14.5 (patch)
+
+AC #4 host verification (macOS, colima, after merge in 0.14.5): command devcontainer up --workspace-folder . --remove-existing-container with runArgs [--cap-add=NET_ADMIN, --cap-add=NET_RAW, --add-host=host.docker.internal:host-gateway] -> exit 0, outcome success, container e8102fdef3f6. postStartCommand: 'Firewall verification passed - unable to reach https://example.com as expected' and 'Firewall verification passed - able to reach https://api.github.com via proxy as expected'. In the container: getent hosts host.docker.internal -> '192.168.5.2     host.docker.internal' (exit 0; the Mac on colima, as measured in the source); /etc/hosts line 7 '192.168.5.2 host.docker.internal'; docker inspect HostConfig.ExtraHosts ['host.docker.internal:host-gateway']; curl https://api.github.com/meta through the proxy -> 200. Note: the Ralph run marked this task Done and merged it with AC #4 still unchecked; the orchestrator's post-run push (TASK-211) then published 0.14.4-0.14.7 before this host check.
 <!-- SECTION:NOTES:END -->

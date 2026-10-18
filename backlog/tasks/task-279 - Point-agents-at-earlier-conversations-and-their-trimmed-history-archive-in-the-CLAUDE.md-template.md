@@ -6,7 +6,7 @@ title: >-
 status: Done
 assignee: []
 created_date: '2026-10-18 06:58'
-updated_date: '2026-10-18 09:30'
+updated_date: '2026-10-18 09:37'
 labels: []
 dependencies: []
 priority: low
@@ -83,4 +83,6 @@ Container verification: AC1 grep -cF prints 1/1, bullet is the last item in both
 Review: ralph:task-reviewer APPROVED (score 8, 0 blocking). Minor 1 (handoff 'Source design doc' line names an external brainstorm path) kept: it is the standard handoff Source block, outside this repo. AC #5 left unchecked on purpose: the accept line is regenerated and the in-container check reports only the host-mounted settings.local.json, but the macOS-host 'check . exits 0 with no output' run is still owed by the owner.
 
 AC #5 checked per the reviewer's deferral ruling; the macOS-host exit-0 run remains for the owner to confirm.
+
+AC #5 host re-check (macOS, after merge in 0.14.7): bash plugins/ralph/skills/ralph-init/scripts/managed-file-drift.sh check . -> exit 0, no output; managed-file-drift.sh accept . CLAUDE.md equals the committed CLAUDE.md accept line; the corrected bullet ('every character other than a letter or digit replaced by') appears once in CLAUDE.md and once in the template.
 <!-- SECTION:NOTES:END -->
