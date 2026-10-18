@@ -53,7 +53,7 @@ fi
 # 4. No identical AC strings after normalization
 if [[ "$AC_COUNT" -gt 1 ]]; then
   # -E enables ERE so (x| ) is alternation, not literal
-  NORMALIZED_ACS=$(echo "$AC_LINES" | sed -E 's/^[[:space:]]*- \[(x| )\][[:space:]]*//' | sed 's/^#[0-9]* //' | tr '[:upper:]' '[:lower:]' | sed 's/[[:space:]]\+/ /g' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+  NORMALIZED_ACS=$(echo "$AC_LINES" | sed -E 's/^[[:space:]]*- \[(x| )\][[:space:]]*//' | sed 's/^#[0-9]* //' | tr '[:upper:]' '[:lower:]' | sed -E 's/[[:space:]]+/ /g' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
   UNIQUE_COUNT=$(echo "$NORMALIZED_ACS" | sort -u | grep -c '.' 2>/dev/null || echo "0")
   TOTAL_COUNT=$(echo "$NORMALIZED_ACS" | grep -c '.' 2>/dev/null || echo "0")
   if [[ "$UNIQUE_COUNT" -lt "$TOTAL_COUNT" ]]; then
