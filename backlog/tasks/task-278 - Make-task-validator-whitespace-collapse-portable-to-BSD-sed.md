@@ -4,7 +4,7 @@ title: Make task-validator whitespace collapse portable to BSD sed
 status: Done
 assignee: []
 created_date: '2026-10-17 16:30'
-updated_date: '2026-10-18 09:18'
+updated_date: '2026-10-18 09:37'
 labels:
   - 'feature:ralph-init'
 dependencies: []
@@ -73,4 +73,6 @@ Commit: `dbda63a` - task-278: restore the execute bit on both task-validator cop
 Line 56 of both task-validator.sh copies now collapses whitespace with sed -E 's/[[:space:]]+/ /g'. New tests/unit/task-validator.bats (4 tests) runs both copies on ACs that differ only in whitespace; test 3 runs under a sed shim that reads BRE '\+' as a literal '+' (like macOS /usr/bin/sed), and it fails against the old line on GNU hosts too. Real macOS sed could not be run in the container. template-parity.bats: 11/12; the only failure (settings.local.json shape) reads the gitignored, container-local .claude/settings.local.json and also fails on master. pytest 913 passed, ruff clean. task-reviewer: APPROVED after the execute bit was restored (sed -i on this mount had dropped it).
 
 Commit: `576d4a9` - task-278: bump plugin version to 0.14.6 (patch)
+
+Host re-check (macOS, after merge in 0.14.6): PATH=/usr/bin:/bin bats tests/unit/task-validator.bats -> 4/4 ok. Direct comparison with /usr/bin/sed on 'foo  bar', 'foo bar', 'other<TAB>thing', 'other thing': old sed 's/[[:space:]]\+/ /g' -> 4 unique lines, new sed -E 's/[[:space:]]+/ /g' -> 2 (matches the source measurement).
 <!-- SECTION:NOTES:END -->
