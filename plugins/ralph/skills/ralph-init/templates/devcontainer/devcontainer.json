@@ -19,7 +19,14 @@
       "ZSH_IN_DOCKER_VERSION": "1.2.0"
     }
   },
-  "runArgs": ["--cap-add=NET_ADMIN", "--cap-add=NET_RAW"],
+  // --add-host maps host.docker.internal, which the proxy vars and
+  // MCP_GATEWAY_HOST below depend on. Docker Desktop and colima define that
+  // name, but a plain Linux Docker Engine does not, so without the mapping
+  // postStartCommand's firewall fetch through the proxy fails there.
+  // host-gateway is the host on all three: Docker Desktop's host, colima's
+  // Mac (the same address its DNS returns), and a Linux engine's bridge
+  // gateway, i.e. the Linux host itself.
+  "runArgs": ["--cap-add=NET_ADMIN", "--cap-add=NET_RAW", "--add-host=host.docker.internal:host-gateway"],
   "customizations": {
     "vscode": {
       "extensions": [
