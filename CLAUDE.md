@@ -52,6 +52,7 @@ Prefer `backlog task edit` for: adding/removing acceptance criteria, status chan
 - `README.md` and `*.md` files in repo root and subdirectories
 - Run `backlog doc list --plain` to check for backlog docs (may not exist). If present, read relevant ones with `backlog doc view <id>`
 - `CLAUDE.md` / `AGENTS.md` files for agent-specific conventions
+- Earlier conversations in this project: Claude Code keeps their transcripts in `~/.claude/projects/<dir>/*.jsonl`, where `<dir>` is the project's absolute path with every character other than a letter or digit replaced by `-`. If `~/.claude/transcript-archive/<dir>/` exists, a transcript trimmer has archived older history there as `*.jsonl.gz`. Search both with `rg -z <pattern>`.
 
 ## Rules
 
