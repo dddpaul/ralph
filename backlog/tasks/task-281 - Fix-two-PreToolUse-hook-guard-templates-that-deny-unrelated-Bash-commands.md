@@ -1,10 +1,10 @@
 ---
 id: TASK-281
 title: Fix two PreToolUse hook guard templates that deny unrelated Bash commands
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-29T07:03:00Z'
-updated_date: '2026-10-29T13:05:00Z'
+updated_date: '2026-10-29T13:13:00Z'
 labels:
   - feature:ralph-init
 dependencies: []
@@ -97,4 +97,8 @@ No-extractable-message decision: when the command is a real commit but no messag
 if: question (TASK-123 AC5), settled with evidence on Claude Code 2.1.283 in this repo, whose live commit-msg-guard was still the unconditional grep: echo / python3 heredoc / && compound / quoted $(...) commands carrying the trailer name were NOT denied, so if: Bash(git commit *) does filter them. But 'X=1; echo ... Co-Authored-By $X $(date +%s)' WAS denied by the commit-msg guard. The hooks docs (code.claude.com/docs/en/hooks) say the filter is best-effort: patterns that specify more than the command name run the hook anyway on $(), backticks or $VAR, and so does any command Claude Code cannot parse. So if: is real filtering but not a reliable gate, and each guard must gate itself. The same probe also hit the old prefix guard: a python3 heredoc command in this session whose text contained the phrase was denied on task-281.
 
 Portability: awk program uses POSIX features only (verified under mawk here); bash uses [[ =~ ]] with regex in a variable, $'\n', BASH_REMATCH and parameter expansion, all bash 3.2. No GNU-only flags added. Gate limits: options between git and commit are recognised (-C path, -c k=v, other -flags); env-prefix forms (FOO=1 git commit) and sudo/env wrappers are not gated and are allowed. Pre-existing: uv run ruff check . reports 43 errors on master too (none in touched files); bats is not installed in this container so tests/unit/pretools-hooks.bats was not run, and its guard cases are covered again by the new pytest file.
+
+Review round 1 (CHANGES REQUESTED, 3 blocking) fixed: the regex gate is replaced by an awk lexer (identical block in both guards, enforced by a test) that splits simple commands, skips VAR= assignments and if/then/else/elif/do/while/until/time/!/{ prefixes, keeps escaped chars, treats <<< and $((..))/((..)) as non-heredocs, and reads quoted or hyphenated heredoc delimiters. The prefix guard walks the lexed commit args for the first -m/--message or -F/--file (clustered short options such as -am; -C/-c/-t consume their value), so a -m inside --author=".." or a later command is not read. Lexer output uses \037/\036 separators, not \001 (bash's internal CTLESC).
+
+Review round 2: APPROVED (0 blocking, 3 minor). Correction to the earlier gate-limits note: leading VAR=value assignments (FOO=1 git commit) ARE now gated, since the lexer skips them. Known limits left as-is (minor, recorded rather than fixed post-approval): (1) a commit inside $(...) or backticks is not gated by either guard; the git commit-msg hook still enforces the trailer ban, but nothing backs the prefix rule there. (2) git commit -m "" -m "bad" is allowed by the prefix guard, because the empty first -m counts as no message. Candidates for a follow-up task. Final checks: uv run pytest 980 passed / 3 skipped; ruff clean on the touched files (43 errors elsewhere already exist on master); bash -n ok on both scripts; template and .claude/hooks copies byte-identical.
 <!-- SECTION:NOTES:END -->
