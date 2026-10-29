@@ -1,5 +1,5 @@
 ---
-id: TASK-102
+id: TASK-285
 title: Scratch validator test
 status: To Do
 assignee: []

@@ -1,5 +1,5 @@
 ---
-id: TASK-102
+id: TASK-286
 title: Validator JSON-output smoke test
 status: To Do
 assignee: []
