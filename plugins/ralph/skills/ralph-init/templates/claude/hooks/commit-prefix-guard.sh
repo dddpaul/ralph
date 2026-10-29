@@ -6,50 +6,128 @@
 
 cmd=$(jq -r '.tool_input.command')
 
+# --- command lexer (keep identical in commit-msg-guard.sh) -------------------
 # The settings.json `if:` filter is best-effort: Claude Code still runs the
 # hook for commands it cannot fully parse (unquoted $VAR, $(...), backticks).
-# Self-gate on a real `git commit` at a command position, ignoring text
-# inside quotes and heredoc bodies, so a command that merely mentions the
-# phrase (e.g. backlog notes quoting it) is never checked.
-skeleton=$(printf '%s\n' "$cmd" | awk '
-  BEGIN { sq = "\047"; dq = "\"" }
-  inbody != "" { t = $0; sub(/^\t+/, "", t); if (t == inbody) inbody = ""; print ""; next }
-  {
-    out = ""; n = length($0)
-    for (i = 1; i <= n; i++) {
-      c = substr($0, i, 1)
-      if (q == sq) { if (c == sq) q = ""; continue }
-      if (q == dq) { if (c == "\\") i++; else if (c == dq) q = ""; continue }
-      if (c == "\\") { i++; continue }
-      if (c == sq || c == dq) { q = c; out = out "_"; continue }
-      if (substr($0, i, 2) == "<<" && substr($0, i + 2, 1) != "<") {
-        j = i + 2
-        if (substr($0, j, 1) == "-") j++
-        while (substr($0, j, 1) ~ /[ \t]/) j++
-        if (substr($0, j, 1) == sq || substr($0, j, 1) == dq) j++
-        w = ""
-        while (substr($0, j, 1) ~ /[A-Za-z0-9_]/) { w = w substr($0, j, 1); j++ }
-        if (substr($0, j, 1) == sq || substr($0, j, 1) == dq) j++
-        if (w != "") { pending = w; out = out "<<_"; i = j - 1; continue }
-      }
-      out = out c
+# So split the command into simple commands and words the way the shell does
+# (quotes, escapes, $(...), arithmetic, heredocs) and act only on a real
+# `git commit` / `gh pr create`, never on text that merely mentions one.
+# Prints nothing when there is none, else KIND, then each commit argument
+# prefixed by \037, then \036 and the body of a heredoc fed to that command.
+lexer='
+function endword() { if (inw) { w[++nw] = cur; cur = ""; inw = 0 } }
+function endcmd(   j, k) {
+  endword()
+  if (kind == "" && nw > 0) {
+    j = 1
+    while (j <= nw && (w[j] ~ /^[A-Za-z_][A-Za-z0-9_]*=/ || w[j] ~ /^(if|then|else|elif|do|while|until|time|!)$/ || w[j] == "{")) j++
+    if (w[j] == "git") {
+      for (j++; j <= nw && w[j] ~ /^-/; j++) if (w[j] == "-C" || w[j] == "-c") j++
+      if (w[j] == "commit") { kind = "commit"; mcmd = ncmd; for (k = j + 1; k <= nw; k++) args = args US w[k] }
+    } else if (w[j] == "gh" && w[j + 1] == "pr" && w[j + 2] == "create") { kind = "pr"; mcmd = ncmd }
+  }
+  for (k = 1; k <= nw; k++) delete w[k]
+  nw = 0; ncmd++
+}
+function rawparen(i,   d, j, ch) {
+  for (j = i + 1; j <= n; j++) {
+    ch = substr(s, j, 1)
+    if (ch == "(") d++
+    else if (ch == ")" && --d == 0) break
+  }
+  cur = cur substr(s, i, j - i + 1); inw = 1
+  return j + 1
+}
+function dquote(i,   ch, nx) {
+  inw = 1
+  while (i <= n) {
+    ch = substr(s, i, 1); nx = substr(s, i + 1, 1)
+    if (ch == dq) return i + 1
+    if (ch == "\\") {
+      if (nx != "\n") cur = cur (index("\"\\$`", nx) ? "" : ch) nx
+      i += 2
+    } else if (ch == "$" && nx == "(") i = rawparen(i)
+    else { cur = cur ch; i++ }
+  }
+  return i
+}
+function heredoc(i,   dash, del, ch, e) {
+  endword(); i += 2
+  if (substr(s, i, 1) == "-") { dash = 1; i++ }
+  while (substr(s, i, 1) == " " || substr(s, i, 1) == "\t") i++
+  while (i <= n && index(" \t\n;&|<>()", ch = substr(s, i, 1)) == 0) {
+    if (ch == sq || ch == dq) {
+      e = index(substr(s, i + 1), ch); if (e == 0) e = n - i + 1
+      del = del substr(s, i + 1, e - 1); i += e + 1
+    } else if (ch == "\\") { del = del substr(s, i + 1, 1); i += 2 }
+    else { del = del ch; i++ }
+  }
+  if (del != "") { pdel[++np] = del; pdash[np] = dash; pcmd[np] = ncmd }
+  return i
+}
+function bodies(i,   p, e, line, t, body) {
+  for (p = 1; p <= np; p++) {
+    body = ""
+    while (i <= n) {
+      e = index(substr(s, i), "\n"); if (e == 0) e = n - i + 2
+      line = substr(s, i, e - 1); i += e
+      t = line; if (pdash[p]) sub(/^\t+/, "", t)
+      if (t == pdel[p]) break
+      body = body line "\n"
     }
-    if (pending != "") { inbody = pending; pending = "" }
-    print out
-  }')
-nl=$'\n'
-sep="(^|[;&|(]|${nl})[[:space:]]*"
-git_re="${sep}git([[:space:]]+-[Cc][[:space:]]+[^[:space:];&|]+|[[:space:]]+-[^[:space:];&|]+)*[[:space:]]+commit([[:space:];&|)]|$)"
-[[ $skeleton =~ $git_re ]] || exit 0
+    if (pcmd[p] == mcmd && kind != "" && !got) { doc = body; got = 1 }
+  }
+  np = 0
+  return i
+}
+BEGIN { US = "\037"; sq = "\047"; dq = "\"" }
+{ s = s (NR > 1 ? "\n" : "") $0 }
+END {
+  n = length(s); i = 1; ncmd = 1
+  while (i <= n) {
+    c = substr(s, i, 1); nx = substr(s, i + 1, 1)
+    if (c == "\n") { endcmd(); i = bodies(i + 1) }
+    else if (c == " " || c == "\t") { endword(); i++ }
+    else if (c == "#" && !inw) { while (i <= n && substr(s, i, 1) != "\n") i++ }
+    else if (c == "\\") { if (nx != "\n") { cur = cur nx; inw = 1 } i += 2 }
+    else if (c == sq) {
+      e = index(substr(s, i + 1), sq); if (e == 0) e = n - i + 1
+      cur = cur substr(s, i + 1, e - 1); inw = 1; i += e + 1
+    }
+    else if (c == dq) i = dquote(i + 1)
+    else if (c == "$" && nx == "(") i = rawparen(i)
+    else if (c == "(" && nx == "(") { endcmd(); e = index(substr(s, i), "))"); i = e ? i + e + 1 : n + 1 }
+    else if (substr(s, i, 3) == "<<<") { endword(); i += 3 }
+    else if (c == "<" && nx == "<") i = heredoc(i)
+    else if (c == "<" || c == ">" || (c == "&" && nx == ">")) { endword(); for (i++; index("&>|", substr(s, i, 1)) && i <= n; i++); }
+    else if (index(";&|()", c)) { endcmd(); i++ }
+    else { cur = cur c; inw = 1; i++ }
+  }
+  endcmd()
+  if (kind != "") printf "%s%s\036%s", kind, args, doc
+}'
+parsed=$(printf '%s\n' "$cmd" | awk "$lexer")
+# --- end command lexer -------------------------------------------------------
+rs=$'\036'
+us=$'\037'
+[ "${parsed%%["$rs$us"]*}" = commit ] || exit 0
 
 branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)
 case "$branch" in task-*) ;; *) exit 0;; esac
 
 task_id=$(echo "$branch" | grep -oE '^task-[0-9]+' | sed 's/task-//')
 
-# Look for the message only from the commit invocation onward.
-rest=$cmd
-[[ $cmd =~ $git_re ]] && rest=${cmd#*"${BASH_REMATCH[0]}"}
+nl=$'\n'
+head=${parsed%%"$rs"*}
+doc=${parsed#*"$rs"}
+list=${head#commit}
+args=()
+while [ -n "$list" ]; do
+  list=${list#"$us"}
+  tok=${list%%"$us"*}
+  args[${#args[@]}]=$tok
+  list=${list#"$tok"}
+done
 
 # first_line TEXT — first non-blank line of TEXT, leading whitespace trimmed.
 first_line() {
@@ -63,36 +141,56 @@ first_line() {
   done
 }
 
-# heredoc_line TEXT — first body line of the first heredoc in TEXT.
-heredoc_re="<<-?[[:space:]]*[\"']?[A-Za-z0-9_]+[\"']?[^${nl}]*${nl}(.*)$"
+# heredoc_line TEXT — first body line of the first heredoc in TEXT, for a
+# -m "$(cat <<'EOF' ... EOF)" value.
+heredoc_re="<<-?[[:space:]]*[^${nl}]*${nl}(.*)$"
 heredoc_line() {
   [[ $1 =~ $heredoc_re ]] && first_line "${BASH_REMATCH[1]}"
 }
 
-# Message sources, in order: -m/--message (any quoting, may span lines, may
-# wrap a $(cat <<EOF) heredoc), -F/--file (named file, or - for a heredoc),
-# then a bare heredoc. Multi-line values work because bash regex matching is
-# not line-bound, unlike sed.
-val='("(([^"\\]|\\.)*)"|'"'([^']*)'"'|([^[:space:]\"'"'"';&|]+))'
-msg_re="(^|[[:space:]])(-[[:alnum:]]*m|--message)(=|[[:space:]]*)${val}"
-file_re="(^|[[:space:]])(-[[:alnum:]]*F|--file)(=|[[:space:]]+)${val}"
-msg=
-if [[ $rest =~ $msg_re ]]; then
-  value="${BASH_REMATCH[5]}${BASH_REMATCH[7]}${BASH_REMATCH[8]}"
-  case "$value" in
-    '$('*) msg=$(heredoc_line "$value") ;;
-    *) msg=$(first_line "$value") ;;
+# Message source: the first -m/--message or -F/--file option (short options
+# may be clustered, e.g. -am), else a heredoc fed to the commit.
+src=
+val=
+i=0
+while [ "$i" -lt "${#args[@]}" ]; do
+  a=${args[$i]}
+  i=$((i + 1))
+  case "$a" in
+    --) break ;;
+    --message=*) src=m; val=${a#*=}; break ;;
+    --file=*) src=F; val=${a#*=}; break ;;
+    --message) src=m; val=${args[$i]}; break ;;
+    --file) src=F; val=${args[$i]}; break ;;
+    --*) ;;
+    -?*)
+      opt=${a#-}
+      while [ -n "$opt" ]; do
+        o=${opt%"${opt#?}"}
+        opt=${opt#?}
+        case "$o" in
+          m|F) src=$o; val=$opt; [ -n "$val" ] || val=${args[$i]}; break 2 ;;
+          C|c|t) [ -n "$opt" ] || i=$((i + 1)); break ;;
+        esac
+      done ;;
   esac
-elif [[ $rest =~ $file_re ]]; then
-  file="${BASH_REMATCH[5]}${BASH_REMATCH[7]}${BASH_REMATCH[8]}"
-  if [ "$file" = "-" ]; then
-    msg=$(heredoc_line "$rest")
-  elif [ -f "$file" ] && [ -r "$file" ]; then
-    msg=$(first_line "$(cat "$file")")
-  fi
-else
-  msg=$(heredoc_line "$rest")
-fi
+done
+
+msg=
+case "$src" in
+  m)
+    case "$val" in
+      '$('*) msg=$(heredoc_line "$val") ;;
+      *) msg=$(first_line "$val") ;;
+    esac ;;
+  F)
+    if [ "$val" = "-" ]; then
+      msg=$(first_line "$doc")
+    elif [ -f "$val" ] && [ -r "$val" ]; then
+      msg=$(first_line "$(cat "$val")")
+    fi ;;
+  *) msg=$(first_line "$doc") ;;
+esac
 
 # No extractable message (editor, --no-edit, -C, $VAR, unreadable file):
 # allow. A false deny blocks legitimate work; the git commit-msg hook still

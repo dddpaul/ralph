@@ -194,3 +194,58 @@ def test_prefix_guard_ignores_master(tmp_path: Path) -> None:
 @pytest.mark.parametrize("name", GUARDS)
 def test_live_copy_matches_template(name: str) -> None:
     assert (LIVE / name).read_bytes() == (HOOKS / name).read_bytes()
+
+
+# --- lexer edge cases (task-reviewer round 1) -------------------------------
+
+BAD = f'{COMMIT} -m "bad\n\n{TRAILER}"'
+
+
+@pytest.mark.parametrize(
+    "prefix",
+    [
+        "if true; then ",
+        "if false; then :; else ",
+        "{ ",
+        "! ",
+        "time ",
+        "FOO=1 ",
+        "cat <<<abc; ",
+        "echo $((1<<3)); ",
+        "cat <<'END-MSG'\nhi\nEND-MSG\n",
+        "\\",
+        "cd /tmp &&\n",
+    ],
+)
+def test_guards_see_commit_after_shell_syntax(task_repo: Path, prefix: str) -> None:
+    command = prefix + BAD
+    assert is_deny(run_guard("commit-msg-guard.sh", command, task_repo))
+    assert is_deny(run_guard("commit-prefix-guard.sh", command, task_repo))
+
+
+@pytest.mark.parametrize(
+    ("command", "denied"),
+    [
+        (f"{COMMIT} --author=\"A -mB <a@b>\" -m 'task-99: ok'", False),
+        (f'{COMMIT} -C HEAD -m "task-99: ok"', False),
+        (f'{COMMIT} -m "task-99: ok" 2>&1 && git log -m "x"', False),
+        (f'{COMMIT} --no-edit && foo -m "x"', False),
+        (f'{COMMIT} -m "task-99: a) b\n\nbody"', False),
+        (f"{COMMIT} -m \"$(cat <<'EOF'\nwip (draft\nEOF\n)\"", True),
+        (f"{COMMIT} -mwip", True),
+        (f'{COMMIT} -m "" ', False),
+    ],
+)
+def test_prefix_guard_option_parsing(
+    task_repo: Path, command: str, denied: bool
+) -> None:
+    assert is_deny(run_guard("commit-prefix-guard.sh", command, task_repo)) is denied
+
+
+def test_lexer_block_identical_in_both_guards() -> None:
+    def block(name: str) -> str:
+        text = (HOOKS / name).read_text()
+        start = text.index("lexer='")
+        return text[start : text.index("# --- end command lexer", start)]
+
+    assert block("commit-msg-guard.sh") == block("commit-prefix-guard.sh")
