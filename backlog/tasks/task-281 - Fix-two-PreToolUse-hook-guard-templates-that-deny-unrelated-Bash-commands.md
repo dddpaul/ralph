@@ -1,10 +1,10 @@
 ---
 id: TASK-281
 title: Fix two PreToolUse hook guard templates that deny unrelated Bash commands
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-29T07:03:00Z'
-updated_date: '2026-10-29T07:04:00Z'
+updated_date: '2026-10-29T13:13:00Z'
 labels:
   - feature:ralph-init
 dependencies: []
@@ -77,12 +77,28 @@ If anything is unclear or any check fails: STOP and ask the user. Do NOT start w
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 commit-msg-guard.sh exits 0 silently with no output for a command that is not a real commit or pull-request-create, verified by piping a tool_input whose command is a backlog task create carrying the forbidden trailer names in its text
-- [ ] #2 commit-msg-guard.sh still emits the deny JSON for a real commit whose message contains a forbidden trailer, and for one containing the forbidden heading
-- [ ] #3 commit-prefix-guard.sh exits 0 silently on a task-N branch for a correctly prefixed message whose -m value spans several lines
-- [ ] #4 commit-prefix-guard.sh still emits the deny JSON on a task-N branch for an unprefixed and for a wrongly prefixed message, tested both as a single line and as multiple lines
-- [ ] #5 commit-prefix-guard.sh exits 0 silently for a command that merely mentions the two-word git-commit phrase without being a commit, such as a backlog task edit whose notes quote that pattern
-- [ ] #6 Message extraction handles -m with multi-line double quotes, -m with multi-line single quotes, --message=, -F and --file reading the named file, and a heredoc; the chosen behaviour when no message can be extracted is recorded in the task notes with its rationale
-- [ ] #7 Regression tests under tests/ cover each case above and pass with uv run pytest, and this repo's .claude/hooks copies of both scripts are byte-identical to the templates
-- [ ] #8 Both scripts pass bash -n and satisfy R-INFRA-3 GNU and BSD userland plus bash 3.2 portability, and the notes settle TASK-123's open AC5 question by recording with evidence whether PreToolUse if: conditions filter hook invocations
+- [x] #1 commit-msg-guard.sh exits 0 silently with no output for a command that is not a real commit or pull-request-create, verified by piping a tool_input whose command is a backlog task create carrying the forbidden trailer names in its text
+- [x] #2 commit-msg-guard.sh still emits the deny JSON for a real commit whose message contains a forbidden trailer, and for one containing the forbidden heading
+- [x] #3 commit-prefix-guard.sh exits 0 silently on a task-N branch for a correctly prefixed message whose -m value spans several lines
+- [x] #4 commit-prefix-guard.sh still emits the deny JSON on a task-N branch for an unprefixed and for a wrongly prefixed message, tested both as a single line and as multiple lines
+- [x] #5 commit-prefix-guard.sh exits 0 silently for a command that merely mentions the two-word git-commit phrase without being a commit, such as a backlog task edit whose notes quote that pattern
+- [x] #6 Message extraction handles -m with multi-line double quotes, -m with multi-line single quotes, --message=, -F and --file reading the named file, and a heredoc; the chosen behaviour when no message can be extracted is recorded in the task notes with its rationale
+- [x] #7 Regression tests under tests/ cover each case above and pass with uv run pytest, and this repo's .claude/hooks copies of both scripts are byte-identical to the templates
+- [x] #8 Both scripts pass bash -n and satisfy R-INFRA-3 GNU and BSD userland plus bash 3.2 portability, and the notes settle TASK-123's open AC5 question by recording with evidence whether PreToolUse if: conditions filter hook invocations
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan: self-gate both guards on a real commit (and gh pr create for the msg guard) at a command position, using an awk pass that drops quoted text and heredoc bodies so mentions never match; replace the sed extraction in the prefix guard with bash [[ =~ ]] matching (not line-bound) over -m/--message (double, single, unquoted, $(cat <<EOF) wrapper), -F/--file (named file or - heredoc) and a bare heredoc; pytest regression tests in tests/python/test_commit_guards.py; sync .claude/hooks copies.
+
+No-extractable-message decision: when the command is a real commit but no message can be extracted (editor, --amend --no-edit, -C, -m "$MSG", -F naming a file not present yet), the prefix guard ALLOWS. Rationale: a false deny blocks legitimate work (the complaint this task fixes), while the git commit-msg hook still sees the final message. Old behaviour denied these on task-* branches.
+
+if: question (TASK-123 AC5), settled with evidence on Claude Code 2.1.283 in this repo, whose live commit-msg-guard was still the unconditional grep: echo / python3 heredoc / && compound / quoted $(...) commands carrying the trailer name were NOT denied, so if: Bash(git commit *) does filter them. But 'X=1; echo ... Co-Authored-By $X $(date +%s)' WAS denied by the commit-msg guard. The hooks docs (code.claude.com/docs/en/hooks) say the filter is best-effort: patterns that specify more than the command name run the hook anyway on $(), backticks or $VAR, and so does any command Claude Code cannot parse. So if: is real filtering but not a reliable gate, and each guard must gate itself. The same probe also hit the old prefix guard: a python3 heredoc command in this session whose text contained the phrase was denied on task-281.
+
+Portability: awk program uses POSIX features only (verified under mawk here); bash uses [[ =~ ]] with regex in a variable, $'\n', BASH_REMATCH and parameter expansion, all bash 3.2. No GNU-only flags added. Gate limits: options between git and commit are recognised (-C path, -c k=v, other -flags); env-prefix forms (FOO=1 git commit) and sudo/env wrappers are not gated and are allowed. Pre-existing: uv run ruff check . reports 43 errors on master too (none in touched files); bats is not installed in this container so tests/unit/pretools-hooks.bats was not run, and its guard cases are covered again by the new pytest file.
+
+Review round 1 (CHANGES REQUESTED, 3 blocking) fixed: the regex gate is replaced by an awk lexer (identical block in both guards, enforced by a test) that splits simple commands, skips VAR= assignments and if/then/else/elif/do/while/until/time/!/{ prefixes, keeps escaped chars, treats <<< and $((..))/((..)) as non-heredocs, and reads quoted or hyphenated heredoc delimiters. The prefix guard walks the lexed commit args for the first -m/--message or -F/--file (clustered short options such as -am; -C/-c/-t consume their value), so a -m inside --author=".." or a later command is not read. Lexer output uses \037/\036 separators, not \001 (bash's internal CTLESC).
+
+Review round 2: APPROVED (0 blocking, 3 minor). Correction to the earlier gate-limits note: leading VAR=value assignments (FOO=1 git commit) ARE now gated, since the lexer skips them. Known limits left as-is (minor, recorded rather than fixed post-approval): (1) a commit inside $(...) or backticks is not gated by either guard; the git commit-msg hook still enforces the trailer ban, but nothing backs the prefix rule there. (2) git commit -m "" -m "bad" is allowed by the prefix guard, because the empty first -m counts as no message. Candidates for a follow-up task. Final checks: uv run pytest 980 passed / 3 skipped; ruff clean on the touched files (43 errors elsewhere already exist on master); bash -n ok on both scripts; template and .claude/hooks copies byte-identical.
+<!-- SECTION:NOTES:END -->
