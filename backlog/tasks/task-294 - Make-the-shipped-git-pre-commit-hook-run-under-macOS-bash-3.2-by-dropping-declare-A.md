@@ -6,7 +6,7 @@ title: >-
 status: Done
 assignee: []
 created_date: '2026-11-03T19:02:00Z'
-updated_date: '2026-11-03T21:14:00Z'
+updated_date: '2026-11-03T21:21:00Z'
 labels: []
 dependencies: []
 priority: high
@@ -65,7 +65,7 @@ Out of scope:
 - [x] #2 A pytest case fails when any git-tracked shell script uses declare -A, local -A, typeset -A, mapfile or readarray outside a comment, and passes on the fixed tree
 - [x] #3 The NFC/NFD behaviour is unchanged: every existing case in tests/unit/pre-commit-hook.bats passes, plus a new case where a HEAD path containing a backslash still blocks its NFD duplicate
 - [x] #4 LC_ALL=C bats tests/unit, uv run pytest and uv run ruff check . pass
-- [ ] #5 On the macOS host, outside the sandbox: PATH="/usr/bin:/bin:/opt/homebrew/bin:$PATH" LC_ALL=C bats tests/unit/pre-commit-hook.bats has no failures, and a commit in a scratch repo with the hook installed and /bin/bash first on PATH succeeds; both results are recorded in the task notes
+- [x] #5 On the macOS host, outside the sandbox: PATH="/usr/bin:/bin:/opt/homebrew/bin:$PATH" LC_ALL=C bats tests/unit/pre-commit-hook.bats has no failures, and a commit in a scratch repo with the hook installed and /bin/bash first on PATH succeeds; both results are recorded in the task notes
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -82,4 +82,6 @@ AC5 DEFERRED to the macOS host outside the Claude Code sandbox: this Linux conta
 Replaced declare -A in the pre-commit template with an nfc<TAB>path string index; the lookup goes through awk ENVIRON (backslash-safe) with a forced string compare. Installed copy .git/hooks/pre-commit is byte-identical. Added a static pytest guard (test_bash32_syntax.py) for declare/local/typeset -A, mapfile and readarray outside comments, plus two bats cases (backslash HEAD path; numeric-lookalike paths). Both cases are mutation-checked. Final: pytest 1028 passed / 3 skipped, ruff clean, bats tests/unit 204/205 (the R11 settings.local.json failure comes from the gitignored local file and also fails on master). task-reviewer APPROVED on re-review. AC5 deferred to the macOS host (see above).
 
 Commit: `1b9cb61` - task-294: bump plugin version to 0.14.15 (patch)
+
+macOS host verification (after merge, master 0.14.15), outside the sandbox with PATH=/usr/bin:/bin:/opt/homebrew/bin:$PATH, which gives bash 3.2.57, Apple git 2.50.1 and python3 3.9.6. LC_ALL=C bats tests/unit/pre-commit-hook.bats: 15/15, and the full LC_ALL=C bats tests/unit under the same PATH: 205/205. Before the fix this PATH failed cases 44-46, 49, 54 and 55. Real commits: a scratch repo with the template hook installed as .git/hooks/pre-commit, with env bash resolving to /bin/bash 3.2.57, accepted the first commit and then a second commit with HEAD present, which runs the NFC check (2 commits in log). Host gates on master: ruff clean, uv run pytest 1027 passed / 4 skipped, LC_ALL=C bats tests/unit 205/205.
 <!-- SECTION:NOTES:END -->
