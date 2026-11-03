@@ -3,10 +3,10 @@ id: TASK-293
 title: >-
   Make the devcontainer locale an installed one: en_US.UTF-8 is exported but not
   generated
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-03T17:55:00Z'
-updated_date: '2026-11-03T18:40:00Z'
+updated_date: '2026-11-03T18:43:00Z'
 labels: []
 dependencies: []
 priority: low
@@ -46,4 +46,10 @@ Plan: switch remoteEnv LANG/LC_ALL to C.UTF-8 (already installed in the base ima
 Evidence in this container (same image): with en_US.UTF-8 bash prints 'setlocale: LC_ALL: cannot change locale' and Python raises locale.Error; with C.UTF-8 bash -c true prints nothing on stderr and locale.setlocale(LC_ALL, '') succeeds. AC1/AC2 literally require a recreated container via devcontainer exec, which can only be done from the host — left unchecked for host verification.
 
 Commit: `9c0e1e2` - task-293: set the devcontainer remoteEnv locale to the installed C.UTF-8
+
+Commit: `6ce2d07` - task-293: describe the C.UTF-8 remoteEnv locale in the devcontainer comment
+
+Review: task-reviewer APPROVED (score 9); minor finding on the stale devcontainer.json comment fixed in both copies. Final: uv run pytest 1015 passed / 3 skipped, ruff clean. AC1/AC2 deferred to the macOS host: recreate the container and run 'devcontainer exec ... bash -c true' (expect empty stderr) and the python3 setlocale one-liner (expect exit 0).
+
+Commit: `6519dcb` - task-293: bump plugin version to 0.14.14 (patch)
 <!-- SECTION:NOTES:END -->
