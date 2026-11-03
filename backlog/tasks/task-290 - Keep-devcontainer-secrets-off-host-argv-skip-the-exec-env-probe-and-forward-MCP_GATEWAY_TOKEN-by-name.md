@@ -3,10 +3,10 @@ id: TASK-290
 title: >-
   Keep devcontainer secrets off host argv: skip the exec env probe and forward
   MCP_GATEWAY_TOKEN by name
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-03T17:32:00Z'
-updated_date: '2026-11-03T17:58:00Z'
+updated_date: '2026-11-03T18:00:00Z'
 labels: []
 dependencies: []
 priority: high
@@ -78,4 +78,8 @@ Commit: `72f7a0d` - task-290: forward MCP_GATEWAY_TOKEN by name and skip the dev
 Deferred: AC #5, #6 and #7 need the macOS host after the merge and a container recreate (host ps -ww -eo args grepped with each token via -f from a umask 077 mktemp file, for docker run and during devcontainer exec --workspace-folder . sleep 8; token lengths, LANG/LC_ALL and claude -p 'Reply with the single word OK' via devcontainer exec; devcontainer exec --workspace-folder . uv run pytest -q). The owner runs them and records the counts and results here. They cannot run from inside the container.
 
 Commit: `28a455b` - task-290: say the gateway token is unset, not empty, when the host lacks it
+
+Commit: `4dd092b` - task-290: drop a stray blank line in the token-forward test
+
+Done: MCP_GATEWAY_TOKEN moved from containerEnv to the single runArgs element --env=MCP_GATEWAY_TOKEN, next to --env=CLAUDE_CODE_OAUTH_TOKEN. Both devcontainer.json copies (byte-identical) set userEnvProbe none and remoteEnv LANG/LC_ALL en_US.UTF-8. The orchestrator's exec argv is unchanged, since devcontainer.json is enough. The token-forward test is parametrised over both secrets and pins the probe and locale. SKILL.md has a new userEnvProbe note, the host MCP gateway passage now describes the name-only forward, and runArgs plus the secrets are in the U5 recreate note. pytest 1011 passed, ruff clean. template-parity.bats: 11/12, and test 5 fails the same way on master in the container (.claude/settings.local.json is the container overlay). task-reviewer APPROVED on the second pass. Follow-up: TASK-293 (en_US.UTF-8 is not a generated locale in the image).
 <!-- SECTION:NOTES:END -->
