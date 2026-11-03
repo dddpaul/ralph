@@ -44,4 +44,6 @@ TASK-290 moved the locale from the user-env probe to remoteEnv (LANG and LC_ALL 
 Plan: switch remoteEnv LANG/LC_ALL to C.UTF-8 (already installed in the base image, no Dockerfile change, upgrades via the normal devcontainer.json template diff) in both copies, update the pinned test and the SKILL.md probe paragraph.
 
 Evidence in this container (same image): with en_US.UTF-8 bash prints 'setlocale: LC_ALL: cannot change locale' and Python raises locale.Error; with C.UTF-8 bash -c true prints nothing on stderr and locale.setlocale(LC_ALL, '') succeeds. AC1/AC2 literally require a recreated container via devcontainer exec, which can only be done from the host — left unchecked for host verification.
+
+Commit: `9c0e1e2` - task-293: set the devcontainer remoteEnv locale to the installed C.UTF-8
 <!-- SECTION:NOTES:END -->
