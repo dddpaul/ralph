@@ -173,7 +173,7 @@ Assemble the Dockerfile from base + language snippets, then write four files:
 - `templates/devcontainer/init-firewall.sh` → `.devcontainer/init-firewall.sh`
 - `templates/devcontainer/container-settings.local.json` → `.devcontainer/container-settings.local.json` — copy verbatim; it is the container's `.claude/settings.local.json` (see the "shared `.claude`" note below)
 
-**Host-side prerequisites for devcontainer auth (macOS):** the template forwards `CLAUDE_CODE_OAUTH_TOKEN` from the host into the container via `containerEnv` + `${localEnv:...}`. macOS hosts store Claude OAuth credentials in the system Keychain (not on disk), so the bind-mounted host credentials file is empty inside the container. Without the env-var forward, `claude` inside the container fails auth. After running `ralph-init`, tell the user to do the following on the host (one-time setup, token is valid for ~1 year):
+**Host-side prerequisites for devcontainer auth (macOS):** the template forwards `CLAUDE_CODE_OAUTH_TOKEN` from the host into the container with the name-only runArgs entry `--env=CLAUDE_CODE_OAUTH_TOKEN`: given a name without `=value`, docker copies the value from its own environment, which it inherits from the devcontainer CLI and so from the host shell. It is deliberately **not** a `containerEnv` entry: the devcontainer CLI turns a containerEnv value into `docker run -e NAME=value`, and that `docker run` process stays alive for the container's lifetime, so the token would be visible in the host's `ps` output to any process that can list processes. Keep it one element, not the pair `"-e", "CLAUDE_CODE_OAUTH_TOKEN"` — `merge-runargs.sh` drops every project runArgs element the template already has, so a template `"-e"` would strip a project's own `"-e"` and leave its value as a stray `docker run` argument. macOS hosts store Claude OAuth credentials in the system Keychain (not on disk), so the bind-mounted host credentials file is empty inside the container. Without the env-var forward, `claude` inside the container fails auth. After running `ralph-init`, tell the user to do the following on the host (one-time setup, token is valid for ~1 year):
 
 1. **Mint a long-lived token** by running `claude setup-token` once on the host. Reference: https://code.claude.com/docs/en/authentication.md#generate-a-long-lived-token
 
@@ -183,13 +183,13 @@ Assemble the Dockerfile from base + language snippets, then write four files:
    export CLAUDE_CODE_OAUTH_TOKEN="$(security find-generic-password -a "$USER" -s "claude-code-oauth-token" -w 2>/dev/null)"
    ```
 
-3. **GUI-app caveat:** VS Code launched from Dock/Spotlight does **not** source the shell's env file, so `${localEnv:CLAUDE_CODE_OAUTH_TOKEN}` resolves to empty when VS Code starts the devcontainer. Either (a) restart VS Code from a terminal that has the token in its environment, or (b) run `launchctl setenv CLAUDE_CODE_OAUTH_TOKEN <value>` once for a launchd-domain export visible to all GUI apps.
+3. **GUI-app caveat:** VS Code launched from Dock/Spotlight does **not** source the shell's env file, so the `docker run` it starts has no `CLAUDE_CODE_OAUTH_TOKEN` to copy and the container gets none. Either (a) restart VS Code from a terminal that has the token in its environment, or (b) run `launchctl setenv CLAUDE_CODE_OAUTH_TOKEN <value>` once for a launchd-domain export visible to all GUI apps.
 
 4. **`launchctl setenv` does not persist across reboots.** Either re-run it after each reboot, or persist via a launchd plist (e.g. `~/Library/LaunchAgents/com.user.claude-oauth.plist` with a `RunAtLoad` `launchctl setenv` invocation).
 
-**Graceful degradation:** when the host shell does not export the token, `${localEnv:CLAUDE_CODE_OAUTH_TOKEN}` resolves to empty string and the container starts unaffected. The existing host Keychain auth path stays intact for non-devcontainer use.
+**Graceful degradation:** when the host shell does not export the token, `--env=CLAUDE_CODE_OAUTH_TOKEN` leaves the variable unset in the container and the container starts unaffected. The existing host Keychain auth path stays intact for non-devcontainer use.
 
-**Do not** commit the token value anywhere — only the env var name and the `${localEnv:...}` substitution belong in `devcontainer.json`.
+**Do not** commit the token value anywhere — only the env var name, in `--env=CLAUDE_CODE_OAUTH_TOKEN`, belongs in `devcontainer.json`.
 
 **Shared `.claude`, with one file overridden (keeps host and container in sync):** `workspaceMount` bind-mounts the host project folder at `/workspace`, so the container sees the project's own `.claude/` directly — `.claude/skills/**`, `.claude/hooks/**`, and `CLAUDE.md` are the same bytes on both sides, host edits are visible to the container immediately, and a container-side commit can never carry a stale copy back into git. Exactly one file has to differ: `bwrap` cannot create mount namespaces on Docker Desktop macOS, so Claude Code's sandbox must be **off** inside the container while the host keeps it **on**. The template therefore binds a single container-specific file over that one path:
 
