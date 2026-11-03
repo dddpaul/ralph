@@ -10,6 +10,12 @@ version 3, and skips with the reason otherwise.
 
 ``BASH32_SYNTAX_SHELL`` overrides the ``/bin/bash`` default so a locally built
 bash 3.2 can drive the guard on Linux.
+
+``bash -n`` cannot see run-time-only bash 4 builtins: ``declare -A`` parses fine
+and only fails when executed (TASK-294). A static scan therefore rejects
+associative-array declarations, ``mapfile`` and ``readarray`` outside comments
+on every host. ``|&`` and ``&>>`` are left out: the commit guards' jq lexer
+program carries those characters as data.
 """
 
 from __future__ import annotations
@@ -24,6 +30,10 @@ from devcontainer_config import REPO_ROOT
 
 SYNTAX_SHELL = os.environ.get("BASH32_SYNTAX_SHELL", "/bin/bash")
 SHEBANG = re.compile(rb"^#!.*\b(ba)?sh\b")
+BASH4_BUILTIN = re.compile(
+    r"\b(?:declare|local|typeset)\s+(?:-\w+\s+)*-\w*A\b|\b(?:mapfile|readarray)\b"
+)
+COMMENT = re.compile(r"(?:^|\s)#.*$")
 
 
 def tracked_shell_scripts() -> list[Path]:
@@ -43,6 +53,15 @@ def tracked_shell_scripts() -> list[Path]:
                 if SHEBANG.match(fh.readline()):
                     scripts.append(path)
     return scripts
+
+
+def bash4_builtin_lines(text: str) -> list[str]:
+    """Return the lines of ``text`` that use a bash 4 builtin outside a ``#`` comment."""
+    return [
+        line
+        for line in text.splitlines()
+        if BASH4_BUILTIN.search(COMMENT.sub("", line))
+    ]
 
 
 def shell_major_version(shell: str) -> int | None:
@@ -79,3 +98,47 @@ def test_tracked_shell_scripts_parse_under_bash32() -> None:
         if result.returncode != 0:
             failures.append(f"{script.relative_to(REPO_ROOT)}:\n{result.stderr}")
     assert not failures, f"{SYNTAX_SHELL} -n failed:\n" + "\n".join(failures)
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "declare -A head_by_nfc",
+        "  local -A seen=()",
+        "typeset -A map",
+        "declare -gA cache",
+        "declare -r -A frozen",
+        "mapfile -t lines < file",
+        'n=${#x[@]}; readarray -t rows <<< "$out"',
+    ],
+)
+def test_bash4_builtin_scan_flags_usage(line: str) -> None:
+    """The static scan flags each bash 4 builtin form."""
+    assert bash4_builtin_lines(f"#!/usr/bin/env bash\n{line}\n") == [line]
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "# bash 3.2 has no associative arrays: no declare -A here",
+        "x=1  # avoid mapfile / readarray",
+        "declare -a list",
+        "local -r name=value",
+        "echo ${#arr[@]}",
+    ],
+)
+def test_bash4_builtin_scan_ignores_comments_and_bash32_forms(line: str) -> None:
+    """Comments, indexed arrays and other bash 3.2 declarations pass the scan."""
+    assert bash4_builtin_lines(f"{line}\n") == []
+
+
+def test_tracked_shell_scripts_avoid_bash4_builtins() -> None:
+    """No tracked script uses associative arrays, ``mapfile`` or ``readarray`` (TASK-294)."""
+    failures = [
+        f"{script.relative_to(REPO_ROOT)}: {line.strip()}"
+        for script in tracked_shell_scripts()
+        for line in bash4_builtin_lines(script.read_text(errors="replace"))
+    ]
+    assert not failures, "bash 4-only builtins (macOS /bin/bash is 3.2):\n" + "\n".join(
+        failures
+    )

@@ -107,6 +107,31 @@ teardown() {
   [ "$status" -eq 0 ]
 }
 
+# git prints a path containing a backslash quoted and escaped ("dir\\й.md"),
+# so the hook's HEAD lookup must compare that key verbatim — `awk -v` would
+# expand the escape and miss the match (TASK-294).
+@test "pre-commit: blocks the NFD duplicate of a HEAD path containing a backslash" {
+  stage_plumbed "dir\\$NFC_NAME" nfc
+  git -c core.hooksPath=/dev/null commit -q -m "add NFC form"
+
+  stage_plumbed "dir\\$NFD_NAME" nfd
+
+  run bash "$HOOK"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"BLOCKED"* ]]
+}
+
+# The HEAD lookup compares keys as strings: "1.0" and "1" are distinct paths.
+@test "pre-commit: passes when a staged path only equals a HEAD path numerically" {
+  stage_plumbed 1.0 a
+  git -c core.hooksPath=/dev/null commit -q -m "init"
+
+  stage_plumbed 1 b
+
+  run bash "$HOOK"
+  [ "$status" -eq 0 ]
+}
+
 # ===========================================================================
 # filename-length-guard delegation (TASK-227)
 # ===========================================================================
