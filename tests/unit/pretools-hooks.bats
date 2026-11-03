@@ -73,6 +73,68 @@ run_hook() {
 }
 
 # ===========================================================================
+# 1c. commit-msg-guard gate: only a real commit or pr create (TASK-281)
+# ===========================================================================
+
+# Helper: a Bash tool_input JSON for an arbitrary (multi-line) command
+cmd_json() {
+  jq -nc --arg c "$1" '{tool_name: "Bash", tool_input: {command: $c}}'
+}
+
+@test "commit-msg-guard: ignores backlog task create naming the trailers (TASK-281)" {
+  run run_hook "commit-msg-guard.sh" "$(cmd_json 'backlog task create "Ban trailers" -d "Forbid Co-Authored-By, Generated with Claude Code and ## Test plan in git commit messages"')"
+  [ "$status" -eq 0 ]
+  [[ -z "$output" ]]
+}
+
+@test "commit-msg-guard: ignores notes quoting a commit with a trailer (TASK-281)" {
+  run run_hook "commit-msg-guard.sh" "$(cmd_json 'backlog task edit 7 --append-notes "Denied:
+git commit -m \"x
+
+Co-Authored-By: a\""')"
+  [ "$status" -eq 0 ]
+  [[ -z "$output" ]]
+}
+
+@test "commit-msg-guard: ignores a heredoc script mentioning commit and trailer (TASK-281)" {
+  run run_hook "commit-msg-guard.sh" "$(cmd_json "python3 - <<'PY'
+print('git commit -m \"Co-Authored-By: x\"')
+PY")"
+  [ "$status" -eq 0 ]
+  [[ -z "$output" ]]
+}
+
+@test "commit-msg-guard: blocks a trailer in a multi-line commit after another command (TASK-281)" {
+  run run_hook "commit-msg-guard.sh" "$(cmd_json 'git add -u && git commit -m "task-1: fix
+
+Co-Authored-By: someone"')"
+  [[ "$output" == *"deny"* ]]
+}
+
+@test "commit-msg-guard: blocks a Test plan heading in a heredoc commit message (TASK-281)" {
+  run run_hook "commit-msg-guard.sh" "$(cmd_json "cat <<'MSG' | git commit -F -
+task-1: fix
+
+## Test plan
+- run it
+MSG")"
+  [[ "$output" == *"deny"* ]]
+}
+
+@test "commit-msg-guard and commit-prefix-guard share an identical lexer (TASK-281)" {
+  local a b
+  a=$(sed -n '/^# >>> shared command lexer/,/^# <<< shared command lexer/p' "$HOOKS_DIR/commit-msg-guard.sh")
+  b=$(sed -n '/^# >>> shared command lexer/,/^# <<< shared command lexer/p' "$HOOKS_DIR/commit-prefix-guard.sh")
+  [[ -n "$a" ]]
+  [[ "$a" == "$b" ]]
+}
+
+@test "commit guards use neither python3 nor a line-based sed extraction (TASK-281)" {
+  ! grep -q 'python' "$HOOKS_DIR/commit-msg-guard.sh" "$HOOKS_DIR/commit-prefix-guard.sh"
+  ! grep -q 'sed -n' "$HOOKS_DIR/commit-prefix-guard.sh"
+}
+
+# ===========================================================================
 # 2. notes-guard
 # ===========================================================================
 
@@ -385,4 +447,147 @@ hook_json() {
   run run_hook_in_repo "commit-prefix-guard.sh" \
     '{"tool_name":"Bash","tool_input":{"command":"kill 1"}}'
   [[ -z "$output" ]]
+}
+
+# ===========================================================================
+# 5b. commit-prefix-guard: command-position gate and multi-line extraction
+#     (TASK-281)
+# ===========================================================================
+
+# Helper: run commit-prefix-guard on a task-99 branch for a command string
+prefix_guard_on_task_branch() {
+  [[ -d "$TEST_DIR/repo" ]] || {
+    setup_git_repo
+    git -C "$TEST_DIR/repo" checkout -b task-99-feature >/dev/null 2>&1
+  }
+  run run_hook_in_repo "commit-prefix-guard.sh" "$(cmd_json "$1")"
+}
+
+assert_denied() {
+  [[ "$output" == *"deny"* ]]
+  [[ "$output" == *"task-99"* ]]
+}
+
+assert_allowed() {
+  [ "$status" -eq 0 ]
+  [[ -z "$output" ]]
+}
+
+@test "commit-prefix-guard: allows a prefixed multi-line double-quoted -m" {
+  prefix_guard_on_task_branch 'git commit -m "task-99: fix the widget
+
+Longer body line."'
+  assert_allowed
+}
+
+@test "commit-prefix-guard: allows a prefixed multi-line single-quoted -m" {
+  prefix_guard_on_task_branch "git commit -m 'task-99: it'\\''s fixed
+
+Body.'"
+  assert_allowed
+}
+
+@test "commit-prefix-guard: blocks an unprefixed multi-line -m" {
+  prefix_guard_on_task_branch 'git commit -m "fix the widget
+
+task-99: is not the subject"'
+  assert_denied
+}
+
+@test "commit-prefix-guard: blocks a wrongly prefixed single-line -m" {
+  prefix_guard_on_task_branch 'git commit -m "task-98: fix the widget"'
+  assert_denied
+}
+
+@test "commit-prefix-guard: blocks a wrongly prefixed multi-line -m" {
+  prefix_guard_on_task_branch "git commit -m 'task-98: fix the widget
+
+Body.'"
+  assert_denied
+}
+
+@test "commit-prefix-guard: ignores notes quoting the commit phrase" {
+  prefix_guard_on_task_branch 'backlog task edit 99 --append-notes "Run git commit -m \"foo\" then
+git commit --amend"'
+  assert_allowed
+}
+
+@test "commit-prefix-guard: ignores a heredoc script mentioning the commit phrase" {
+  prefix_guard_on_task_branch "python3 - <<'PY'
+import os
+os.system('git commit -m foo')
+PY"
+  assert_allowed
+}
+
+@test "commit-prefix-guard: ignores git log whose argument is the word commit" {
+  prefix_guard_on_task_branch 'git log --grep commit'
+  assert_allowed
+}
+
+@test "commit-prefix-guard: --message= is checked" {
+  prefix_guard_on_task_branch 'git commit --message="task-99: ok"'
+  assert_allowed
+  prefix_guard_on_task_branch 'git commit --message="not ok"'
+  assert_denied
+}
+
+@test "commit-prefix-guard: -F and --file read the named file" {
+  printf 'task-99: from a file\n\nBody.\n' > "$TEST_DIR/good.txt"
+  printf 'no prefix\n' > "$TEST_DIR/bad.txt"
+  prefix_guard_on_task_branch "git commit -F '$TEST_DIR/good.txt'"
+  assert_allowed
+  prefix_guard_on_task_branch "git commit -F '$TEST_DIR/bad.txt'"
+  assert_denied
+  prefix_guard_on_task_branch "git commit --file '$TEST_DIR/bad.txt'"
+  assert_denied
+  prefix_guard_on_task_branch "git commit --file='$TEST_DIR/bad.txt'"
+  assert_denied
+}
+
+@test "commit-prefix-guard: checks a heredoc piped into -F -" {
+  prefix_guard_on_task_branch "cat <<'MSG' | git commit -F -
+task-99: fix the widget
+
+It's done.
+MSG"
+  assert_allowed
+  prefix_guard_on_task_branch "cat <<'MSG' | git commit -F -
+fix the widget
+MSG"
+  assert_denied
+}
+
+@test "commit-prefix-guard: checks a heredoc on -F - itself" {
+  prefix_guard_on_task_branch "git commit -F - <<'MSG'
+fix the widget
+MSG"
+  assert_denied
+}
+
+@test "commit-prefix-guard: checks an -m built from a cat heredoc" {
+  prefix_guard_on_task_branch "git commit -m \"\$(cat <<'EOF'
+task-99: it's \"done\"
+
+Body.
+EOF
+)\""
+  assert_allowed
+  prefix_guard_on_task_branch "git commit -m \"\$(cat <<'EOF'
+it's not prefixed
+EOF
+)\""
+  assert_denied
+}
+
+@test "commit-prefix-guard: sees a commit after env assignments, git -C and a separator" {
+  prefix_guard_on_task_branch 'git add -u && PATH=/usr/bin:$PATH git -C . commit -am "no prefix" 2>&1 | tail -1'
+  assert_denied
+}
+
+@test "commit-prefix-guard: allows a commit whose message cannot be extracted" {
+  prefix_guard_on_task_branch 'git commit --amend --no-edit'
+  assert_allowed
+  prefix_guard_on_task_branch 'git commit -F /nonexistent/msg.txt'
+  assert_allowed
 }
