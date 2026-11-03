@@ -3,9 +3,10 @@ id: TASK-290
 title: >-
   Keep devcontainer secrets off host argv: skip the exec env probe and forward
   MCP_GATEWAY_TOKEN by name
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-03T17:32:00Z'
+updated_date: '2026-11-03T18:00:00Z'
 labels: []
 dependencies: []
 priority: high
@@ -58,11 +59,29 @@ Out of scope:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Neither .devcontainer/devcontainer.json nor the ralph-init template devcontainer.json has an MCP_GATEWAY_TOKEN key in containerEnv, and both list "--env=MCP_GATEWAY_TOKEN" as one element in their single-line runArgs next to "--env=CLAUDE_CODE_OAUTH_TOKEN"
-- [ ] #2 Both devcontainer.json copies set "userEnvProbe": "none" and set LANG and LC_ALL to en_US.UTF-8 through remoteEnv (or the notes record why another place was used)
-- [ ] #3 A test pins the template's MCP_GATEWAY_TOKEN name-only forward, the absent containerEnv entry, userEnvProbe none and the locale entries; uv run pytest, uv run ruff check . and tests/unit/template-parity.bats pass
-- [ ] #4 plugins/ralph/skills/ralph-init/SKILL.md describes the name-only MCP_GATEWAY_TOKEN forward and the userEnvProbe none setting with its reason (the probe re-sends the container env as docker exec -e NAME=value, visible in the host's ps for each exec's lifetime), and the Upgrade Mode U5 recreate note covers the change
+- [x] #1 Neither .devcontainer/devcontainer.json nor the ralph-init template devcontainer.json has an MCP_GATEWAY_TOKEN key in containerEnv, and both list "--env=MCP_GATEWAY_TOKEN" as one element in their single-line runArgs next to "--env=CLAUDE_CODE_OAUTH_TOKEN"
+- [x] #2 Both devcontainer.json copies set "userEnvProbe": "none" and set LANG and LC_ALL to en_US.UTF-8 through remoteEnv (or the notes record why another place was used)
+- [x] #3 A test pins the template's MCP_GATEWAY_TOKEN name-only forward, the absent containerEnv entry, userEnvProbe none and the locale entries; uv run pytest, uv run ruff check . and tests/unit/template-parity.bats pass
+- [x] #4 plugins/ralph/skills/ralph-init/SKILL.md describes the name-only MCP_GATEWAY_TOKEN forward and the userEnvProbe none setting with its reason (the probe re-sends the container env as docker exec -e NAME=value, visible in the host's ps for each exec's lifetime), and the Upgrade Mode U5 recreate note covers the change
 - [ ] #5 On the macOS host after the merge and a container recreate: ps -ww -eo args, grepped with each token read via -f from a umask 077 mktemp file, counts 0 lines for this repo's docker run and 0 lines while devcontainer exec --workspace-folder . sleep 8 is running; the counts are recorded in the task notes
 - [ ] #6 On the macOS host, in that container: both token lengths printed by devcontainer exec equal the host's, LANG and LC_ALL print en_US.UTF-8, and devcontainer exec --workspace-folder . claude -p 'Reply with the single word OK' prints OK
 - [ ] #7 On the macOS host: devcontainer exec --workspace-folder . uv run pytest -q passes in the recreated container
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan: in both devcontainer.json copies move MCP_GATEWAY_TOKEN from containerEnv to the single runArgs element --env=MCP_GATEWAY_TOKEN, add userEnvProbe none + remoteEnv LANG/LC_ALL; extend tests/python/test_devcontainer_oauth_token_forward.py to pin both; rewrite SKILL.md host MCP gateway passage, add a userEnvProbe note, extend the U5 recreate note. Precondition check: locale -a in this container lists only C, C.utf8, POSIX — en_US.utf8 is NOT installed; the probe's en_US.UTF-8 comes from ~/.zshrc (zsh-in-docker), so the value is already a non-installed locale today. Keeping en_US.UTF-8 per AC #2 preserves the status quo exactly; a follow-up task covers installing the locale or switching to C.UTF-8.
+
+Commit: `72f7a0d` - task-290: forward MCP_GATEWAY_TOKEN by name and skip the devcontainer exec env probe
+
+Deferred: AC #5, #6 and #7 need the macOS host after the merge and a container recreate (host ps -ww -eo args grepped with each token via -f from a umask 077 mktemp file, for docker run and during devcontainer exec --workspace-folder . sleep 8; token lengths, LANG/LC_ALL and claude -p 'Reply with the single word OK' via devcontainer exec; devcontainer exec --workspace-folder . uv run pytest -q). The owner runs them and records the counts and results here. They cannot run from inside the container.
+
+Commit: `28a455b` - task-290: say the gateway token is unset, not empty, when the host lacks it
+
+Commit: `4dd092b` - task-290: drop a stray blank line in the token-forward test
+
+Done: MCP_GATEWAY_TOKEN moved from containerEnv to the single runArgs element --env=MCP_GATEWAY_TOKEN, next to --env=CLAUDE_CODE_OAUTH_TOKEN. Both devcontainer.json copies (byte-identical) set userEnvProbe none and remoteEnv LANG/LC_ALL en_US.UTF-8. The orchestrator's exec argv is unchanged, since devcontainer.json is enough. The token-forward test is parametrised over both secrets and pins the probe and locale. SKILL.md has a new userEnvProbe note, the host MCP gateway passage now describes the name-only forward, and runArgs plus the secrets are in the U5 recreate note. pytest 1011 passed, ruff clean. template-parity.bats: 11/12, and test 5 fails the same way on master in the container (.claude/settings.local.json is the container overlay). task-reviewer APPROVED on the second pass. Follow-up: TASK-293 (en_US.UTF-8 is not a generated locale in the image).
+
+Commit: `9382e78` - task-290: bump plugin version to 0.14.12 (patch)
+<!-- SECTION:NOTES:END -->
