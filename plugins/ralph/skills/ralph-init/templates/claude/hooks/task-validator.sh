@@ -17,6 +17,9 @@ if [[ -z "$TASK_ID" ]]; then
   exit 0
 fi
 
+# Hooks run from the session's cwd, which a `cd <subdir> && …` moves; resolve task paths from the project root.
+cd "${CLAUDE_PROJECT_DIR:-.}" 2>/dev/null || exit 0
+
 # Find the task file
 TASK_FILE=$(find backlog/tasks -maxdepth 1 -name "task-${TASK_ID} -*" -o -name "task-${TASK_ID}-*" 2>/dev/null | head -1)
 if [[ -z "$TASK_FILE" ]] || [[ ! -f "$TASK_FILE" ]]; then
@@ -262,7 +265,7 @@ fi
 RUBRIC="${RUBRIC}${ITEM_NUM}. Self-containment (task can be completed without unstated context).\n"
 
 # Build rubric text and combine with det issues for single JSON emission
-RUBRIC_TEXT=$(printf 'Task validator triggered for TASK-%s.\nFile: %s\n\nRead the task file and evaluate against this rubric:\n%b\nOutput format: "Validator [llm]: task-%s OK" if no issues, or "Validator [llm]: task-%s" followed by terse one-line issues. No remediation suggestions, no rewrites.' "$TASK_ID" "$TASK_FILE" "$RUBRIC" "$TASK_ID" "$TASK_ID")
+RUBRIC_TEXT=$(printf 'Task validator triggered for TASK-%s.\nFile: %s\n\nRead the task file and evaluate against this rubric:\n%b\nOutput format: "Validator [llm]: task-%s OK" if no issues, or "Validator [llm]: task-%s" followed by terse one-line issues. No remediation suggestions, no rewrites.' "$TASK_ID" "$PWD/$TASK_FILE" "$RUBRIC" "$TASK_ID" "$TASK_ID")
 
 # === Emit combined JSON output ===
 COMBINED=""

@@ -3,11 +3,12 @@ id: TASK-288
 title: >-
   Resolve task-validator paths from CLAUDE_PROJECT_DIR so it still validates
   after a cwd change
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-25T16:15:00Z'
+updated_date: '2026-11-03 16:59'
 labels:
-  - feature:ralph-init
+  - 'feature:ralph-init'
 dependencies:
   - TASK-280
 priority: medium
@@ -78,11 +79,27 @@ If anything is unclear or any check fails: STOP and ask the user. Do NOT start w
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A bats case in tests/unit/task-validator.bats runs the template validator from a subdirectory with CLAUDE_PROJECT_DIR set to the project root, on a task depending on a missing TASK-9, and gets the same 'Dependency TASK-9 not found' [det] output as from the root
-- [ ] #2 A bats case: from a subdirectory, a backlog task create whose description backticks an existing root-relative path reports no 'does not exist' issue for it, and a missing path is still reported
-- [ ] #3 From a subdirectory, the LLM rubric's File: line names the task file by an absolute path that exists
-- [ ] #4 With CLAUDE_PROJECT_DIR unset, the existing tests/unit/task-validator.bats cases pass unchanged
-- [ ] #5 .claude/hooks/task-validator.sh is identical to the template, and tests/unit/template-parity.bats passes
+- [x] #1 A bats case in tests/unit/task-validator.bats runs the template validator from a subdirectory with CLAUDE_PROJECT_DIR set to the project root, on a task depending on a missing TASK-9, and gets the same 'Dependency TASK-9 not found' [det] output as from the root
+- [x] #2 A bats case: from a subdirectory, a backlog task create whose description backticks an existing root-relative path reports no 'does not exist' issue for it, and a missing path is still reported
+- [x] #3 From a subdirectory, the LLM rubric's File: line names the task file by an absolute path that exists
+- [x] #4 With CLAUDE_PROJECT_DIR unset, the existing tests/unit/task-validator.bats cases pass unchanged
+- [x] #5 .claude/hooks/task-validator.sh is identical to the template, and tests/unit/template-parity.bats passes
 - [ ] #6 The reproduction in the description, run on the macOS host after the fix, prints the [det] dependency issue from the subdirectory too; the output is recorded in the task notes
-- [ ] #7 uv run pytest passes, uv run ruff check . is clean, and LC_ALL=C bats tests/unit has no failures
+- [x] #7 uv run pytest passes, uv run ruff check . is clean, and LC_ALL=C bats tests/unit has no failures
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Handoff gate (destination): green. All paths exist, TASK-280 is Done, the template and live task-validator.sh are identical, and .claude/managed-file-drift.accept has no task-validator line to regenerate. AC #6 (the reproduction on the macOS host) is run on the host after the merge.
+
+Plan: add an early cd "${CLAUDE_PROJECT_DIR:-.}" (exit 0 on failure) before the task-file lookup in the template validator; print the rubric File: line as $PWD/$TASK_FILE; mirror to .claude/hooks; run_validator unsets CLAUDE_PROJECT_DIR so the root cases exercise the unset path; add subdirectory bats cases for the dependency check, path existence (existing + missing) and the absolute File: line.
+
+Commit: `11fce24` - task-288: resolve task-validator paths from CLAUDE_PROJECT_DIR so it validates from a subdirectory
+
+Verification (container): uv run ruff check . clean; uv run pytest 921 passed, 3 skipped; LC_ALL=C bats tests/unit 199/199 in a clean worktree of task-288 (in /workspace the single failure is 'R11: settings.local.json keeps the template's JSON shape', caused by the untracked machine-local .claude/settings.local.json and reproduced identically on master). Container run of the description reproduction: root and sub both print '[det] issues for TASK-1: - Dependency TASK-9 not found in backlog/tasks/', exit 0. AC #6 (same reproduction on the macOS host) is left for the host after the merge.
+
+task-reviewer: APPROVED (0 blocking, 0 minor, score 10). Done with AC #6 unchecked: it is a macOS-host run of the description reproduction, to be recorded after the merge; the container run of the same reproduction passes.
+
+Commit: `c2e8634` - task-288: bump plugin version to 0.14.10 (patch)
+<!-- SECTION:NOTES:END -->

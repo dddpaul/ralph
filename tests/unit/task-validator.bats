@@ -59,8 +59,36 @@ EOF
 
 run_validator() {
   local script="$1"
-  (cd "$TEST_DIR" && echo '{"tool_input":{"command":"backlog task edit 1 -s \"To Do\""}}' \
+  (unset CLAUDE_PROJECT_DIR; cd "$TEST_DIR" && echo '{"tool_input":{"command":"backlog task edit 1 -s \"To Do\""}}' \
     | RALPH_AUTONOMOUS=0 bash "$script" 2>/dev/null)
+}
+
+# Write task-1 depending on the missing TASK-9, backticking one existing and one missing root-relative path
+write_subdir_task() {
+  mkdir -p "$TEST_DIR/sub" "$TEST_DIR/docs"
+  : > "$TEST_DIR/docs/present.md"
+  printf '%s\n' \
+    '---' \
+    'id: TASK-1' \
+    'title: Sample' \
+    'status: To Do' \
+    'dependencies: [TASK-9]' \
+    '---' \
+    '' \
+    '## Description' \
+    '' \
+    'See `docs/present.md` and `docs/absent.md`.' \
+    '' \
+    '## Acceptance Criteria' \
+    '- [ ] #1 one' \
+    > "$TEST_DIR/backlog/tasks/task-1 - Sample.md"
+}
+
+# Run the template validator from $1 (a cwd) with CLAUDE_PROJECT_DIR at the project root; $2 is the backlog command
+run_validator_from() {
+  local cwd="$1" cmd="$2"
+  (cd "$cwd" && jq -n --arg c "$cmd" '{tool_input:{command:$c}}' \
+    | CLAUDE_PROJECT_DIR="$TEST_DIR" RALPH_AUTONOMOUS=0 bash "$TEMPLATE_VALIDATOR" 2>/dev/null)
 }
 
 @test "task-validator: reports ACs differing only in whitespace as duplicates (live copy)" {
@@ -89,4 +117,31 @@ run_validator() {
   [ "$status" -eq 1 ]
   grep -qF "sed -E 's/[[:space:]]+/ /g'" "$LIVE_VALIDATOR"
   grep -qF "sed -E 's/[[:space:]]+/ /g'" "$TEMPLATE_VALIDATOR"
+}
+
+@test "task-validator: reports a missing dependency from a subdirectory as from the root" {
+  write_subdir_task
+  run run_validator_from "$TEST_DIR" 'backlog task edit 1 -s "To Do"'
+  [[ "$output" == *"Dependency TASK-9 not found"* ]]
+  run run_validator_from "$TEST_DIR/sub" 'backlog task edit 1 -s "To Do"'
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"[det] issues for TASK-1"* ]]
+  [[ "$output" == *"Dependency TASK-9 not found"* ]]
+}
+
+@test "task-validator: checks root-relative paths from a subdirectory" {
+  write_subdir_task
+  run run_validator_from "$TEST_DIR/sub" 'backlog task create 1'
+  [[ "$output" != *"'docs/present.md' does not exist"* ]]
+  [[ "$output" == *"'docs/absent.md' does not exist"* ]]
+}
+
+@test "task-validator: rubric File: line is an absolute path that exists from a subdirectory" {
+  write_subdir_task
+  run run_validator_from "$TEST_DIR/sub" 'backlog task create 1'
+  file_line=$(printf '%s' "$output" | jq -r '.hookSpecificOutput.additionalContext' | grep '^File: ')
+  file_path="${file_line#File: }"
+  [[ "$file_path" == /* ]]
+  [ -f "$file_path" ]
+  [ "$file_path" = "$TEST_DIR/backlog/tasks/task-1 - Sample.md" ]
 }
