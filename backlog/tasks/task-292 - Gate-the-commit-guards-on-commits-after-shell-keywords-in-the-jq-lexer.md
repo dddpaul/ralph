@@ -35,13 +35,13 @@ Out of scope:
 - `plugins/ralph/skills/ralph-init/templates/claude/hooks/commit-prefix-guard.sh` (exists)
 - `plugins/ralph/skills/ralph-init/templates/claude/hooks/commit-msg-guard.sh` (exists)
 - `.claude/hooks/commit-prefix-guard.sh` and `.claude/hooks/commit-msg-guard.sh` (exist): keep identical to the templates
-- `tests/unit/pretools-hooks.bats` (exists)
+- `tests/unit/pretools-hooks.bats` (exists); `tests/python/test_commit_guards.py` (exists): remove the four xfail marks
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 The four xfail-marked cases of test_guards_see_commit_after_shell_syntax in tests/python/test_commit_guards.py (prefixes 'if true; then ', 'if false; then :; else ', '{ ', '! ') pass with their xfail marks removed: both guards deny the bad commit after each prefix
-- [ ] #2 Matching bats cases in tests/unit/pretools-hooks.bats pass, the identical-lexer bats case passes, and the .claude/hooks copies of both guards are byte-identical to the templates
+- [ ] #2 New bats cases for the four keyword prefixes are added to tests/unit/pretools-hooks.bats and pass, the identical-lexer bats case passes, and the .claude/hooks copies of both guards are byte-identical to the templates
 - [ ] #3 A command that only mentions the two-word phrase after a keyword, such as if true; then echo "G<SP>C"; fi, is still allowed by both guards (a bats case)
 - [ ] #4 Both guards pass bash -n and satisfy R-INFRA-3; uv run pytest, uv run ruff check . and LC_ALL=C bats tests/unit pass
 - [ ] #5 On the macOS host, tests/unit/pretools-hooks.bats passes with /bin/bash 3.2 first on PATH; the result is recorded in the task notes
