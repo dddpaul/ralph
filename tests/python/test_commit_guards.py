@@ -200,6 +200,7 @@ def test_live_copy_matches_template(name: str) -> None:
 
 BAD = f'{COMMIT} -m "bad\n\n{TRAILER}"'
 
+
 @pytest.mark.parametrize(
     "prefix",
     [

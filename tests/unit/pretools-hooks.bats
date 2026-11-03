@@ -134,7 +134,7 @@ Co-Authored-By: y'")"
     run run_hook "commit-msg-guard.sh" "$(cmd_json "${prefix}git commit -m 'x
 
 Co-Authored-By: y'")"
-    [[ "$output" == *"deny"* ]]
+    [[ "$output" == *"deny"* ]] || false
   done
 }
 
@@ -633,7 +633,7 @@ EOF
   local prefix
   for prefix in 'if true; then ' 'if false; then :; else ' '{ ' '! '; do
     prefix_guard_on_task_branch "${prefix}git commit -m 'not prefixed'"
-    assert_denied
+    [[ "$output" == *"deny"* && "$output" == *"task-99"* ]] || false
   done
   prefix_guard_on_task_branch "if true; then git commit -m 'task-99: ok'; fi"
   assert_allowed
