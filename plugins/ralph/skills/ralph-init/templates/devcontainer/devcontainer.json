@@ -47,8 +47,8 @@
   // supplies the locale the probe used to pick up from ~/.zshrc.
   "userEnvProbe": "none",
   "remoteEnv": {
-    "LANG": "en_US.UTF-8",
-    "LC_ALL": "en_US.UTF-8"
+    "LANG": "C.UTF-8",
+    "LC_ALL": "C.UTF-8"
   },
   "customizations": {
     "vscode": {
