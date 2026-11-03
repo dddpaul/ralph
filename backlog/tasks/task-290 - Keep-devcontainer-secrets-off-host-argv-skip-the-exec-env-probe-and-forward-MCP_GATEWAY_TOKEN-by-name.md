@@ -82,4 +82,6 @@ Commit: `28a455b` - task-290: say the gateway token is unset, not empty, when th
 Commit: `4dd092b` - task-290: drop a stray blank line in the token-forward test
 
 Done: MCP_GATEWAY_TOKEN moved from containerEnv to the single runArgs element --env=MCP_GATEWAY_TOKEN, next to --env=CLAUDE_CODE_OAUTH_TOKEN. Both devcontainer.json copies (byte-identical) set userEnvProbe none and remoteEnv LANG/LC_ALL en_US.UTF-8. The orchestrator's exec argv is unchanged, since devcontainer.json is enough. The token-forward test is parametrised over both secrets and pins the probe and locale. SKILL.md has a new userEnvProbe note, the host MCP gateway passage now describes the name-only forward, and runArgs plus the secrets are in the U5 recreate note. pytest 1011 passed, ruff clean. template-parity.bats: 11/12, and test 5 fails the same way on master in the container (.claude/settings.local.json is the container overlay). task-reviewer APPROVED on the second pass. Follow-up: TASK-293 (en_US.UTF-8 is not a generated locale in the image).
+
+Commit: `9382e78` - task-290: bump plugin version to 0.14.12 (patch)
 <!-- SECTION:NOTES:END -->
