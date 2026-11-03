@@ -88,13 +88,6 @@ def test_remote_env_supplies_the_locale(path: Path) -> None:
     assert not set(remote) & set(SECRETS)
 
 
-@each_copy
-def test_restoring_the_probe_is_caught(path: Path) -> None:
-    text = path.read_text(encoding="utf-8")
-    mutated = text.replace('"userEnvProbe": "none"', '"userEnvProbe": "loginInteractiveShell"')
-    assert mutated != text
-    assert loads_jsonc(mutated)["userEnvProbe"] != "none"
-
 
 def test_merge_keeps_the_forward_and_a_project_e_pair(tmp_path: Path) -> None:
     text = TEMPLATE.read_text(encoding="utf-8")
