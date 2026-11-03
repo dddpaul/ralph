@@ -76,4 +76,6 @@ Plan: in both devcontainer.json copies move MCP_GATEWAY_TOKEN from containerEnv 
 Commit: `72f7a0d` - task-290: forward MCP_GATEWAY_TOKEN by name and skip the devcontainer exec env probe
 
 Deferred: AC #5, #6 and #7 need the macOS host after the merge and a container recreate (host ps -ww -eo args grepped with each token via -f from a umask 077 mktemp file, for docker run and during devcontainer exec --workspace-folder . sleep 8; token lengths, LANG/LC_ALL and claude -p 'Reply with the single word OK' via devcontainer exec; devcontainer exec --workspace-folder . uv run pytest -q). The owner runs them and records the counts and results here. They cannot run from inside the container.
+
+Commit: `28a455b` - task-290: say the gateway token is unset, not empty, when the host lacks it
 <!-- SECTION:NOTES:END -->

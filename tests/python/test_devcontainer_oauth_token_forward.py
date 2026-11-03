@@ -88,7 +88,6 @@ def test_remote_env_supplies_the_locale(path: Path) -> None:
     assert not set(remote) & set(SECRETS)
 
 
-
 def test_merge_keeps_the_forward_and_a_project_e_pair(tmp_path: Path) -> None:
     text = TEMPLATE.read_text(encoding="utf-8")
     line = runargs_line(text)
