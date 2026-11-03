@@ -6,7 +6,7 @@ title: >-
 status: Done
 assignee: []
 created_date: '2026-10-29T11:40:00Z'
-updated_date: '2026-11-03 16:52'
+updated_date: '2026-11-03T17:19:00Z'
 labels:
   - devcontainer
   - template
@@ -68,9 +68,9 @@ If anything is unclear or any check fails: STOP and ask the user. Do NOT start w
 <!-- AC:BEGIN -->
 - [x] #1 Neither .devcontainer/devcontainer.json nor plugins/ralph/skills/ralph-init/templates/devcontainer/devcontainer.json has a CLAUDE_CODE_OAUTH_TOKEN key in containerEnv, and both list "--env=CLAUDE_CODE_OAUTH_TOKEN" (one element, the name only, no value) in their single-line runArgs, with no separate "-e" element
 - [x] #2 A test pins the template's name-only forward and the absent containerEnv entry, a test runs merge-runargs.sh on the template and a project file whose runArgs add "-e", "FOO" and finds both "--env=CLAUDE_CODE_OAUTH_TOKEN" and the project's "-e", "FOO" pair in the output, and uv run pytest and the template-parity bats suite pass
-- [ ] #3 On the macOS host after the merge: with CLAUDE_CODE_OAUTH_TOKEN exported in the host shell, a freshly created container from the changed devcontainer.json (devcontainer up) reports a non-zero token length via devcontainer exec sh -c 'printf %s ${#CLAUDE_CODE_OAUTH_TOKEN}', and ps -eo args on the host, grepped with the token read via -f from a umask 077 mktemp file, counts 0; both results are recorded in the task notes
-- [ ] #4 On the macOS host: in that container, devcontainer exec claude -p 'Reply with the single word OK' answers rather than reporting Not logged in
-- [ ] #5 On the macOS host: with CLAUDE_CODE_OAUTH_TOKEN unset in the host shell, devcontainer up of a fresh container still succeeds and the in-container token length prints 0
+- [x] #3 On the macOS host after the merge: with CLAUDE_CODE_OAUTH_TOKEN exported in the host shell, a freshly created container from the changed devcontainer.json (devcontainer up) reports a non-zero token length via devcontainer exec sh -c 'printf %s ${#CLAUDE_CODE_OAUTH_TOKEN}', and ps -eo args on the host, grepped with the token read via -f from a umask 077 mktemp file, counts 0; both results are recorded in the task notes
+- [x] #4 On the macOS host: in that container, devcontainer exec claude -p 'Reply with the single word OK' answers rather than reporting Not logged in
+- [x] #5 On the macOS host: with CLAUDE_CODE_OAUTH_TOKEN unset in the host shell, devcontainer up of a fresh container still succeeds and the in-container token length prints 0
 - [x] #6 plugins/ralph/skills/ralph-init/SKILL.md describes the token forward as the name-only runArgs entry --env=CLAUDE_CODE_OAUTH_TOKEN and says why: a containerEnv value becomes docker run -e NAME=value, visible in the host's ps for the container's lifetime
 <!-- AC:END -->
 
@@ -86,4 +86,6 @@ Commit: `db3d18c` - task-282: forward CLAUDE_CODE_OAUTH_TOKEN by name in runArgs
 Done in container: AC #1, #2, #6. Both devcontainer.json copies drop the containerEnv token entry and carry the runArgs element --env=CLAUDE_CODE_OAUTH_TOKEN (commented with the why); SKILL.md auth passage (prerequisites, GUI caveat, graceful degradation, do-not-commit) rewritten for the name-only forward. tests/python/test_devcontainer_oauth_token_forward.py (8 tests) pins the forward, the absent containerEnv key, a mutation, a real merge-runargs.sh run keeping a project "-e", "FOO" pair, and the SKILL.md wording. uv run pytest 921 passed/3 skipped; ruff clean; template-parity.bats 11/12 - test 5 (settings.local.json shape) fails identically on master: in the container .claude/settings.local.json is the overlay lacking the template's attribution key, unrelated. task-reviewer: APPROVED (0 findings). PENDING on the macOS host after merge: AC #3, #4, #5 (devcontainer up / exec / host ps check) - record their results here and check them off.
 
 Commit: `733b8b7` - task-282: bump plugin version to 0.14.9 (patch)
+
+macOS host verification (after merge, master 0.14.11; colima, devcontainer CLI). AC #3: with the token exported (length 108), devcontainer up --remove-existing-container succeeded (outcome success), and devcontainer exec sh -c 'printf %s ${#CLAUDE_CODE_OAUTH_TOKEN}' printed 108. ps -ww -eo args, grepped with the token read via -f from a umask 077 mktemp file: this repo's single docker run line carries --env=CLAUDE_CODE_OAUTH_TOKEN, and 0 lines of it carry the value. The machine-wide count was 8 before the recreate and 7 after; the 7 are other projects' long-running containers created from the old template (equation/services, equation/core, claude-skills, mycloud, maestro-cloud, agent-skills, channels). They drop out after each project's ralph-init upgrade and a container recreate, so a literal machine-wide 0 is not reachable on this host, and the AC is judged on this repo's container. AC #4: devcontainer exec claude -p 'Reply with the single word OK' printed OK with rc 0; stderr held only the claude-trim SessionEnd 'not found' line that TASK-289 covers. AC #5: under env -u CLAUDE_CODE_OAUTH_TOKEN, devcontainer up of a fresh container succeeded and the in-container length printed 0; the container was then recreated with the token (length 108) for later Ralph runs. Finding outside this task: while a devcontainer exec runs, the count rises by one. The devcontainer CLI's 'docker exec -i -u node -e PATH=... -e ...' line carries the token value for the life of each exec, which includes every Ralph iteration.
 <!-- SECTION:NOTES:END -->

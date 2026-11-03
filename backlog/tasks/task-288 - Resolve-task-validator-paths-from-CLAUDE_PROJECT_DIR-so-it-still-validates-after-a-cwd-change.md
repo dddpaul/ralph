@@ -6,9 +6,9 @@ title: >-
 status: Done
 assignee: []
 created_date: '2026-10-25T16:15:00Z'
-updated_date: '2026-11-03 16:59'
+updated_date: '2026-11-03T17:19:00Z'
 labels:
-  - 'feature:ralph-init'
+  - feature:ralph-init
 dependencies:
   - TASK-280
 priority: medium
@@ -84,7 +84,7 @@ If anything is unclear or any check fails: STOP and ask the user. Do NOT start w
 - [x] #3 From a subdirectory, the LLM rubric's File: line names the task file by an absolute path that exists
 - [x] #4 With CLAUDE_PROJECT_DIR unset, the existing tests/unit/task-validator.bats cases pass unchanged
 - [x] #5 .claude/hooks/task-validator.sh is identical to the template, and tests/unit/template-parity.bats passes
-- [ ] #6 The reproduction in the description, run on the macOS host after the fix, prints the [det] dependency issue from the subdirectory too; the output is recorded in the task notes
+- [x] #6 The reproduction in the description, run on the macOS host after the fix, prints the [det] dependency issue from the subdirectory too; the output is recorded in the task notes
 - [x] #7 uv run pytest passes, uv run ruff check . is clean, and LC_ALL=C bats tests/unit has no failures
 <!-- AC:END -->
 
@@ -102,4 +102,6 @@ Verification (container): uv run ruff check . clean; uv run pytest 921 passed, 3
 task-reviewer: APPROVED (0 blocking, 0 minor, score 10). Done with AC #6 unchecked: it is a macOS-host run of the description reproduction, to be recorded after the merge; the container run of the same reproduction passes.
 
 Commit: `c2e8634` - task-288: bump plugin version to 0.14.10 (patch)
+
+macOS host verification (after merge, master 0.14.11): the description's reproduction, run from the repo root, prints '[det] issues for TASK-1: - Dependency TASK-9 not found in backlog/tasks/' from the root and from the subdirectory; from the subdirectory with /bin/bash 3.2.57 and /usr/bin first on PATH it prints the same; the pre-fix template (26633eb) prints nothing from the subdirectory. In a git-initialised copy with a changed task file, the rubric's File: line from the subdirectory is <tmp>/backlog/tasks/task-1 - Sample.md, absolute and existing. Host gates on master: uv run ruff check . clean, uv run pytest 935 passed / 4 skipped, LC_ALL=C bats tests/unit 199/199.
 <!-- SECTION:NOTES:END -->

@@ -4,9 +4,9 @@ title: Fix two PreToolUse hook guard templates that deny unrelated Bash commands
 status: Done
 assignee: []
 created_date: '2026-10-29T07:03:00Z'
-updated_date: '2026-11-03 16:43'
+updated_date: '2026-11-03T17:19:00Z'
 labels:
-  - 'feature:ralph-init'
+  - feature:ralph-init
 dependencies: []
 priority: high
 ---
@@ -114,4 +114,6 @@ Commit: `04f69bf` - task-281: end short-option clusters at -S/-u, skip env/comma
 Review round 2: task-reviewer APPROVED (0 blocking). Its one open minor point is the jq 1.7.1 run: the author ran it with the official jq-1.7.1 linux-arm64 binary first on PATH (73/73), and the reviewer, which had only jq 1.6, could not reproduce it. Final gates: LC_ALL=C bats tests/unit, 196 tests, only the R11 settings.local.json case failing (pre-existing; it depends on the gitignored local file); uv run pytest 913 passed, 3 skipped; ruff clean. Host follow-ups: /bin/bash -n on both guards, and the AC9 if: probe.
 
 Commit: `8ad52c6` - task-281: bump plugin version to 0.14.8 (patch)
+
+macOS host verification (after merge, master 0.14.11, Claude Code 2.1.309): /bin/bash -n (GNU bash 3.2.57) passes on both guards, and the live .claude/hooks copies are byte-identical to the templates. tests/unit/pretools-hooks.bats: 73/73 with /bin/bash 3.2 first on PATH and 73/73 with Homebrew bash; with Apple git and the BSD tools first on PATH it is 72/73, the one failure being the unchanged master-branch-guard 'no active task branch' message case under Apple git 2.50, unrelated to this task. AC #9 controlled run, done on the host because the container's claude is not logged in: a throwaway git repo whose .claude/settings.json registers two PreToolUse Bash hooks, one with if: Bash(G<SP>C *) and one without, each appending .tool_input.command to hook.log; claude -p --model claude-haiku-5-5 --setting-sources project --allowedTools Bash then ran four commands. (1) echo plain: only the unconditional hook. (2) echo with the two-word phrase inside double quotes: only the unconditional hook. (3) a multi-line cat <<'EOF' heredoc whose body mentions the phrase: both hooks, so the if: hook fired. (4) a real commit, the positive control: both hooks. So if: does filter PreToolUse hooks and sees through quotes on a one-line command, but a multi-line heredoc command fires it although no commit runs. It fails open on heredocs, which matches the source project's reports (multi-line backlog and python3 heredoc commands) and is why both guards must gate themselves, as they now do. This settles TASK-123 AC5.
 <!-- SECTION:NOTES:END -->
