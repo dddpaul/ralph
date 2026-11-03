@@ -67,18 +67,22 @@ else
   to_nfc() { "$nfc_python" -c 'import sys, unicodedata; sys.stdout.write(unicodedata.normalize("NFC", sys.argv[1]))' "$1"; }
 fi
 
-declare -A head_by_nfc
+# bash 3.2 (macOS /bin/bash) has no associative arrays (TASK-294): index HEAD
+# as "nfc<TAB>path" lines and look a key up with awk. The key travels through
+# ENVIRON, not `awk -v`, because -v expands backslash escapes and git prints a
+# path containing a backslash as a quoted, escaped string. The `""` concatenation
+# forces a string comparison — awk would otherwise compare "1.0" == "1" as numbers.
+head_index=""
 while IFS= read -r p; do
   [ -z "$p" ] && continue
-  nfc=$(to_nfc "$p")
-  head_by_nfc["$nfc"]+="$p"$'\n'
+  head_index+="$(to_nfc "$p")"$'\t'"$p"$'\n'
 done <<< "$head_paths"
 
 violations=()
 while IFS= read -r p; do
   [ -z "$p" ] && continue
   nfc=$(to_nfc "$p")
-  existing="${head_by_nfc["$nfc"]:-}"
+  existing=$(printf '%s' "$head_index" | NFC_KEY="$nfc" awk -F'\t' '$1 "" == ENVIRON["NFC_KEY"] "" { print $2 }')
   [ -z "$existing" ] && continue
   while IFS= read -r e; do
     [ -z "$e" ] && continue
