@@ -200,20 +200,14 @@ def test_live_copy_matches_template(name: str) -> None:
 
 BAD = f'{COMMIT} -m "bad\n\n{TRAILER}"'
 
-# The jq lexer kept when the two TASK-281 implementations were merged does not
-# skip shell reserved words before the program word yet.
-KEYWORD_GAP = pytest.mark.xfail(
-    strict=True, reason="TASK-292: keyword prefixes not gated"
-)
-
 
 @pytest.mark.parametrize(
     "prefix",
     [
-        pytest.param("if true; then ", marks=KEYWORD_GAP),
-        pytest.param("if false; then :; else ", marks=KEYWORD_GAP),
-        pytest.param("{ ", marks=KEYWORD_GAP),
-        pytest.param("! ", marks=KEYWORD_GAP),
+        "if true; then ",
+        "if false; then :; else ",
+        "{ ",
+        "! ",
         "time ",
         "FOO=1 ",
         "cat <<<abc; ",
