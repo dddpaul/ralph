@@ -26,7 +26,17 @@
   // host-gateway is the host on all three: Docker Desktop's host, colima's
   // Mac (the same address its DNS returns), and a Linux engine's bridge
   // gateway, i.e. the Linux host itself.
-  "runArgs": ["--cap-add=NET_ADMIN", "--cap-add=NET_RAW", "--add-host=host.docker.internal:host-gateway"],
+  //
+  // --env=CLAUDE_CODE_OAUTH_TOKEN names the variable without a value, so docker
+  // copies it from its own environment (the devcontainer CLI's, and so the
+  // host shell's) and the token never reaches argv. A containerEnv entry
+  // would become docker run -e NAME=value, and that docker run process stays
+  // alive for the container's lifetime, so the token would sit in the host's
+  // ps output. Unset on the host, the variable is simply absent in the
+  // container. Keep it one element, not "-e", "NAME": merge-runargs.sh drops
+  // project elements the template already has, so a template "-e" would strip
+  // a project's own "-e" and leave its value as a stray docker run argument.
+  "runArgs": ["--cap-add=NET_ADMIN", "--cap-add=NET_RAW", "--add-host=host.docker.internal:host-gateway", "--env=CLAUDE_CODE_OAUTH_TOKEN"],
   "customizations": {
     "vscode": {
       "extensions": [
@@ -83,7 +93,6 @@
     "source=claude-code-project-venv-${devcontainerId},target=/workspace/.venv,type=volume"
   ],
   "containerEnv": {
-    "CLAUDE_CODE_OAUTH_TOKEN": "${localEnv:CLAUDE_CODE_OAUTH_TOKEN}",
     "NODE_OPTIONS": "--max-old-space-size=4096",
     // The config root is the HOST path, not /home/node/.claude — both names
     // are binds of the same directory, but the plugin registries under it
