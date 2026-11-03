@@ -128,6 +128,22 @@ Co-Authored-By: y'")"
   [[ "$output" == *"deny"* ]]
 }
 
+@test "commit-msg-guard: blocks a trailer in a commit after a shell keyword (TASK-292)" {
+  local prefix
+  for prefix in 'if true; then ' 'if false; then :; else ' '{ ' '! '; do
+    run run_hook "commit-msg-guard.sh" "$(cmd_json "${prefix}git commit -m 'x
+
+Co-Authored-By: y'")"
+    [[ "$output" == *"deny"* ]]
+  done
+}
+
+@test "commit-msg-guard: allows a keyword block that only mentions the commit phrase (TASK-292)" {
+  run run_hook "commit-msg-guard.sh" "$(cmd_json 'if true; then echo "git commit -m Co-Authored-By: y"; fi')"
+  [ "$status" -eq 0 ]
+  [[ -z "$output" ]]
+}
+
 @test "commit-msg-guard and commit-prefix-guard share an identical lexer (TASK-281)" {
   local a b
   a=$(sed -n '/^# >>> shared command lexer/,/^# <<< shared command lexer/p' "$HOOKS_DIR/commit-msg-guard.sh")
@@ -611,6 +627,21 @@ EOF
   assert_denied
   prefix_guard_on_task_branch "time command git commit -m 'x'"
   assert_denied
+}
+
+@test "commit-prefix-guard: sees a commit after a shell keyword (TASK-292)" {
+  local prefix
+  for prefix in 'if true; then ' 'if false; then :; else ' '{ ' '! '; do
+    prefix_guard_on_task_branch "${prefix}git commit -m 'not prefixed'"
+    assert_denied
+  done
+  prefix_guard_on_task_branch "if true; then git commit -m 'task-99: ok'; fi"
+  assert_allowed
+}
+
+@test "commit-prefix-guard: allows a keyword block that only mentions the commit phrase (TASK-292)" {
+  prefix_guard_on_task_branch 'if true; then echo "git commit"; fi'
+  assert_allowed
 }
 
 @test "commit-prefix-guard: allows a subject that only expansion can reveal" {

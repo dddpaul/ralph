@@ -54,10 +54,11 @@ def lex:
   . as $s | ($s | length) as $n
   | {i: 0, cur: null, pend: [], segs: [{w: [], hd: null, pin: false}]}
   | until(.i >= $n; step($s[.i:])) | endw | .segs;
-# Words of a simple command from its program on, past leading VAR=value words
-# and bare env/command/time/nice/nohup/exec wrappers.
+# Words of a simple command from its program on, past leading VAR=value words,
+# bare env/command/time/nice/nohup/exec wrappers and the shell reserved words
+# if/then/else/elif/do/while/until/!/{ that can precede a command.
 def prog: . as $w
-  | ([range(0; $w | length) | select($w[.] | test("\\A([A-Za-z_][A-Za-z0-9_]*=|(env|command|time|nice|nohup|exec)\\z)") | not)]
+  | ([range(0; $w | length) | select($w[.] | test("\\A([A-Za-z_][A-Za-z0-9_]*=|(env|command|time|nice|nohup|exec|if|then|else|elif|do|while|until|!|\\{)\\z)") | not)]
     | .[0] // ($w | length)) as $k | $w[$k:];
 # git's subcommand and its arguments, past git's own options such as -C <dir>.
 def gitsub: prog | select((.[0] // "") | test("(\\A|/)git\\z")) | . as $w
