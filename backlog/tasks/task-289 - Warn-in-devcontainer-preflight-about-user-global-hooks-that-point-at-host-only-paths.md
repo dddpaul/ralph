@@ -6,7 +6,7 @@ title: >-
 status: Done
 assignee: []
 created_date: '2026-11-03T05:45:00Z'
-updated_date: '2026-11-03 17:06'
+updated_date: '2026-11-03T17:19:00Z'
 labels: []
 dependencies: []
 priority: medium
@@ -88,4 +88,6 @@ Commit: `9f65c99` - task-289: warn in devcontainer preflight about user hooks th
 Implemented _check_user_hooks (preflight check 8, devcontainer=true only, report-only). It reads ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json and shlex-splits each hook command, classifying the first word. Absolute paths and $HOME/${HOME}/~ paths outside the config dir and $HOME/.claude produce warnings. Bare names, the [ DEVCONTAINER guard, and missing, unparsable or hookless settings produce none. The owner's real settings yield 7 warnings (claude-trim x2, agterm x5), matching Y2. Documented in ralph-run Step 3 and ralph-init devcontainer notes. Also fixed the .venv note's 'note directly above' pointer, which the insertion would have made wrong. Tests: tests/python/test_preflight_host_only_hooks.py (15). Gates: pytest 936 passed/3 skipped, ruff clean, pyright 0 errors. Review: ralph:task-reviewer APPROVED, 1 minor not taken (unset HOME, unrealistic for a host preflight).
 
 Commit: `bd14525` - task-289: bump plugin version to 0.14.11 (patch)
+
+macOS host verification (after merge, master 0.14.11): _check_user_hooks('true', False) against the owner's ~/.claude/settings.json prints exactly 7 'WARNING: user hook not reachable in the devcontainer' lines: the agterm status hook for Notification, PermissionRequest, PostToolUse, Stop and UserPromptSubmit, and claude-trim for SessionStart and SessionEnd. It prints none for the peon-ping and notify hooks under ~/.claude or for the CLAUDE_ENV_FILE one-liner; with devcontainer=false preflight prints none. The check was run directly because the full preflight.sh stops at 'ERROR: No To Do tasks in backlog' before reaching it when the backlog has no To Do tasks.
 <!-- SECTION:NOTES:END -->
