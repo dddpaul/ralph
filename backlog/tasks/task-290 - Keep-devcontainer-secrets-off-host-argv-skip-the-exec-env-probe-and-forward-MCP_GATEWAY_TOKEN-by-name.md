@@ -6,7 +6,7 @@ title: >-
 status: Done
 assignee: []
 created_date: '2026-11-03T17:32:00Z'
-updated_date: '2026-11-03T18:00:00Z'
+updated_date: '2026-11-03T18:30:00Z'
 labels: []
 dependencies: []
 priority: high
@@ -63,9 +63,9 @@ Out of scope:
 - [x] #2 Both devcontainer.json copies set "userEnvProbe": "none" and set LANG and LC_ALL to en_US.UTF-8 through remoteEnv (or the notes record why another place was used)
 - [x] #3 A test pins the template's MCP_GATEWAY_TOKEN name-only forward, the absent containerEnv entry, userEnvProbe none and the locale entries; uv run pytest, uv run ruff check . and tests/unit/template-parity.bats pass
 - [x] #4 plugins/ralph/skills/ralph-init/SKILL.md describes the name-only MCP_GATEWAY_TOKEN forward and the userEnvProbe none setting with its reason (the probe re-sends the container env as docker exec -e NAME=value, visible in the host's ps for each exec's lifetime), and the Upgrade Mode U5 recreate note covers the change
-- [ ] #5 On the macOS host after the merge and a container recreate: ps -ww -eo args, grepped with each token read via -f from a umask 077 mktemp file, counts 0 lines for this repo's docker run and 0 lines while devcontainer exec --workspace-folder . sleep 8 is running; the counts are recorded in the task notes
-- [ ] #6 On the macOS host, in that container: both token lengths printed by devcontainer exec equal the host's, LANG and LC_ALL print en_US.UTF-8, and devcontainer exec --workspace-folder . claude -p 'Reply with the single word OK' prints OK
-- [ ] #7 On the macOS host: devcontainer exec --workspace-folder . uv run pytest -q passes in the recreated container
+- [x] #5 On the macOS host after the merge and a container recreate: ps -ww -eo args, grepped with each token read via -f from a umask 077 mktemp file, counts 0 lines for this repo's docker run and 0 lines while devcontainer exec --workspace-folder . sleep 8 is running; the counts are recorded in the task notes
+- [x] #6 On the macOS host, in that container: both token lengths printed by devcontainer exec equal the host's, LANG and LC_ALL print en_US.UTF-8, and devcontainer exec --workspace-folder . claude -p 'Reply with the single word OK' prints OK
+- [x] #7 On the macOS host: devcontainer exec --workspace-folder . uv run pytest -q passes in the recreated container
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -84,4 +84,6 @@ Commit: `4dd092b` - task-290: drop a stray blank line in the token-forward test
 Done: MCP_GATEWAY_TOKEN moved from containerEnv to the single runArgs element --env=MCP_GATEWAY_TOKEN, next to --env=CLAUDE_CODE_OAUTH_TOKEN. Both devcontainer.json copies (byte-identical) set userEnvProbe none and remoteEnv LANG/LC_ALL en_US.UTF-8. The orchestrator's exec argv is unchanged, since devcontainer.json is enough. The token-forward test is parametrised over both secrets and pins the probe and locale. SKILL.md has a new userEnvProbe note, the host MCP gateway passage now describes the name-only forward, and runArgs plus the secrets are in the U5 recreate note. pytest 1011 passed, ruff clean. template-parity.bats: 11/12, and test 5 fails the same way on master in the container (.claude/settings.local.json is the container overlay). task-reviewer APPROVED on the second pass. Follow-up: TASK-293 (en_US.UTF-8 is not a generated locale in the image).
 
 Commit: `9382e78` - task-290: bump plugin version to 0.14.12 (patch)
+
+macOS host verification (after merge, master 0.14.13; colima, devcontainer CLI 0.90.0). The host lengths were oauth 108 and mcp 64. devcontainer up --remove-existing-container succeeded (outcome success, container 14663c677f7a). AC #5: ps -ww -eo args was grepped with each token read via -f from umask 077 mktemp files. At rest, this repo's one docker run line carries neither token. While devcontainer exec --workspace-folder . sleep 8 runs, this container's docker exec line carries neither, and its only -e flags are LANG, LC_ALL and VSCODE_REMOTE_CONTAINERS_SESSION; before this change it carried 36 flags including both tokens. Machine-wide, 7 lines still carry each token: the other projects' long-running containers built from the old template, which drop out after their ralph-init upgrade and a recreate. AC #6: in the container, devcontainer exec printed oauth=108 mcp=64 LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8, and devcontainer exec claude -p 'Reply with the single word OK' printed OK with rc 0 and no stderr. The locale value is set but en_US.utf8 is not generated in the image, which is TASK-293. AC #7: devcontainer exec --workspace-folder . uv run pytest -q gave rc 0, 1015 passed / 3 skipped. Host gates on master: ruff clean, uv run pytest 1014 passed / 4 skipped, LC_ALL=C bats tests/unit 203/203.
 <!-- SECTION:NOTES:END -->
