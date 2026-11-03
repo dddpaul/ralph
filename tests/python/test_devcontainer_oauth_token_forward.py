@@ -31,7 +31,7 @@ FORWARD = f"--env={TOKEN}"
 GATEWAY = "MCP_GATEWAY_TOKEN"
 SECRETS = (TOKEN, GATEWAY)
 each_secret = pytest.mark.parametrize("name", SECRETS)
-LOCALE = "en_US.UTF-8"
+LOCALE = "C.UTF-8"
 MERGE = REPO_ROOT / "plugins/ralph/skills/ralph-init/scripts/merge-runargs.sh"
 SKILL_MD = REPO_ROOT / "plugins/ralph/skills/ralph-init/SKILL.md"
 

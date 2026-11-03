@@ -44,11 +44,12 @@
   // values would sit in the host's ps output for each exec's lifetime, and a
   // Ralph iteration is one exec. An exec process inherits the container env
   // anyway, so the secrets, PATH, claude and uv are all still there; remoteEnv
-  // supplies the locale the probe used to pick up from ~/.zshrc.
+  // supplies an installed UTF-8 locale (C.UTF-8) in place of the en_US.UTF-8
+  // the probe picked up from ~/.zshrc, which the image does not generate.
   "userEnvProbe": "none",
   "remoteEnv": {
-    "LANG": "en_US.UTF-8",
-    "LC_ALL": "en_US.UTF-8"
+    "LANG": "C.UTF-8",
+    "LC_ALL": "C.UTF-8"
   },
   "customizations": {
     "vscode": {
