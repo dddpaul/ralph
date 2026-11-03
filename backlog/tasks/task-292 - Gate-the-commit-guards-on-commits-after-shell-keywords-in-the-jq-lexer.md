@@ -4,7 +4,7 @@ title: Gate the commit guards on commits after shell keywords in the jq lexer
 status: Done
 assignee: []
 created_date: '2026-11-03T17:32:00Z'
-updated_date: '2026-11-03T18:15:00Z'
+updated_date: '2026-11-03T18:30:00Z'
 labels: []
 dependencies: []
 priority: medium
@@ -45,7 +45,7 @@ Out of scope:
 - [x] #2 New bats cases for the four keyword prefixes are added to tests/unit/pretools-hooks.bats and pass, the identical-lexer bats case passes, and the .claude/hooks copies of both guards are byte-identical to the templates
 - [x] #3 A command that only mentions the two-word phrase after a keyword, such as if true; then echo "G<SP>C"; fi, is still allowed by both guards (a bats case)
 - [x] #4 Both guards pass bash -n and satisfy R-INFRA-3; uv run pytest, uv run ruff check . and LC_ALL=C bats tests/unit pass
-- [ ] #5 On the macOS host, tests/unit/pretools-hooks.bats passes with /bin/bash 3.2 first on PATH; the result is recorded in the task notes
+- [x] #5 On the macOS host, tests/unit/pretools-hooks.bats passes with /bin/bash 3.2 first on PATH; the result is recorded in the task notes
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -62,4 +62,6 @@ Commit: `2b20a29` - task-292: make the keyword-loop bats asserts errexit-safe un
 Review: task-reviewer APPROVED (score 10) on the second pass. Implemented: prog() in the shared jq lexer now also skips if/then/else/elif/do/while/until/!/{ before the program word, so both commit guards gate a commit after a shell keyword. AC5 stays unchecked until the host run is recorded.
 
 Commit: `1dc6c4b` - task-292: bump plugin version to 0.14.13 (patch)
+
+macOS host verification (after merge, master 0.14.13). With /bin/bash 3.2.57 first on PATH, LC_ALL=C bats tests/unit/pretools-hooks.bats gives 77/77. /bin/bash -n passes on both guard templates, and the .claude/hooks copies are byte-identical. uv run pytest on the host: 1014 passed / 4 skipped, with no xfail left in tests/python/test_commit_guards.py.
 <!-- SECTION:NOTES:END -->

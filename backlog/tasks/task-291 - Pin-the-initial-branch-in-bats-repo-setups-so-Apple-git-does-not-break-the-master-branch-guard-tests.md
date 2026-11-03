@@ -6,7 +6,7 @@ title: >-
 status: Done
 assignee: []
 created_date: '2026-11-03T17:32:00Z'
-updated_date: '2026-11-03T18:07:00Z'
+updated_date: '2026-11-03T18:30:00Z'
 labels: []
 dependencies: []
 priority: low
@@ -51,7 +51,7 @@ Out of scope:
 - [x] #1 setup_git_repo in tests/unit/pretools-hooks.bats creates its repo on master explicitly (git init -b master or -c init.defaultBranch=master)
 - [x] #2 The git init calls in tests/unit/commit-msg-hook.bats and tests/unit/post-commit-hook.bats also pin the initial branch, and grep finds no bare git init left in tests/unit/*.bats
 - [x] #3 LC_ALL=C bats tests/unit and uv run pytest pass
-- [ ] #4 On the macOS host, PATH="/usr/bin:/bin:/opt/homebrew/bin:$PATH" LC_ALL=C bats tests/unit (Apple git first on PATH) has no failures; the result is recorded in the task notes
+- [x] #4 On the macOS host, PATH="/usr/bin:/bin:/opt/homebrew/bin:$PATH" LC_ALL=C bats tests/unit (Apple git first on PATH) has no failures; the result is recorded in the task notes
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -65,4 +65,6 @@ AC3: LC_ALL=C bats tests/unit gives 198/199 and pytest gives 1011 passed, 3 skip
 AC4 is DEFERRED to the macOS host, because this Linux container has git 2.39.5 and no Apple git. Host command: PATH="/usr/bin:/bin:/opt/homebrew/bin:$PATH" LC_ALL=C bats tests/unit. Stand-in: GIT_CONFIG_GLOBAL pointing at a file with init.defaultBranch=main. Under it, master fails #76 (master-branch-guard: blocks edit on master to non-allowlisted path), which reproduces the bug; task-291 passes #76, and only the environmental #185 remains.
 
 Review: task-reviewer APPROVED (score 10) on the second pass. AC4 is still unchecked until the host run is recorded.
+
+macOS host verification (after merge, master 0.14.13). The AC #4 command as written, PATH=/usr/bin:/bin:/opt/homebrew/bin:$PATH, puts more than Apple git first: it also selects /bin/bash 3.2 and Apple python3 3.9. Run outside the sandbox (inside it, Apple's python3 shim and diff fail on 'Operation not permitted'), it shows 203 tests with 6 failures, all in tests/unit/pre-commit-hook.bats. They come from the shipped git pre-commit hook: its declare -A at line 70 (since TASK-136) is invalid in bash 3.2, so under /bin/bash the hook exits 2. That is unrelated to this task and is reported to the owner as a separate finding. With only git swapped to Apple git 2.50.1 (a shim dir holding a git symlink to /usr/bin/git, first on PATH), LC_ALL=C bats tests/unit gives 203/203. The pre-TASK-291 pretools-hooks.bats (7dfeb3a) under the same shim fails 'master-branch-guard: blocks edit on master to non-allowlisted path', so this task fixes exactly the git-dependent failure. AC #4 is checked on that basis, with the deviation recorded here.
 <!-- SECTION:NOTES:END -->
