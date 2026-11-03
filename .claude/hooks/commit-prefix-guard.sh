@@ -55,8 +55,11 @@ def lex:
   . as $s | ($s | length) as $n
   | {i: 0, cur: null, pend: [], segs: [{w: [], hd: null, pin: false}]}
   | until(.i >= $n; step($s[.i:])) | endw | .segs;
-# Words of a simple command from its program on, past leading VAR=value words.
-def prog: . as $w | ([range(0; $w | length) | select($w[.] | test("\\A[A-Za-z_][A-Za-z0-9_]*=") | not)] | .[0] // ($w | length)) as $k | $w[$k:];
+# Words of a simple command from its program on, past leading VAR=value words
+# and bare env/command/time/nice/nohup/exec wrappers.
+def prog: . as $w
+  | ([range(0; $w | length) | select($w[.] | test("\\A([A-Za-z_][A-Za-z0-9_]*=|(env|command|time|nice|nohup|exec)\\z)") | not)]
+    | .[0] // ($w | length)) as $k | $w[$k:];
 # git's subcommand and its arguments, past git's own options such as -C <dir>.
 def gitsub: prog | select((.[0] // "") | test("(\\A|/)git\\z")) | . as $w
   | {k: 1} | until(($w[.k] // "") | startswith("-") | not;
@@ -76,13 +79,16 @@ def commit_msg($s; $j):
         elif $x | startswith("--message=") then .m += [$x[10:]] | .k += 1
         elif $x == "--file" then .f = $a[.k + 1] | .k += 2
         elif $x | startswith("--file=") then .f = $x[7:] | .k += 1
-        elif $x | test("\\A-(?!-)[^mFCct]*[mFCct]") then
-          ($x | capture("\\A-[^mFCct]*(?<o>[mFCct])(?<v>[\\s\\S]*)")) as $o
-          | (if $o.v != "" then $o.v else $a[.k + 1] // "" end) as $v
+        elif $x | test("\\A-(?!-)[^mFCctSu]*[mFCctSu]") then
+          # -S[<keyid>] and -u[<mode>] take only an attached value; the others take either form.
+          ($x | capture("\\A-[^mFCctSu]*(?<o>[mFCctSu])(?<v>[\\s\\S]*)")) as $o
+          | (if $o.v != "" or $o.o == "S" or $o.o == "u" then $o.v else $a[.k + 1] // "" end) as $v
           | (if $o.o == "m" then .m += [$v] elif $o.o == "F" then .f = $v else . end)
-          | .k += (if $o.v != "" then 1 else 2 end)
+          | .k += (if $o.v != "" or $o.o == "S" or $o.o == "u" then 1 else 2 end)
         else .k += 1 end)
-  | if (.m | length) > 0 then {kind: "m", v: (.m | join("\n\n"))}
+  # A subject still holding $VAR, $(...) or a backtick is only known after expansion: none found.
+  | if (.m | length) > 0 then (.m | join("\n\n")) as $v
+      | (if $v | sub("\\A\\s+"; "") | split("\n")[0] | test("\\$[A-Za-z_({]|`") then {kind: "n"} else {kind: "m", v: $v} end)
     elif .f == "-" then (if $in != null then {kind: "m", v: $in} else {kind: "n"} end)
     elif .f != null then {kind: "f", v: .f}
     else {kind: "n"} end;

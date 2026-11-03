@@ -121,6 +121,13 @@ MSG")"
   [[ "$output" == *"deny"* ]]
 }
 
+@test "commit-msg-guard: blocks a trailer in a commit behind env (TASK-281)" {
+  run run_hook "commit-msg-guard.sh" "$(cmd_json "env git commit -m 'x
+
+Co-Authored-By: y'")"
+  [[ "$output" == *"deny"* ]]
+}
+
 @test "commit-msg-guard and commit-prefix-guard share an identical lexer (TASK-281)" {
   local a b
   a=$(sed -n '/^# >>> shared command lexer/,/^# <<< shared command lexer/p' "$HOOKS_DIR/commit-msg-guard.sh")
@@ -590,4 +597,35 @@ EOF
   assert_allowed
   prefix_guard_on_task_branch 'git commit -F /nonexistent/msg.txt'
   assert_allowed
+}
+
+@test "commit-prefix-guard: attached -S and -u values do not hide the message" {
+  prefix_guard_on_task_branch "git commit -unormal -Spaul@mail.com -m 'task-99: signed'"
+  assert_allowed
+  prefix_guard_on_task_branch "git commit -Smykey -m 'not prefixed'"
+  assert_denied
+}
+
+@test "commit-prefix-guard: sees a commit behind env, command and time wrappers" {
+  prefix_guard_on_task_branch "env git commit -m 'x'"
+  assert_denied
+  prefix_guard_on_task_branch "time command git commit -m 'x'"
+  assert_denied
+}
+
+@test "commit-prefix-guard: allows a subject that only expansion can reveal" {
+  prefix_guard_on_task_branch "git commit -m \"\$(printf 'task-99: x')\""
+  assert_allowed
+  prefix_guard_on_task_branch 'git commit -m "$MSG"'
+  assert_allowed
+}
+
+@test "commit-prefix-guard: still checks a message whose body holds backticks" {
+  prefix_guard_on_task_branch "git commit -m \"\$(cat <<'EOF'
+not prefixed
+
+Run \`make\`.
+EOF
+)\""
+  assert_denied
 }
