@@ -175,7 +175,7 @@ Co-Authored-By: y'")"
 # ===========================================================================
 
 setup_git_repo() {
-  git init "$TEST_DIR/repo" >/dev/null 2>&1
+  git init -b master "$TEST_DIR/repo" >/dev/null 2>&1
   git -C "$TEST_DIR/repo" config user.email "test@test.com"
   git -C "$TEST_DIR/repo" config user.name "Test"
   git -C "$TEST_DIR/repo" commit --allow-empty -m "init" >/dev/null 2>&1

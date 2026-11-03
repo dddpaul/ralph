@@ -12,7 +12,7 @@ HOOK="$PROJECT_ROOT/plugins/ralph/skills/ralph-init/templates/git-hooks/post-com
 setup() {
   TEST_DIR="$(make_temp_dir)"
   cd "$TEST_DIR"
-  git init -q
+  git init -q -b master
   git config user.email test@example.com
   git config user.name Test
   git config commit.gpgsign false

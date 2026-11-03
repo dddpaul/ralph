@@ -19,7 +19,7 @@ setup() {
   TEST_DIR="$(make_temp_dir)"
   # Run in a tmp git repo so the hook's `[ -e .git/MERGE_MSG ]` check is meaningful.
   cd "$TEST_DIR"
-  git init -q
+  git init -q -b master
 }
 
 teardown() {
