@@ -27,16 +27,29 @@
   // Mac (the same address its DNS returns), and a Linux engine's bridge
   // gateway, i.e. the Linux host itself.
   //
-  // --env=CLAUDE_CODE_OAUTH_TOKEN names the variable without a value, so docker
-  // copies it from its own environment (the devcontainer CLI's, and so the
-  // host shell's) and the token never reaches argv. A containerEnv entry
-  // would become docker run -e NAME=value, and that docker run process stays
-  // alive for the container's lifetime, so the token would sit in the host's
-  // ps output. Unset on the host, the variable is simply absent in the
-  // container. Keep it one element, not "-e", "NAME": merge-runargs.sh drops
-  // project elements the template already has, so a template "-e" would strip
-  // a project's own "-e" and leave its value as a stray docker run argument.
-  "runArgs": ["--cap-add=NET_ADMIN", "--cap-add=NET_RAW", "--add-host=host.docker.internal:host-gateway", "--env=CLAUDE_CODE_OAUTH_TOKEN"],
+  // --env=CLAUDE_CODE_OAUTH_TOKEN and --env=MCP_GATEWAY_TOKEN name each
+  // secret without a value, so docker copies it from its own environment (the
+  // devcontainer CLI's, and so the host shell's) and the value never reaches
+  // argv. A containerEnv entry would become docker run -e NAME=value, and that
+  // docker run process stays alive for the container's lifetime, so the secret
+  // would sit in the host's ps output. Unset on the host, the variable is
+  // simply absent in the container. Keep each one element, not "-e", "NAME":
+  // merge-runargs.sh drops project elements the template already has, so a
+  // template "-e" would strip a project's own "-e" and leave its value as a
+  // stray docker run argument.
+  "runArgs": ["--cap-add=NET_ADMIN", "--cap-add=NET_RAW", "--add-host=host.docker.internal:host-gateway", "--env=CLAUDE_CODE_OAUTH_TOKEN", "--env=MCP_GATEWAY_TOKEN"],
+  // No user-env probe: by default every devcontainer exec runs a login shell
+  // in the container and re-sends the environment it prints as docker exec
+  // -e NAME=value flags. That environment holds both secrets above, so their
+  // values would sit in the host's ps output for each exec's lifetime, and a
+  // Ralph iteration is one exec. An exec process inherits the container env
+  // anyway, so the secrets, PATH, claude and uv are all still there; remoteEnv
+  // supplies the locale the probe used to pick up from ~/.zshrc.
+  "userEnvProbe": "none",
+  "remoteEnv": {
+    "LANG": "en_US.UTF-8",
+    "LC_ALL": "en_US.UTF-8"
+  },
   "customizations": {
     "vscode": {
       "extensions": [
@@ -108,7 +121,6 @@
     "HTTPS_PROXY": "http://host.docker.internal:3128",
     "NO_PROXY": "localhost,127.0.0.1,.local,host.docker.internal",
     "MCP_GATEWAY_HOST": "host.docker.internal",
-    "MCP_GATEWAY_TOKEN": "${localEnv:MCP_GATEWAY_TOKEN}",
     "TZ": "${localEnv:TZ:America/Los_Angeles}"
   },
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
