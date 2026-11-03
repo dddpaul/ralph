@@ -10,6 +10,11 @@ the project and prints one ``WARNING:`` line per managed file that is behind
 the installed plugin on stderr. It never changes the exit code: a project that
 missed an upgrade still runs, the operator is just told to upgrade it.
 
+With ``devcontainer=true`` one more report-only check reads the user
+``settings.json`` and prints one ``WARNING:`` line per hook command whose
+executable lives outside the user Claude config dir: the container shares only
+``~/.claude``, so such a hook fails there with "not found".
+
 Invariants the AC pins down explicitly:
 
 * Runs against the invoker's PWD — this module never calls ``os.chdir``.
@@ -22,8 +27,10 @@ Invariants the AC pins down explicitly:
 from __future__ import annotations
 
 import contextlib
+import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -31,6 +38,7 @@ import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 from ralph import usage_check as _usage_check
 
@@ -42,6 +50,7 @@ _PID_RE = re.compile(r'"pid":([0-9]+)')
 # preflight.py → ralph/ → scripts/ → ralph-run/ → skills/ → the plugin root.
 _PLUGIN_ROOT = Path(__file__).resolve().parents[4]
 _DRIFT_SCRIPT = _PLUGIN_ROOT / "skills/ralph-init/scripts/managed-file-drift.sh"
+_HOME_PREFIXES = ("$HOME/", "${HOME}/", "~/")
 
 
 @dataclass(frozen=True)
@@ -367,6 +376,84 @@ def _check_managed_drift(verbose: bool) -> None:
     print(f"WARNING: could not check ralph-init managed files — {reason}", file=sys.stderr)
 
 
+def _hook_executable_path(command: str, home: str) -> str | None:
+    """Return the path a hook command runs, or ``None`` for a bare name.
+
+    Only the first word counts: absolute paths and ``$HOME/`` / ``${HOME}/`` /
+    ``~/`` paths (quoted or not, ``$HOME`` expanded to ``home``) are paths.
+    A bare name such as ``jq`` or the ``[`` of a DEVCONTAINER guard is not.
+    """
+    try:
+        words = shlex.split(command)
+    except ValueError:
+        words = command.split()
+    if not words:
+        return None
+    first = words[0]
+    for prefix in _HOME_PREFIXES:
+        if first.startswith(prefix):
+            return os.path.join(home, first[len(prefix):])
+    return first if first.startswith("/") else None
+
+
+def _hook_commands(data: object) -> list[tuple[str, str]]:
+    """Flatten parsed settings into ``(event, command)``; skip malformed entries."""
+    hooks = cast(dict[str, object], data).get("hooks") if isinstance(data, dict) else None
+    if not isinstance(hooks, dict):
+        return []
+    pairs: list[tuple[str, str]] = []
+    for event, groups in cast(dict[str, object], hooks).items():
+        for group in cast(list[object], groups) if isinstance(groups, list) else []:
+            entries = cast(dict[str, object], group).get("hooks") if isinstance(group, dict) else None
+            for entry in cast(list[object], entries) if isinstance(entries, list) else []:
+                command = cast(dict[str, object], entry).get("command") if isinstance(entry, dict) else None
+                if isinstance(command, str):
+                    pairs.append((event, command))
+    return pairs
+
+
+def _host_only_hooks_from(data: object, home: str, config_dir: str) -> list[tuple[str, str]]:
+    """List ``(event, command)`` for every hook in ``data`` run from outside ``config_dir``.
+
+    ``data`` is the parsed user settings. ``$HOME/.claude`` counts as inside
+    too: the container binds it as well.
+    """
+    roots = {os.path.normpath(config_dir), os.path.normpath(os.path.join(home, ".claude"))}
+    found: list[tuple[str, str]] = []
+    for event, command in _hook_commands(data):
+        path = _hook_executable_path(command, home)
+        if path is None:
+            continue
+        path = os.path.normpath(path)
+        if not any(path == r or path.startswith(r + os.sep) for r in roots):
+            found.append((event, command))
+    return found
+
+
+def _check_user_hooks(devcontainer: str, verbose: bool) -> None:
+    """Warn on stderr about user hooks the devcontainer cannot run; never fail."""
+    if devcontainer != "true":
+        _verbose(verbose, "check user_hooks: ok (skipped, devcontainer=false)")
+        return
+    home = os.environ.get("HOME", "")
+    config_dir = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(home, ".claude")
+    try:
+        data: object = json.loads((Path(config_dir) / "settings.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        data = None
+    found = _host_only_hooks_from(data, home, config_dir)
+    if not found:
+        _verbose(verbose, "check user_hooks: ok")
+        return
+    _verbose(verbose, f"check user_hooks: WARN ({len(found)} not reachable)")
+    for event, command in found:
+        print(
+            f"WARNING: user hook not reachable in the devcontainer — {event}: {command} "
+            "(guard the hook command with DEVCONTAINER, see ralph-init)",
+            file=sys.stderr,
+        )
+
+
 def main(argv: list[str] | None = None) -> int:
     real_argv = sys.argv[1:] if argv is None else argv
     args = _parse_args(real_argv)
@@ -413,6 +500,9 @@ def main(argv: list[str] | None = None) -> int:
 
     # Check 7: managed files behind the plugin — report only, never aborts.
     _check_managed_drift(args.verbose)
+
+    # Check 8: user hooks unreachable in the devcontainer — report only.
+    _check_user_hooks(args.devcontainer, args.verbose)
 
     print(f"OK RALPH_PATH={args.ralph_path}")
     return 0
