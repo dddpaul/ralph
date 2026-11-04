@@ -513,3 +513,85 @@ def test_ralph_run_documents_the_accept_file() -> None:
     assert "`<project>/.claude/managed-file-drift.accept`" in text
     assert "`<path> template=<sha256> project=<sha256>`" in text
     assert "skills/ralph-init/scripts/managed-file-drift.sh accept . <path>" in text
+
+
+# --------------------------------------------------------------------------
+# Plugin hooks (TASK-300)
+# --------------------------------------------------------------------------
+
+PLUGIN_GUARDS = (
+    "commit-msg-guard",
+    "commit-prefix-guard",
+    "master-branch-guard",
+    "naming-guard",
+    "notes-guard",
+    "task-validator",
+)
+SHIM = TEMPLATES / "shims/git-hook"
+needs_jq = pytest.mark.skipif(shutil.which("jq") is None, reason="jq is not installed")
+
+
+def migrate_tracked(project: Path, *local: str) -> None:
+    """Shape ``project`` like a migrated one: marker set, no settings files, only local guard copies."""
+    (project / ".claude/ralph.json").write_text(json.dumps({"pluginHooks": True, "localGuards": list(local)}))
+    (project / ".claude/settings.json").unlink()
+    (project / ".claude/settings.local.json").unlink()
+    for guard in PLUGIN_GUARDS:
+        if guard not in local:
+            (project / f".claude/hooks/{guard}.sh").unlink()
+
+
+@needs_jq
+def test_migrated_project_stops_managing_settings_and_guard_copies(project: Path) -> None:
+    migrate_tracked(project, "notes-guard")
+    (project / ".claude/hooks/notes-guard.sh").write_text("#!/bin/sh\n# customised\n")
+    result = run("check", str(project))
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.stdout == ""
+
+
+@needs_jq
+def test_migrated_project_reports_a_leftover_legacy_copy(project: Path) -> None:
+    migrate_tracked(project)
+    shutil.copyfile(TEMPLATES / "claude/hooks/naming-guard.sh", project / ".claude/hooks/naming-guard.sh")
+    result = run("check", str(project))
+    assert result.returncode == 1
+    assert result.stdout == ".claude/hooks/naming-guard.sh: legacy copy\n"
+
+
+@needs_jq
+def test_migrated_project_still_manages_the_length_guard_helper(project: Path) -> None:
+    migrate_tracked(project)
+    (project / ".claude/hooks/filename-length-guard.sh").unlink()
+    assert run("check", str(project)).stdout == ".claude/hooks/filename-length-guard.sh: missing\n"
+
+
+@needs_jq
+def test_accept_refuses_a_path_the_plugin_owns(project: Path) -> None:
+    migrate_tracked(project, "notes-guard")
+    (project / ".claude/hooks/notes-guard.sh").write_text("#!/bin/sh\n")
+    result = run("accept", str(project), ".claude/hooks/notes-guard.sh")
+    assert result.returncode == 2
+    assert "not managed in a project migrated to plugin hooks" in result.stderr
+
+
+def shim_clone(project: Path) -> None:
+    """Turn ``project`` into a git clone whose hooks are the plugin shim and switch is on."""
+    shutil.rmtree(project / ".git")
+    subprocess.run(["git", "init", "-q", str(project)], check=True)
+    subprocess.run(["git", "-C", str(project), "config", "ralph.pluginHooks", "true"], check=True)
+    for name in ("pre-commit", "commit-msg", "post-commit"):
+        shutil.copyfile(SHIM, project / ".git/hooks" / name)
+
+
+def test_shimmed_clone_compares_git_hooks_with_the_shim(project: Path) -> None:
+    shim_clone(project)
+    assert run("check", str(project)).returncode == 0
+    shutil.copyfile(TEMPLATES / "git-hooks/pre-commit", project / ".git/hooks/pre-commit")
+    assert run("check", str(project)).stdout == ".git/hooks/pre-commit: outdated\n"
+
+
+def test_clone_without_the_switch_compares_the_legacy_bodies(project: Path) -> None:
+    shim_clone(project)
+    subprocess.run(["git", "-C", str(project), "config", "--unset", "ralph.pluginHooks"], check=True)
+    assert run("check", str(project)).stdout.count(": outdated\n") == 3
