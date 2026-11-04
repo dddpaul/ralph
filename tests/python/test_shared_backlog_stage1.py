@@ -12,11 +12,20 @@ The stage-1 suite expects its original layout. It resolves its source root as
 ``scripts/hooks/pre-push`` and ``backlog/config.yml`` from there. The harness
 therefore rebuilds that layout in a temp directory and runs the suite in place.
 It never points the suite at the hardened plugin copy.
+
+Two inputs are isolated from the host so that only the frozen script decides
+the outcome:
+
+- the backlog config comes from the pinned fixture ``tests/shell/stage1/config.yml``,
+  not this repo's live ``backlog/config.yml``;
+- the suite runs without ``SHARED_BACKLOG_*`` variables, which change the
+  script's behaviour, and without git's repository-location variables.
 """
 
 from __future__ import annotations
 
 import hashlib
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -56,8 +65,18 @@ def build_stage1_layout(root: Path) -> Path:
     shutil.copy2(STAGE1 / "pre-push", root / "scripts" / "hooks" / "pre-push")
     suite = root / "scripts" / "tests" / "shared-backlog-test.sh"
     shutil.copy2(STAGE1 / "shared-backlog-test.sh", suite)
-    shutil.copy2(REPO_ROOT / "backlog" / "config.yml", root / "backlog" / "config.yml")
+    shutil.copy2(STAGE1 / "config.yml", root / "backlog" / "config.yml")
     return suite
+
+
+def suite_env() -> dict[str, str]:
+    """Return the host environment minus variables that steer the frozen script or git."""
+    git_location = {"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"}
+    return {
+        key: value
+        for key, value in os.environ.items()
+        if not key.startswith("SHARED_BACKLOG_") and key not in git_location
+    }
 
 
 @pytest.mark.skipif(shutil.which("backlog") is None, reason="backlog CLI not on PATH")
@@ -70,6 +89,7 @@ def test_stage1_suite_passes(tmp_path: Path) -> None:
         text=True,
         timeout=900,
         check=False,
+        env=suite_env(),
     )
     report = result.stdout[-4000:] + result.stderr[-2000:]
     assert result.returncode == 0, report
