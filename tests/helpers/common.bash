@@ -37,8 +37,8 @@ setup_test_dir() {
   export RALPH_RUN_LOG="$TEST_DIR/.ralph-run.log"
   export RALPH_HEARTBEAT_FILE="$TEST_DIR/.ralph-heartbeat"
   # Tests that invoke `bash ralph.sh` (relative) hit the thin shim, which resolves
-  # ralph_orchestrator.py via $RALPH_ORCHESTRATOR (tier 1) or the newest installed
-  # plugin-cache copy (tier 2). Point the tier-1 override at the in-tree
+  # ralph_orchestrator.py via $RALPH_ORCHESTRATOR (tier 1) or the install recorded
+  # in the plugin registry (tier 2). Point the tier-1 override at the in-tree
   # orchestrator so the shim runs it instead of whatever plugin-cache copy is
   # installed (shim.bats unsets this to exercise the other tiers in isolation).
   export RALPH_ORCHESTRATOR="$PROJECT_ROOT/plugins/ralph/skills/ralph-run/scripts/ralph_orchestrator.py"

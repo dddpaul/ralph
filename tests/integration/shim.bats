@@ -1,8 +1,10 @@
 #!/usr/bin/env bats
-# Resolver tests for the ralph.sh thin shim (US-004; simplified in TASK-212).
+# Resolver tests for the ralph.sh thin shim (US-004; simplified in TASK-212;
+# registry lookup in TASK-295).
 #
 # The shim locates ralph_orchestrator.py by precedence — $RALPH_ORCHESTRATOR,
-# then the newest marketplace plugin-cache install, else a clear error — and
+# then the install recorded in <config>/plugins/installed_plugins.json, else a
+# clear error — and
 # execs it with `uv run`. These tests stub `uv` on PATH so `uv run
 # <orchestrator> ...` reports the resolved path instead of launching the loop,
 # letting us assert which tier the resolver selected. The dropped in-repo-source
@@ -73,26 +75,51 @@ install_shim() {
   [ "$output" = "UV_RAN=$override" ]
 }
 
-@test "resolver tier 2: newest marketplace plugin-cache install via sort -V" {
-  # No override and no cache under the default empty config, so resolution falls
-  # to the plugin-cache tier once a cache dir is provided below.
+# Write a version-2 registry under $1 whose ralph@dddpaul-ralph user-scope
+# entry points at $2.
+write_registry() {
+  mkdir -p "$1/plugins"
+  printf '{"version":2,"plugins":{"ralph@dddpaul-ralph":[{"scope":"user","installPath":"%s","version":"0.14.15"}]}}\n' \
+    "$2" > "$1/plugins/installed_plugins.json"
+}
+
+@test "resolver tier 2: the registered install wins over a newer-sorting fork in the cache" {
   local proj="$TEST_DIR/proj"
   local shim
   shim="$(install_shim "$proj")"
+  git -C "$proj" init -q
 
   local cfg="$TEST_DIR/cfg"
-  local cache="$cfg/plugins/cache/dddpaul-ralph/ralph"
-  # v0.9.0 vs v0.10.0: a plain lexical sort would pick v0.9.0; sort -V (version
-  # sort) correctly picks v0.10.0, so this asserts the resolver uses sort -V.
-  local older="$cache/v0.9.0/skills/ralph-run/scripts/ralph_orchestrator.py"
-  local newer="$cache/v0.10.0/skills/ralph-run/scripts/ralph_orchestrator.py"
-  mkdir -p "$(dirname "$older")" "$(dirname "$newer")"
-  touch "$older" "$newer"
+  local cache="$cfg/plugins/cache"
+  # sort -V over whole cache paths would pick zz-fork; the registry names
+  # dddpaul-ralph 0.14.15, so that is the one the shim must exec.
+  local registered="$cache/dddpaul-ralph/ralph/0.14.15/skills/ralph-run/scripts/ralph_orchestrator.py"
+  local fork="$cache/zz-fork/ralph/0.1.0/skills/ralph-run/scripts/ralph_orchestrator.py"
+  mkdir -p "$(dirname "$registered")" "$(dirname "$fork")"
+  touch "$registered" "$fork"
+  write_registry "$cfg" "$cache/dddpaul-ralph/ralph/0.14.15"
 
   run env CLAUDE_CONFIG_DIR="$cfg" bash "$shim" --help
   [ "$status" -eq 0 ]
-  [ "$output" = "UV_RAN=$newer" ]
-  [[ "$output" != *"$older"* ]]
+  [ "$output" = "UV_RAN=$registered" ]
+}
+
+@test "refine.sh tier 4: resolves refine_orchestrator.py through the registry" {
+  local proj="$TEST_DIR/proj"
+  mkdir -p "$proj"
+  cp "$REPO_ROOT/refine.sh" "$proj/refine.sh"
+  git -C "$proj" init -q
+
+  local cfg="$TEST_DIR/cfg"
+  local install="$cfg/plugins/cache/dddpaul-ralph/ralph/0.14.15"
+  local orch="$install/skills/ralph-run/scripts/refine_orchestrator.py"
+  mkdir -p "$(dirname "$orch")"
+  touch "$orch"
+  write_registry "$cfg" "$install"
+
+  run env -u REFINE_ORCHESTRATOR CLAUDE_CONFIG_DIR="$cfg" bash "$proj/refine.sh" --help
+  [ "$status" -eq 0 ]
+  [ "$output" = "UV_RAN=$orch" ]
 }
 
 @test "resolver tier 3: clear error and non-zero exit when the plugin is missing" {
@@ -100,10 +127,12 @@ install_shim() {
   local shim
   shim="$(install_shim "$proj")"
 
-  # Nothing installed: no override and an empty config dir means the plugin
-  # cache glob cannot match, so the shim exits with the install-the-plugin error.
+  # Nothing installed: no override and an empty config dir means there is no
+  # registry, so the shim exits with the install-the-plugin error.
+  git -C "$proj" init -q
   run bash "$shim" --help
   [ "$status" -eq 1 ]
+  [[ "$output" == *"plugin registry"*"not found"* ]]
   [[ "$output" == *"could not locate ralph_orchestrator.py"* ]]
   [[ "$output" == *"/plugin install ralph@dddpaul-ralph"* ]]
 }

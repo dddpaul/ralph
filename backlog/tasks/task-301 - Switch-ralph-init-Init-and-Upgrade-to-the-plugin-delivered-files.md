@@ -4,6 +4,7 @@ title: Switch ralph-init Init and Upgrade to the plugin-delivered files
 status: To Do
 assignee: []
 created_date: '2026-11-04T14:52:00Z'
+updated_date: '2026-11-04T15:20:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -30,3 +31,9 @@ Reference: PRD design/plugin-delivered-project-files-prd.md, US-007.
 - [ ] #5 `plugins/ralph/skills/ralph-init/SKILL.md` covers both Init and Upgrade for the change, and `README.md` describes the marker, the switches, the shims and the one-time migration
 - [ ] #6 ruff, pytest and bats pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+From the TASK-295 review: ralph-init SKILL.md's plugin-installed preflight (Step 1, the find over $CLAUDE_DIR/plugins/cache) still checks the cache by glob and does not check jq, while ralph.sh/refine.sh now resolve through installed_plugins.json with jq. Switch that check to the registry resolver (templates/shims/resolve-plugin.sh) when ralph-init moves to plugin-delivered files.
+<!-- SECTION:NOTES:END -->
