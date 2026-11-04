@@ -133,3 +133,14 @@ teardown() {
   [ "$status" -eq 1 ]
   [[ "$output" == *"BLOCKED"* ]]
 }
+
+@test "blocks: user-settings fragment changed without a version bump" {
+  echo '{"permissions": {"allow": []}}' > plugins/ralph/user-settings.json
+  git add -A
+  git commit -q -m "fragment, no bump"
+  local head; head=$(git rev-parse HEAD)
+
+  run_guard "$head" "$BASE"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"BLOCKED"* ]]
+}
