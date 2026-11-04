@@ -59,13 +59,13 @@ This feature does two things:
 - [ ] **Registry lookup.**
   - It reads `<config>/plugins/installed_plugins.json` with jq and requires `version` 2.
   - It selects `plugins["ralph@dddpaul-ralph"]`.
-  - A `scope: "project"` entry whose `projectPath` equals the clone's project identity wins over the `scope: "user"` entry.
+  - It takes the first entry, in registry array order, that applies to the clone, as Claude Code does (observed on Claude Code 2.1.309; the order is undocumented and the tests pin it). A `scope: "user"` entry applies everywhere. A `scope: "project"` or `scope: "local"` entry applies only when its `projectPath` equals the clone's project identity. Claude Code appends new installs, so a user install made before a project install still wins inside the project.
 - [ ] **Project identity.**
   - It is `git config ralph.projectPath`, which the clone migration saves as the host's canonical main worktree root.
   - Without that key, it is the canonical main worktree root: the parent of `git rev-parse --git-common-dir`, made absolute with `pwd -P`.
   - Layouts with a separate git dir, whose common dir is not `<root>/.git`, are rejected explicitly.
 - [ ] **One identity everywhere.** The same identity applies on the host, inside the devcontainer (where the clone is mounted at `/workspace`), and in a linked or temporary worktree. Tests resolve a project-only install, with no user-scope fallback, from all three.
-- [ ] **Errors.** Each of these is an error with its own message: two candidate entries, a missing `installPath`, a missing target file, the wrong registry version, and no jq.
+- [ ] **Errors.** Each of these is an error with its own message: no applicable entry, a missing `installPath`, a missing target file, the wrong registry version, and no jq. Several applicable entries are not an error: the first one wins.
 - [ ] **Finding jq and the config dir.**
   - jq: on PATH first, else `git config ralph.jq`.
   - The config dir: `$CLAUDE_CONFIG_DIR`, else `git config ralph.claudeConfigDir`, else `$HOME/.claude`.
@@ -590,7 +590,7 @@ This feature does two things:
   - **Keys:** `ralph.jq`, `ralph.claudeConfigDir`, `ralph.projectPath`, `ralph.pluginHooks`, `ralph.sharedBacklog` and `ralph.holder`.
   - **The trusted switches** are `ralph.pluginHooks` and `ralph.sharedBacklog`.
   - **Who sets them:** only the migration, `shared-backlog.sh enable` and `disable`, and the user. Nothing rewrites them to switch identity.
-- **FR-3: Finding the plugin.** The plugin is resolved only by the US-001 resolver, which uses the main worktree's root for scope. Nothing selects a plugin by scanning the cache.
+- **FR-3: Finding the plugin.** The plugin is resolved only by the US-001 resolver, which uses the main worktree's root for scope. It takes the first registry entry that applies (user scope, or project or local scope for this project), the rule Claude Code 2.1.309 was observed to follow, so the shims and the Claude hooks run the same install. Nothing selects a plugin by scanning the cache.
 - **FR-4: Claude hooks.** The plugin's guard hooks act only when the marker at the session's canonical git root has `"pluginHooks": true`, and only for guards not in `localGuards`. The one exception is the autonomous-creation guard (US-022), which keys only on `RALPH_AUTONOMOUS` and `ralph.sharedBacklog`.
 - **FR-5: Blocking when the plugin is missing.** pre-commit and commit-msg block on `ralph.pluginHooks`, and pre-push on `ralph.pluginHooks` or `ralph.sharedBacklog`. post-commit only warns. `--no-verify` is the documented bypass.
 - **FR-6: The holder.** It comes from `--as`, else `SHARED_BACKLOG_HOLDER`, else `ralph.holder`, and is resolved once per run. A bare `@claude` assignee counts as unassigned everywhere.
@@ -662,6 +662,6 @@ This feature does two things:
 
 ## 9. Open Questions
 
-- **Scope precedence** in the real registry, checked on the host in US-001 before the resolver ships.
+- **Scope precedence** in the real registry, checked on the host in US-001 before the resolver ships. Answered on Claude Code 2.1.309: the first applicable entry in registry order wins.
 - **`CLAUDE_PROJECT_DIR`** when a session starts in a subdirectory, covered by US-002's tests and US-008's host check.
 - **Dropping the `Skill(...)` allow rules,** checked on the host in US-004.

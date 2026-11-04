@@ -5,9 +5,11 @@
 # ralph_resolve_plugin <dir> <relpath>
 #   Print <installPath>/<relpath> for the ralph@dddpaul-ralph install that Claude
 #   Code registered for the clone holding <dir>; on failure print one reason on
-#   stderr and return 1. A project-scope entry whose projectPath is the clone's
-#   identity (git config ralph.projectPath, else the main worktree root) wins
-#   over the user-scope entry (design/plugin-delivered-project-files-prd.md US-001).
+#   stderr and return 1. Like Claude Code (observed on 2.1.309), it takes the
+#   first entry in registry order that applies: a user-scope entry, or a project-
+#   or local-scope entry whose projectPath is the clone's identity (git config
+#   ralph.projectPath, else the main worktree root)
+#   (design/plugin-delivered-project-files-prd.md US-001).
 ralph_resolve_plugin() {
   local dir="$1" rel="$2" common root id jq cfg reg ver sel count install
   common="$(unset CDPATH; cd -- "$dir" 2>/dev/null && c="$(git rev-parse --git-common-dir 2>/dev/null)" && cd -- "$c" && pwd -P)"
@@ -51,24 +53,18 @@ ralph_resolve_plugin() {
     return 1
   fi
   sel="$("$jq" -r --arg id "$id" '
-    [.plugins["ralph@dddpaul-ralph"][]?] as $all
-    | [$all[] | select(.scope == "project" and .projectPath == $id)] as $proj
-    | (if ($proj | length) > 0 then $proj else [$all[] | select(.scope == "user")] end) as $c
+    [.plugins["ralph@dddpaul-ralph"][]?
+      | select(.scope == "user" or ((.scope == "project" or .scope == "local") and .projectPath == $id))] as $c
     | "\($c | length) \($c[0].installPath // "")"' "$reg" 2>/dev/null)"
   count="${sel%% *}"
   install="${sel#* }"
   case "$count" in
-    1) ;;
     0)
-      echo "ralph: plugin lookup: ralph@dddpaul-ralph has no project-scope entry for $id and no user-scope entry in $reg" >&2
+      echo "ralph: plugin lookup: ralph@dddpaul-ralph has no user-scope entry and no project- or local-scope entry for $id in $reg" >&2
       return 1
       ;;
     *[!0-9]* | '')
       echo "ralph: plugin lookup: cannot read the ralph@dddpaul-ralph entries in $reg" >&2
-      return 1
-      ;;
-    *)
-      echo "ralph: plugin lookup: $count candidate ralph@dddpaul-ralph entries for $id in $reg" >&2
       return 1
       ;;
   esac

@@ -408,9 +408,9 @@ The shim sets `RALPH_PROJECT_ROOT` and delegates to the canonical orchestrator, 
 
 - finds `jq` on `PATH`, else at `git config ralph.jq`;
 - reads `<config>/plugins/installed_plugins.json`, where the config dir is `$CLAUDE_CONFIG_DIR`, else `git config ralph.claudeConfigDir`, else `$HOME/.claude`, and requires `"version": 2`;
-- takes only the `ralph@dddpaul-ralph` entries: a `scope: "project"` entry whose `projectPath` equals the clone's identity wins over the `scope: "user"` entry;
+- takes only the `ralph@dddpaul-ralph` entries and, like Claude Code (observed on 2.1.309), picks the first one in registry order that applies: a `scope: "user"` entry applies everywhere, a `scope: "project"` or `scope: "local"` entry only where its `projectPath` equals the clone's identity. Claude Code appends new installs, so a user install made before a project install still wins inside the project;
 - uses `git config ralph.projectPath` as the identity, else the main worktree root (the canonical parent of `git rev-parse --git-common-dir`), so a linked worktree resolves like its main clone; a separate-git-dir layout is rejected;
-- fails with its own message for each of: no jq, no registry, invalid JSON, the wrong registry version, no matching entry, more than one candidate, no `installPath`, a missing `installPath` directory, and a missing target file.
+- fails with its own message for each of: no jq, no registry, invalid JSON, the wrong registry version, no applicable entry, no `installPath`, a missing `installPath` directory, and a missing target file.
 
 **Inside the DevContainer** the `.devcontainer/devcontainer.json` mounts bind the **entire** host `~/.claude` at its own host path, which is where `CLAUDE_CONFIG_DIR` points, so the registry and the host paths it records are both reachable and a user-scope install resolves as on the host. The clone itself is mounted at `/workspace`, which never equals a host `projectPath`: a project-scope install matches there only when the clone's `git config ralph.projectPath` holds the host path (the config lives in `.git/config`, so it travels with the mount). To check the lookup from a shell inside the container:
 
