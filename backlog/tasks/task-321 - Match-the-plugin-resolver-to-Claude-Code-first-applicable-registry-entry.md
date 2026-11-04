@@ -4,7 +4,7 @@ title: Match the plugin resolver to Claude Code first-applicable registry entry
 status: Done
 assignee: []
 created_date: '2026-11-04T16:56:00Z'
-updated_date: '2026-11-04T17:08:00Z'
+updated_date: '2026-11-04T18:54:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -43,7 +43,7 @@ Reference: PRD design/plugin-delivered-project-files-prd.md, US-001 and FR-3. Cr
 - [x] #3 The two-candidate ambiguity error is removed and its test replaced
 - [x] #4 Every embedded copy of the block (ralph.sh, refine.sh, shim templates) matches the updated block and the parity test passes
 - [x] #5 PRD US-001 and FR-3 in design/plugin-delivered-project-files-prd.md describe the first-applicable-entry rule and name Claude Code 2.1.309 as the version observed
-- [ ] #6 (host) In an isolated CLAUDE_CONFIG_DIR holding a user and a project install of different versions from the git-sourced marketplace, the resolver and a Claude Code session pick the same installPath in both registry orders, recorded in the notes
+- [x] #6 (host) In an isolated CLAUDE_CONFIG_DIR holding a user and a project install of different versions from the git-sourced marketplace, the resolver and a Claude Code session pick the same installPath in both registry orders, recorded in the notes
 - [x] #7 ruff, pytest and bats pass, and bash -n plus the bash 3.2 static guard pass on every changed shell file
 <!-- AC:END -->
 
@@ -59,4 +59,6 @@ AC #6 deferred (host): it needs real Claude Code on the macOS host with the git-
 Done: resolver takes the first applicable ralph@dddpaul-ralph entry in registry order (user anywhere; project or local with projectPath = identity); two-candidate error removed; block re-embedded in ralph.sh, refine.sh and templates/root copies; tests pin user-then-project, project-then-user (clone + unrelated repo), local scope, no applicable entry, several applicable entries; PRD US-001/FR-3/open question, README and a superseded note in the brainstorm updated. ruff clean; pytest 1115 passed/3 skipped; bats 265/266 (R11 settings.local.json shape, known local gitignored-file failure, also on master); bash -n clean. task-reviewer CHANGES REQUESTED (missing AC #6 deferral note), fixed, then APPROVED. AC #6 (host) still pending.
 
 Commit: `bc67187` - task-321: bump plugin version to 0.16.1 (patch)
+
+macOS host check for AC #6 (Claude Code 2.1.309, isolated CLAUDE_CONFIG_DIR, git-sourced marketplace dddpaul/ralph). The config held user-scope 0.14.15 and project-scope 0.16.0 for a test clone. For each registry order, the run compared the installPath a claude -p session loaded (debug log line 'Attempting to load skills from plugin ralph default skillsPath') with the installPath the merged resolver block printed. With user first, both picked 0.14.15 in the clone and both picked 0.14.15 in an unrelated repo. With project first, both picked 0.16.0 in the clone and both picked 0.14.15 in the unrelated repo. The resolver and Claude Code agree in both orders.
 <!-- SECTION:NOTES:END -->
