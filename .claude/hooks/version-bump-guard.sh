@@ -25,7 +25,9 @@
 # Release tag check (TASK-319): two hosts can each bump to the same version
 # with different content. The release commit of vX.Y.Z is the first commit,
 # along the pushed tip's first-parent history (what becomes origin's master),
-# where both manifests read X.Y.Z. The guard refuses a master push when the two
+# where both manifests read X.Y.Z; when that commit is a merge bringing X.Y.Z
+# in from another parent (a merge pull), that parent's release commit counts
+# too. The guard refuses a master push when the two
 # manifests disagree on the tip, when origin already has vX.Y.Z peeled to a
 # different commit, or when origin cannot be reached within
 # VERSION_GUARD_LS_REMOTE_TIMEOUT seconds (default 20). An absent tag passes
@@ -141,6 +143,23 @@ EOF
   printf '%s\n' "$release"
 }
 
+# True iff $3 is a release commit of version $2 for tip $1: the first-parent
+# release commit, or — when that commit is a merge bringing the version in from
+# another parent (a merge pull of another host's release) — a release commit
+# of that parent's line.
+is_release_of() { # $1=tip $2=version $3=candidate
+  local rel parent
+  rel=$(release_commit "$1" "$2")
+  [ -n "$rel" ] || return 1
+  [ "$rel" = "$3" ] && return 0
+  for parent in $(git rev-list --parents -n 1 "$rel" | cut -d' ' -f3-); do
+    [ "$(manifest_version_at "$parent" "$MANIFEST")" = "$2" ] || continue
+    [ "$(manifest_version_at "$parent" "$MARKET_MANIFEST")" = "$2" ] || continue
+    is_release_of "$parent" "$2" "$3" && return 0
+  done
+  return 1
+}
+
 # Run `git ls-remote` for tag $1 and its peeled ref on $REMOTE, killed after
 # $LS_REMOTE_TIMEOUT seconds. Prints the listing; returns git's status (or the
 # kill status on timeout).
@@ -199,8 +218,8 @@ $listing
 EOF
   [ -n "$peeled" ] || return 0
 
-  release=$(release_commit "$1" "$plugin_ver")
-  if [ "$peeled" != "$release" ]; then
+  if ! is_release_of "$1" "$plugin_ver" "$peeled"; then
+    release=$(release_commit "$1" "$plugin_ver")
     echo "BLOCKED: version conflict on $tag." >&2
     echo "  '$REMOTE' tags $tag at $peeled," >&2
     echo "  but the release commit of $plugin_ver on the pushed tip is ${release:-<none>}." >&2

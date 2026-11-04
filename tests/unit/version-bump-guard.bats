@@ -276,6 +276,26 @@ bump_020_from() { # $1=parent $2=content $3=file
   [ "$status" -eq 0 ]
 }
 
+@test "passes: merge pull of another host's release without a local bump" {
+  local a1 a2 b1 m
+  a1=$(bump_020_from "$BASE" "host A" design/a.md)
+  origin_tag v0.2.0 "$a1" annotated
+  echo "host A docs" > design/a2.md
+  git add -A
+  git commit -q -m "docs after release"
+  a2=$(git rev-parse HEAD)
+  publish "$a2"
+  git checkout -q master
+  echo "host B docs" > README.md
+  git add -A
+  git commit -q -m "local docs"
+  git merge -q --no-edit "$a2"
+  m=$(git rev-parse HEAD)
+
+  run_guard "$m" "$a2"
+  [ "$status" -eq 0 ]
+}
+
 @test "blocks: the two manifests disagree on the pushed tip" {
   set_version "0.2.0" "0.2.1"
   git commit -q -am "half bump"

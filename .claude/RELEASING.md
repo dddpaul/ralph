@@ -11,7 +11,7 @@ Repo-specific tooling under `.claude/`; not shipped in the plugin and not mirror
 
 ## The release commit rule
 
-The release commit of `vX.Y.Z` is the first commit, along origin's `master` first-parent history, where both manifests read `X.Y.Z`. The tag, peeled for annotated tags, must point at that commit. Commits after the release that keep the same version do not move the release commit.
+The release commit of `vX.Y.Z` is the first commit, along origin's `master` first-parent history, where both manifests read `X.Y.Z`. The tag, peeled for annotated tags, must point at that commit. Commits after the release that keep the same version do not move the release commit. When that first commit is a merge that brings `X.Y.Z` in from another parent — a merge pull of another host's release — the release commit of that parent's line also counts, so pulling a release by merge or by rebase both pass.
 
 The pre-push guard `.claude/hooks/version-bump-guard.sh` checks this on every push of `master`. It runs `git ls-remote origin 'refs/tags/vX.Y.Z' 'refs/tags/vX.Y.Z^{}'` with a deadline of `VERSION_GUARD_LS_REMOTE_TIMEOUT` seconds (default 20) and refuses the push when:
 
@@ -28,7 +28,7 @@ A tag on origin is never moved, deleted or force-pushed. Whatever origin tagged 
 When the guard reports `version conflict on vX.Y.Z`:
 
 1. Delete only your local, never-pushed tag: `git tag -d vX.Y.Z`. Then `git fetch origin --tags` to get origin's.
-2. Bring `master` up to date with `origin/master` (merge or rebase your unpushed work onto it).
+2. Bring `master` up to date with `origin/master` (merge it in, or rebase your unpushed work onto it).
 3. Re-bump both manifests to a version above `X.Y.Z`, e.g. `.claude/hooks/bump-version.sh patch` on a task branch, then merge it into `master` as usual.
 4. On `master`, `.claude/hooks/bump-version.sh --tag` tags the new version; push again.
 
