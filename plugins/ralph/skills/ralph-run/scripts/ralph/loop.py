@@ -253,6 +253,7 @@ def _run_loop(
 ) -> None:
     _ = project_root  # reserved for future per-iteration relative paths
     whitelist = args.task_whitelist or None
+    holder = tasks_module.resolve_holder()
 
     for i in range(1, args.max_iterations + 1):
         installer.raise_if_pending()
@@ -269,7 +270,7 @@ def _run_loop(
 
         clear_pause(status)
 
-        next_task = tasks_module.pick_next_task(whitelist=whitelist)
+        next_task = tasks_module.pick_next_task(whitelist=whitelist, holder=holder)
         if next_task is None:
             state.exit_reason = (
                 "all specified tasks done" if whitelist else "all tasks done"
