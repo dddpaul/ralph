@@ -1,9 +1,10 @@
 ---
 id: TASK-298
 title: Ship the common allow rules as a user-settings fragment in the plugin
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-04T14:52:00Z'
+updated_date: '2026-11-04T16:09:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies: []
@@ -26,10 +27,26 @@ Reference: PRD design/plugin-delivered-project-files-prd.md, US-004.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 plugins/ralph/user-settings.json holds the 46 Bash rules and ScheduleWakeup from the template settings.local.json, attribution with empty commit and pr, and sandbox with enabled and autoAllowBashIfSandboxed
-- [ ] #2 The fragment holds no Skill(...) rules
-- [ ] #3 The /ralph-run preflight prints one warning listing exactly the fragment entries missing from the user settings and changes no file
-- [ ] #4 A merge helper appends missing allow entries to a sample user settings file, keeps every unrelated key and value, and reports a differing scalar without overwriting it
+- [x] #1 plugins/ralph/user-settings.json holds the 46 Bash rules and ScheduleWakeup from the template settings.local.json, attribution with empty commit and pr, and sandbox with enabled and autoAllowBashIfSandboxed
+- [x] #2 The fragment holds no Skill(...) rules
+- [x] #3 The /ralph-run preflight prints one warning listing exactly the fragment entries missing from the user settings and changes no file
+- [x] #4 A merge helper appends missing allow entries to a sample user settings file, keeps every unrelated key and value, and reports a differing scalar without overwriting it
 - [ ] #5 (host) In an interactive session in a project without Skill(...) rules, /ralph-status runs with no permission prompt, and the result is recorded in the notes
-- [ ] #6 ruff, pytest and bats pass
+- [x] #6 ruff, pytest and bats pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan: generate plugins/ralph/user-settings.json from the template settings.local.json minus the 7 Skill(...) rules; add ralph.user_settings (missing_entries + non-overwriting merge, CLI behind merge-user-settings.sh); add a report-only preflight check 9 that prints one stderr warning listing the missing entries; tests in tests/python/test_user_settings_fragment.py; docs in ralph-run SKILL.md and README.
+
+Commit: `9ed8338` - task-298: ship the common allow rules as a user-settings fragment with a preflight check and a merge helper
+
+AC #5 deferred (host): it needs an interactive Claude Code session on the Mac host, which this container cannot run (the -p mode test already showed skills need no allow rule). Follow-up on the host: in a test project whose .claude/settings.local.json has no Skill(...) rules, start an interactive session, run /ralph-status, confirm no permission prompt appears, then check AC #5 and append the result (Claude Code version, prompt yes/no) to these notes. If a prompt appears, the Skill(...) rules go back into plugins/ralph/user-settings.json.
+
+Commit: `68d7747` - task-298: count the user-settings fragment as a shipped plugin file
+
+Done: plugins/ralph/user-settings.json (46 Bash rules + ScheduleWakeup, attribution, sandbox; no Skill rules); ralph.user_settings (missing_entries, non-overwriting merge) with merge-user-settings.sh shim; preflight check 9 prints one stderr warning listing missing entries and writes nothing; the preflight fixture pins CLAUDE_CONFIG_DIR to a dir seeded with the fragment; the fragment joins the shipped set. ruff clean, pytest 1112 passed, bats 265/266 (the one failure, R11 settings.local.json shape, is a known local gitignored-file failure that also happens on master). task-reviewer APPROVED after two fixes (AC #5 deferral note, shipped-set entry).
+
+Commit: `a0094a8` - task-298: bump plugin version to 0.16.0 (minor)
+<!-- SECTION:NOTES:END -->
