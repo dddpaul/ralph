@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# shared-backlog pre-push hook — refuse a push whose tree carries a duplicate
+# task ID. A duplicate arrives with no git conflict (the two files have
+# different names), so only a check of the tree being pushed catches it.
+# Installed by `scripts/shared-backlog.sh install-hooks`; the tracked copy lives
+# in scripts/hooks/pre-push. Bash 3.2 clean.
+
+set -eu
+
+root=$(git rev-parse --show-toplevel)
+script="$root/scripts/shared-backlog.sh"
+if [ ! -f "$script" ]; then
+  echo "pre-push: $script is missing, so duplicate task IDs cannot be checked." >&2
+  echo "pre-push: push from a checkout that has it, or bypass with --no-verify." >&2
+  exit 1
+fi
+
+zero=0000000000000000000000000000000000000000
+rc=0
+# stdin: <local ref> <local sha> <remote ref> <remote sha>, one line per ref.
+while read -r local_ref local_sha remote_ref _remote_sha; do
+  case "$local_sha" in "$zero"|"") continue ;; esac  # a deletion
+  if ! bash "$script" check-dupes "$local_sha"; then
+    echo "pre-push: refusing to push $local_ref -> $remote_ref: duplicate task IDs." >&2
+    echo "pre-push: run 'scripts/shared-backlog.sh renumber', then push again." >&2
+    rc=1
+  fi
+done
+exit "$rc"
