@@ -276,7 +276,7 @@ clone_main() {
   set_config ralph.jq "$jq"
   set_config ralph.projectPath "$main"
   if [ -n "${CLAUDE_CONFIG_DIR:-}" ] && [ "$(canonical "$CLAUDE_CONFIG_DIR")" != "$(canonical "$HOME/.claude")" ]; then
-    set_config ralph.claudeConfigDir "$CLAUDE_CONFIG_DIR"
+    set_config ralph.claudeConfigDir "$(canonical "$CLAUDE_CONFIG_DIR")"
   fi
   stop_after config
 

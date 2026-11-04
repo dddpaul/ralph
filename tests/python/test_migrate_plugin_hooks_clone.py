@@ -190,7 +190,7 @@ def test_claude_config_dir_is_saved_only_off_the_default(tmp_path: Path, home: P
     config_dir.mkdir(exist_ok=True)
     assert clone(root, home, config_dir=config_dir).returncode == 0
     saved = ralph_config(root).get("ralph.claudeconfigdir")
-    assert saved == (None if where == "default" else str(config_dir))
+    assert saved == (None if where == "default" else str(config_dir.resolve()))
 
 
 # --------------------------------------------------------------------------
