@@ -73,6 +73,7 @@ Template changes since 2026-08-01, by area:
   2. **Find the config dir:** `$CLAUDE_CONFIG_DIR`, else `git config ralph.claudeConfigDir`, else `$HOME/.claude`.
   3. **Read the registry:** `installed_plugins.json`, checking that its `version` is 2. Take only `ralph@dddpaul-ralph`.
   4. **Pick the entry:** a project-scope entry whose `projectPath` is this clone's canonical git root wins over the user-scope entry. More than one candidate, or a missing `installPath`, is an error.
+     *Superseded (TASK-321): the host check on Claude Code 2.1.309 showed Claude Code takes the first applicable entry in registry order; the PRD's US-001 holds the rule now.*
   5. **Run the hook:** `exec` the file `<installPath>/git-hooks/<name>`.
   - **Before the plugin's hook:** if `.git/hooks/<name>.local` exists, the shim runs it first and stops if it fails. Arguments pass through to both, and pre-push stdin is read once and given to each.
   - **Independent of Claude:** git enforcement depends only on the marker and the installed package, not on `enabledPlugins` in Claude's settings.
@@ -133,7 +134,7 @@ Template changes since 2026-08-01, by area:
 
 ## Open questions
 
-- **Scope precedence in the real registry:** whether a project-scope install wins over the user-scope one. Verify against Claude Code with a project-scope install.
+- **Scope precedence in the real registry:** whether a project-scope install wins over the user-scope one. Verify against Claude Code with a project-scope install. *Answered in the PRD's US-001: the first applicable entry in registry order wins.*
 - **`CLAUDE_PROJECT_DIR` when a session starts in a subdirectory:** whether it is the launch directory or the git root. Verify.
 - **The 7 `Skill(...)` rules:** whether an interactive session prompts without them. Drop them only after an interactive check.
 - **The marker's final file name and schema** (`.claude/ralph.json` is a proposal).

@@ -1,4 +1,4 @@
-"""The plugin registry resolver shared by ralph.sh, refine.sh and the shims (TASK-295).
+"""The plugin registry resolver shared by ralph.sh, refine.sh and the shims (TASK-295, TASK-321).
 
 ``templates/shims/resolve-plugin.sh`` holds one marker-delimited block that
 defines ``ralph_resolve_plugin <dir> <relpath>``. Every embedding file carries a
@@ -131,9 +131,9 @@ def user(install: Path) -> dict[str, Any]:
     return {"scope": "user", "installPath": str(install), "version": install.name}
 
 
-def project(install: Path, project_path: Path | str) -> dict[str, Any]:
+def project(install: Path, project_path: Path | str, scope: str = "project") -> dict[str, Any]:
     return {
-        "scope": "project",
+        "scope": scope,
         "projectPath": str(project_path),
         "installPath": str(install),
         "version": install.name,
@@ -193,8 +193,7 @@ REASONS = (
     "installed_plugins.json not found",
     "is not valid JSON",
     "has version",
-    "no project-scope entry for",
-    "candidate ralph@dddpaul-ralph entries",
+    "no project- or local-scope entry for",
     "has no installPath",
     "does not exist",
     "not found in the installed plugin",
@@ -235,10 +234,34 @@ def test_user_scope_entry_resolves_despite_a_zz_fork_cache(world: dict[str, Path
 
 
 @needs_jq
-def test_project_scope_entry_for_this_clone_wins_over_user(world: dict[str, Path]) -> None:
+def test_user_then_project_resolves_the_user_entry(world: dict[str, Path]) -> None:
+    # Claude Code 2.1.309 loads the first applicable entry in registry order, and
+    # appends new installs: a user install made first wins inside the project too.
     write_registry(world["cfg"], [user(world["user"]), project(world["proj"], world["clone"])])
+    ok(resolve(world["clone"], world["cfg"]), world["user"])
+    ok(resolve(world["clone"] / ".git", world["cfg"]), world["user"])
+
+
+@needs_jq
+def test_project_then_user_resolves_by_location(world: dict[str, Path]) -> None:
+    unrelated = make_clone(world["base"] / "unrelated")
+    write_registry(world["cfg"], [project(world["proj"], world["clone"]), user(world["user"])])
     ok(resolve(world["clone"], world["cfg"]), world["proj"])
     ok(resolve(world["clone"] / ".git", world["cfg"]), world["proj"])
+    ok(resolve(unrelated, world["cfg"]), world["user"])
+
+
+@needs_jq
+def test_local_scope_entry_behaves_like_project_scope(world: dict[str, Path]) -> None:
+    unrelated = make_clone(world["base"] / "unrelated")
+    write_registry(world["cfg"], [project(world["proj"], world["clone"], "local"), user(world["user"])])
+    ok(resolve(world["clone"], world["cfg"]), world["proj"])
+    ok(resolve(unrelated, world["cfg"]), world["user"])
+    write_registry(world["cfg"], [user(world["user"]), project(world["proj"], world["clone"], "local")])
+    ok(resolve(world["clone"], world["cfg"]), world["user"])
+    write_registry(world["cfg"], [project(world["proj"], world["clone"], "local")])
+    ok(resolve(world["clone"], world["cfg"]), world["proj"])
+    fails(resolve(unrelated, world["cfg"]), "no project- or local-scope entry for")
 
 
 @needs_jq
@@ -273,7 +296,7 @@ def test_project_only_install_from_a_workspace_mount(world: dict[str, Path]) -> 
     host_path = "/Users/someone/Projects/my project"
     mount = make_clone(world["base"] / "workspace")
     write_registry(world["cfg"], [project(world["proj"], host_path)])
-    fails(resolve(mount, world["cfg"]), "no project-scope entry for")
+    fails(resolve(mount, world["cfg"]), "no project- or local-scope entry for")
     git(mount, "config", "ralph.projectPath", host_path)
     ok(resolve(mount, world["cfg"]), world["proj"])
 
@@ -338,18 +361,27 @@ def test_missing_registry(world: dict[str, Path]) -> None:
 @needs_jq
 def test_not_installed(world: dict[str, Path]) -> None:
     write_registry(world["cfg"], [])
-    fails(resolve(world["clone"], world["cfg"]), "no project-scope entry for")
+    fails(resolve(world["clone"], world["cfg"]), "no project- or local-scope entry for")
+
+
+@needs_jq
+def test_no_applicable_entry(world: dict[str, Path]) -> None:
+    other = world["base"] / "elsewhere"
+    entries = [project(world["proj"], other), project(world["user"], other, "local"), {"scope": "managed"}]
+    write_registry(world["cfg"], entries)
+    result = resolve(world["clone"], world["cfg"])
+    fails(result, f"has no user-scope entry and no project- or local-scope entry for {world['clone']}")
 
 
 @needs_jq
 @pytest.mark.parametrize("scope", ["user", "project"])
-def test_two_candidate_entries(world: dict[str, Path], scope: str) -> None:
+def test_several_applicable_entries_take_the_first(world: dict[str, Path], scope: str) -> None:
     if scope == "user":
         entries = [user(world["user"]), user(world["proj"])]
     else:
-        entries = [user(world["user"]), project(world["user"], world["clone"]), project(world["proj"], world["clone"])]
+        entries = [project(world["proj"], world["clone"]), project(world["user"], world["clone"]), user(world["fork"])]
     write_registry(world["cfg"], entries)
-    fails(resolve(world["clone"], world["cfg"]), "2 candidate ralph@dddpaul-ralph entries")
+    ok(resolve(world["clone"], world["cfg"]), world["user"] if scope == "user" else world["proj"])
 
 
 @needs_jq
