@@ -121,3 +121,15 @@ teardown() {
   run_guard "$head" "$BASE"
   [ "$status" -eq 0 ]
 }
+
+@test "blocks: plugin hook changed without a version bump" {
+  mkdir -p plugins/ralph/hooks
+  echo '{"hooks": {}}' > plugins/ralph/hooks/hooks.json
+  git add -A
+  git commit -q -m "plugin hook, no bump"
+  local head; head=$(git rev-parse HEAD)
+
+  run_guard "$head" "$BASE"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"BLOCKED"* ]]
+}

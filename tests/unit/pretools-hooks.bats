@@ -200,7 +200,8 @@ setup_git_repo() {
 run_hook_in_repo() {
   local script="$HOOKS_DIR/$1"
   local json="$2"
-  echo "$json" | bash -c "cd '$TEST_DIR/repo' && bash '$script'" 2>/dev/null
+  echo "$json" | env -u RALPH_PROJECT_ROOT -u CLAUDE_PROJECT_DIR \
+    bash -c "cd '$TEST_DIR/repo' && bash '$script'" 2>/dev/null
 }
 
 @test "master-branch-guard: blocks edit on master to non-allowlisted path" {

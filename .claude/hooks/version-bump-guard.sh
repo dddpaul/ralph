@@ -16,6 +16,7 @@
 #
 # Shipped set (a change here requires a strictly-greater version):
 #   plugins/ralph/skills/**                     plugins/ralph/agents/**
+#   plugins/ralph/hooks/**
 #   plugins/ralph/.claude-plugin/plugin.json    .claude-plugin/marketplace.json
 # Excluded (docs & tooling, not shipped-and-executed): README, design/,
 # backlog/, .claude/.

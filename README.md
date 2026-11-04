@@ -222,7 +222,7 @@ This repo is its own plugin marketplace. Claude Code runs the plugin's skills fr
 - **minor** (`0.3.0`) — a new skill/agent/flag, or a removed/renamed skill.
 - **major** (`1.0.0`) — deferred to a future stable-surface declaration.
 
-A `pre-push` git hook (`.claude/hooks/version-bump-guard.sh`, activated via a `.git/hooks/pre-push` wrapper) enforces this at the push boundary: if a push of `master` changes any shipped-set file (`plugins/ralph/skills/**`, `plugins/ralph/agents/**`, `plugin.json`, `marketplace.json`) without a strictly-greater version (`sort -V`), it is **blocked**. Non-master pushes, docs/tooling-only ranges, and the first push pass through. This guard is project-specific to this producer repo and is intentionally **not** part of the `ralph-init` template tree (seeded consumer projects ship no manifests).
+A `pre-push` git hook (`.claude/hooks/version-bump-guard.sh`, activated via a `.git/hooks/pre-push` wrapper) enforces this at the push boundary: if a push of `master` changes any shipped-set file (`plugins/ralph/skills/**`, `plugins/ralph/agents/**`, `plugins/ralph/hooks/**`, `plugin.json`, `marketplace.json`) without a strictly-greater version (`sort -V`), it is **blocked**. Non-master pushes, docs/tooling-only ranges, and the first push pass through. This guard is project-specific to this producer repo and is intentionally **not** part of the `ralph-init` template tree (seeded consumer projects ship no manifests).
 
 **Examples:**
 
@@ -286,6 +286,7 @@ The same workflow (branch, implement, review, merge) applies in both modes.
 | `.claude-plugin/marketplace.json` | Marketplace manifest — defines the `dddpaul-ralph` marketplace and its one `ralph` plugin |
 | `plugins/ralph/` | The `ralph` plugin (`.claude-plugin/plugin.json` manifest) — bundles all `ralph-*` skills and both agents |
 | `plugins/ralph/agents/` | Plugin-bundled agents: `task-reviewer` and `ralph-reviewer` |
+| `plugins/ralph/hooks/` | Plugin-delivered Claude guard hooks: `hooks.json`, the `run.sh` marker-gate dispatcher and the seven guards |
 | `backlog/` | Task files managed by backlog.md CLI |
 | `scripts/shorten-backlog-filenames.py` | Remediation for backlog filenames already over the 125-byte cap, across one project or a whole tree of them (dry-run by default, `--apply` renames via `git mv` and commits each project) |
 | `.devcontainer/` | DevContainer configuration with firewall for sandboxed execution |
@@ -416,6 +417,16 @@ The shim sets `RALPH_PROJECT_ROOT` and delegates to the canonical orchestrator, 
 ralph_resolve_plugin . skills/ralph-run/scripts/ralph_orchestrator.py
 # -> /Users/<user>/.claude/plugins/cache/dddpaul-ralph/ralph/<version>/skills/ralph-run/scripts/ralph_orchestrator.py
 ```
+
+### Plugin guard hooks
+
+The plugin ships the Claude guard hooks in `plugins/ralph/hooks/`: the seven guards (`commit-msg-guard`, `commit-prefix-guard`, `master-branch-guard`, `naming-guard`, `notes-guard`, `task-validator`, `filename-length-guard`) and a `hooks.json` with the same 13 entries and `if:` filters as the ralph-init template `settings.json`. Every entry runs `"${CLAUDE_PLUGIN_ROOT}"/hooks/run.sh <guard>`, a dispatcher that:
+
+- resolves the session's git root from `$CLAUDE_PROJECT_DIR` (`git rev-parse --show-toplevel`, made canonical), so a session started in a subdirectory finds its root and a nested repository is its own root;
+- exits 0 unless that root's tracked `.claude/ralph.json` has `"pluginHooks": true`, and exits 0 for a guard listed in its `localGuards` array;
+- otherwise runs the guard from the payload's `cwd` with the hook input unchanged, exports `RALPH_PROJECT_ROOT`, and returns the guard's exit code. A bad guard name, a missing jq or an unreadable marker is a non-blocking error (exit 1).
+
+Without the marker the plugin hooks do nothing, so a project keeps its legacy `.claude/hooks/` wiring, and the guards still work there: they take project paths from the git root of `RALPH_PROJECT_ROOT`, else of `$CLAUDE_PROJECT_DIR`. The template copies and this repo's `.claude/hooks/` copies stay byte-identical to the plugin (`tests/python/test_plugin_hooks.py`).
 
 ### Double-Run Guard
 
@@ -566,6 +577,7 @@ uv run pytest plugins/ralph/skills/ralph-run/tests/test_loop_exit_code.py
 
 **Python (`tests/python/`)** — also run by `uv run pytest`:
 
+- `test_plugin_hooks.py` - Tests the plugin guard hooks: parity of the seven guards with the template and live copies, `hooks.json` against the template `settings.json`, the `run.sh` marker gate (marker present/absent, `localGuards`, subdirectory session, nested repository, input, cwd, `RALPH_PROJECT_ROOT` and exit-code passthrough), the guards' root fallback when run directly, and a template-bootstrapped project still blocking through its legacy wiring
 - `test_shorten_backlog_filenames.py` - Tests `scripts/shorten-backlog-filenames.py` (slug normalizer, byte budget math, collision suffixing, backlog-root discovery and per-repo grouping, plus CLI runs over throwaway git repos with a stubbed `claude`: single project, multi-project sweep, pathspec-scoped commits, hook-blocked commits and `--no-verify`)
 - `test_devcontainer_*.py` - Pin the devcontainer config on both the live `.devcontainer/` and the ralph-init template: the `.venv` volume overlay, the shared `.claude` scheme and its lifecycle hooks, the host-path `~/.claude` bind, the `CLAUDE_CONFIG_DIR` root, the Claude Code version pin (concrete build arg, no floating `ARG` default, the guard run under `sh`), and the language fragments' Python runtime guard. Each module carries a mutated-copy negative case. `devcontainer_config.py` is their shared JSONC reader (it blanks whole-line `//` comments only; inline comments are not supported)
 
