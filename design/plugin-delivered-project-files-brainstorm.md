@@ -223,3 +223,209 @@ Next: `ralph-prd` to formalize as PRD, then `ralph-backlog` to generate tasks. T
 6. **This repo.** Migrate this repo: marker with `localGuards` for its live copies; template parity against `plugins/ralph/hooks/`.
 7. **Docs and live checks.** Update the README and ralph-init docs, then run the live checks on both hosts.
 8. **Separate task:** fix `commit-msg`'s `.git/MERGE_MSG` test for linked worktrees, using `git rev-parse --git-path MERGE_MSG`.
+
+---
+
+## Addendum: shared-backlog protocol (added 2026-11-04)
+
+### Why
+
+**Task IDs collided between two clones of one origin, in opposite directions.**
+
+- One destination clone was behind origin and allocated an ID that upstream already had.
+- Another clone was ahead: it allocated an ID locally, and the other host then took the same number.
+
+**A duplicate ID is costly and hard to see.** It blocks every ID-based backlog command until it is repaired. It also arrives with no git conflict, because the two file names differ.
+
+**Two obvious fixes don't work.**
+
+- Per-host ID ranges or prefixes are rejected: backlog.md has one project-wide prefix and always allocates max+1.
+- `backlog doctor --fix` is not a repair: when tested, it renumbered the copy that was already on origin.
+
+**A sibling project has already proven a fix.** Its stage-1 implementation is pinned at commit `af5b1f8`. It is one bash 3.2 script with 75 tests, plus a pre-push duplicate check. The script treats an ID as provisional until its push lands, and lets the push to origin decide which host holds a task. This addendum moves that protocol into the plugin, hardened after review.
+
+**Picking a task is not claiming it.** Two hosts that both filter out assigned tasks still pick the same unassigned task, because neither has pushed a claim yet.
+
+### What changed
+
+**Owner decisions (2026-11-04):**
+
+1. **The protocol is opt-in per project.** The tracked marker declares it with `"sharedBacklog": true`. The per-clone migration then turns on a clone-level switch, `git config ralph.sharedBacklog true`, and the hooks enforce on that switch. Turning enforcement off takes an explicit command. A commit that drops the marker does not turn it off.
+2. **`/ralph-handoff` uses the protocol only when the destination opted in.** In that case it creates the task through the protocol. Otherwise it keeps today's behaviour: the task file stays uncommitted and the ID is reported as provisional.
+3. **A bare `@claude` assignee counts as unassigned,** in both `claim` and Ralph's task picker. No task files are rewritten.
+4. **An autonomous run in an opted-in project creates no tasks.** It records follow-ups in its task's notes. A guard enforces this.
+5. **Opted-in runs publish after each completed iteration,** so the next claim starts from a master that matches origin.
+6. **`create` refuses when origin is unreachable,** instead of handing out a provisional ID.
+
+**What changes in the ralph code:**
+
+| Area | Change |
+|---|---|
+| Script | `plugins/ralph/scripts/shared-backlog.sh`, ported from `af5b1f8`, with a tracked fixed project shim that resolves the plugin through the registry resolver |
+| `create` | Allocates in a detached temporary worktree, under a protocol lock |
+| `integrate` | Never renumbers; checks run in the run's context |
+| Duplicate check | Reads its settings from the revision it inspects |
+| pre-push | A plugin body enforced by the clone switch |
+| `push.py` | Publishes through `integrate` after each iteration |
+| Picker | Claims a task before starting it |
+| Guard | Refuses task creation inside an autonomous run |
+| `/ralph-handoff` | Creates through the protocol in opted-in destinations |
+| R-INFRA-6 | Allows only the protocol's commits and reviewed or integration merges on master |
+| `commit-msg` | Fixes the `MERGE_MSG` check for worktrees |
+| This repo | Its release process handles version-tag clashes |
+
+### Implementation checklist
+
+Item 1 is interactive; items 2 to 11 depend on it and on the base design's resolver and migration work. The Distilled block below has the full steps.
+
+1. Import the stage-1 files from `af5b1f8` unchanged.
+2. Harden the script.
+3. Add the project shim and the clone switch.
+4. Add the plugin pre-push body.
+5. Make `push.py` publish through `integrate` after each iteration.
+6. Make the picker claim before it starts a task.
+7. Add the guard against creating tasks during a run.
+8. Make `/ralph-handoff` create through the protocol.
+9. Rewrite R-INFRA-6.
+10. Fix the `MERGE_MSG` check in `commit-msg`.
+11. Add tag-to-content release validation in this repo.
+
+### Distilled for ralph-task
+
+**Direction:** Move the shared-backlog protocol into the ralph plugin. It is opt-in per project: the tracked marker declares it and a clone-level switch enforces it. It reuses the base design's registry resolver, marker and shim mechanism. The push to origin decides which task IDs and claims are real.
+
+**Locked decisions (with rationale):**
+
+- **The script lives in the plugin.** `plugins/ralph/scripts/shared-backlog.sh`, ported from the stage-1 implementation at `af5b1f8` together with its tests.
+  - It keeps the subcommands `sync`, `claim`, `release`, `create`, `integrate`, `check-dupes` and `renumber`, and drops `install-hooks`.
+  - Opted-in projects keep a tracked fixed shim, `scripts/shared-backlog.sh`, which resolves the plugin through the registry resolver.
+  - The port fixes `usage()`: today `--help` stops at the `# Exit codes` line and exits 64.
+
+  *Rationale:* one implementation for every project, proven by the stage-1 tests.
+- **Configuration has three layers.**
+  - **The marker.** `.claude/ralph.json` holds `"sharedBacklog": true` and an optional `"checks"`: a command run with `sh -c` at the repo root, which maps onto the script's existing `SHARED_BACKLOG_CHECKS`.
+  - **The clone switch.** The per-clone migration sets `git config ralph.sharedBacklog true` from the marker. An explicit `shared-backlog.sh disable` clears it.
+  - **The holder.** It comes from `--as`, then `SHARED_BACKLOG_HOLDER`, then `git config ralph.holder`, which the migration sets as the host default.
+
+  *Rationale:* the holder differs per agent per host, so it cannot be tracked. Enforcement must not switch off through an ordinary commit.
+- **Holder delegation.** A run launched by a holder acts as that holder. The launcher passes `SHARED_BACKLOG_HOLDER` into the run, including into the devcontainer for that run. A separately dispatched worker uses its own holder and claims for itself. Shared git config is never rewritten to switch identity. *Rationale:* a separate run identity would make the launcher's own claim look like someone else's.
+- **One protocol lock.** A single lock in the git common dir covers every protocol operation and a run's claim and publish steps. One protocol operation runs per clone at a time. The design states that a person's own git commands in the same clone during an operation are unsupported. *Rationale:* claims and creates must not interleave.
+- **`create` allocates in a detached temporary worktree.**
+  - **Steps.**
+    1. Make the worktree at a freshly fetched `origin/master`.
+    2. Run `backlog task create` there.
+    3. Commit `task-N: add task` with a `Shared-Backlog-Op: <id>` trailer.
+    4. Push.
+  - **A lost race.** On a non-fast-forward rejection, it fetches again and retries in a fresh worktree, at most 3 times.
+  - **An uncertain push.** If the push outcome is unclear, it checks origin for the operation's trailer before retrying.
+  - **Cleanup.** It removes the worktree on every exit, and keeps recovery details when acceptance is uncertain.
+  - **What it leaves alone.** It never touches the user's index, working tree or branch. Only the remote-tracking refs move.
+  - **Offline.** It refuses, with exit 2.
+  - **The result.** The ID is final when `create` returns 0. The user's clone picks the task up on its next `sync` or `integrate`.
+  - **Untracked task files** in the user's tree are flagged, and `sync` and `integrate` refuse to run until they are dealt with.
+
+  *Rationale:* destinations that are ahead, dirty or on a task branch all work, and an ID is never exposed before it is published.
+- **Claims and assignees.**
+  - A bare `@claude` assignee counts as unassigned.
+  - A task is taken if it has any other assignee besides the holder, alone or alongside others.
+  - A claim this holder already has is still rechecked: status To Do and dependencies Done.
+
+  *Rationale:* existing tasks carry the generic `@claude`, which names no host.
+- **The picker claims before starting, in opted-in projects.**
+  - Default-mode Ralph syncs, picks the lowest eligible To Do task, claims it and pushes the claim, then checks it again before the iteration starts.
+  - When a claim loses, it moves to the next candidate.
+  - `tasks=N` refuses a task held by another holder unless forced.
+  - `BacklogTask` parses `Assignee:`. In every project, the picker skips tasks with a real assignee other than the holder.
+
+  *Rationale:* picking is not claiming.
+- **Opted-in runs publish through `integrate` after each completed iteration.** `push.py` calls `integrate` with a real total timeout that kills the whole process tree. It retries only when the push was rejected as non-fast-forward. Network, auth and hook failures are reported, not retried. Projects that haven't opted in keep today's single push, with the failure class now reported. *Rationale:* the next claim needs a master that matches origin.
+- **`integrate` never renumbers on its own.**
+  - **Merge.** It merges `origin/master` and never rebases.
+  - **Checks.** It runs `check-dupes` and the configured checks, inside the devcontainer when the run used one. The opt-in and checks policy comes from the HEAD before the merge, fixed when the command starts.
+  - **Stops.** It stops before the merge when the checks or their context are missing, and stops with an old-to-new ID mapping when it finds duplicates. `renumber` stays a manual command.
+  - **Timeouts and retries.** A timeout preserves the interrupted state instead of resetting it, and a retry first checks for a clean state.
+
+  *Rationale:* an ID already used in branch names, commit subjects or dependencies cannot be renumbered unattended.
+- **The duplicate check reads the revision it inspects.**
+  - It reads the prefix and config from that revision, and includes drafts.
+  - A missing `backlog` executable fails the hook, and only warns when run by hand.
+  - A ref with no backlog directory passes explicitly.
+
+  *Rationale:* the hook fails closed, so it must not quietly do less.
+- **The plugin's pre-push body.**
+  - It enforces on the clone switch and buffers stdin.
+  - It runs `check-dupes` on every pushed sha, skips deletions, and is tested on them.
+  - It is chained through `.git/hooks/pre-push.local`, and fails closed when the plugin cannot be resolved.
+
+  *Rationale:* a duplicate arrives with no git conflict.
+- **No task creation inside a run.** A plugin PreToolUse guard refuses `backlog task create` and the shared-backlog `create` when `RALPH_AUTONOMOUS=1` (set by the orchestrator and passed into the container) and the clone switch is on. The template `CLAUDE.md`'s Autonomous Mode text tells the agent to record follow-ups in its notes instead. *Rationale:* the container cannot publish an ID.
+- **`/ralph-handoff` in an opted-in destination.** It runs the plugin's `create` with the destination as cwd, and reports the ID as final only after `create` returns 0. Otherwise it keeps today's uncommitted, provisional behaviour. *Rationale:* owner decision.
+- **R-INFRA-6 allows only these on master:**
+  - the master-branch guard's allowlist paths;
+  - `task-N: ` commits that change only task files under `backlog/{tasks,drafts,archive,completed}/`;
+  - merges of a reviewed `task-*` branch through the existing lifecycle;
+  - `integrate`'s merge of the configured origin base branch.
+
+  For both kinds of merge, equality with `git merge-tree` is an extra check that nothing was resolved by hand. A hand-resolved merge reruns the reviewer before it is pushed. *Rationale:* a clean merge proves no manual resolution, not that the merged-in work was approved.
+- **`commit-msg` finds the merge message with `git rev-parse --git-path MERGE_MSG`.** The git hooks are tested in linked worktrees. *Rationale:* worktrees are now on the main path.
+- **Network calls are bounded.** Each git network call keeps BatchMode, ConnectTimeout and the HTTPS low-speed limits, and each operation also gets a total deadline. *Rationale:* per-connection limits do not stop a connection that is up but stalled.
+- **This repo only: version-tag clashes.** `integrate` stays generic and stops on a manifest version conflict. A re-bump, retest and fresh tag go through the repo's release process, and an existing tag is never moved. Release validation checks that each tag matches its content. *Rationale:* a tag clash can happen even when the merge is clean.
+
+**Scope cuts:**
+
+- No per-host ID ranges or prefixes.
+- No `backlog doctor --fix`.
+- No automatic renumber inside `integrate`.
+- No task creation inside autonomous runs.
+- No provisional IDs offline.
+- No batch migration across projects.
+- No rebase anywhere in the protocol.
+
+**Acceptance criteria (sketch):**
+
+- **`create` in a stale clone.** In each of these clones, `create` publishes a task whose ID is free on origin, and leaves the user's branch, index and working tree unchanged:
+  - a clone behind origin;
+  - a clone ahead of origin;
+  - a dirty clone;
+  - a clone with a task branch checked out.
+- **Two `create` calls racing** from two clones of one origin end with distinct IDs on origin and no duplicate.
+- **A push that succeeded but whose outcome looked unclear** is not repeated: the retry finds the operation trailer on origin and creates no second task.
+- **`create` with origin unreachable** exits 2 and leaves no commit and no task file.
+- **Two pickers in two clones racing** for the same unassigned task: exactly one claim lands, and the other run moves to the next candidate.
+- **`claim`** treats a bare `@claude` as unassigned, and refuses a task held by `@other` without `--force`.
+- **A delegated run's claim.** A run launched by holder X claims as X inside the devcontainer.
+- **`integrate` on a merged tree with duplicate IDs** stops with an old-to-new mapping and does not push.
+- **`integrate` with checks on a changed tree.**
+  - It runs the configured checks inside the devcontainer when the run used one.
+  - It uses the pre-merge checks policy when the merged-in commits change the `checks` value.
+- **`push.py` and rejected pushes.** It retries only a non-fast-forward rejection. An auth failure, a hook refusal and an unreachable origin are each reported and not retried.
+- **pre-push with a duplicate.**
+  - It refuses a push whose tip has a duplicate ID, including one carried by a draft.
+  - It refuses when `backlog` is missing.
+  - It passes a branch deletion.
+  - It keeps enforcing after a commit that removes the marker, while the clone switch is on.
+- **The mid-run guard.** Inside an autonomous run in an opted-in project, `backlog task create` is refused.
+- **`/ralph-handoff` into an opted-in destination** reports the ID only after the push lands. Into a destination that hasn't opted in, it leaves the file uncommitted and calls the ID provisional.
+- **R-INFRA-6 review fixtures.** The reviewer approves an `integrate` merge of origin that git made cleanly, and flags a hand-edited merge.
+- **`commit-msg` in a linked worktree** recognises a merge in progress.
+- **The ported test suite passes under bash 3.2,** and the new cases do too.
+
+**Implementation checklist:**
+
+1. **Import the stage-1 files unchanged** from `af5b1f8` into the plugin as a baseline commit: the script, its pre-push body and its tests. This is an interactive step on the host, because the devcontainer sees only this repo.
+2. **Harden the script.**
+   - The protocol lock and the worktree-based `create`, with an operation trailer, reconcile-before-retry and refusal when offline.
+   - The claim rules: bare `@claude`, multiple assignees, rechecking an already-held claim.
+   - `integrate` without automatic renumber, with policy fixed at invocation, preserved interrupted state and a total timeout.
+   - `check-dupes` reading its settings from the inspected revision, including drafts, and failing closed when `backlog` is missing.
+   - The `usage()` fix.
+   - Tests for all of the above.
+3. **The project shim and clone switch:** the `disable` command, the holder default, and the per-clone migration step. This depends on the base design's resolver and migration tasks.
+4. **The plugin pre-push body,** with tests: buffered stdin, several refs, deletions, missing `backlog`, a marker removed while the switch is on.
+5. **`push.py`:** publish through `integrate` after each iteration in opted-in projects, classify push failures, run checks in the devcontainer, and enforce the process-tree timeout.
+6. **The picker:** the claim lifecycle, `tasks=N` refusing another holder's task, `Assignee` parsing, and the template `CLAUDE.md` Autonomous Mode text.
+7. **The mid-run creation guard,** and `RALPH_AUTONOMOUS` passed through to the container.
+8. **`/ralph-handoff` through the protocol** in opted-in destinations, with tests for stale destination clones.
+9. **The R-INFRA-6 rewrite,** with fixtures for both kinds of merge.
+10. **The `commit-msg` `MERGE_MSG` fix,** and git hook tests in linked worktrees.
+11. **This repo:** release validation that each tag matches its content, and the manual re-bump procedure documented.
