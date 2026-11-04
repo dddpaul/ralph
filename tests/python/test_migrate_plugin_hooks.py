@@ -2,12 +2,13 @@
 
 ``migrate-plugin-hooks.sh tracked`` writes the marker first, then the
 ``.gitignore`` exception, then strips the managed ``settings.json`` entries, then
-deletes the managed guard copies. The tests build a project the way ralph-init
-Init does today (template guard copies, template ``settings.json``) plus
+deletes the managed guard copies. The tests build a project the way older
+ralph-init versions did (guard copies, the legacy ``settings.json`` kept as
+``fixtures/legacy-claude-settings.json``) plus
 project-owned extras, and check what the run keeps, what it removes, that a
 second run is a no-op, and — by stopping the run after every step through
-``RALPH_MIGRATE_STOP_AFTER`` — that no interruption point leaves a template
-registration that neither the plugin dispatcher nor a legacy copy enforces.
+``RALPH_MIGRATE_STOP_AFTER`` — that no interruption point leaves a
+legacy registration that neither the plugin dispatcher nor a legacy copy enforces.
 """
 
 from __future__ import annotations
@@ -24,8 +25,7 @@ from devcontainer_config import REPO_ROOT
 
 SCRIPT = REPO_ROOT / "plugins/ralph/skills/ralph-init/scripts/migrate-plugin-hooks.sh"
 PLUGIN_HOOKS = REPO_ROOT / "plugins/ralph/hooks"
-TEMPLATES = REPO_ROOT / "plugins/ralph/skills/ralph-init/templates"
-SETTINGS = TEMPLATES / "claude/settings.json"
+SETTINGS = REPO_ROOT / "tests/python/fixtures/legacy-claude-settings.json"
 MANAGED = (
     "commit-msg-guard",
     "commit-prefix-guard",
@@ -55,7 +55,7 @@ def git(cwd: Path, *args: str) -> str:
 
 
 def make_project(path: Path, *, extras: bool = True) -> Path:
-    """Create a git repo bootstrapped with the legacy template guard wiring and return its canonical root.
+    """Create a git repo with the legacy guard wiring and return its canonical root.
 
     With ``extras`` it also carries a project-owned hook script and its
     registration, a ``permissions`` key in ``settings.json``, and an existing
@@ -65,9 +65,9 @@ def make_project(path: Path, *, extras: bool = True) -> Path:
     git(path, "init", "-q", "-b", "master")
     hooks = path / ".claude/hooks"
     hooks.mkdir(parents=True)
-    for template in (TEMPLATES / "claude/hooks").iterdir():
-        target = hooks / template.name
-        shutil.copyfile(template, target)
+    for name in (*MANAGED, "filename-length-guard"):
+        target = hooks / f"{name}.sh"
+        shutil.copyfile(PLUGIN_HOOKS / f"{name}.sh", target)
         target.chmod(0o755)
     settings = json.loads(SETTINGS.read_text())
     if extras:
@@ -137,7 +137,7 @@ def plugin_enforces(root: Path, guard: str) -> bool:
 def legacy_enforces(
     root: Path, event: str, matcher: str, cond: str | None, guard: str
 ) -> bool:
-    """True when the project still registers this template entry and its guard copy exists."""
+    """True when the project still registers this legacy entry and its guard copy exists."""
     command = f'"$CLAUDE_PROJECT_DIR"/.claude/hooks/{guard}.sh'
     return (event, matcher, cond, command) in registrations(
         root / ".claude/settings.json"
@@ -145,7 +145,7 @@ def legacy_enforces(
 
 
 def assert_every_guard_enforced(root: Path) -> None:
-    """Every template registration is covered by the plugin gate or by its legacy copy."""
+    """Every legacy registration is covered by the plugin gate or by its legacy copy."""
     for event, matcher, cond, command in registrations(SETTINGS):
         match = LEGACY_COMMAND.match(command)
         assert match, command
@@ -337,7 +337,7 @@ def test_local_guards_keep_their_files_and_registrations(tmp_path: Path) -> None
     for guard in ("notes-guard", "naming-guard"):
         copy = root / f".claude/hooks/{guard}.sh"
         assert (
-            copy.read_bytes() == (TEMPLATES / f"claude/hooks/{guard}.sh").read_bytes()
+            copy.read_bytes() == (PLUGIN_HOOKS / f"{guard}.sh").read_bytes()
         )
     kept = {
         LEGACY_COMMAND.match(c).group(1)
@@ -345,12 +345,12 @@ def test_local_guards_keep_their_files_and_registrations(tmp_path: Path) -> None
         if LEGACY_COMMAND.match(c)
     }
     assert kept == {"notes-guard", "naming-guard", "own-check"}
-    template_rows = [
+    legacy_rows = [
         r
         for r in registrations(SETTINGS)
         if "notes-guard" in r[3] or "naming-guard" in r[3]
     ]
-    assert set(template_rows) <= set(registrations(root / ".claude/settings.json"))
+    assert set(legacy_rows) <= set(registrations(root / ".claude/settings.json"))
     assert_every_guard_enforced(root)
     assert notes_guard_denies(root)
 

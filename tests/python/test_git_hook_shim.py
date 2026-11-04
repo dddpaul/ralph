@@ -1,8 +1,9 @@
 """Git hook bodies in the plugin behind one fixed per-clone shim (TASK-297).
 
 ``plugins/ralph/git-hooks/`` holds the pre-commit, commit-msg and post-commit
-bodies; ``templates/git-hooks/`` keeps byte-identical copies for legacy
-installs straight into ``.git/hooks``. ``templates/shims/git-hook`` is the one
+bodies, which also still work as legacy copies installed straight into
+``.git/hooks`` (ralph-init no longer ships template copies of them).
+``templates/shims/git-hook`` is the one
 file installed under every hook name: it runs ``<name>.local`` first, then
 execs the plugin body found through the registry resolver, and when the plugin
 cannot be resolved it blocks or warns per the clone's switches (PRD US-003,
@@ -24,9 +25,8 @@ from devcontainer_config import REPO_ROOT
 PLUGIN = REPO_ROOT / "plugins/ralph"
 BODIES = PLUGIN / "git-hooks"
 TEMPLATES = REPO_ROOT / "plugins/ralph/skills/ralph-init/templates"
-TEMPLATE_HOOKS = TEMPLATES / "git-hooks"
 SHIM = TEMPLATES / "shims/git-hook"
-LEGACY_GUARD = TEMPLATES / "claude/hooks/filename-length-guard.sh"
+LEGACY_GUARD = PLUGIN / "hooks/filename-length-guard.sh"
 HOOK_NAMES = ("pre-commit", "commit-msg", "post-commit")
 GIT = shutil.which("git") or "/usr/bin/git"
 LONG_NAME = "x" * 130 + ".md"
@@ -100,14 +100,13 @@ def commit_file(world: dict[str, Path], name: str, message: str = "add") -> subp
 
 
 @pytest.mark.parametrize("name", HOOK_NAMES)
-def test_template_copy_is_byte_identical_to_the_plugin_body(name: str) -> None:
-    body, copy = BODIES / name, TEMPLATE_HOOKS / name
-    assert body.read_bytes() == copy.read_bytes()
-    assert os.access(body, os.X_OK) and os.access(copy, os.X_OK)
+def test_plugin_body_is_executable(name: str) -> None:
+    assert os.access(BODIES / name, os.X_OK)
 
 
-def test_plugin_ships_exactly_the_template_hooks() -> None:
-    assert sorted(p.name for p in BODIES.iterdir()) == sorted(p.name for p in TEMPLATE_HOOKS.iterdir())
+def test_plugin_ships_exactly_the_shimmed_hooks_and_no_template_copies() -> None:
+    assert sorted(p.name for p in BODIES.iterdir()) == sorted(HOOK_NAMES)
+    assert not (TEMPLATES / "git-hooks").exists()
 
 
 def test_shim_is_executable_and_names_no_hook() -> None:
@@ -145,12 +144,12 @@ def test_plugin_pre_commit_uses_the_bundled_length_guard(world: dict[str, Path])
 def test_legacy_pre_commit_falls_back_to_the_project_guard(world: dict[str, Path], with_project_guard: bool) -> None:
     hooks = world["clone"] / ".git/hooks"
     hooks.mkdir(exist_ok=True)
-    shutil.copy2(TEMPLATE_HOOKS / "pre-commit", hooks / "pre-commit")
+    shutil.copy2(BODIES / "pre-commit", hooks / "pre-commit")
     if with_project_guard:
         guard = world["clone"] / ".claude/hooks/filename-length-guard.sh"
         guard.parent.mkdir(parents=True)
         shutil.copy2(LEGACY_GUARD, guard)
-        guard.chmod(0o755)  # tracked 100644 in the templates; ralph-init installs it executable
+        guard.chmod(0o755)
     result = commit_file(world, LONG_NAME)
     assert result.returncode == (1 if with_project_guard else 0), result.stderr
 
@@ -158,7 +157,7 @@ def test_legacy_pre_commit_falls_back_to_the_project_guard(world: dict[str, Path
 def test_legacy_install_into_git_hooks_still_works(world: dict[str, Path]) -> None:
     hooks = world["clone"] / ".git/hooks"
     for name in HOOK_NAMES:
-        shutil.copy2(TEMPLATE_HOOKS / name, hooks / name)
+        shutil.copy2(BODIES / name, hooks / name)
     assert commit_file(world, "ok.md").returncode == 0
     blocked = commit_file(world, "two.md", "add\n\n## Test plan")
     assert blocked.returncode == 1
@@ -275,9 +274,13 @@ def test_unresolved_plugin_blocks_a_real_commit_until_no_verify(world: dict[str,
 # ---------------------------------------------------------------- merge in a linked worktree
 
 
-@pytest.mark.parametrize("hook", [BODIES / "commit-msg", TEMPLATE_HOOKS / "commit-msg"])
-def test_commit_msg_recognises_a_merge_in_a_linked_worktree(world: dict[str, Path], hook: Path) -> None:
+@pytest.mark.parametrize("legacy", [False, True], ids=["plugin-body", "legacy-copy"])
+def test_commit_msg_recognises_a_merge_in_a_linked_worktree(world: dict[str, Path], legacy: bool) -> None:
     clone, cfg = world["clone"], world["cfg"]
+    hook = BODIES / "commit-msg"
+    if legacy:
+        hook = clone / ".git/hooks/commit-msg"
+        shutil.copy2(BODIES / "commit-msg", hook)
     linked = world["base"] / "linked tree"
     git_ok(clone, cfg, "branch", "side")
     git_ok(clone, cfg, "worktree", "add", "-q", "-b", "work", str(linked))

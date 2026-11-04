@@ -15,10 +15,17 @@
 # See TASK-228.
 
 PROJECT_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/../.." && pwd)"
-TEMPLATES="$PROJECT_ROOT/plugins/ralph/skills/ralph-init/templates"
+PLUGIN="$PROJECT_ROOT/plugins/ralph"
+TEMPLATES="$PLUGIN/skills/ralph-init/templates"
 
 # --------------------------------------------------------------------------
-# Pair registry: "<mode>|<live path>|<template path>", both repo-relative.
+# Pair registry: "<mode>|<live path>|<template path>". The live path is
+# repo-relative; the template path is templates/-relative, or plugin-relative
+# when it starts with "plugin:". The Claude guards and the git hook bodies ship
+# in the plugin itself (plugins/ralph/hooks/, plugins/ralph/git-hooks/), not as
+# ralph-init templates, so this repo's live copies are compared with those.
+# This repo keeps its legacy .claude/settings.json wiring until it migrates
+# (TASK-302); ralph-init no longer ships a settings.json, so it has no pair.
 #
 # Modes:
 #   exact  — diff must be silent.
@@ -34,22 +41,21 @@ TEMPLATES="$PROJECT_ROOT/plugins/ralph/skills/ralph-init/templates"
 # --------------------------------------------------------------------------
 registry() {
   cat <<'ROWS'
-exact|.claude/settings.json|claude/settings.json
 keys|.claude/settings.local.json|claude/settings.local.json
-exact|.claude/hooks/commit-msg-guard.sh|claude/hooks/commit-msg-guard.sh
-exact|.claude/hooks/commit-prefix-guard.sh|claude/hooks/commit-prefix-guard.sh
-exact|.claude/hooks/filename-length-guard.sh|claude/hooks/filename-length-guard.sh
-exact|.claude/hooks/master-branch-guard.sh|claude/hooks/master-branch-guard.sh
-exact|.claude/hooks/naming-guard.sh|claude/hooks/naming-guard.sh
-exact|.claude/hooks/notes-guard.sh|claude/hooks/notes-guard.sh
-exact|.claude/hooks/task-validator.sh|claude/hooks/task-validator.sh
+exact|.claude/hooks/commit-msg-guard.sh|plugin:hooks/commit-msg-guard.sh
+exact|.claude/hooks/commit-prefix-guard.sh|plugin:hooks/commit-prefix-guard.sh
+exact|.claude/hooks/filename-length-guard.sh|plugin:hooks/filename-length-guard.sh
+exact|.claude/hooks/master-branch-guard.sh|plugin:hooks/master-branch-guard.sh
+exact|.claude/hooks/naming-guard.sh|plugin:hooks/naming-guard.sh
+exact|.claude/hooks/notes-guard.sh|plugin:hooks/notes-guard.sh
+exact|.claude/hooks/task-validator.sh|plugin:hooks/task-validator.sh
 exact|.claude/brainstorm-rules.md|claude/brainstorm-rules.md
 exact|ralph.sh|root/ralph.sh
 exact|refine.sh|root/refine.sh
 region|CLAUDE.md|root/CLAUDE.md
-prefix|.git/hooks/post-commit|git-hooks/post-commit
-exact|.git/hooks/commit-msg|git-hooks/commit-msg
-exact|.git/hooks/pre-commit|git-hooks/pre-commit
+prefix|.git/hooks/post-commit|plugin:git-hooks/post-commit
+exact|.git/hooks/commit-msg|plugin:git-hooks/commit-msg
+exact|.git/hooks/pre-commit|plugin:git-hooks/pre-commit
 exact|.devcontainer/devcontainer.json|devcontainer/devcontainer.json
 exact|.devcontainer/container-settings.local.json|devcontainer/container-settings.local.json
 exact|.devcontainer/init-firewall.sh|devcontainer/init-firewall.sh
@@ -104,6 +110,14 @@ generic_region() {
   sed -n '/^## Project-Specific/q;p' "$1"
 }
 
+# Print the absolute path of registry template column $1.
+template_path() {
+  case "$1" in
+    plugin:*) printf '%s\n' "$PLUGIN/${1#plugin:}" ;;
+    *) printf '%s\n' "$TEMPLATES/$1" ;;
+  esac
+}
+
 # True when $1 (repo-relative) appears as the live or template side of a row.
 in_registry() {
   registry | cut -d'|' -f2,3 | tr '|' '\n' | grep -Fxq "$1"
@@ -139,7 +153,7 @@ ROWS
   while IFS='|' read -r mode live tmpl; do
     [ "$mode" = "exact" ] || continue
     live_path="$PROJECT_ROOT/$live"
-    tmpl_path="$TEMPLATES/$tmpl"
+    tmpl_path="$(template_path "$tmpl")"
 
     if [ ! -f "$tmpl_path" ]; then
       failures="$failures
@@ -174,8 +188,8 @@ EOF
     echo "$failures"
     return 1
   }
-  # Anti-vacuity: 16 exact rows, 2 of which (.git/hooks/*) may be absent in CI.
-  [ "$checked" -ge 14 ]
+  # Anti-vacuity: 15 exact rows, 2 of which (.git/hooks/*) may be absent in CI.
+  [ "$checked" -ge 13 ]
 }
 
 # --------------------------------------------------------------------------
@@ -244,9 +258,9 @@ EOF
 # prefix carve-out: .git/hooks/post-commit
 # --------------------------------------------------------------------------
 
-@test "R11: .git/hooks/post-commit opens with its template verbatim" {
+@test "R11: .git/hooks/post-commit opens with the plugin's body verbatim" {
   live_path="$PROJECT_ROOT/.git/hooks/post-commit"
-  tmpl_path="$TEMPLATES/git-hooks/post-commit"
+  tmpl_path="$PLUGIN/git-hooks/post-commit"
   [ -f "$tmpl_path" ]
   [ -f "$live_path" ] || skip "git hooks are untracked and not installed here"
 
@@ -285,29 +299,36 @@ EOF
 @test "R11: settings.local.json keeps the template's JSON shape" {
   live_path="$PROJECT_ROOT/.claude/settings.local.json"
   tmpl_path="$TEMPLATES/claude/settings.local.json"
+  fragment="$PLUGIN/user-settings.json"
   [ -f "$tmpl_path" ]
   command -v jq >/dev/null 2>&1 || skip "jq not available"
   run jq -e . "$tmpl_path"
   [ "$status" -eq 0 ]
 
-  # The live file is gitignored: it accumulates per-developer permission grants
-  # with machine-absolute paths, so its bytes are not a repo invariant and it
-  # is absent in CI. What must hold is that the starter file a bootstrapped
-  # project receives still has the same shape.
-  [ -f "$live_path" ] || skip "settings.local.json is a gitignored local override"
-
-  run diff <(jq -S 'to_entries | map({key, type: (.value | type)})' "$live_path") \
-           <(jq -S 'to_entries | map({key, type: (.value | type)})' "$tmpl_path")
+  # The template carries only the project's own rules; the common allow rules,
+  # attribution and sandbox come from the plugin's user-settings.json fragment.
+  run jq -en --slurpfile t "$tmpl_path" --slurpfile f "$fragment" \
+    '($t[0].permissions.allow | length) > 0 and ($t[0] | keys) == ["permissions"]
+     and ($t[0].permissions.allow - $f[0].permissions.allow) == $t[0].permissions.allow'
   [ "$status" -eq 0 ] || {
-    echo "settings.local.json top-level shape drifted from the template:"
-    echo "$output"
+    echo "the settings.local.json template must hold project-only rules, none of the fragment's"
     return 1
   }
 
-  run diff <(jq -S '.permissions | keys' "$live_path") \
-           <(jq -S '.permissions | keys' "$tmpl_path")
+  # The live file is gitignored: it accumulates per-developer permission grants
+  # with machine-absolute paths, so its bytes are not a repo invariant and it
+  # is absent in CI. In the devcontainer it is the sandbox-only override. What
+  # must hold is that every key it has is one the template or the fragment
+  # gives, with the same JSON type.
+  [ -f "$live_path" ] || skip "settings.local.json is a gitignored local override"
+
+  run jq -en --slurpfile l "$live_path" --slurpfile t "$tmpl_path" --slurpfile f "$fragment" '
+    def shape: [paths(type != "array") | select(length <= 2)] as $ps
+      | [$ps[] as $p | {p: $p, type: (getpath($p) | type)}];
+    (($t[0] * $f[0]) | shape) as $known
+    | [($l[0] | shape)[] | select(. as $e | $known | index([$e]) | not)] | if . == [] then true else error(tojson) end'
   [ "$status" -eq 0 ] || {
-    echo "settings.local.json permissions keys drifted from the template:"
+    echo "settings.local.json has keys neither the template nor the fragment gives:"
     echo "$output"
     return 1
   }

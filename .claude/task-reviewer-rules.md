@@ -26,19 +26,20 @@ The Ralph project ships a template tree at `plugins/ralph/skills/ralph-init/temp
 
 | Live path                              | Template path                                                       |
 |----------------------------------------|----------------------------------------------------------------------|
-| `.claude/settings.json`                | `plugins/ralph/skills/ralph-init/templates/claude/settings.json`                   |
 | `.claude/settings.local.json`          | `plugins/ralph/skills/ralph-init/templates/claude/settings.local.json`             |
-| `.claude/hooks/<name>.sh`              | `plugins/ralph/skills/ralph-init/templates/claude/hooks/<name>.sh`                 |
+| `.claude/hooks/<name>.sh` (the seven Ralph guards) | `plugins/ralph/hooks/<name>.sh` (shipped in the plugin, not a template) |
 | `ralph.sh` (thin shim)                 | `plugins/ralph/skills/ralph-init/templates/root/ralph.sh` (thin shim)              |
 | `refine.sh` (thin shim)                | `plugins/ralph/skills/ralph-init/templates/root/refine.sh` (thin shim)             |
 | `CLAUDE.md` (generic section above `## Project-Specific`) | `plugins/ralph/skills/ralph-init/templates/root/CLAUDE.md` (same region) |
-| `.git/hooks/post-commit`               | `plugins/ralph/skills/ralph-init/templates/git-hooks/post-commit`                  |
-| `.git/hooks/commit-msg`                | `plugins/ralph/skills/ralph-init/templates/git-hooks/commit-msg`                   |
+| `.git/hooks/post-commit`               | `plugins/ralph/git-hooks/post-commit` (shipped in the plugin, not a template)      |
+| `.git/hooks/commit-msg`                | `plugins/ralph/git-hooks/commit-msg` (shipped in the plugin, not a template)       |
 | `.devcontainer/devcontainer.json`      | `plugins/ralph/skills/ralph-init/templates/devcontainer/devcontainer.json`         |
 | `.devcontainer/container-settings.local.json` | `plugins/ralph/skills/ralph-init/templates/devcontainer/container-settings.local.json` |
 | `.devcontainer/init-firewall.sh`       | `plugins/ralph/skills/ralph-init/templates/devcontainer/init-firewall.sh`          |
 
 Note on `ralph.sh` and `refine.sh`: the parity rule covers only the thin shim copies above, which each carry an orchestrator resolver (`ralph.sh`: `$RALPH_ORCHESTRATOR` override or the registered plugin install, simplified from five tiers in TASK-212; `refine.sh`: a 5-tier resolver — see `design/ralph-marketplace-prd.md` US-004 and `design/ralph-refine-prd.md` US-006) and exec the resolved orchestrator via `uv run "$ORCHESTRATOR"`. Both look the plugin up through the same embedded `ralph-resolve-plugin` block, whose source of truth is `plugins/ralph/skills/ralph-init/templates/shims/resolve-plugin.sh`; `tests/python/test_resolve_plugin.py` enforces that every embedded copy matches it. `ralph.sh` resolves `ralph_orchestrator.py`; `refine.sh` resolves `refine_orchestrator.py`. The canonical orchestrators at `plugins/ralph/skills/ralph-run/scripts/{ralph,refine}_orchestrator.py` (plus the `ralph/` package) are the single source of truth and are intentionally excluded from this mirror set — the two copies of each shim must remain byte-identical to their own template (a `diff` of the two MUST produce no output), but neither needs to match the canonical, and the two shims (`ralph.sh` vs `refine.sh`) are NOT required to match each other. Because the resolver logic lives in each shim itself, any change to it MUST land in both copies of that shim (keeping them byte-identical); a change to a canonical orchestrator does NOT trigger a parity finding.
+
+Note on the guards and git hooks: ralph-init no longer copies them into projects (a migrated project runs them from the plugin), so they have no template; this repo's live copies are compared with the plugin's own files. This repo's `.claude/settings.json` is its legacy guard wiring, kept until the repo migrates to plugin hooks (TASK-302); ralph-init ships no `settings.json` template, so the file has no pair. `tests/unit/template-parity.bats` enforces the table.
 
 Note on `CLAUDE.md`: the `## Project-Specific` section is intentionally project-local and is NOT part of the parity rule. Only the generic section above that heading is mirrored.
 

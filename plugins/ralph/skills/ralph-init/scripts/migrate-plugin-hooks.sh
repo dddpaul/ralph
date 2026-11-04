@@ -37,11 +37,12 @@
 #                  settings.json command still names is kept, with a warning,
 #                  so no entry is left calling a missing script.
 #
-# Managed guards are the six Claude guards the ralph-init template
-# settings.json registers. Every other file in .claude/hooks/ is the project's
-# own and is never touched. filename-length-guard.sh is kept too: it is a git
-# hook helper, not a Claude guard, and a clone whose .git/hooks/pre-commit is
-# still the legacy copy falls back to it until that clone runs the plugin shim.
+# Managed guards are the six Claude guards older ralph-init versions copied
+# into .claude/hooks/ and registered in .claude/settings.json. Every other file
+# in .claude/hooks/ is the project's own and is never touched.
+# filename-length-guard.sh is kept too: it is a git hook helper, not a Claude
+# guard, and a clone whose .git/hooks/pre-commit is still the legacy copy falls
+# back to it until that clone runs the plugin shim.
 # A second run changes nothing. RALPH_MIGRATE_STOP_AFTER=<step> (marker,
 # gitignore, settings or hooks:<guard>) exits 3 right after that step; the
 # tests use it to stop the run at every interruption point.
@@ -55,7 +56,8 @@
 #   2. shims    — installs the plugin shim (templates/shims/git-hook) as
 #                 pre-commit, commit-msg and post-commit in the directory
 #                 `git rev-parse --git-path hooks` returns. A hook that is
-#                 absent or the legacy template copy is replaced. A hook that
+#                 absent or a legacy copy of the plugin's hook body
+#                 (git-hooks/<name>) is replaced. A hook that
 #                 differs and that .claude/managed-file-drift.accept lists for
 #                 .git/hooks/<name> is kept as <name>.local, which the shim runs
 #                 first. Any other differing hook, or an existing <name>.local
@@ -171,7 +173,7 @@ copy_into() {
 plan_hooks() {
   local name hook loc tmpl
   for name in $SHIMMED; do
-    hook=$hooks/$name loc=$hooks/$name.local tmpl=$templates/git-hooks/$name
+    hook=$hooks/$name loc=$hooks/$name.local tmpl=$plugin_root/git-hooks/$name
     if [ ! -e "$hook" ] && [ ! -L "$hook" ]; then
       echo "$name:install"
     elif cmp -s "$hook" "$shim"; then
@@ -184,7 +186,7 @@ plan_hooks() {
       fi
       echo "$name:local"
     else
-      refuse "$hook differs from the ralph-init template and .claude/managed-file-drift.accept does not list it; to keep it as $name.local, accept it (managed-file-drift.sh accept . .git/hooks/$name) and rerun, else delete it and rerun"
+      refuse "$hook differs from the plugin's $name hook body and .claude/managed-file-drift.accept does not list it; to keep it as $name.local, accept it (managed-file-drift.sh accept . .git/hooks/$name) and rerun, else delete it and rerun"
     fi
   done
 }

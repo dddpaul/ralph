@@ -1,9 +1,9 @@
 #!/usr/bin/env bats
-# Unit tests for the task-validator PostToolUse hook (live copy and ralph-init template)
+# Unit tests for the task-validator PostToolUse hook (live copy and the plugin copy)
 
 load '../helpers/common'
 LIVE_VALIDATOR="$PROJECT_ROOT/.claude/hooks/task-validator.sh"
-TEMPLATE_VALIDATOR="$PROJECT_ROOT/plugins/ralph/skills/ralph-init/templates/claude/hooks/task-validator.sh"
+TEMPLATE_VALIDATOR="$PROJECT_ROOT/plugins/ralph/hooks/task-validator.sh"
 
 setup() {
   TEST_DIR="$(make_temp_dir)"

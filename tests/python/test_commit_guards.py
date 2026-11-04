@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 from devcontainer_config import REPO_ROOT
 
-HOOKS = REPO_ROOT / "plugins/ralph/skills/ralph-init/templates/claude/hooks"
+HOOKS = REPO_ROOT / "plugins/ralph/hooks"
 LIVE = REPO_ROOT / ".claude/hooks"
 GUARDS = ["commit-msg-guard.sh", "commit-prefix-guard.sh"]
 COMMIT = "git" + " commit"
@@ -25,7 +25,7 @@ TRAILER = "Co-Authored-" + "By: someone <x@y>"
 
 
 def run_guard(name: str, command: str, cwd: Path | None = None) -> str:
-    """Run a template guard with ``command`` as tool_input and return stdout."""
+    """Run a plugin guard with ``command`` as tool_input and return stdout."""
     payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}})
     result = subprocess.run(
         ["bash", str(HOOKS / name)],
@@ -192,7 +192,7 @@ def test_prefix_guard_ignores_master(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("name", GUARDS)
-def test_live_copy_matches_template(name: str) -> None:
+def test_live_copy_matches_the_plugin(name: str) -> None:
     assert (LIVE / name).read_bytes() == (HOOKS / name).read_bytes()
 
 

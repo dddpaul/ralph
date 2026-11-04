@@ -24,6 +24,7 @@ from devcontainer_config import REPO_ROOT
 SKILLS = REPO_ROOT / "plugins/ralph/skills"
 INIT_MD = SKILLS / "ralph-init/SKILL.md"
 TEMPLATE = SKILLS / "ralph-init/templates/claude/settings.local.json"
+FRAGMENT = REPO_ROOT / "plugins/ralph/user-settings.json"
 HELPER = re.compile(r"plugins/cache/|\.claude/skills/ralph")
 
 DEAD = [
@@ -63,9 +64,10 @@ def run_strip(tmp_path: Path, settings: dict[str, object]) -> tuple[str, dict[st
 
 
 def test_template_seeds_no_helper_rule() -> None:
-    allow = json.loads(TEMPLATE.read_text("utf-8"))["permissions"]["allow"]
-    assert [r for r in allow if HELPER.search(r)] == []
-    assert "{{" not in TEMPLATE.read_text("utf-8")
+    for seeded in (TEMPLATE, FRAGMENT):
+        allow = json.loads(seeded.read_text("utf-8"))["permissions"]["allow"]
+        assert [r for r in allow if HELPER.search(r)] == []
+        assert "{{" not in seeded.read_text("utf-8")
 
 
 def test_strip_removes_both_dead_shapes_and_keeps_the_rest(tmp_path: Path) -> None:

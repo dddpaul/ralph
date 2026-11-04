@@ -21,6 +21,7 @@ from ralph import preflight, user_settings
 REPO = Path(__file__).resolve().parents[2]
 FRAGMENT = REPO / "plugins/ralph/user-settings.json"
 TEMPLATE = REPO / "plugins/ralph/skills/ralph-init/templates/claude/settings.local.json"
+LEGACY = REPO / "tests/python/fixtures/legacy-settings.local.json"
 SHIM = REPO / "plugins/ralph/skills/ralph-run/scripts/merge-user-settings.sh"
 WARNING = "WARNING: user settings miss"
 
@@ -33,11 +34,24 @@ def _allow(data: dict[str, object]) -> list[str]:
     return data["permissions"]["allow"]  # type: ignore[index]
 
 
-def test_fragment_holds_the_template_bash_rules_and_schedule_wakeup() -> None:
-    template = json.loads(TEMPLATE.read_text(encoding="utf-8"))
-    bash = [r for r in _allow(template) if r.startswith("Bash(")]
+def test_fragment_holds_the_legacy_template_bash_rules_and_schedule_wakeup() -> None:
+    legacy = json.loads(LEGACY.read_text(encoding="utf-8"))
+    bash = [r for r in _allow(legacy) if r.startswith("Bash(")]
     assert len(bash) == 46
     assert _allow(_fragment()) == [*bash, "ScheduleWakeup"]
+    assert {k: v for k, v in legacy.items() if k != "permissions"} == {
+        k: v for k, v in _fragment().items() if k != "permissions"
+    }
+
+
+def test_template_holds_only_project_rules_and_no_fragment_entry() -> None:
+    template = json.loads(TEMPLATE.read_text(encoding="utf-8"))
+    assert set(template) == {"permissions"}
+    assert set(template["permissions"]) == {"allow"}
+    assert _allow(template)
+    assert all(r.startswith("Skill(") for r in _allow(template))
+    assert not set(_allow(template)) & set(_allow(_fragment()))
+    assert user_settings.missing_entries(_fragment(), template) == user_settings.missing_entries(_fragment(), {})
 
 
 def test_fragment_holds_attribution_and_sandbox_and_nothing_else() -> None:

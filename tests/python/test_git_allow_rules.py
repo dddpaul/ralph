@@ -1,6 +1,7 @@
 """Every seeded git allow-rule is a named, vetted subcommand prefix (TASK-257).
 
-The template pre-approves the narrow write rules the merge flow needs plus a
+The plugin's user-settings fragment (the common allow rules ralph-init used to
+copy into each project) pre-approves the narrow write rules the merge flow needs plus a
 handful of read-only queries. ``git tag`` and ``git branch`` look like queries
 but are not: ``git tag -d`` deletes a release tag and ``git branch -D`` deletes
 an unmerged branch, so both must keep prompting. A blanket ``Bash(git:*)`` is
@@ -18,9 +19,7 @@ import re
 
 from devcontainer_config import REPO_ROOT
 
-TEMPLATE = (
-    REPO_ROOT / "plugins/ralph/skills/ralph-init/templates/claude/settings.local.json"
-)
+TEMPLATE = REPO_ROOT / "plugins/ralph/user-settings.json"
 GIT_RULE = re.compile(r"Bash\(git(?P<rest>[ :].*)?\)")
 NAMED = re.compile(r" (?P<sub>[a-z][a-z-]*):\*")
 
