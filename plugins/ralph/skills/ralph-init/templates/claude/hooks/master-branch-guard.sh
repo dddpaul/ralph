@@ -6,21 +6,25 @@
 # Action: deny JSON (PreToolUse)
 # Input: tool_input JSON on stdin
 
-branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)
+# Project root: the git root of RALPH_PROJECT_ROOT (set by the plugin dispatcher, or
+# inherited from a ralph.sh shim that may sit in scripts/ralph/), else of
+# CLAUDE_PROJECT_DIR (legacy .claude/hooks/ wiring). Not a repo → not our concern.
+project_root=$(git -C "${RALPH_PROJECT_ROOT:-${CLAUDE_PROJECT_DIR:-.}}" rev-parse --show-toplevel 2>/dev/null)
+[ -z "$project_root" ] && exit 0
+
+branch=$(git -C "$project_root" rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)
 if [ "$branch" != "master" ]; then exit 0; fi
 
 path=$(jq -r '.tool_input.file_path // empty')
 [ -z "$path" ] && exit 0
 
-# Resolve relative paths against the current working directory so the prefix check is meaningful.
+# Resolve relative paths against the current working directory (the payload's cwd) so the prefix check is meaningful.
 case "$path" in
   /*) abs_path="$path" ;;
   *)  abs_path="$PWD/$path" ;;
 esac
 
 # Outside the project tree → not our concern. (Includes /tmp, $TMPDIR, $HOME/Downloads, sibling repos.)
-project_root=$(git rev-parse --show-toplevel 2>/dev/null)
-[ -z "$project_root" ] && exit 0
 case "$abs_path" in
   "$project_root"|"$project_root"/*) ;;
   *) exit 0 ;;

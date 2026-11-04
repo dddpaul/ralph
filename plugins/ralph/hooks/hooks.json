@@ -1,0 +1,88 @@
+{
+  "description": "Ralph guard hooks. run.sh runs a guard only when .claude/ralph.json at the project git root has pluginHooks true and the guard is not in localGuards.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(git commit *)",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/run.sh commit-msg-guard"
+          },
+          {
+            "type": "command",
+            "if": "Bash(gh pr create *)",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/run.sh commit-msg-guard"
+          },
+          {
+            "type": "command",
+            "if": "Bash(backlog task edit *)",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/run.sh notes-guard"
+          },
+          {
+            "type": "command",
+            "if": "Bash(backlog task create *)",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/run.sh naming-guard"
+          },
+          {
+            "type": "command",
+            "if": "Bash(backlog task edit *)",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/run.sh naming-guard"
+          },
+          {
+            "type": "command",
+            "if": "Bash(backlog doc create *)",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/run.sh naming-guard"
+          },
+          {
+            "type": "command",
+            "if": "Bash(backlog decision create *)",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/run.sh naming-guard"
+          },
+          {
+            "type": "command",
+            "if": "Bash(backlog draft create *)",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/run.sh naming-guard"
+          },
+          {
+            "type": "command",
+            "if": "Bash(git checkout -b *)",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/run.sh naming-guard"
+          },
+          {
+            "type": "command",
+            "if": "Bash(git commit *)",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/run.sh commit-prefix-guard"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/run.sh master-branch-guard"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(backlog task edit *)",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/run.sh task-validator"
+          },
+          {
+            "type": "command",
+            "if": "Bash(backlog task create *)",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/run.sh task-validator"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -17,8 +17,12 @@ if [[ -z "$TASK_ID" ]]; then
   exit 0
 fi
 
-# Hooks run from the session's cwd, which a `cd <subdir> && …` moves; resolve task paths from the project root.
-cd "${CLAUDE_PROJECT_DIR:-.}" 2>/dev/null || exit 0
+# Hooks run from the session's cwd, which a `cd <subdir> && …` moves; resolve task paths from the project root:
+# the git root of RALPH_PROJECT_ROOT (set by the plugin dispatcher, or inherited from a ralph.sh shim that may
+# sit in scripts/ralph/), else of CLAUDE_PROJECT_DIR (legacy wiring), else that directory itself.
+PROJECT_DIR=${RALPH_PROJECT_ROOT:-${CLAUDE_PROJECT_DIR:-.}}
+PROJECT_ROOT=$(git -C "$PROJECT_DIR" rev-parse --show-toplevel 2>/dev/null) || PROJECT_ROOT=$PROJECT_DIR
+cd "$PROJECT_ROOT" 2>/dev/null || exit 0
 
 # Find the task file
 TASK_FILE=$(find backlog/tasks -maxdepth 1 -name "task-${TASK_ID} -*" -o -name "task-${TASK_ID}-*" 2>/dev/null | head -1)

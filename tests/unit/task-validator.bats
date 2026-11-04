@@ -59,7 +59,7 @@ EOF
 
 run_validator() {
   local script="$1"
-  (unset CLAUDE_PROJECT_DIR; cd "$TEST_DIR" && echo '{"tool_input":{"command":"backlog task edit 1 -s \"To Do\""}}' \
+  (unset CLAUDE_PROJECT_DIR RALPH_PROJECT_ROOT; cd "$TEST_DIR" && echo '{"tool_input":{"command":"backlog task edit 1 -s \"To Do\""}}' \
     | RALPH_AUTONOMOUS=0 bash "$script" 2>/dev/null)
 }
 
@@ -87,7 +87,7 @@ write_subdir_task() {
 # Run the template validator from $1 (a cwd) with CLAUDE_PROJECT_DIR at the project root; $2 is the backlog command
 run_validator_from() {
   local cwd="$1" cmd="$2"
-  (cd "$cwd" && jq -n --arg c "$cmd" '{tool_input:{command:$c}}' \
+  (unset RALPH_PROJECT_ROOT; cd "$cwd" && jq -n --arg c "$cmd" '{tool_input:{command:$c}}' \
     | CLAUDE_PROJECT_DIR="$TEST_DIR" RALPH_AUTONOMOUS=0 bash "$TEMPLATE_VALIDATOR" 2>/dev/null)
 }
 
