@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "Ralph autonomous agent workflow for Claude Code, distributed as a plugin.",
-    "version": "0.18.0"
+    "version": "0.18.1"
   },
   "plugins": [
     {
