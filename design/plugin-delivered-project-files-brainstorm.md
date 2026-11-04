@@ -1,3 +1,9 @@
+---
+export: true
+title: Plugin-Delivered Project Files (Claude guards, git hooks, allow rules)
+type: design
+---
+
 # Plugin-Delivered Project Files (Claude guards, git hooks, allow rules)
 
 ## Architecture decision
@@ -429,3 +435,29 @@ Item 1 is interactive; items 2 to 11 depend on it and on the base design's resol
 9. **The R-INFRA-6 rewrite,** with fixtures for both kinds of merge.
 10. **The `commit-msg` `MERGE_MSG` fix,** and git hook tests in linked worktrees.
 11. **This repo:** release validation that each tag matches its content, and the manual re-bump procedure documented.
+
+---
+
+## Addendum: decisions from the PRD review (added 2026-11-04)
+
+### Why
+
+A review of the first PRD found that two behaviours were underspecified:
+
+- **When git hooks block.** The base design blocked commits whenever the tracked marker was present. The shared-backlog addendum, by contrast, enforces through a trusted clone-level switch.
+- **What `--no-push` means in an opted-in clone.** That clone has to push to claim a task.
+
+### What changed
+
+- **Commit blocking now follows a per-clone switch.** The per-clone migration sets `git config ralph.pluginHooks true`.
+  - With the switch on, pre-commit and commit-msg block when the plugin cannot be resolved.
+  - pre-push blocks when either `ralph.pluginHooks` or `ralph.sharedBacklog` is on. Its repair message names `git push --no-verify`.
+  - The marker still declares the project's intent, and the migration reads it.
+  - A commit that removes the marker does not stop enforcement.
+
+  This replaces the "marker present" row in the base design's failure table.
+- **In an opted-in clone, `--no-push` is allowed only with `tasks=N` for a single task.** The claim is still pushed, because it is coordination rather than work. The finished work is not published until the operator runs `integrate`.
+
+### Implementation checklist
+
+- The PRD (`design/plugin-delivered-project-files-prd.md`) carries both decisions in its stories and functional requirements.
