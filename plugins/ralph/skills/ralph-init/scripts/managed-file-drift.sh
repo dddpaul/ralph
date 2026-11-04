@@ -49,8 +49,9 @@
 # with the plugin shim (templates/shims/git-hook) instead of the legacy bodies.
 # .claude/settings.json, .devcontainer/Dockerfile (assembled) and .gitignore
 # (append-only) are never compared: ralph-init no longer ships a settings.json,
-# and migrate-plugin-hooks.sh tracked removes the legacy guard entries from it. Project-owned files — .claude/task-reviewer-rules.md above all —
-# are not in the table and are never read.
+# and migrate-plugin-hooks.sh tracked removes the legacy guard entries from it.
+# Project-owned files — .claude/task-reviewer-rules.md above all — are not in
+# the table and are never read.
 #
 # The accept file records reviewed, deliberate differences, one line per path:
 #

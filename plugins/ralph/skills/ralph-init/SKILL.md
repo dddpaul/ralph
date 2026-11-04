@@ -207,7 +207,7 @@ Assemble the Dockerfile from base + language snippets, then write four files:
 }
 ```
 
-No permission allowlist belongs in it — Ralph launches `claude` with `--dangerously-skip-permissions` inside the container, so the allowlist is never consulted there. The override wins over the user-level `${localEnv:HOME}/.claude` bind above it, and the host's own project `.claude/settings.local.json` (sandbox enabled, `autoAllowBashIfSandboxed`) is untouched because nothing is mounted over the directory any more.
+No permission allowlist belongs in it — Ralph launches `claude` with `--dangerously-skip-permissions` inside the container, so the allowlist is never consulted there. The override wins over the user-level `${localEnv:HOME}/.claude` bind above it, and the host's own project `.claude/settings.local.json` is untouched because nothing is mounted over the directory any more. On the host, the sandbox (`enabled`, `autoAllowBashIfSandboxed`) comes from the user settings, which hold the plugin's `user-settings.json` fragment (Step 3.7a).
 
 Two lifecycle hooks go with it:
 
@@ -329,7 +329,7 @@ bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-run/scripts/merge-user-settings.sh "${CL
 
 The merge appends missing allow rules and keys, keeps every other key, never overwrites a value, prints one `added:` line per entry it wrote and reports a differing value on stderr as `differs:`. A rerun adds nothing. When the user declines — for example because configuration management owns that file — skip it: the `/ralph-run` preflight warns with the exact entries the user settings lack until they are there.
 
-**No allow-rule is seeded for the plugin helper scripts** (ralph-run `preflight.sh` / `wait-heartbeat.sh`, ralph-status `utc-to-moscow.sh`). The skills invoke them as `bash ${CLAUDE_PLUGIN_ROOT}/...`, and on Claude Code 2.1.280 sandbox auto-allow (`autoAllowBashIfSandboxed`, set in the template) approves every one of those calls without a prompt — measured in TASK-254, including the older two-line `utc_iso=` snippet. A host measured prompting on every launch and watch tick ran 2.1.274; the fix there is upgrading Claude Code, not the allowlist. Do not add a helper rule — every shape is unacceptable (measured on 2.1.280 with the sandbox off):
+**No allow-rule is seeded for the plugin helper scripts** (ralph-run `preflight.sh` / `wait-heartbeat.sh`, ralph-status `utc-to-moscow.sh`). The skills invoke them as `bash ${CLAUDE_PLUGIN_ROOT}/...`, and on Claude Code 2.1.280 sandbox auto-allow (`autoAllowBashIfSandboxed`, set by the plugin's `user-settings.json` fragment in the user settings) approves every one of those calls without a prompt — measured in TASK-254, including the older two-line `utc_iso=` snippet. A host measured prompting on every launch and watch tick ran 2.1.274; the fix there is upgrading Claude Code, not the allowlist. Do not add a helper rule — every shape is unacceptable (measured on 2.1.280 with the sandbox off):
 
 | Rule | Why not |
 |---|---|

@@ -38,8 +38,8 @@
 #                  so no entry is left calling a missing script.
 #
 # Managed guards are the six Claude guards older ralph-init versions copied
-# into .claude/hooks/ and registered in .claude/settings.json. Every other file in .claude/hooks/ is the project's
-# own and is never touched. filename-length-guard.sh is kept too: it is a git
+# into .claude/hooks/ and registered in .claude/settings.json. Every other file
+# in .claude/hooks/ is the project's own and is never touched. filename-length-guard.sh is kept too: it is a git
 # hook helper, not a Claude guard, and a clone whose .git/hooks/pre-commit is
 # still the legacy copy falls back to it until that clone runs the plugin shim.
 # A second run changes nothing. RALPH_MIGRATE_STOP_AFTER=<step> (marker,
