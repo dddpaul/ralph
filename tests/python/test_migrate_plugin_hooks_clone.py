@@ -5,8 +5,9 @@ saves ``ralph.jq`` / ``ralph.projectPath`` (and ``ralph.claudeConfigDir`` off
 the default), installs the plugin shim as pre-commit, commit-msg and
 post-commit in ``git rev-parse --git-path hooks``, sets ``ralph.pluginHooks``
 and trims the common allow rules from ``.claude/settings.local.json`` that the
-user settings already hold. The tests build a clone the way ralph-init Init
-does today (legacy template hook bodies, template ``settings.local.json``) and
+user settings already hold. The tests build a clone the way older ralph-init
+versions did (legacy copies of the hook bodies, the legacy
+``settings.local.json`` kept as ``fixtures/legacy-settings.local.json``) and
 check what it installs, keeps and refuses, that it never commits or sets
 ``ralph.sharedBacklog``, and that a second run changes nothing.
 """
@@ -27,7 +28,8 @@ SCRIPT = REPO_ROOT / "plugins/ralph/skills/ralph-init/scripts/migrate-plugin-hoo
 TEMPLATES = REPO_ROOT / "plugins/ralph/skills/ralph-init/templates"
 SHIM = TEMPLATES / "shims/git-hook"
 FRAGMENT = REPO_ROOT / "plugins/ralph/user-settings.json"
-LOCAL_TEMPLATE = TEMPLATES / "claude/settings.local.json"
+LOCAL_TEMPLATE = REPO_ROOT / "tests/python/fixtures/legacy-settings.local.json"
+BODIES = REPO_ROOT / "plugins/ralph/git-hooks"
 HOOK_NAMES = ("pre-commit", "commit-msg", "post-commit")
 STOP_POINTS = ("config", *(f"shim:{n}" for n in HOOK_NAMES), "switch")
 BASH = shutil.which("bash") or "/bin/bash"
@@ -42,12 +44,12 @@ def git(cwd: Path, *args: str, check: bool = True) -> str:
 
 
 def make_clone(path: Path) -> Path:
-    """A git repo with the legacy template git hooks and settings.local.json; return its canonical root."""
+    """A git repo with legacy git hook copies and the legacy settings.local.json; return its canonical root."""
     path.mkdir(parents=True)
     git(path, "init", "-q", "-b", "master")
     for name in HOOK_NAMES:
         hook = path / ".git/hooks" / name
-        shutil.copyfile(TEMPLATES / "git-hooks" / name, hook)
+        shutil.copyfile(BODIES / name, hook)
         hook.chmod(0o755)
     (path / ".claude").mkdir()
     shutil.copyfile(LOCAL_TEMPLATE, path / ".claude/settings.local.json")
@@ -103,7 +105,7 @@ def ralph_config(root: Path) -> dict[str, str]:
 
 def accept(root: Path, name: str) -> None:
     """Append the accept-file line managed-file-drift.sh prints for ``.git/hooks/<name>``."""
-    template = hashlib.sha256((TEMPLATES / "git-hooks" / name).read_bytes()).hexdigest()
+    template = hashlib.sha256((BODIES / name).read_bytes()).hexdigest()
     project = hashlib.sha256((root / ".git/hooks" / name).read_bytes()).hexdigest()
     with (root / ".claude/managed-file-drift.accept").open("a") as f:
         f.write(f".git/hooks/{name} template={template} project={project}\n")
@@ -165,7 +167,7 @@ def test_shims_go_where_git_path_hooks_points(tmp_path: Path, home: Path) -> Non
     assert clone(root, home).returncode == 0
     for name in HOOK_NAMES:
         assert (root / "custom-hooks" / name).read_bytes() == SHIM.read_bytes()
-        assert (root / ".git/hooks" / name).read_bytes() == (TEMPLATES / "git-hooks" / name).read_bytes()
+        assert (root / ".git/hooks" / name).read_bytes() == (BODIES / name).read_bytes()
 
 
 def test_linked_worktree_saves_the_main_worktree_root(tmp_path: Path, home: Path) -> None:
@@ -260,7 +262,7 @@ def test_unaccepted_differing_hook_stops_before_any_write(tmp_path: Path, home: 
     before = snapshot(root)
     result = clone(root, home)
     assert result.returncode == 1
-    assert "commit-msg differs from the ralph-init template" in result.stderr
+    assert "commit-msg differs from the plugin's commit-msg hook body" in result.stderr
     assert snapshot(root) == before
     assert ralph_config(root) == {}
 

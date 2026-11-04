@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Unit tests for plugins/ralph/skills/ralph-init/templates/git-hooks/post-commit
+# Unit tests for plugins/ralph/git-hooks/post-commit
 #
 # The hook appends a "Commit: `<hash>` - <subject>" note to the task named by
 # the task-* branch. It skips commits that touch only task files (status / AC /
@@ -7,7 +7,7 @@
 # still be recorded, otherwise /ralph-review finds no Commit lines.
 
 load '../helpers/common'
-HOOK="$PROJECT_ROOT/plugins/ralph/skills/ralph-init/templates/git-hooks/post-commit"
+HOOK="$PROJECT_ROOT/plugins/ralph/git-hooks/post-commit"
 
 setup() {
   TEST_DIR="$(make_temp_dir)"

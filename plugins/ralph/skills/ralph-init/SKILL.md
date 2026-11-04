@@ -42,18 +42,19 @@ If `backlog` is missing: `npm install -g backlog.md`
 If not a git repo: `git init -b master`
 
 ```bash
-CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
-find "$CLAUDE_DIR/plugins/cache" -type f \
-  -path '*/ralph/*/skills/ralph-run/scripts/ralph_orchestrator.py' 2>/dev/null \
-  | grep -q . || {
-  echo "ERROR: the ralph plugin is not installed. Install it first, then re-run ralph-init:"
+bash -c '. "$1" && ralph_resolve_plugin . skills/ralph-run/scripts/ralph_orchestrator.py' _ \
+  "${CLAUDE_PLUGIN_ROOT}/skills/ralph-init/templates/shims/resolve-plugin.sh" >/dev/null || {
+  echo "ERROR: the ralph plugin cannot be resolved through Claude Code's plugin registry (reason above)."
+  echo "Install it (and jq) first, then re-run ralph-init:"
   echo "  /plugin marketplace add dddpaul/ralph"
   echo "  /plugin install ralph@dddpaul-ralph"
   exit 1
 }
 ```
 
-The project-root `ralph.sh` written in Step 3.1 is a thin shim that resolves the Ralph orchestrator wherever the plugin is installed — by precedence (`$RALPH_ORCHESTRATOR` explicit override, then the install Claude Code recorded in `<config>/plugins/installed_plugins.json`, else error) — and `exec`s it via `uv run`. Absent an override, the orchestrator comes from that registered install, found with `jq`; if the ralph plugin is not installed the shim has nothing to exec and the bootstrap is broken. Hard-stop here and instruct the user to install the plugin first.
+The check runs the registry resolver (`templates/shims/resolve-plugin.sh`) that the git hook shims, `ralph.sh` and `refine.sh` all embed: it reads `<config>/plugins/installed_plugins.json` with `jq` (`<config>` is `$CLAUDE_CONFIG_DIR`, else `$HOME/.claude`) and takes the first `ralph@dddpaul-ralph` entry that applies to this clone, so a leftover cache folder or a fork called `ralph` does not count. It prints one reason on stderr when it fails — no registry, no applicable entry, a missing install, or no `jq` — and `jq` is a hard requirement here, because the shims need it too.
+
+The project-root `ralph.sh` written in Step 3.1 is a thin shim that resolves the Ralph orchestrator wherever the plugin is installed — by precedence (`$RALPH_ORCHESTRATOR` explicit override, then the install Claude Code recorded in `<config>/plugins/installed_plugins.json`, else error) — and `exec`s it via `uv run`. Absent an override, the orchestrator comes from that registered install, found with `jq`; if the ralph plugin is not installed the shim has nothing to exec, the git hook shims Step 3.11 installs block every commit, and the bootstrap is broken. Hard-stop here and instruct the user to install the plugin first.
 
 The same plugin also ships the `task-reviewer` agent (`agents/task-reviewer.md`, resolved as `ralph:task-reviewer`), so this check covers it too — no user-level copy under `~/.claude/agents/` is needed.
 
@@ -115,14 +116,10 @@ Read `templates/root/CLAUDE.md` → replace ALL `<FILL IN ...>` placeholders in 
 
 Write to project root.
 
-### 3.3 `.git/hooks/post-commit`, `.git/hooks/commit-msg`, `.git/hooks/pre-commit`, and Unicode normalization
-Read `templates/git-hooks/post-commit` → write to `.git/hooks/post-commit`. Make executable (`chmod +x`). If hook already exists, warn user and ask before overwriting.
+### 3.3 Unicode normalization (the git hooks come from the plugin)
+Init copies **no git hook bodies**. The pre-commit, commit-msg and post-commit bodies ship in the plugin (`plugins/ralph/git-hooks/`), and Step 3.11's `migrate-plugin-hooks.sh clone` installs one fixed shim under each of the three names that runs the installed plugin's body. A plugin update then reaches the hooks with no per-project run. pre-commit rejects a commit when a staged path duplicates an existing tree path under a different Unicode normalization (NFD vs NFC) — see TASK-136 for the downstream incident that prompted it — and runs the 125-byte filename-length guard bundled beside it in the plugin, the cap that keeps names inside the ~140-byte ecryptfs/Syncthing budget, Windows MAX_PATH, and archive round-trips.
 
-Read `templates/git-hooks/commit-msg` → write to `.git/hooks/commit-msg`. Make executable (`chmod +x`). If hook already exists, warn user and ask before overwriting.
-
-Read `templates/git-hooks/pre-commit` → write to `.git/hooks/pre-commit`. Make executable (`chmod +x`). If hook already exists, warn user and ask before overwriting. The hook rejects a commit when a staged path duplicates an existing tree path under a different Unicode normalization (NFD vs NFC) — see TASK-136 for the downstream incident that prompted it. It also delegates to `.claude/hooks/filename-length-guard.sh` (written in Step 3.7a), which rejects any staged path whose name components exceed 125 bytes — the cap that keeps names inside the ~140-byte ecryptfs/Syncthing budget, Windows MAX_PATH, and archive round-trips. The delegation is guarded by `[ -x ]`, so the hook degrades to the NFC check alone in a project that predates the guard script.
-
-Then bootstrap git's Unicode normalization so working-tree paths are recorded in NFC even on macOS APFS, which hands filenames back in NFD:
+Bootstrap git's Unicode normalization here so working-tree paths are recorded in NFC even on macOS APFS, which hands filenames back in NFD:
 
 ```bash
 git config --local core.precomposeunicode true
@@ -144,6 +141,7 @@ backlog/.ralph-heartbeat
 
 # Claude Code (ignore local overrides, track project config)
 .claude/*
+!.claude/ralph.json
 !.claude/settings.json
 !.claude/task-reviewer-rules.md
 !.claude/brainstorm-rules.md
@@ -152,7 +150,7 @@ backlog/.ralph-heartbeat
 # Python virtualenv (also the devcontainer .venv volume mountpoint)
 .venv/
 ```
-Do NOT add `backlog/` — task files should be committed.
+Do NOT add `backlog/` — task files should be committed. `!.claude/ralph.json` keeps the plugin-hooks marker Step 3.11 writes trackable (the migration script adds the line too when it is missing). `!.claude/settings.json` and `!.claude/hooks/` are for the project's own hooks: Init writes neither.
 
 ### 3.5 Backlog
 Skip if `backlog/` directory already exists. Otherwise run non-interactively using the repo directory name as the project name:
@@ -274,7 +272,7 @@ awk '$5 == "/workspace" || $5 ~ /^\/workspace\// { print $5, $(NF-2) }' /proc/se
 # /workspace/.venv                      ext4       <- .venv volume; absent means it did not apply
 ```
 
-`/workspace/.claude` itself must **not** appear as its own filesystem — if it does, the container is still running the old whole-directory volume and needs a recreate. Two more checks for the shared bind: `md5sum .claude/settings.json` must match on host and in the container, and `git status` must work as `node` with no manual config.
+`/workspace/.claude` itself must **not** appear as its own filesystem — if it does, the container is still running the old whole-directory volume and needs a recreate. Two more checks for the shared bind: `md5sum .claude/ralph.json` must match on host and in the container, and `git status` must work as `node` with no manual config.
 
 A `mounts` or lifecycle-hook change needs **Dev Containers: Rebuild Container** (or `--rebuild` / `/ralph-run rebuild=true`) — a restart will not pick it up, because `mounts`, `initializeCommand`, and `postCreateCommand` are all read only when the container is created.
 
@@ -318,9 +316,18 @@ A `mounts` or lifecycle-hook change needs **Dev Containers: Rebuild Container** 
 
 > **`host.docker.internal` on every runtime:** the template's `runArgs` carry `--add-host=host.docker.internal:host-gateway`, so the name resolves to the host whatever the engine: Docker Desktop's host, colima's Mac (the same address colima's DNS already returns), and on a plain Linux Docker Engine — which does not define the name itself — the bridge gateway, i.e. the Linux host. Upgrade U4 adds the element to an existing project's `runArgs` while keeping the project's own. **Linux-host prerequisite:** the mapping only makes the host reachable; a Linux host must still serve the Squid proxy on port 3128, reachable from the docker bridge (bound to the `docker0` gateway address or `0.0.0.0`, not just `127.0.0.1`). Without it `postStartCommand`'s `init-firewall.sh` cannot fetch the GitHub ranges through the proxy and `devcontainer up` fails.
 
-### 3.7a `.claude/hooks/` and `.claude/settings.local.json` (template write)
-Read each `templates/claude/hooks/*-guard.sh` and `templates/claude/hooks/task-validator.sh` → write to `.claude/hooks/<name>.sh`. Make executable (`chmod +x`). Create `.claude/hooks/` directory if it does not exist. The `*-guard.sh` glob includes `filename-length-guard.sh`, which is not a PreToolUse hook — it is the tracked implementation that `.git/hooks/pre-commit` (Step 3.3) invokes, so it must be executable even though `settings.json` never references it.
-Read `templates/claude/settings.local.json` → write to `.claude/settings.local.json` (user permissions).
+### 3.7a `.claude/settings.local.json` and the user settings
+Init copies **no guard scripts and no common allow rules**. The Claude guards ship in the plugin (`plugins/ralph/hooks/`) and act once Step 3.11 writes the marker.
+
+Read `templates/claude/settings.local.json` → write to `.claude/settings.local.json`. It holds only the project's own rules — the `Skill(...)` rules for the Ralph skills.
+
+The common rules live in the plugin's `user-settings.json` fragment, which belongs in the user settings file, `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json`. A plugin cannot ship allow rules itself. The fragment holds the 46 `Bash(...)` rules, `ScheduleWakeup`, the empty `attribution` trailers and the `sandbox` switch. Tell the user which file this edits, and ask before merging the fragment in:
+
+```bash
+bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-run/scripts/merge-user-settings.sh "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"
+```
+
+The merge appends missing allow rules and keys, keeps every other key, never overwrites a value, prints one `added:` line per entry it wrote and reports a differing value on stderr as `differs:`. A rerun adds nothing. When the user declines — for example because configuration management owns that file — skip it: the `/ralph-run` preflight warns with the exact entries the user settings lack until they are there.
 
 **No allow-rule is seeded for the plugin helper scripts** (ralph-run `preflight.sh` / `wait-heartbeat.sh`, ralph-status `utc-to-moscow.sh`). The skills invoke them as `bash ${CLAUDE_PLUGIN_ROOT}/...`, and on Claude Code 2.1.280 sandbox auto-allow (`autoAllowBashIfSandboxed`, set in the template) approves every one of those calls without a prompt — measured in TASK-254, including the older two-line `utc_iso=` snippet. A host measured prompting on every launch and watch tick ran 2.1.274; the fix there is upgrading Claude Code, not the allowlist. Do not add a helper rule — every shape is unacceptable (measured on 2.1.280 with the sandbox off):
 
@@ -335,7 +342,7 @@ A rule written with `$HOME` would not match either: the matcher compares literal
 
 The ralph-status and ralph-status-watch skills call `utc-to-moscow.sh` as a single `bash` command with the timestamp inlined, not behind a `VAR=` assignment. The upstream auto-allow defect (Claude Code changelog, fixed in 2.1.285) concerned inline scripts containing `=`, so the single-command shape stays clear of it on any version.
 
-`.claude/settings.json` (the project-wide file that *registers* the hooks with Claude Code) is deliberately **not** written here. The hook scripts on disk are inert until the registration file lands, so this step leaves them dormant. See Step 3.11 for the deferred activation rationale.
+Nothing here activates a guard: the plugin's guards stay inert until Step 3.11 writes the `.claude/ralph.json` marker. See Step 3.11 for the deferred activation rationale.
 
 ### 3.7b Merge pptx helper rules into `settings.local.json` (Documentation / Mixed only)
 
@@ -412,10 +419,22 @@ fi
 
 `grep -F` matches the literal string so paths containing regex-special characters (e.g. `.`, `+`, `$`) do not cause false negatives.
 
-### 3.11 `.claude/settings.json` (hook activation — last act of init)
-Read `templates/claude/settings.json` → write to `.claude/settings.json` (project-wide hooks).
+### 3.11 Plugin hooks (hook activation — last act of init)
+Run both parts of the migration script, in this order:
 
-This is the file that *registers* the hook scripts written in Step 3.7a with Claude Code, so writing it activates `master-branch-guard.sh` and the other PreToolUse hooks mid-session. Deferring it until after every other Step 3.x template write means subsequent steps (including 3.9's `.obsidian/*` writes on `master`) cannot self-block on a hook this same `/ralph-init` invocation just installed. The invariant for future template-write steps is durable: **hook activation is the last act of init.** Rationale walked end-to-end in `design/ralph-init-hook-ordering-brainstorm.md` (Options A–E, Q1–Q5, addendum 2026-06-13).
+```bash
+bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-init/scripts/migrate-plugin-hooks.sh tracked .
+bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-init/scripts/migrate-plugin-hooks.sh clone .
+```
+
+- **`tracked`** writes the tracked ownership marker `.claude/ralph.json` with `"pluginHooks": true`, and adds `!.claude/ralph.json` to `.gitignore` if missing. From then on the plugin's hooks enforce every Ralph guard in this project: `master-branch-guard`, the commit-message and commit-prefix guards, the naming and notes guards and `task-validator`. On a fresh project there are no legacy copies or `settings.json` entries for it to remove.
+- **`clone`** sets the per-clone switches in git config: `ralph.pluginHooks true`, `ralph.jq`, `ralph.projectPath`, and `ralph.claudeConfigDir` when the config dir is not `$HOME/.claude`. It installs the fixed shim (`templates/shims/git-hook`) as pre-commit, commit-msg and post-commit in the directory `git rev-parse --git-path hooks` returns. With `ralph.pluginHooks` true, pre-commit and commit-msg block — naming `git commit --no-verify` — when the plugin cannot be resolved.
+
+Neither part commits. `clone` exits 1 before writing anything when a git hook it would replace already exists and differs from the plugin's body — a hook of the project's own. Relay its message. It names the two ways out: accept the hook with `managed-file-drift.sh accept`, so that it is kept as `<name>.local` and the shim runs it first; or delete it. Then rerun `clone`. Exit 2 is a usage or read error (for example `jq` not found): stop and report it.
+
+The marker is what *activates* the guards, so it is written last. Writing it activates `master-branch-guard` and the other PreToolUse guards mid-session. Deferring it until after every other Step 3.x template write means subsequent steps (including 3.9's `.obsidian/*` writes on `master`) cannot self-block on a guard this same `/ralph-init` invocation just switched on. The invariant for future template-write steps is durable: **hook activation is the last act of init.** Rationale walked end-to-end in `design/ralph-init-hook-ordering-brainstorm.md` (Options A–E, Q1–Q5, addendum 2026-06-13); the plugin-delivered design is in `design/plugin-delivered-project-files-prd.md`.
+
+**Second host.** The marker is committed with the rest of the scaffold. Another clone of the project — on a second host, say — needs only the per-clone part after `git pull`: `migrate-plugin-hooks.sh clone`.
 
 ---
 
@@ -428,14 +447,15 @@ Files created:
   ralph.sh              - Main autonomous loop script (supports claude, opencode)
   refine.sh             - Adversarial author-reviewer refinement loop (ralph-refine)
   CLAUDE.md             - Agent instructions for Claude Code
-  .git/hooks/post-commit - Commit hash tracking for tasks
-  .git/hooks/commit-msg  - Forbidden trailer/heading guard
-  .git/hooks/pre-commit  - Filename-length (125-byte) + Unicode NFC/NFD guards
+  .git/hooks/post-commit - Plugin shim: commit hash tracking for tasks
+  .git/hooks/commit-msg  - Plugin shim: forbidden trailer/heading guard
+  .git/hooks/pre-commit  - Plugin shim: filename-length (125-byte) + Unicode NFC/NFD guards
   .gitignore            - Updated with Ralph entries
   backlog/              - Backlog initialized
-  .claude/settings.json      - Claude Code hooks (project-wide)
-  .claude/hooks/             - Hook scripts referenced by settings.json
-  .claude/settings.local.json - Claude Code permissions
+  .claude/ralph.json         - Plugin-hooks marker (the plugin's guards enforce here)
+  .claude/settings.local.json - The project's own Skill(...) permissions
+  git config ralph.*         - Per-clone switches (not committed; a second clone runs
+                               migrate-plugin-hooks.sh clone after git pull)
   .claude/brainstorm-rules.md - Phase 3/4 brainstorm rules (section-aware merge on upgrade)
   .devcontainer/        - (if applicable) Sandboxed execution environment
   .obsidian/            - (if Documentation/Mixed) Obsidian vault configuration
@@ -469,18 +489,18 @@ Next steps:
 
 Run this manual smoke test once after any change to the init permission flow. It confirms a fresh scaffold launches Ralph with **zero permission prompts except the single devcontainer sandbox bypass** — the property this init flow exists to guarantee. It exercises the real Claude Code permission matcher, which the Python unit tests cannot.
 
-**Why no seeded rule is needed:** the scaffolded `.claude/settings.local.json` sets `sandbox.enabled: true` and `autoAllowBashIfSandboxed: true`, and on Claude Code 2.1.280 sandbox auto-allow approves the ralph-run / ralph-status helpers without a prompt (TASK-254). Run this test on the Claude Code version you ship with. On older builds (2.1.274 was measured prompting) the fix is upgrading Claude Code, not seeding a rule — Step 3.7a lists why every rule shape is unacceptable.
+**Why no seeded rule is needed:** the user settings hold the plugin fragment (Step 3.7a), which sets `sandbox.enabled: true` and `autoAllowBashIfSandboxed: true`, and on Claude Code 2.1.280 sandbox auto-allow approves the ralph-run / ralph-status helpers without a prompt (TASK-254). Run this test on the Claude Code version you ship with. On older builds (2.1.274 was measured prompting) the fix is upgrading Claude Code, not seeding a rule — Step 3.7a lists why every rule shape is unacceptable.
 
 **Setup — scaffold a throwaway project:**
 
-1. In an empty git repo (`git init`), install the ralph plugin, then run `/ralph-init` and answer **Code-only** (Q0 → A) with the devcontainer **enabled**. Code-only skips Step 3.7b, so the scaffold carries **no** pptx rules and **no** `.claude/skills` narrow rules — only the template allowlist plus the two sandbox keys.
+1. In an empty git repo (`git init`), install the ralph plugin, then run `/ralph-init` and answer **Code-only** (Q0 → A) with the devcontainer **enabled**. Code-only skips Step 3.7b, so the scaffold carries **no** pptx rules and **no** `.claude/skills` narrow rules — only the template's `Skill(...)` rules. Merge the fragment into the user settings when Step 3.7a asks.
 2. Confirm the scaffold is clean:
    ```bash
    # Expect NO output: no helper rules of any shape (pre-marketplace
    # .claude/skills rules or plugin-cache rules).
    grep -nE '\.claude/skills/ralph|plugins/cache/' .claude/settings.local.json
    # Expect { "enabled": true, "autoAllowBashIfSandboxed": true }.
-   jq -c '.sandbox' .claude/settings.local.json
+   jq -c '.sandbox' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"
    ```
 3. Create one trivial task so `/ralph-run` has something to launch: `backlog task create "smoke" -d "noop"`.
 
@@ -495,7 +515,7 @@ Run this manual smoke test once after any change to the init permission flow. It
 - ✅ **Preflight** (`bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-run/scripts/preflight.sh …`) — no prompt. Sandbox auto-allow covers it (Claude Code 2.1.280; TASK-254).
 - ✅ **Heartbeat wait** (`bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-run/scripts/wait-heartbeat.sh && rm -f backlog/.ralph-launch.log`) — no prompt. The helper and the trailing `rm` (which only touches `backlog/.ralph-launch.log` inside the workspace) are both sandbox-covered.
 - ✅ **ralph-status `utc-to-moscow.sh`** (fired by `watch`) — no prompt. Sandbox-covered; the skill invokes it as a single `bash` command with no `VAR=` assignment in front.
-- ✅ **backlog / git / jq** helpers — no prompt. Covered by the template allowlist.
+- ✅ **backlog / git / jq** helpers — no prompt. Covered by the fragment's allow rules in the user settings.
 - ⚠️ **Launch** (`nohup "${RALPH_CMD[@]}" > backlog/.ralph-launch.log 2>&1 & disown`) — **one** prompt. ralph-run Step 4 sets `dangerouslyDisableSandbox: true` on this call so the orchestrator gets full OS access (mktemp, /dev/fd, tee, docker); disabling the sandbox always prompts. This is the expected devcontainer bypass and the only prompt allowed to appear.
 
 If a helper prompts, check the Claude Code version first: builds before 2.1.280 may not auto-allow it, and the fix is upgrading. Then check that the invocation leads with `bash ${CLAUDE_PLUGIN_ROOT}/…` with no assignment in front, and that the helper is still read-only and workspace-confined. Do not add a helper allow-rule — Step 3.7a explains why every shape is either too broad (a bare `*` crosses `/` and auto-allows `bash` on every cached plugin file) or dies at the next plugin upgrade.
@@ -529,7 +549,7 @@ If neither exists, tell the user: "Ralph has not been initialized in this projec
 
 ### U1.5: Branch Safety
 
-Refuse to proceed with the upgrade flow when the user is on `master` (or a detached HEAD). Upgrade-mode U4 overwrites root-level files — `ralph.sh`, `CLAUDE.md`, `.git/hooks/*`, `.devcontainer/*` — none of which are in the master-branch-guard exempt list. If the hook is already installed (which it will be after a prior init), every U4 write is denied. The fix is to require a task branch before upgrade can begin.
+Refuse to proceed with the upgrade flow when the user is on `master` (or a detached HEAD). Upgrade-mode U4 overwrites root-level files — `ralph.sh`, `CLAUDE.md`, `.devcontainer/*` — none of which are in the master-branch-guard exempt list, and its plugin-hooks migration changes tracked files that must be committed on a branch. If the hook is already installed (which it will be after a prior init), every U4 write is denied. The fix is to require a task branch before upgrade can begin.
 
 Run:
 
@@ -603,6 +623,10 @@ The removal is an unstaged deletion when the file was committed; the `!.claude/t
 
 ### U2: Build File Status Table
 
+**The plugin-hooks migration state comes first.** Projects bootstrapped before the plugin shipped the guards carry legacy copies of the guards, the git hooks and the common allow rules. U4 migrates them once with `migrate-plugin-hooks.sh`. The drift script below reads the marker `.claude/ralph.json` and the clone's `ralph.pluginHooks` switch, and compares each file against what that state expects. Report the state in the table as one more line:
+
+- **`plugin hooks`** — **current** when `.claude/ralph.json` sets `"pluginHooks": true` and `git config --bool ralph.pluginHooks` is `true`. **missing** (not migrated) when neither is set. **outdated** (partially migrated) when only one of them is set, or when the drift script reports a `legacy copy`. The `/ralph-run` preflight reports the same three states.
+
 Compare each managed file against its current template by running `bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-init/scripts/managed-file-drift.sh check .` — the same script `/ralph-run`'s preflight runs before every loop, so upgrade and preflight report drift from one implementation. It prints one `<path>: outdated` or `<path>: missing` line per file below that is behind (`.claude/hooks/` per hook script) and exits 1, or exits 0 with no output; every file it does not name is **current**, or **skipped** under the gates below. Exit 2 is a usage or read error — stop and report it. Its file list is pinned against this list by `tests/python/test_managed_file_drift.py`, so a managed file added here must be added to the script's table as well. Assign one status per file:
 
 | Status | Meaning |
@@ -617,12 +641,12 @@ Compare each managed file against its current template by running `bash ${CLAUDE
 1. **`ralph.sh`** — exact content match against `templates/root/ralph.sh`
 2. **`refine.sh`** — exact content match against `templates/root/refine.sh`
 3. **`CLAUDE.md`** — compare only lines **above** the `## Project-Specific` heading against the same region in `templates/root/CLAUDE.md`. Everything from `## Project-Specific` down (including conventions) is the project block and must never be touched.
-4. **`.git/hooks/post-commit`** — exact content match against `templates/git-hooks/post-commit`
-5. **`.git/hooks/commit-msg`** — exact content match against `templates/git-hooks/commit-msg`
-6. **`.git/hooks/pre-commit`** — exact content match against `templates/git-hooks/pre-commit` (125-byte filename-length guard + Unicode NFC/NFD duplicate guard, see TASK-136)
-7. **`.claude/settings.json`** — exact content match against `templates/claude/settings.json`
-8. **`.claude/hooks/`** — each script in `templates/claude/hooks/*-guard.sh` and `templates/claude/hooks/task-validator.sh` must match `.claude/hooks/<name>.sh`. A project that predates `filename-length-guard.sh` reports it **missing**; U4 creates it, which is what arms the pre-commit length check.
-9. **`.claude/settings.local.json`** — **current** when every rule of the template's `permissions.allow` is in the file's `permissions.allow` and everything else in the file equals the template as JSON; rules the project adds to `permissions.allow` — the Step 3.7b pptx helpers U4 merges back for Documentation / Mixed projects, or the project's own — are not drift, and the order of the array does not matter. A missing template rule or any other differing key or value is **outdated**. (Without `jq` on PATH the script falls back to an exact content match.)
+4. **`.git/hooks/post-commit`** — in a clone whose git config `ralph.pluginHooks` is true, exact content match against the plugin shim `templates/shims/git-hook`; otherwise (a legacy copy) against the plugin's body `${CLAUDE_PLUGIN_ROOT}/git-hooks/post-commit`
+5. **`.git/hooks/commit-msg`** — the same, against the shim or `${CLAUDE_PLUGIN_ROOT}/git-hooks/commit-msg`
+6. **`.git/hooks/pre-commit`** — the same, against the shim or `${CLAUDE_PLUGIN_ROOT}/git-hooks/pre-commit` (125-byte filename-length guard + Unicode NFC/NFD duplicate guard, see TASK-136)
+7. **`.claude/settings.json`** — always **skipped**: ralph-init ships no `settings.json`. In a project that is not migrated yet it still registers the legacy guard copies; U4's `migrate-plugin-hooks.sh tracked` removes those entries and keeps every other one.
+8. **`.claude/hooks/`** — in a project that is not migrated yet, each legacy copy `.claude/hooks/<name>.sh` must match the plugin's `${CLAUDE_PLUGIN_ROOT}/hooks/<name>.sh`, for every `*-guard.sh` and `task-validator.sh`. A project whose `.claude/ralph.json` sets `"pluginHooks": true` no longer has its six Claude guard copies compared: a copy of a guard the marker does not list in `localGuards` is reported as `<path>: legacy copy`, and a local guard is the project's own. `filename-length-guard.sh` is still compared, because a clone whose pre-commit is still a legacy copy calls it.
+9. **`.claude/settings.local.json`** — not compared in a migrated project: the common rules belong to the user settings there, and `migrate-plugin-hooks.sh clone` trims them. Otherwise **current** when every rule of the template's `permissions.allow` (the project's `Skill(...)` rules) is in the file's `permissions.allow` and everything else in the file equals the template as JSON. Rules the project adds to `permissions.allow` — the Step 3.7b pptx helpers U4 merges back for Documentation / Mixed projects, or the project's own — are not drift, and the order of the array does not matter. A missing template rule or any other key — the legacy `attribution` and `sandbox` keys included — is **outdated**. (Without `jq` on PATH the script falls back to an exact content match.)
 10. **`.devcontainer/devcontainer.json`** — exact content match against `templates/devcontainer/devcontainer.json` once the project's own `runArgs` elements are kept (see "Project `runArgs` in `devcontainer.json`" under U4): **current** when the file equals `bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-init/scripts/merge-runargs.sh templates/devcontainer/devcontainer.json .devcontainer/devcontainer.json` byte for byte. If `.devcontainer/` directory does not exist, status is **skipped**.
 11. **`.devcontainer/init-firewall.sh`** — exact content match against `templates/devcontainer/init-firewall.sh`. If `.devcontainer/` directory does not exist, status is **skipped**.
 12. **`.devcontainer/Dockerfile`** — always **skipped** (assembled from fragments, cannot diff meaningfully). It is still **checked**, not silently passed over: run `bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-init/scripts/stale-runtime-copy.sh check .devcontainer/Dockerfile`. Exit 0 keeps the plain `skipped (assembled)`; exit 1 means the file still copies a foreign interpreter over `/usr/local` — status **skipped (assembled; stale runtime copy)**, and U4 offers the in-place patch. Then, independently, run `bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-init/scripts/floating-uv-copy.sh check .devcontainer/Dockerfile`. Exit 1 means uv is still copied from a floating tag (the pre-TASK-251 `COPY --from=ghcr.io/astral-sh/uv:latest`, not the `ghcr.io/astral-sh/uv:${UV_VERSION}` stage) — status **skipped (assembled; floating uv copy)**, and U4 offers the uv pin patch. This check reads the Dockerfile alone, never `devcontainer.json`'s status, so a project that declined the uv patch on an earlier run is flagged again on every later one. Two more checks run on the same file, also independently: `bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-init/scripts/early-claude-arg.sh check .devcontainer/Dockerfile` — exit 1 means `ARG CLAUDE_CODE_VERSION` is declared above other `RUN` steps in the final stage (the pre-TASK-272 layout), so every Claude Code bump rebuilds the whole image — status **skipped (assembled; early claude-code arg)**; and `bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-init/scripts/broad-sudoers-chown.sh check .devcontainer/Dockerfile` — exit 1 means the `node-firewall` sudoers grant still allows a bare `/bin/chown` (the pre-TASK-271 rule), with which `node` can take over the root-run `init-firewall.sh` and get root — status **skipped (assembled; broad sudoers chown)**. U4 offers a patch for each. Any of the four conditions can hold at once; join them in the order claude arg, uv, runtime copy, sudoers — e.g. **skipped (assembled; floating uv copy; stale runtime copy)** or **skipped (assembled; early claude-code arg; floating uv copy; broad sudoers chown)**. Exit 2 from any check is a read error — report it and keep the plain `skipped (assembled)`. The file is never added to the mirror registry: it is patched in place, not re-synced.
@@ -642,12 +666,13 @@ File                                         Status
 ralph.sh                                     outdated
 refine.sh                                    outdated
 CLAUDE.md (generic section)                  current
+plugin hooks                                 missing (not migrated)
 .git/hooks/post-commit                       outdated
 .git/hooks/commit-msg                        outdated
 .git/hooks/pre-commit                        outdated
-.claude/settings.json                        current
-.claude/hooks/                               current
-.claude/settings.local.json                  current
+.claude/settings.json                        skipped (no template)
+.claude/hooks/                               outdated
+.claude/settings.local.json                  outdated
 .claude/brainstorm-rules.md                  outdated
 .devcontainer/devcontainer.json              skipped (no .devcontainer/)
 .devcontainer/init-firewall.sh               skipped (no .devcontainer/)
@@ -658,8 +683,10 @@ CLAUDE.md (generic section)                  current
 
 **For outdated files, show details:**
 
-- **`ralph.sh`**, **`refine.sh`**, **`.git/hooks/post-commit`**, **`.git/hooks/commit-msg`**, and **`.git/hooks/pre-commit`**: show a plain language summary of what changed (e.g. "Template adds --model flag support and fixes timeout handling"). Read both versions and describe the meaningful differences — do not dump raw diffs for these files.
-- **`.claude/settings.json`**: show the unified diff (`diff -u`) because the project may have custom hooks the user wants to preserve. If the diff shows extra hook entries of the project's own, tell the user to convert each `command` to the `"$CLAUDE_PROJECT_DIR"/.claude/hooks/<name>.sh` form the template uses. Claude Code runs hook commands from the session's current directory, so a relative `.claude/hooks/<name>.sh` fails with "No such file or directory" after any `cd <subdir>`, and the guard is silently skipped.
+- **`ralph.sh`** and **`refine.sh`**: show a plain language summary of what changed (e.g. "Template adds --model flag support and fixes timeout handling"). Read both versions and describe the meaningful differences — do not dump raw diffs for these files.
+- **`plugin hooks`** when not migrated or partially migrated: say that U4 runs `migrate-plugin-hooks.sh tracked` and `clone`. After that the guards, the git hooks and the common allow rules come from the installed plugin, and a plugin update reaches them with no further upgrade.
+- **`.git/hooks/*`** and **`.claude/hooks/`** in a project that is not migrated: these are legacy copies, and U4's migration replaces them; they are not overwritten. For a guard copy or a git hook that differs from the plugin's file, show `diff -u` against it — `${CLAUDE_PLUGIN_ROOT}/hooks/<name>.sh` or `${CLAUDE_PLUGIN_ROOT}/git-hooks/<name>` — because the difference may be a deliberate local change that U4 offers to keep.
+- **`.claude/settings.json`** (skipped, but read it): if it registers hooks of the project's own, tell the user to convert each `command` to the `"$CLAUDE_PROJECT_DIR"/.claude/hooks/<name>.sh` form. Claude Code runs hook commands from the session's current directory, so a relative `.claude/hooks/<name>.sh` fails with "No such file or directory" after any `cd <subdir>`, and the guard is silently skipped.
 - **`.claude/settings.local.json`**: show the unified diff (`diff -u`) because the project may have custom permissions the user wants to preserve.
 - **`CLAUDE.md`**: show a plain language summary of what changed in the generic section (above `## Project-Specific`).
 - **`.claude/brainstorm-rules.md`**: show a plain language summary of what changed in the Ralph-managed region (above `## Project additions`).
@@ -687,12 +714,36 @@ For each file the user approved:
 
 - **`ralph.sh`**: overwrite from `templates/root/ralph.sh`, then `chmod +x`.
 - **`refine.sh`**: overwrite from `templates/root/refine.sh`, then `chmod +x`.
-- **`.git/hooks/post-commit`**: overwrite from `templates/git-hooks/post-commit`, then `chmod +x`.
-- **`.git/hooks/commit-msg`**: overwrite from `templates/git-hooks/commit-msg`, then `chmod +x`.
-- **`.git/hooks/pre-commit`**: overwrite from `templates/git-hooks/pre-commit`, then `chmod +x`. Also re-assert `git config --local core.precomposeunicode true` (idempotent — no-op if already set) so the macOS NFD-on-write defense ships alongside the hook. The overwritten hook calls `.claude/hooks/filename-length-guard.sh`; if the user skipped the `.claude/hooks/` update the `[ -x ]` guard makes the call a silent no-op rather than a broken hook, so the two files may be updated in either order.
-- **`.claude/settings.json`**: overwrite from `templates/claude/settings.json`.
-- **`.claude/hooks/`**: for each `templates/claude/hooks/*-guard.sh` and `templates/claude/hooks/task-validator.sh`, overwrite `.claude/hooks/<name>.sh`, then `chmod +x`. Create directory if needed. This is how an existing project picks up `filename-length-guard.sh`; `chmod +x` is not optional for it, since pre-commit tests `[ -x ]` before calling it.
-- **`.claude/settings.local.json`**: overwrite from `templates/claude/settings.local.json`. **If the project is Documentation or Mixed** (detect via existing `.obsidian/` directory), run the Step 3.7b pptx merge so the overwrite does not strip the `Bash(python scripts/office/soffice.py:*)` and `Bash(pdftoppm:*)` rules. User-added custom permissions in the existing `allow` array are preserved by the `+ unique` merge. The merged file is what U2 item 9 calls **current**: it holds every template rule, and the pptx rules it adds are not drift, so the next upgrade and every ralph-run preflight report it current.
+- **Plugin hooks (`plugin hooks`, `.git/hooks/*`, `.claude/hooks/`, the legacy `.claude/settings.json` entries)** — the one-time migration. U4 does not copy a guard script, a git hook body or a common allow rule. It runs the migration script instead; the script is idempotent, so it is also how a partially migrated project is finished:
+  1. **User settings.** As in Init Step 3.7a, ask before merging the plugin's fragment into `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json` with `merge-user-settings.sh`. Do this first, so that step 4 can drop the common rules from `.claude/settings.local.json`; `clone` drops only the rules the user settings already hold.
+  2. **Local guards.** For each managed guard copy that differs from the plugin's (U3 showed the diff), ask whether to keep it as a local guard. A local guard keeps its copy and its `settings.json` registration, and the plugin skips it. Otherwise the plugin's version takes over and the copy is deleted.
+  3. **Tracked part**, once per project, on one host:
+
+     ```bash
+     bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-init/scripts/migrate-plugin-hooks.sh tracked [--local-guards <name>[,<name>...]] .
+     ```
+
+     It writes the marker first, so an interrupted run leaves the plugin guards enforcing. It merges `"pluginHooks": true` (and the `localGuards`) into an existing `.claude/ralph.json`, keeping its other keys, and adds `!.claude/ralph.json` to `.gitignore`. It removes only the managed guard entries from `.claude/settings.json`, and deletes the file only when nothing else is left in it. Then it deletes the managed guard copies that are not local guards. It keeps the project's own hook scripts and entries and `filename-length-guard.sh` (a legacy pre-commit copy still calls it).
+  4. **Clone part**, once per clone:
+
+     ```bash
+     bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-init/scripts/migrate-plugin-hooks.sh clone .
+     ```
+
+     It saves the switches `ralph.jq`, `ralph.projectPath` (and `ralph.claudeConfigDir` off the default). It installs the plugin shim as pre-commit, commit-msg and post-commit, and sets `ralph.pluginHooks true`. It removes from `.claude/settings.local.json` the fragment entries the user settings already hold, and reports the ones it kept. It never sets `ralph.sharedBacklog`. A legacy hook that differs from the plugin's body stops it with exit 1 before it writes anything. Relay the message: to keep the hook, accept it (`bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-init/scripts/managed-file-drift.sh accept . .git/hooks/<name>`, appended to `.claude/managed-file-drift.accept`), so that it becomes `<name>.local` and the shim runs it first; or delete it. Then rerun. An existing `<name>.local` is never overwritten.
+  5. Re-assert `git config --local core.precomposeunicode true` (idempotent) — the macOS NFD-on-write defense that goes with pre-commit.
+
+  Neither part commits. The tracked changes — the marker, `.gitignore`, `.claude/settings.json` and the deleted guard copies — are committed on the upgrade branch with the rest of U4 and pushed once. **A second host needs only the clone part:** after `git pull` brings the tracked part, run `migrate-plugin-hooks.sh clone .` in that clone. Running the tracked part there too would make a second, diverging commit.
+- **`.claude/settings.local.json`**: never overwritten — it may still hold common rules that the user settings lack. Merge the template's rules in with the same `+ unique` pattern as Step 3.7b:
+
+  ```bash
+  jq --slurpfile t ${CLAUDE_PLUGIN_ROOT}/skills/ralph-init/templates/claude/settings.local.json \
+    '.permissions.allow = ((.permissions.allow // []) + $t[0].permissions.allow | unique)' \
+    .claude/settings.local.json > .claude/settings.local.json.tmp \
+    && mv .claude/settings.local.json.tmp .claude/settings.local.json
+  ```
+
+  Then, **if the project is Documentation or Mixed** (detect via an existing `.obsidian/` directory), run the Step 3.7b pptx merge. User-added custom permissions in the existing `allow` array are preserved by both merges. The plugin-hooks migration above then drops the common rules the user settings hold. Once the project is migrated, U2 item 9 no longer compares this file; before that, the file is **current** only when it holds the template rules and no other key.
 
   That merge would also preserve **dead helper rules** from earlier versions, so strip them afterwards. Ralph seeds no helper rule any more (Step 3.7a), and both older shapes are dead: pre-marketplace rules naming `.claude/skills/ralph-run/` or `.claude/skills/ralph-status/` (in either `$HOME/...` or absolute form — those files no longer exist), and plugin-cache rules pinned to a concrete version (`.../ralph/0.1.0/skills/...` — dead at the first plugin upgrade after they were written). List them first, then remove them:
 
@@ -899,12 +950,13 @@ Ralph upgrade complete!
   ralph.sh                          updated
   refine.sh                         updated
   CLAUDE.md (generic section)       current
-  .git/hooks/post-commit            updated
-  .git/hooks/commit-msg             updated
-  .git/hooks/pre-commit             updated
-  .claude/settings.json             current
-  .claude/hooks/                    current
-  .claude/settings.local.json       current
+  plugin hooks                      migrated (tracked + clone; commit the tracked part once)
+  .git/hooks/post-commit            updated (plugin shim)
+  .git/hooks/commit-msg             updated (plugin shim)
+  .git/hooks/pre-commit             updated (plugin shim)
+  .claude/settings.json             skipped (no template; legacy guard entries removed)
+  .claude/hooks/                    updated (legacy copies removed)
+  .claude/settings.local.json       updated
   .claude/brainstorm-rules.md       updated
   .devcontainer/devcontainer.json   skipped (no .devcontainer/)
   .devcontainer/init-firewall.sh    skipped (no .devcontainer/)
@@ -913,7 +965,8 @@ Ralph upgrade complete!
 ```
 
 Use these labels:
-- **updated** — file was overwritten with the latest template
+- **updated** — file was overwritten with the latest template, or replaced by the plugin-hooks migration
+- **migrated** — `plugin hooks` only: both parts of the migration ran; add "a second clone runs only `migrate-plugin-hooks.sh clone` after `git pull`"
 - **created** — file was missing and has been created
 - **current** — file already matched the template
 - **skipped (reason)** — file was excluded from checks, with reason in parentheses

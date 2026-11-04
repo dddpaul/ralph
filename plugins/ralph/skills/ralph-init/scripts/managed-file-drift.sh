@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Report ralph-init managed files in a project that are behind the installed
-# plugin's templates.
+# plugin's templates and, for the legacy copies of a project that is not yet
+# migrated to plugin hooks, the plugin's own hooks/ and git-hooks/.
 #
 #   managed-file-drift.sh check <project-dir>
 #       Prints one "<path>: outdated" or "<path>: missing" line per managed file
@@ -25,8 +26,8 @@
 #   exact     — byte-identical to the template.
 #   above:<h> — only the lines above the first line equal to <h> are compared;
 #               a project file without that line is outdated.
-#   hooks     — every templates/claude/hooks/*-guard.sh and task-validator.sh
-#               must match .claude/hooks/<name>.sh.
+#   hooks     — every plugin hooks/*-guard.sh and task-validator.sh must
+#               match .claude/hooks/<name>.sh.
 #   allow     — JSON equal to the template once permissions.allow is set
 #               aside, and that array holds every template rule; added rules
 #               (the pptx helpers Upgrade U4 merges in) are not drift. Without
@@ -40,14 +41,15 @@
 # Plugin hooks (design/plugin-delivered-project-files-prd.md US-006) change two
 # things. In a project whose .claude/ralph.json sets "pluginHooks": true (read
 # with jq; without jq the project counts as not migrated), the plugin owns the
-# six managed Claude guards and the common allow rules: .claude/settings.json,
-# .claude/settings.local.json and the guard copies are no longer compared, and a
+# six managed Claude guards and the common allow rules: .claude/settings.local.json
+# and the guard copies are no longer compared, and a
 # copy of a guard the marker does not list in "localGuards" is reported as
 # "<path>: legacy copy" (migrate-plugin-hooks.sh tracked deletes it). In a clone
 # whose git config ralph.pluginHooks is true, the three git hooks are compared
 # with the plugin shim (templates/shims/git-hook) instead of the legacy bodies.
-# .devcontainer/Dockerfile (assembled) and .gitignore (append-only) are never
-# compared. Project-owned files — .claude/task-reviewer-rules.md above all —
+# .claude/settings.json, .devcontainer/Dockerfile (assembled) and .gitignore
+# (append-only) are never compared: ralph-init no longer ships a settings.json,
+# and migrate-plugin-hooks.sh tracked removes the legacy guard entries from it. Project-owned files — .claude/task-reviewer-rules.md above all —
 # are not in the table and are never read.
 #
 # The accept file records reviewed, deliberate differences, one line per path:
@@ -71,11 +73,10 @@ table() {
 ralph.sh|skills/ralph-init/templates/root/ralph.sh|exact|-
 refine.sh|skills/ralph-init/templates/root/refine.sh|exact|-
 CLAUDE.md|skills/ralph-init/templates/root/CLAUDE.md|above:## Project-Specific|-
-.git/hooks/post-commit|skills/ralph-init/templates/git-hooks/post-commit|exact|git
-.git/hooks/commit-msg|skills/ralph-init/templates/git-hooks/commit-msg|exact|git
-.git/hooks/pre-commit|skills/ralph-init/templates/git-hooks/pre-commit|exact|git
-.claude/settings.json|skills/ralph-init/templates/claude/settings.json|exact|-
-.claude/hooks/|skills/ralph-init/templates/claude/hooks/|hooks|-
+.git/hooks/post-commit|git-hooks/post-commit|exact|git
+.git/hooks/commit-msg|git-hooks/commit-msg|exact|git
+.git/hooks/pre-commit|git-hooks/pre-commit|exact|git
+.claude/hooks/|hooks/|hooks|-
 .claude/settings.local.json|skills/ralph-init/templates/claude/settings.local.json|allow|-
 .devcontainer/devcontainer.json|skills/ralph-init/templates/devcontainer/devcontainer.json|runargs|devcontainer
 .devcontainer/init-firewall.sh|skills/ralph-init/templates/devcontainer/init-firewall.sh|exact|devcontainer
@@ -214,7 +215,7 @@ plugin_owned() {
   local name
   [ "$migrated" -eq 1 ] || return 0
   case $1 in
-    (.claude/settings.json | .claude/settings.local.json) echo skip; return 0 ;;
+    (.claude/settings.local.json) echo skip; return 0 ;;
     (.claude/hooks/*.sh) name=${1#.claude/hooks/} name=${name%.sh} ;;
     (*) return 0 ;;
   esac

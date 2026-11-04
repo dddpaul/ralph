@@ -79,10 +79,8 @@ def shell_major_version(shell: str) -> int | None:
 
 
 def test_scan_covers_hooks_and_hook_templates() -> None:
-    """The scan reaches the extensionless git-hook templates and the live hooks."""
+    """The scan reaches the extensionless plugin git hooks, the shim template and the live hooks."""
     found = {p.relative_to(REPO_ROOT).as_posix() for p in tracked_shell_scripts()}
-    git_hooks = "plugins/ralph/skills/ralph-init/templates/git-hooks/"
-    assert {f"{git_hooks}{h}" for h in ("commit-msg", "post-commit", "pre-commit")} <= found
     assert {f"plugins/ralph/git-hooks/{h}" for h in ("commit-msg", "post-commit", "pre-commit")} <= found
     assert "plugins/ralph/skills/ralph-init/templates/shims/git-hook" in found
     assert ".claude/hooks/task-validator.sh" in found

@@ -31,7 +31,7 @@ Ralph ships as a single Claude Code plugin (`ralph`) in the `dddpaul-ralph` mark
 
 **Common allow rules:** a plugin cannot ship allow rules, so `plugins/ralph/user-settings.json` holds the common ones for your user settings (`~/.claude/settings.json`): 46 `Bash(...)` rules, `ScheduleWakeup`, `attribution` with an empty commit and PR trailer, and `sandbox` with `enabled` and `autoAllowBashIfSandboxed`. It holds no `Skill(...)` rules, because plugin skills need none. The `/ralph-run` preflight lists the entries your user settings miss in one warning and changes no file. To add them, run `bash <installPath>/skills/ralph-run/scripts/merge-user-settings.sh ~/.claude/settings.json` (configuration management can run it too). It appends missing entries, keeps every other key, and reports a differing value on stderr without overwriting it.
 
-**Updating:** re-run `/plugin marketplace add dddpaul/ralph` (or `/plugin update ralph@dddpaul-ralph`) to pull the latest version. `ralph-init` does not manage `~/.claude/` — the user owns that directory.
+**Updating:** re-run `/plugin marketplace add dddpaul/ralph` (or `/plugin update ralph@dddpaul-ralph`) to pull the latest version. The user owns `~/.claude/`: `ralph-init` writes to it only when you agree to merge the fragment above into `settings.json` (Init Step 3.7a, Upgrade U4).
 
 ## Setup
 
@@ -289,6 +289,8 @@ The same workflow (branch, implement, review, merge) applies in both modes.
 | `plugins/ralph/` | The `ralph` plugin (`.claude-plugin/plugin.json` manifest) — bundles all `ralph-*` skills and both agents |
 | `plugins/ralph/agents/` | Plugin-bundled agents: `task-reviewer` and `ralph-reviewer` |
 | `plugins/ralph/hooks/` | Plugin-delivered Claude guard hooks: `hooks.json`, the `run.sh` marker-gate dispatcher and the seven guards |
+| `plugins/ralph/git-hooks/` | Plugin-delivered git hook bodies (`pre-commit`, `commit-msg`, `post-commit`), run through the per-clone shim |
+| `plugins/ralph/user-settings.json` | The common allow rules, `attribution` and `sandbox` for the user settings file |
 | `backlog/` | Task files managed by backlog.md CLI |
 | `scripts/shorten-backlog-filenames.py` | Remediation for backlog filenames already over the 125-byte cap, across one project or a whole tree of them (dry-run by default, `--apply` renames via `git mv` and commits each project) |
 | `.devcontainer/` | DevContainer configuration with firewall for sandboxed execution |
@@ -353,7 +355,7 @@ The post-commit hook appends commit hashes to task files on `task-*` branches. T
 
 A `pre-push` hook additionally guards the publish boundary: pushing `master` with a shipped skill/agent change but no version bump is blocked, so `/plugin update` always has a new version to rebuild the consumer cache from. See [Releasing plugin updates](#releasing-plugin-updates-version-bump).
 
-The `pre-commit` hook runs `.claude/hooks/filename-length-guard.sh`, which rejects any staged path whose name component exceeds 125 bytes (the ecryptfs sync target caps names at ~140 bytes and Syncthing adds 15 for its transfer name). The guard only blocks *new* names; to repair backlog files that are already over the cap, run the remediation script — it asks `claude -p` for a shorter semantic slug, keeps the `<type>-<id> - ` prefix, and leaves `title:` frontmatter alone (backlog.md addresses artifacts by `id:`, not by filename):
+The `pre-commit` hook runs the plugin's `hooks/filename-length-guard.sh` (a legacy copy in `.git/hooks` runs `.claude/hooks/filename-length-guard.sh`), which rejects any staged path whose name component exceeds 125 bytes (the ecryptfs sync target caps names at ~140 bytes and Syncthing adds 15 for its transfer name). The guard only blocks *new* names; to repair backlog files that are already over the cap, run the remediation script — it asks `claude -p` for a shorter semantic slug, keeps the `<type>-<id> - ` prefix, and leaves `title:` frontmatter alone (backlog.md addresses artifacts by `id:`, not by filename):
 
 ```bash
 # Dry run: print planned old -> new for every over-limit backlog file
@@ -422,13 +424,13 @@ ralph_resolve_plugin . skills/ralph-run/scripts/ralph_orchestrator.py
 
 ### Plugin guard hooks
 
-The plugin ships the Claude guard hooks in `plugins/ralph/hooks/`: the seven guards (`commit-msg-guard`, `commit-prefix-guard`, `master-branch-guard`, `naming-guard`, `notes-guard`, `task-validator`, `filename-length-guard`) and a `hooks.json` with the same 13 entries and `if:` filters as the ralph-init template `settings.json`. Every entry runs `"${CLAUDE_PLUGIN_ROOT}"/hooks/run.sh <guard>`, a dispatcher that:
+The plugin ships the Claude guard hooks in `plugins/ralph/hooks/`: the seven guards (`commit-msg-guard`, `commit-prefix-guard`, `master-branch-guard`, `naming-guard`, `notes-guard`, `task-validator`, `filename-length-guard`) and a `hooks.json` with the same 13 entries and `if:` filters as the legacy `settings.json` that older ralph-init versions wrote into each project. Every entry runs `"${CLAUDE_PLUGIN_ROOT}"/hooks/run.sh <guard>`, a dispatcher that:
 
 - resolves the session's git root from `$CLAUDE_PROJECT_DIR` (`git rev-parse --show-toplevel`, made canonical), so a session started in a subdirectory finds its root and a nested repository is its own root;
 - exits 0 unless that root's tracked `.claude/ralph.json` has `"pluginHooks": true`, and exits 0 for a guard listed in its `localGuards` array;
 - otherwise runs the guard from the payload's `cwd` with the hook input unchanged, exports `RALPH_PROJECT_ROOT`, and returns the guard's exit code. A bad guard name, a missing jq or an unreadable marker is a non-blocking error (exit 1).
 
-Without the marker the plugin hooks do nothing, so a project keeps its legacy `.claude/hooks/` wiring, and the guards still work there: they take project paths from the git root of `RALPH_PROJECT_ROOT`, else of `$CLAUDE_PROJECT_DIR`. The template copies and this repo's `.claude/hooks/` copies stay byte-identical to the plugin (`tests/python/test_plugin_hooks.py`).
+Without the marker the plugin hooks do nothing, so a project keeps its legacy `.claude/hooks/` wiring, and the guards still work there: they take project paths from the git root of `RALPH_PROJECT_ROOT`, else of `$CLAUDE_PROJECT_DIR`. ralph-init no longer ships template copies of the guards; this repo's `.claude/hooks/` copies stay byte-identical to the plugin (`tests/python/test_plugin_hooks.py`, `tests/unit/template-parity.bats`).
 
 ### Plugin git hooks
 
@@ -438,7 +440,33 @@ The plugin ships the git hook bodies in `plugins/ralph/git-hooks/` (`pre-commit`
 - execs `<installPath>/git-hooks/<name>` found through the registry resolver above, with the same arguments;
 - when the plugin cannot be resolved, prints the resolver's reason and then fails or warns per clone switch: `pre-commit` and `commit-msg` fail when `git config ralph.pluginHooks` is true and name `git commit --no-verify`; `pre-push` fails when `ralph.pluginHooks` or `ralph.sharedBacklog` is true and names `git push --no-verify`; `post-commit` and every hook with neither switch set only warn.
 
-`pre-commit` runs the length guard bundled beside it (`plugins/ralph/hooks/filename-length-guard.sh`) and falls back to `<repo>/.claude/hooks/filename-length-guard.sh` when it runs as a legacy copy in `.git/hooks`. `commit-msg` finds a merge in progress through `git rev-parse --git-path MERGE_MSG`, so it also works in a linked worktree. The `templates/git-hooks/` copies stay byte-identical to the plugin bodies and still work when installed straight into `.git/hooks` (`tests/python/test_git_hook_shim.py`).
+`pre-commit` runs the length guard bundled beside it (`plugins/ralph/hooks/filename-length-guard.sh`) and falls back to `<repo>/.claude/hooks/filename-length-guard.sh` when it runs as a legacy copy in `.git/hooks`. `commit-msg` finds a merge in progress through `git rev-parse --git-path MERGE_MSG`, so it also works in a linked worktree. The plugin bodies still work as legacy copies installed straight into `.git/hooks` (`tests/python/test_git_hook_shim.py`); ralph-init no longer ships template copies of them.
+
+### Plugin-hooks migration
+
+`ralph-init` copies no guard scripts, no git hook bodies and no common allow rules into a project. Instead, a project uses three things:
+
+- **The marker.** The tracked file `.claude/ralph.json` with `"pluginHooks": true` is the project's ownership marker; it switches on the plugin guard hooks above. Its optional `localGuards` array names guards the project keeps as its own copies in `.claude/hooks/`, registered in its `.claude/settings.json`; the plugin skips those. `.gitignore` carries `!.claude/ralph.json` so the marker is committed.
+- **The switches.** Per-clone git config, never committed:
+  - `ralph.pluginHooks true` makes `pre-commit` and `commit-msg` block when the plugin cannot be resolved;
+  - `ralph.jq` and `ralph.projectPath` (the host's canonical main worktree root) tell the resolver which jq to use and which clone it is;
+  - `ralph.claudeConfigDir` is set only when the Claude config dir is not `~/.claude`;
+  - `ralph.sharedBacklog` is never set by the migration.
+- **The shims.** `pre-commit`, `commit-msg` and `post-commit` in each clone are the one fixed shim from [Plugin git hooks](#plugin-git-hooks). A hook of the clone's own survives as `<name>.local` and runs first.
+
+`plugins/ralph/skills/ralph-init/scripts/migrate-plugin-hooks.sh` sets all three up. Init runs both of its parts as its last step. `ralph-init upgrade` runs them once for a project bootstrapped with the legacy copies:
+
+```bash
+# Once per project, on one host; review and commit the result, then push
+bash <installPath>/skills/ralph-init/scripts/migrate-plugin-hooks.sh tracked [--local-guards <name>[,<name>...]] .
+# Once per clone; on a second host, this is the only step after git pull
+bash <installPath>/skills/ralph-init/scripts/migrate-plugin-hooks.sh clone .
+```
+
+- **`tracked`** writes the marker first, so an interrupted run never leaves a guard unenforced. Then it adds the `.gitignore` exception. It removes only the managed guard entries from `.claude/settings.json` and deletes the managed guard copies that are not local guards. It keeps the project's own hooks and entries.
+- **`clone`** checks every git hook before it writes anything. It saves the switches and installs the shims. A differing hook that `.claude/managed-file-drift.accept` lists is kept as `<name>.local`; any other differing hook stops the run, and an existing `<name>.local` is never overwritten. Last, it drops from `.claude/settings.local.json` the common rules your user settings already hold, and reports the ones it kept.
+
+Neither part commits, and a second run changes nothing. After the migration, a plugin update reaches every guard and git hook with no per-project run. The `/ralph-run` preflight reports a project as not migrated, partially migrated, or with shims missing in this clone, and `managed-file-drift.sh` stops comparing what the plugin owns. This repo keeps its legacy wiring until it migrates itself (TASK-302).
 
 ### Double-Run Guard
 

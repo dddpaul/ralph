@@ -18,8 +18,17 @@ from devcontainer_config import REPO_ROOT
 
 from ralph import preflight
 
-TEMPLATES = REPO_ROOT / "plugins/ralph/skills/ralph-init/templates"
-SHIM = TEMPLATES / "shims/git-hook"
+PLUGIN = REPO_ROOT / "plugins/ralph"
+SHIM = PLUGIN / "skills/ralph-init/templates/shims/git-hook"
+LEGACY_SETTINGS = REPO_ROOT / "tests/python/fixtures/legacy-claude-settings.json"
+GUARDS = (
+    "commit-msg-guard",
+    "commit-prefix-guard",
+    "master-branch-guard",
+    "naming-guard",
+    "notes-guard",
+    "task-validator",
+)
 HOOK_NAMES = ("pre-commit", "commit-msg", "post-commit")
 GUARD_COMMAND = '"$CLAUDE_PROJECT_DIR"/.claude/hooks/notes-guard.sh'
 
@@ -29,13 +38,15 @@ def git(cwd: Path, *args: str) -> None:
 
 
 def legacy_project(root: Path) -> Path:
-    """A project wired the legacy way: guard copies, template settings.json, template git hooks."""
+    """A project wired the legacy way: guard copies, the legacy settings.json, git hook bodies in .git/hooks."""
     root.mkdir()
     git(root, "init", "-q", "-b", "master")
-    shutil.copytree(TEMPLATES / "claude/hooks", root / ".claude/hooks")
-    shutil.copyfile(TEMPLATES / "claude/settings.json", root / ".claude/settings.json")
+    (root / ".claude/hooks").mkdir(parents=True)
+    for guard in (*GUARDS, "filename-length-guard"):
+        shutil.copy2(PLUGIN / f"hooks/{guard}.sh", root / f".claude/hooks/{guard}.sh")
+    shutil.copyfile(LEGACY_SETTINGS, root / ".claude/settings.json")
     for name in HOOK_NAMES:
-        shutil.copyfile(TEMPLATES / "git-hooks" / name, root / ".git/hooks" / name)
+        shutil.copyfile(PLUGIN / "git-hooks" / name, root / ".git/hooks" / name)
     return root
 
 
@@ -105,7 +116,7 @@ def test_no_marker_with_missing_guard_copies_is_partially_migrated(tmp_path: Pat
 def test_marker_without_the_clone_part_reports_shims_missing(tmp_path: Path, gap: str) -> None:
     root = migrated_project(tmp_path / "p")
     if gap == "legacy-hook":
-        shutil.copyfile(TEMPLATES / "git-hooks/commit-msg", root / ".git/hooks/commit-msg")
+        shutil.copyfile(PLUGIN / "git-hooks/commit-msg", root / ".git/hooks/commit-msg")
     else:
         git(root, "config", "--unset", "ralph.pluginHooks")
     found = state(root)

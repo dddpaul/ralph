@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Unit tests for plugins/ralph/skills/ralph-init/templates/git-hooks/commit-msg
+# Unit tests for plugins/ralph/git-hooks/commit-msg
 #
 # Regression: when commit.verbose=true (or `git commit -v`), git appends the
 # staged diff below a scissor line. The hook must scan only the author-written
@@ -7,7 +7,7 @@
 # commit of a ralph-init scaffold (the diff contains the hook's own grep regex).
 
 load '../helpers/common'
-HOOK="$PROJECT_ROOT/plugins/ralph/skills/ralph-init/templates/git-hooks/commit-msg"
+HOOK="$PROJECT_ROOT/plugins/ralph/git-hooks/commit-msg"
 
 # Forbidden literals built at runtime so the bats file itself is not flagged
 # by the surrounding PreToolUse / commit-msg guards.

@@ -1,5 +1,7 @@
 #!/usr/bin/env bats
-# Unit tests for plugins/ralph/skills/ralph-init/templates/git-hooks/pre-commit
+# Unit tests for plugins/ralph/git-hooks/pre-commit, run as a legacy copy
+# installed straight into .git/hooks (the bundled-guard layout behind the plugin
+# shim is covered by tests/python/test_git_hook_shim.py).
 #
 # The hook rejects a commit when a staged path's Unicode-normalized (NFC) form
 # collides with an existing tree path that differs only by normalization (NFD vs
@@ -9,8 +11,8 @@
 # present and executable — see TASK-227.
 
 load '../helpers/common'
-HOOK="$PROJECT_ROOT/plugins/ralph/skills/ralph-init/templates/git-hooks/pre-commit"
-LENGTH_GUARD="$PROJECT_ROOT/plugins/ralph/skills/ralph-init/templates/claude/hooks/filename-length-guard.sh"
+HOOK="$PROJECT_ROOT/plugins/ralph/git-hooks/pre-commit"
+LENGTH_GUARD="$PROJECT_ROOT/plugins/ralph/hooks/filename-length-guard.sh"
 
 # Russian й in NFC (U+0439, bytes d0 b9) and NFD (U+0438 U+0306, bytes d0 b8 cc 86).
 NFC_NAME=$(python3 -c 'import unicodedata, sys; sys.stdout.write(unicodedata.normalize("NFC", "й.md"))')
@@ -36,6 +38,10 @@ setup() {
   # Force Linux semantics so the hook sees the byte forms we wrote, regardless
   # of host platform — macOS would otherwise pre-compose NFD to NFC at git layer.
   git config core.precomposeunicode false
+  # A legacy copy has no bundled guard beside it, so it falls back to the
+  # project's .claude/hooks/filename-length-guard.sh.
+  LEGACY_HOOK="$TEST_DIR/.git/hooks/pre-commit"
+  cp "$HOOK" "$LEGACY_HOOK"
 }
 
 teardown() {
@@ -52,7 +58,7 @@ teardown() {
   echo b > unrelated.md
   git add unrelated.md
 
-  run bash "$HOOK"
+  run bash "$LEGACY_HOOK"
   [ "$status" -eq 0 ]
 }
 
@@ -62,7 +68,7 @@ teardown() {
 
   stage_plumbed "$NFD_NAME" nfd
 
-  run bash "$HOOK"
+  run bash "$LEGACY_HOOK"
   [ "$status" -eq 1 ]
   [[ "$output" == *"BLOCKED"* ]]
 }
@@ -73,7 +79,7 @@ teardown() {
 
   stage_plumbed "$NFC_NAME" nfc
 
-  run bash "$HOOK"
+  run bash "$LEGACY_HOOK"
   [ "$status" -eq 1 ]
   [[ "$output" == *"BLOCKED"* ]]
 }
@@ -82,7 +88,7 @@ teardown() {
   echo a > first.md
   git add first.md
 
-  run bash "$HOOK"
+  run bash "$LEGACY_HOOK"
   [ "$status" -eq 0 ]
 }
 
@@ -91,7 +97,7 @@ teardown() {
   git add existing.md
   git commit -q -m "init"
 
-  run bash "$HOOK"
+  run bash "$LEGACY_HOOK"
   [ "$status" -eq 0 ]
 }
 
@@ -103,7 +109,7 @@ teardown() {
   echo b > "$NFC_NAME"
   git add "$NFC_NAME"
 
-  run bash "$HOOK"
+  run bash "$LEGACY_HOOK"
   [ "$status" -eq 0 ]
 }
 
@@ -116,7 +122,7 @@ teardown() {
 
   stage_plumbed "dir\\$NFD_NAME" nfd
 
-  run bash "$HOOK"
+  run bash "$LEGACY_HOOK"
   [ "$status" -eq 1 ]
   [[ "$output" == *"BLOCKED"* ]]
 }
@@ -128,7 +134,7 @@ teardown() {
 
   stage_plumbed 1 b
 
-  run bash "$HOOK"
+  run bash "$LEGACY_HOOK"
   [ "$status" -eq 0 ]
 }
 
@@ -156,7 +162,7 @@ stage_over_limit_path() {
   install_length_guard
   stage_over_limit_path
 
-  run bash "$HOOK"
+  run bash "$LEGACY_HOOK"
   [ "$status" -eq 1 ]
   [[ "$output" == *"125-byte"* ]]
 }
@@ -166,7 +172,7 @@ stage_over_limit_path() {
   chmod -x .claude/hooks/filename-length-guard.sh
   stage_over_limit_path
 
-  run bash "$HOOK"
+  run bash "$LEGACY_HOOK"
   [ "$status" -eq 0 ]
   [[ "$output" != *"125-byte"* ]]
 }
@@ -174,7 +180,7 @@ stage_over_limit_path() {
 @test "pre-commit: skips silently when the length guard is absent" {
   stage_over_limit_path
 
-  run bash "$HOOK"
+  run bash "$LEGACY_HOOK"
   [ "$status" -eq 0 ]
   [[ "$output" != *"125-byte"* ]]
 }
@@ -188,7 +194,7 @@ stage_over_limit_path() {
   echo x > "$name"
   git add "$name"
 
-  run bash "$HOOK"
+  run bash "$LEGACY_HOOK"
   [ "$status" -eq 0 ]
 }
 
@@ -223,7 +229,7 @@ STUB
   stage_plumbed "$NFD_NAME" nfd
   install_broken_python3
 
-  run env PATH="$PWD/stub:$PATH" bash "$HOOK"
+  run env PATH="$PWD/stub:$PATH" bash "$LEGACY_HOOK"
   [ "$status" -eq 1 ]
   [[ "$output" == *"BLOCKED"* ]]
 }
@@ -234,7 +240,7 @@ STUB
   stage_plumbed unrelated.md b
   install_broken_python3
 
-  run env PATH="$PWD/stub:$PATH" bash "$HOOK"
+  run env PATH="$PWD/stub:$PATH" bash "$LEGACY_HOOK"
   [ "$status" -eq 0 ]
   [[ "$output" != *"GLIBC"* ]]
 }

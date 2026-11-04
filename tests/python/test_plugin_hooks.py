@@ -1,14 +1,15 @@
 """The Claude guard hooks shipped as plugin hooks behind a marker gate (TASK-296).
 
 ``plugins/ralph/hooks/hooks.json`` carries the same entries and ``if:`` filters
-as the ralph-init template ``settings.json``, but every entry calls the
+as the legacy ``settings.json`` older ralph-init versions wrote (kept as
+``fixtures/legacy-claude-settings.json``), but every entry calls the
 dispatcher ``run.sh <guard>``. The dispatcher acts only when the tracked marker
 ``.claude/ralph.json`` at the session's git root has ``"pluginHooks": true`` and
 does not list the guard in ``localGuards``. The behaviour tests copy ``run.sh``
 next to a probe guard that records what it was given, so the gate, the input,
 the cwd, ``RALPH_PROJECT_ROOT`` and the exit code are all observable. The
-legacy side is pinned too: the template copies stay byte-identical to the
-plugin and still block when wired the old way.
+legacy side is pinned too: this repo's live copies stay byte-identical to the
+plugin, and the plugin's guards still block when wired the old way.
 """
 
 from __future__ import annotations
@@ -26,8 +27,7 @@ from devcontainer_config import REPO_ROOT
 
 PLUGIN_HOOKS = REPO_ROOT / "plugins/ralph/hooks"
 DISPATCHER = PLUGIN_HOOKS / "run.sh"
-TEMPLATES = REPO_ROOT / "plugins/ralph/skills/ralph-init/templates"
-SETTINGS = TEMPLATES / "claude/settings.json"
+SETTINGS = REPO_ROOT / "tests/python/fixtures/legacy-claude-settings.json"
 GUARDS = (
     "commit-msg-guard",
     "commit-prefix-guard",
@@ -149,14 +149,11 @@ def payload_for(cwd: Path, **tool_input: str) -> str:
 def test_guard_copies_are_byte_identical_to_the_plugin(guard: str) -> None:
     plugin = PLUGIN_HOOKS / f"{guard}.sh"
     assert os.access(plugin, os.X_OK), f"{plugin} is not executable"
-    for copy in (
-        TEMPLATES / f"claude/hooks/{guard}.sh",
-        REPO_ROOT / f".claude/hooks/{guard}.sh",
-    ):
-        assert copy.read_bytes() == plugin.read_bytes(), f"{copy} drifted from {plugin}"
+    copy = REPO_ROOT / f".claude/hooks/{guard}.sh"
+    assert copy.read_bytes() == plugin.read_bytes(), f"{copy} drifted from {plugin}"
 
 
-def test_hooks_json_carries_the_template_entries_and_filters() -> None:
+def test_hooks_json_carries_the_legacy_entries_and_filters() -> None:
     plugin = entries(PLUGIN_HOOKS / "hooks.json", PLUGIN_COMMAND)
     legacy = entries(SETTINGS, LEGACY_COMMAND)
     assert len(legacy) == 13
@@ -434,7 +431,7 @@ def test_task_validator_resolves_task_paths_from_the_root(
 
 
 # --------------------------------------------------------------------------
-# A project bootstrapped from the templates still blocks through legacy wiring
+# A project wired the legacy way still blocks through that wiring
 # --------------------------------------------------------------------------
 
 NON_ASCII = "Привет"
@@ -478,13 +475,13 @@ VALIDATOR_CASES = {
 
 @pytest.fixture
 def bootstrapped(tmp_path: Path) -> Path:
-    """A project with the template settings.json and guards installed the legacy way, and no marker."""
+    """A project with the legacy settings.json and the guards installed the legacy way, and no marker."""
     root = make_repo(tmp_path / "proj")
     (root / ".claude/hooks").mkdir(parents=True)
     shutil.copy2(SETTINGS, root / ".claude/settings.json")
-    for guard in (TEMPLATES / "claude/hooks").glob("*.sh"):
-        shutil.copy2(guard, root / ".claude/hooks" / guard.name)
-        (root / ".claude/hooks" / guard.name).chmod(0o755)
+    for guard in GUARDS:
+        shutil.copy2(PLUGIN_HOOKS / f"{guard}.sh", root / ".claude/hooks" / f"{guard}.sh")
+        (root / ".claude/hooks" / f"{guard}.sh").chmod(0o755)
     (root / "backlog/tasks").mkdir(parents=True)
     (root / "backlog/tasks/task-1 - Empty.md").write_text(
         "---\nid: TASK-1\nstatus: To Do\n---\n"
@@ -504,7 +501,7 @@ def legacy_hooks(root: Path) -> list[tuple[str, str | None, str]]:
     ]
 
 
-def test_template_bootstrapped_project_still_blocks(bootstrapped: Path) -> None:
+def test_legacy_wired_project_still_blocks(bootstrapped: Path) -> None:
     root = bootstrapped
     rows = legacy_hooks(root)
     assert len(rows) == 13

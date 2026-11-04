@@ -28,15 +28,16 @@ SCRIPT = SKILL_DIR / "scripts/managed-file-drift.sh"
 SKILL_MD = SKILL_DIR / "SKILL.md"
 TEMPLATES = SKILL_DIR / "templates"
 
-# Independent oracle: managed project path → shipped template.
+# Independent oracle: managed project path → shipped template. The legacy guard
+# copies and git hooks of a project not yet migrated to plugin hooks compare
+# with the plugin's own hooks/ and git-hooks/.
 MANAGED = {
     "ralph.sh": TEMPLATES / "root/ralph.sh",
     "refine.sh": TEMPLATES / "root/refine.sh",
     "CLAUDE.md": TEMPLATES / "root/CLAUDE.md",
-    ".git/hooks/post-commit": TEMPLATES / "git-hooks/post-commit",
-    ".git/hooks/commit-msg": TEMPLATES / "git-hooks/commit-msg",
-    ".git/hooks/pre-commit": TEMPLATES / "git-hooks/pre-commit",
-    ".claude/settings.json": TEMPLATES / "claude/settings.json",
+    ".git/hooks/post-commit": PLUGIN_ROOT / "git-hooks/post-commit",
+    ".git/hooks/commit-msg": PLUGIN_ROOT / "git-hooks/commit-msg",
+    ".git/hooks/pre-commit": PLUGIN_ROOT / "git-hooks/pre-commit",
     ".claude/settings.local.json": TEMPLATES / "claude/settings.local.json",
     ".claude/brainstorm-rules.md": TEMPLATES / "claude/brainstorm-rules.md",
     ".devcontainer/devcontainer.json": TEMPLATES / "devcontainer/devcontainer.json",
@@ -44,10 +45,15 @@ MANAGED = {
     ".devcontainer/container-settings.local.json": TEMPLATES
     / "devcontainer/container-settings.local.json",
 }
-HOOKS = sorted(
-    [*(TEMPLATES / "claude/hooks").glob("*-guard.sh"), TEMPLATES / "claude/hooks/task-validator.sh"]
-)
+HOOKS = sorted([*(PLUGIN_ROOT / "hooks").glob("*-guard.sh"), PLUGIN_ROOT / "hooks/task-validator.sh"])
 MANAGED.update({f".claude/hooks/{h.name}": h for h in HOOKS})
+
+
+def copy_plugin(plugin: Path) -> None:
+    """Copy the parts of the plugin the script reads into ``plugin``."""
+    shutil.copytree(SKILL_DIR, plugin / "skills/ralph-init")
+    for part in ("hooks", "git-hooks"):
+        shutil.copytree(PLUGIN_ROOT / part, plugin / part)
 
 
 def run(*args: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -157,7 +163,7 @@ def test_gated_rows_are_skipped_without_their_directory(tmp_path: Path) -> None:
 
 def test_templates_resolve_through_claude_plugin_root(project: Path, tmp_path: Path) -> None:
     plugin = tmp_path / "plugin"
-    shutil.copytree(SKILL_DIR, plugin / "skills/ralph-init")
+    copy_plugin(plugin)
     with (plugin / "skills/ralph-init/templates/root/ralph.sh").open("a") as f:
         f.write("# newer plugin\n")
     assert run("check", str(project)).returncode == 0
@@ -218,9 +224,11 @@ def jq(filter_: str, file: Path, *args: str) -> None:
 
 
 def u4_settings_local(project: Path) -> None:
-    """U4 for a Documentation / Mixed project: overwrite, Step 3.7b pptx merge, dead-rule strip."""
+    """U4 for a Documentation / Mixed project: template-rule merge, Step 3.7b pptx merge, dead-rule strip."""
     file = project / ".claude/settings.local.json"
-    shutil.copyfile(MANAGED[".claude/settings.local.json"], file)
+    template = MANAGED[".claude/settings.local.json"]
+    merge_template = ".permissions.allow = ((.permissions.allow // []) + $t[0].permissions.allow | unique)"
+    jq(merge_template, file, "--slurpfile", "t", str(template))
     p1, p2 = PPTX_RULES
     merge = ".permissions.allow = ((.permissions.allow // []) + [$p1, $p2] | unique)"
     jq(merge, file, "--arg", "p1", p1, "--arg", "p2", p2)
@@ -267,11 +275,11 @@ def test_settings_local_after_u4_pptx_merge_is_current(project: Path) -> None:
 @pytest.mark.parametrize(
     "mutate",
     [
-        pytest.param(lambda s: s["permissions"]["allow"].remove("Bash(git status:*)"), id="template-rule-dropped"),
-        pytest.param(lambda s: s["sandbox"].update(enabled=False), id="sandbox-flipped"),
+        pytest.param(lambda s: s["permissions"]["allow"].remove("Skill(ralph-run)"), id="template-rule-dropped"),
+        pytest.param(lambda s: s.update(sandbox={"enabled": False}), id="sandbox-added"),
         pytest.param(lambda s: s.update(model="opus"), id="key-added"),
         pytest.param(lambda s: s["permissions"].update(deny=["Bash(rm:*)"]), id="permissions-key-added"),
-        pytest.param(lambda s: s["attribution"].pop("pr"), id="key-removed"),
+        pytest.param(lambda s: s.pop("permissions"), id="key-removed"),
     ],
 )
 def test_settings_local_containment_still_catches_drift(project: Path, mutate: Callable[[dict], object]) -> None:
@@ -400,7 +408,7 @@ def test_template_change_voids_the_acceptance(project: Path, tmp_path: Path) -> 
         f.write("# local edit\n")
     (project / ACCEPT).write_text(accept(project, "ralph.sh"))
     plugin = tmp_path / "plugin"
-    shutil.copytree(SKILL_DIR, plugin / "skills/ralph-init")
+    copy_plugin(plugin)
     assert run("check", str(project), env={"CLAUDE_PLUGIN_ROOT": str(plugin)}).returncode == 0
     with (plugin / "skills/ralph-init/templates/root/ralph.sh").open("a") as f:
         f.write("# newer plugin\n")
@@ -534,7 +542,6 @@ needs_jq = pytest.mark.skipif(shutil.which("jq") is None, reason="jq is not inst
 def migrate_tracked(project: Path, *local: str) -> None:
     """Shape ``project`` like a migrated one: marker set, no settings files, only local guard copies."""
     (project / ".claude/ralph.json").write_text(json.dumps({"pluginHooks": True, "localGuards": list(local)}))
-    (project / ".claude/settings.json").unlink()
     (project / ".claude/settings.local.json").unlink()
     for guard in PLUGIN_GUARDS:
         if guard not in local:
@@ -553,7 +560,7 @@ def test_migrated_project_stops_managing_settings_and_guard_copies(project: Path
 @needs_jq
 def test_migrated_project_reports_a_leftover_legacy_copy(project: Path) -> None:
     migrate_tracked(project)
-    shutil.copyfile(TEMPLATES / "claude/hooks/naming-guard.sh", project / ".claude/hooks/naming-guard.sh")
+    shutil.copyfile(PLUGIN_ROOT / "hooks/naming-guard.sh", project / ".claude/hooks/naming-guard.sh")
     result = run("check", str(project))
     assert result.returncode == 1
     assert result.stdout == ".claude/hooks/naming-guard.sh: legacy copy\n"
@@ -587,7 +594,7 @@ def shim_clone(project: Path) -> None:
 def test_shimmed_clone_compares_git_hooks_with_the_shim(project: Path) -> None:
     shim_clone(project)
     assert run("check", str(project)).returncode == 0
-    shutil.copyfile(TEMPLATES / "git-hooks/pre-commit", project / ".git/hooks/pre-commit")
+    shutil.copyfile(PLUGIN_ROOT / "git-hooks/pre-commit", project / ".git/hooks/pre-commit")
     assert run("check", str(project)).stdout == ".git/hooks/pre-commit: outdated\n"
 
 
