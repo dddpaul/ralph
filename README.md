@@ -29,6 +29,8 @@ Ralph ships as a single Claude Code plugin (`ralph`) in the `dddpaul-ralph` mark
 /plugin install ralph@dddpaul-ralph
 ```
 
+**Common allow rules:** a plugin cannot ship allow rules, so `plugins/ralph/user-settings.json` holds the common ones for your user settings (`~/.claude/settings.json`): 46 `Bash(...)` rules, `ScheduleWakeup`, `attribution` with an empty commit and PR trailer, and `sandbox` with `enabled` and `autoAllowBashIfSandboxed`. It holds no `Skill(...)` rules, because plugin skills need none. The `/ralph-run` preflight lists the entries your user settings miss in one warning and changes no file. To add them, run `bash <installPath>/skills/ralph-run/scripts/merge-user-settings.sh ~/.claude/settings.json` (configuration management can run it too). It appends missing entries, keeps every other key, and reports a differing value on stderr without overwriting it.
+
 **Updating:** re-run `/plugin marketplace add dddpaul/ralph` (or `/plugin update ralph@dddpaul-ralph`) to pull the latest version. `ralph-init` does not manage `~/.claude/` — the user owns that directory.
 
 ## Setup

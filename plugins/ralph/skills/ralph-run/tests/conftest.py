@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import stat
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -15,6 +16,7 @@ SCRIPTS_DIR = REPO_ROOT / "skills" / "ralph-run" / "scripts"
 BASH_PREFLIGHT = SCRIPTS_DIR / "preflight.sh"
 BASH_WAIT_HEARTBEAT = SCRIPTS_DIR / "wait-heartbeat.sh"
 BASH_USAGE_CHECK = SCRIPTS_DIR / "usage-check.sh"
+USER_SETTINGS_FRAGMENT = REPO_ROOT / "user-settings.json"
 SYS_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 
@@ -37,11 +39,13 @@ class PreflightFixture:
     bin_dir: Path
     ralph_sh: Path
     path_value: str
+    claude_config_dir: Path
 
     def env(self, **extra: str) -> dict[str, str]:
         base = {
             "PATH": self.path_value,
             "HOME": str(self.project_dir),
+            "CLAUDE_CONFIG_DIR": str(self.claude_config_dir),
             "LANG": "C",
             "LC_ALL": "C",
         }
@@ -61,4 +65,9 @@ def preflight_fixture(tmp_path: Path) -> Iterator[PreflightFixture]:
     ralph_sh.write_text("#!/bin/bash\necho hello\n")
     _make_executable(ralph_sh)
     path_value = f"{bin_dir}:{SYS_PATH}"
-    yield PreflightFixture(project_dir, bin_dir, ralph_sh, path_value)
+    # User settings already hold the plugin fragment, so preflight's
+    # user-settings check stays silent unless a test says otherwise.
+    claude_config_dir = tmp_path / "claude-config"
+    claude_config_dir.mkdir()
+    shutil.copyfile(USER_SETTINGS_FRAGMENT, claude_config_dir / "settings.json")
+    yield PreflightFixture(project_dir, bin_dir, ralph_sh, path_value, claude_config_dir)

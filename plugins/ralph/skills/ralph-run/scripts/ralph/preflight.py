@@ -15,6 +15,10 @@ With ``devcontainer=true`` one more report-only check reads the user
 executable lives outside the user Claude config dir: the container shares only
 ``~/.claude``, so such a hook fails there with "not found".
 
+A last report-only check lists, in one ``WARNING:`` line, the entries of the
+plugin's ``user-settings.json`` fragment the user ``settings.json`` misses. It
+reads both files and changes neither.
+
 Invariants the AC pins down explicitly:
 
 * Runs against the invoker's PWD — this module never calls ``os.chdir``.
@@ -41,6 +45,7 @@ from pathlib import Path
 from typing import cast
 
 from ralph import usage_check as _usage_check
+from ralph import user_settings as _user_settings
 
 _TASKS_PATTERN = re.compile(r"^[0-9]+(,[0-9]+)*$")
 _NON_NEG_INT = re.compile(r"^[0-9]+$")
@@ -454,6 +459,29 @@ def _check_user_hooks(devcontainer: str, verbose: bool) -> None:
         )
 
 
+def _check_user_settings(verbose: bool) -> None:
+    """Warn on stderr, in one line, about fragment entries user settings miss; never fail."""
+    config_dir = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(os.environ.get("HOME", ""), ".claude")
+    settings_path = Path(config_dir) / "settings.json"
+    try:
+        fragment = _user_settings.load_json_object(_user_settings.FRAGMENT)
+        settings = _user_settings.load_json_object(settings_path)
+    except (OSError, ValueError) as exc:
+        _verbose(verbose, "check user_settings: WARN (unreadable)")
+        print(f"WARNING: could not check user settings for ralph entries — {exc}", file=sys.stderr)
+        return
+    missing = _user_settings.missing_entries(fragment, settings)
+    if not missing:
+        _verbose(verbose, "check user_settings: ok")
+        return
+    _verbose(verbose, f"check user_settings: WARN ({len(missing)} missing)")
+    print(
+        f"WARNING: user settings miss {len(missing)} ralph entries — {'; '.join(missing)} "
+        f"(add them to {settings_path} from {_user_settings.FRAGMENT})",
+        file=sys.stderr,
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     real_argv = sys.argv[1:] if argv is None else argv
     args = _parse_args(real_argv)
@@ -503,6 +531,9 @@ def main(argv: list[str] | None = None) -> int:
 
     # Check 8: user hooks unreachable in the devcontainer — report only.
     _check_user_hooks(args.devcontainer, args.verbose)
+
+    # Check 9: user settings miss fragment entries — report only.
+    _check_user_settings(args.verbose)
 
     print(f"OK RALPH_PATH={args.ralph_path}")
     return 0
