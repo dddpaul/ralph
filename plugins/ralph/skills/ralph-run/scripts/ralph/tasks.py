@@ -7,6 +7,9 @@ Two modes, matching ``ralph.sh``:
   whose dependencies are all in ``Done`` status. Bash relied on the agent
   to enforce dependency order; the Python port pins it explicitly so the
   loop cannot launch a blocked task even if the agent is misbehaving.
+  Candidates held by someone else are skipped too: a task whose
+  ``Assignee:`` line names anyone besides the holder and ``@claude`` is
+  taken. A bare ``@claude`` counts as unassigned.
 
 * **Whitelist (``--tasks``)**: iterate the user-supplied IDs in the order
   they were given, return the first one still in ``To Do``. This REPLACES
@@ -19,6 +22,7 @@ orchestrator surfaces as ``EXIT_REASON="all tasks done"``.
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 from dataclasses import dataclass
@@ -31,11 +35,16 @@ class BacklogTask:
     id: str
     status: str
     dependencies: tuple[str, ...]
+    assignees: tuple[str, ...] = ()
 
 
 _TASK_ID_RE = re.compile(r"\bTASK-(\d+)\b")
 _STATUS_LINE_RE = re.compile(r"^Status:\s*(.+)$", re.MULTILINE)
 _DEPENDENCIES_LINE_RE = re.compile(r"^Dependencies:\s*(.+)$", re.MULTILINE)
+_ASSIGNEE_LINE_RE = re.compile(r"^Assignee:\s*(.+)$", re.MULTILINE)
+
+UNASSIGNED_ASSIGNEE = "claude"
+"""A bare ``@claude`` assignee is the agent itself, so it holds nothing."""
 
 
 def _backlog_stdout(args: list[str]) -> str:
@@ -65,6 +74,48 @@ def _parse_dependencies(view_output: str) -> tuple[str, ...]:
         return ()
     ids = _TASK_ID_RE.findall(match.group(1))
     return tuple(f"TASK-{n}" for n in ids)
+
+
+def _normalize_assignee(raw: str) -> str:
+    return raw.strip().strip("'\"").lstrip("@").strip()
+
+
+def _parse_assignees(view_output: str) -> tuple[str, ...]:
+    """Return the ``Assignee:`` names without the leading ``@``."""
+    match = _ASSIGNEE_LINE_RE.search(view_output)
+    if match is None:
+        return ()
+    names = (_normalize_assignee(part) for part in match.group(1).split(","))
+    return tuple(name for name in names if name)
+
+
+def resolve_holder() -> str | None:
+    """Return the holder: ``SHARED_BACKLOG_HOLDER``, else ``git config ralph.holder``.
+
+    Returns ``None`` when neither is set; every real assignee then counts as
+    someone else.
+    """
+    env_holder = _normalize_assignee(os.environ.get("SHARED_BACKLOG_HOLDER", ""))
+    if env_holder:
+        return env_holder
+    try:
+        result = subprocess.run(
+            ["git", "config", "--get", "ralph.holder"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except FileNotFoundError:
+        return None
+    return _normalize_assignee(result.stdout) or None
+
+
+def held_by_other(task: BacklogTask, holder: str | None) -> bool:
+    """Return True when ``task`` has an assignee besides ``holder`` and ``@claude``."""
+    own = {UNASSIGNED_ASSIGNEE}
+    if holder:
+        own.add(_normalize_assignee(holder))
+    return any(name not in own for name in task.assignees)
 
 
 def _list_todo_ids() -> list[str]:
@@ -157,7 +208,13 @@ def fetch_task(task_id: str) -> BacklogTask | None:
         return None
     status = _parse_status(out)
     dependencies = _parse_dependencies(out)
-    return BacklogTask(id=f"TASK-{numeric}", status=status, dependencies=dependencies)
+    assignees = _parse_assignees(out)
+    return BacklogTask(
+        id=f"TASK-{numeric}",
+        status=status,
+        dependencies=dependencies,
+        assignees=assignees,
+    )
 
 
 def _all_dependencies_done(task: BacklogTask) -> bool:
@@ -168,7 +225,9 @@ def _all_dependencies_done(task: BacklogTask) -> bool:
     return True
 
 
-def pick_next_task(whitelist: list[str] | None = None) -> str | None:
+def pick_next_task(
+    whitelist: list[str] | None = None, holder: str | None = None
+) -> str | None:
     """Return the next task ID the orchestrator should run, or ``None``.
 
     Args:
@@ -178,6 +237,9 @@ def pick_next_task(whitelist: list[str] | None = None) -> str | None:
             dependency rule is NOT applied — the user's hand-picked order
             is authoritative. The bash port behaves the same way at
             ``ralph.sh:731-744``.
+        holder: The run's holder (see :func:`resolve_holder`). In default
+            mode a candidate assigned to anyone besides the holder and
+            ``@claude`` is skipped.
     """
     if whitelist:
         for raw in whitelist:
@@ -188,7 +250,7 @@ def pick_next_task(whitelist: list[str] | None = None) -> str | None:
 
     for tid in _list_todo_ids():
         task = fetch_task(tid)
-        if task is None:
+        if task is None or held_by_other(task, holder):
             continue
         if _all_dependencies_done(task):
             return task.id

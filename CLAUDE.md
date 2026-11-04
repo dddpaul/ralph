@@ -4,7 +4,7 @@
 
 If the prompt starts with `MODE: autonomous`: complete exactly **ONE** task, then **STOP**. The Ralph loop spawns a fresh instance for the next task.
 
-Task selection: if the prompt names a task, work on that task only. Otherwise, run `backlog task list -s "To Do" --plain` and pick the lowest-ID task whose dependencies are all "Done".
+Task selection: if the prompt names a task, work on that task only. Otherwise, run `backlog task list -s "To Do" --plain` and pick the lowest-ID task whose dependencies are all "Done" and that nobody else holds: skip a task whose `Assignee` names anyone besides the holder (`SHARED_BACKLOG_HOLDER`, else `git config ralph.holder`). A bare `@claude` counts as unassigned.
 
 After completing the task, output:
 
