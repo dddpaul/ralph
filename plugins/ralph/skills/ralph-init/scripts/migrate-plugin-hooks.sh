@@ -22,11 +22,15 @@
 #   2. gitignore — .gitignore gets the !.claude/ralph.json exception, so the
 #                  marker can be committed.
 #   3. settings  — .claude/settings.json loses the hook entries whose command
-#                  runs a managed guard copy that is not in localGuards; every
+#                  runs a managed guard copy that is not in localGuards, in
+#                  any form ralph-init has shipped ("$CLAUDE_PROJECT_DIR"/,
+#                  quoted whole, or relative .claude/hooks/<guard>.sh); every
 #                  other entry and key stays. The file is deleted only when
 #                  nothing is left in it.
 #   4. hooks     — the managed guard copies in .claude/hooks/ that are not in
-#                  localGuards are deleted, one by one.
+#                  localGuards are deleted, one by one. A copy that a remaining
+#                  settings.json command still names is kept, with a warning,
+#                  so no entry is left calling a missing script.
 #
 # Managed guards are the six Claude guards the ralph-init template
 # settings.json registers. Every other file in .claude/hooks/ is the project's
@@ -64,10 +68,12 @@ is_managed() {
 }
 
 # Write stdin to file $1 through a temporary file in the same directory, so a
-# reader never sees a half-written file.
+# reader never sees a half-written file. An existing file keeps its mode; a new
+# one gets 0644 rather than mktemp's 0600.
 write_file() {
   local tmp
   tmp=$(mktemp "$(dirname "$1")/.migrate.XXXXXX")
+  if [ -e "$1" ]; then cp -p "$1" "$tmp"; else chmod 644 "$tmp"; fi
   cat >"$tmp"
   mv -f "$tmp" "$1"
 }
@@ -170,7 +176,7 @@ done
 # shellcheck disable=SC2016  # $-names belong to jq, not the shell
 defs='
   def runs_dropped: (.command? // "") as $c
-    | any($drop[]; . as $g | $c | test("^\"?\\$\\{?CLAUDE_PROJECT_DIR\\}?\"?/\\.claude/hooks/" + $g + "\\.sh$"));
+    | any($drop[]; . as $g | $c | test("(^|[^A-Za-z0-9_.-])\\.claude/hooks/" + $g + "\\.sh([^A-Za-z0-9_.-]|$)"));
   def group_has: (.hooks | type) == "array" and any(.hooks[]; runs_dropped);
   def event_has: type == "array" and any(.[]; group_has);
   def has_dropped: (.hooks | type) == "object" and any(.hooks[]; event_has);
@@ -200,11 +206,17 @@ if [ -f "$settings" ]; then
   fi
 fi
 stop_after settings
+still=""
+if [ -f "$settings" ]; then
+  still=$("$jq" -r '.hooks[]? | arrays | .[] | objects | .hooks? | arrays | .[] | .command? | strings' "$settings")
+fi
 
 # 4. hooks
 for name in $drop; do
   copy=$hooks_dir/$name.sh
-  if [ -e "$copy" ] || [ -L "$copy" ]; then
+  if printf '%s\n' "$still" | grep -Fq -- ".claude/hooks/$name.sh"; then
+    echo "migrate-plugin-hooks: warning: kept .claude/hooks/$name.sh: a .claude/settings.json entry still calls it; remove that entry by hand and rerun" >&2
+  elif [ -e "$copy" ] || [ -L "$copy" ]; then
     note=""
     if [ -r "$plugin_hooks/$name.sh" ] && ! cmp -s "$copy" "$plugin_hooks/$name.sh"; then
       note=" (it differed from the plugin's copy; restore it from git and rerun with --local-guards $name to keep it)"

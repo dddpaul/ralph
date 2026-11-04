@@ -246,6 +246,63 @@ def test_settings_json_left_empty_is_deleted(tmp_path: Path) -> None:
     assert_every_guard_enforced(root)
 
 
+@pytest.mark.parametrize(
+    "command",
+    [
+        ".claude/hooks/naming-guard.sh",
+        '"$CLAUDE_PROJECT_DIR/.claude/hooks/naming-guard.sh"',
+        "${CLAUDE_PROJECT_DIR}/.claude/hooks/naming-guard.sh",
+    ],
+    ids=["relative", "quoted-whole", "braced"],
+)
+def test_older_command_forms_are_removed_too(tmp_path: Path, command: str) -> None:
+    root = make_project(tmp_path / "proj", extras=False)
+    settings = json.loads((root / ".claude/settings.json").read_text())
+    for group in settings["hooks"]["PreToolUse"]:
+        for hook in group["hooks"]:
+            hook["command"] = hook["command"].replace(
+                '"$CLAUDE_PROJECT_DIR"/.claude/hooks/naming-guard.sh', command
+            )
+    (root / ".claude/settings.json").write_text(json.dumps(settings))
+    result = migrate(root)
+    assert result.returncode == 0, result.stderr
+    assert not (root / ".claude/settings.json").exists()
+    assert not (root / ".claude/hooks/naming-guard.sh").exists()
+
+
+def test_a_copy_a_remaining_entry_still_calls_is_kept(tmp_path: Path) -> None:
+    root = make_project(tmp_path / "proj")
+    settings = json.loads((root / ".claude/settings.json").read_text())
+    wrapper = {
+        "type": "command",
+        "command": "bash .claude/hooks/notes-guard.sh_wrapper",
+    }
+    settings["hooks"]["SessionStart"][0]["hooks"].append(wrapper)
+    (root / ".claude/settings.json").write_text(json.dumps(settings))
+    result = migrate(root)
+    assert result.returncode == 0, result.stderr
+    assert (
+        "kept .claude/hooks/notes-guard.sh: a .claude/settings.json entry still calls it"
+        in result.stderr
+    )
+    assert (root / ".claude/hooks/notes-guard.sh").exists()
+    assert (
+        wrapper
+        in json.loads((root / ".claude/settings.json").read_text())["hooks"][
+            "SessionStart"
+        ][0]["hooks"]
+    )
+
+
+def test_rewritten_files_keep_a_readable_mode(tmp_path: Path) -> None:
+    root = make_project(tmp_path / "proj")
+    (root / ".claude/settings.json").chmod(0o664)
+    (root / ".claude/ralph.json").unlink()
+    assert migrate(root).returncode == 0
+    assert (root / ".claude/settings.json").stat().st_mode & 0o777 == 0o664
+    assert (root / ".claude/ralph.json").stat().st_mode & 0o777 == 0o644
+
+
 def test_the_run_commits_nothing(tmp_path: Path) -> None:
     root = make_project(tmp_path / "proj")
     git(root, "add", "-A")
