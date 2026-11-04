@@ -36,6 +36,16 @@
 #
 # Gates skip a row silently: "devcontainer" without a .devcontainer/ directory,
 # "git" without a .git/ directory.
+#
+# Plugin hooks (design/plugin-delivered-project-files-prd.md US-006) change two
+# things. In a project whose .claude/ralph.json sets "pluginHooks": true (read
+# with jq; without jq the project counts as not migrated), the plugin owns the
+# six managed Claude guards and the common allow rules: .claude/settings.json,
+# .claude/settings.local.json and the guard copies are no longer compared, and a
+# copy of a guard the marker does not list in "localGuards" is reported as
+# "<path>: legacy copy" (migrate-plugin-hooks.sh tracked deletes it). In a clone
+# whose git config ralph.pluginHooks is true, the three git hooks are compared
+# with the plugin shim (templates/shims/git-hook) instead of the legacy bodies.
 # .devcontainer/Dockerfile (assembled) and .gitignore (append-only) are never
 # compared. Project-owned files — .claude/task-reviewer-rules.md above all —
 # are not in the table and are never read.
@@ -182,6 +192,50 @@ lookup() {
   return 1
 }
 
+GUARDS="commit-msg-guard commit-prefix-guard master-branch-guard naming-guard notes-guard task-validator"
+
+# Set migrated, locals and shimmed for the project (see the header).
+plugin_state() {
+  local marker=$project/.claude/ralph.json
+  migrated=0 locals="" shimmed=0
+  if [ -f "$marker" ] && command -v jq >/dev/null 2>&1 && jq -e '.pluginHooks == true' "$marker" >/dev/null 2>&1; then
+    migrated=1
+    locals=$(jq -r '.localGuards // [] | .[]? | strings' "$marker" 2>/dev/null || true)
+  fi
+  if [ -d "$project/.git" ] && [ "$(git -C "$project" config --bool ralph.pluginHooks 2>/dev/null || true)" = true ]; then
+    shimmed=1
+  fi
+}
+
+# Print the state the plugin gives managed path $1: "skip" when a migrated
+# project no longer manages it, "legacy" for a leftover legacy guard copy,
+# nothing when the table's rule applies.
+plugin_owned() {
+  local name
+  [ "$migrated" -eq 1 ] || return 0
+  case $1 in
+    (.claude/settings.json | .claude/settings.local.json) echo skip; return 0 ;;
+    (.claude/hooks/*.sh) name=${1#.claude/hooks/} name=${name%.sh} ;;
+    (*) return 0 ;;
+  esac
+  case " $GUARDS " in (*" $name "*) ;; (*) return 0 ;; esac
+  if printf '%s\n' "$locals" | grep -Fxq -- "$name" || [ ! -e "$project/$1" ]; then
+    echo skip
+  else
+    echo legacy
+  fi
+}
+
+# Print the template managed path $1 is compared with: the plugin shim for a
+# git hook in a shimmed clone, else $2.
+template_for() {
+  case $shimmed:$1 in
+    (1:.git/hooks/pre-commit | 1:.git/hooks/commit-msg | 1:.git/hooks/post-commit)
+      echo "$root/skills/ralph-init/templates/shims/git-hook" ;;
+    (*) echo "$2" ;;
+  esac
+}
+
 [ $# -ge 1 ] || usage
 case $1 in
   list)
@@ -202,9 +256,14 @@ root=${CLAUDE_PLUGIN_ROOT:-$here/../../..}
   exit 2
 }
 
+plugin_state
 if [ "$1" = accept ]; then
   found=$(lookup "$3") || { echo "managed-file-drift: $3 is not a managed path" >&2; exit 2; }
-  tmpl=${found%|*} rule=${found##*|}
+  [ -z "$(plugin_owned "$3")" ] || {
+    echo "managed-file-drift: $3 is not managed in a project migrated to plugin hooks" >&2
+    exit 2
+  }
+  tmpl=$(template_for "$3" "${found%|*}") rule=${found##*|}
   s=$(state "$3" "$tmpl" "$rule") || exit 2
   case $s in
     (outdated) accept_line "$3" "$tmpl" "$rule" ;;
@@ -223,10 +282,15 @@ report=$(
     esac
     if [ "$rule" = hooks ]; then
       for hook in "$root/$tmpl"*-guard.sh "$root/${tmpl}task-validator.sh"; do
-        compare "$path${hook##*/}" "$hook" exact
+        case $(plugin_owned "$path${hook##*/}") in
+          (skip) ;;
+          (legacy) echo "$path${hook##*/}: legacy copy" ;;
+          (*) compare "$path${hook##*/}" "$hook" exact ;;
+        esac
       done
     else
-      compare "$path" "$root/$tmpl" "$rule"
+      [ -z "$(plugin_owned "$path")" ] || continue
+      compare "$path" "$(template_for "$path" "$root/$tmpl")" "$rule"
     fi
   done
 )

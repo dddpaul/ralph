@@ -416,7 +416,8 @@ def test_a_customised_copy_is_reported_when_deleted(tmp_path: Path) -> None:
         ["tracked", "--local-guards"],
         ["tracked", "--local-guards", "own-check"],
         ["tracked", "--x"],
-        ["clone"],
+        ["clone", "--x"],
+        ["clone", "a", "b"],
     ],
     ids=[
         "no-subcommand",
@@ -424,7 +425,8 @@ def test_a_customised_copy_is_reported_when_deleted(tmp_path: Path) -> None:
         "missing-list",
         "unmanaged-guard",
         "unknown-flag",
-        "clone-not-here",
+        "clone-unknown-flag",
+        "clone-two-dirs",
     ],
 )
 def test_usage_errors_exit_2_and_touch_nothing(tmp_path: Path, args: list[str]) -> None:

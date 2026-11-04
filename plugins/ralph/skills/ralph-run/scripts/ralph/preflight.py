@@ -19,6 +19,11 @@ A last report-only check lists, in one ``WARNING:`` line, the entries of the
 plugin's ``user-settings.json`` fragment the user ``settings.json`` misses. It
 reads both files and changes neither.
 
+One more report-only check reads the project's migration to plugin hooks
+(``migrate-plugin-hooks.sh``): it prints "not migrated", "partially migrated"
+or "shims missing in this clone" when one applies, and in a project whose
+marker sets ``pluginHooks`` it says that plugin guards are best effort.
+
 Invariants the AC pins down explicitly:
 
 * Runs against the invoker's PWD — this module never calls ``os.chdir``.
@@ -56,6 +61,17 @@ _PID_RE = re.compile(r'"pid":([0-9]+)')
 _PLUGIN_ROOT = Path(__file__).resolve().parents[4]
 _DRIFT_SCRIPT = _PLUGIN_ROOT / "skills/ralph-init/scripts/managed-file-drift.sh"
 _HOME_PREFIXES = ("$HOME/", "${HOME}/", "~/")
+_MIGRATE_SCRIPT = _PLUGIN_ROOT / "skills/ralph-init/scripts/migrate-plugin-hooks.sh"
+_SHIM = _PLUGIN_ROOT / "skills/ralph-init/templates/shims/git-hook"
+_MANAGED_GUARDS = (
+    "commit-msg-guard",
+    "commit-prefix-guard",
+    "master-branch-guard",
+    "naming-guard",
+    "notes-guard",
+    "task-validator",
+)
+_SHIMMED_HOOKS = ("pre-commit", "commit-msg", "post-commit")
 
 
 @dataclass(frozen=True)
@@ -482,6 +498,98 @@ def _check_user_settings(verbose: bool) -> None:
     )
 
 
+def _git_stdout(*args: str) -> str | None:
+    """Return git's stripped stdout in the current directory, or ``None`` when it fails."""
+    try:
+        proc = subprocess.run(["git", *args], capture_output=True, text=True, check=False)
+    except OSError:
+        return None
+    return proc.stdout.strip() if proc.returncode == 0 else None
+
+
+def _legacy_guard_commands(settings: Path, guards: list[str]) -> list[str]:
+    """Return the ``settings.json`` hook commands that run a copy of one of ``guards``."""
+    try:
+        data: object = json.loads(settings.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    pattern = re.compile(
+        r"(^|[^A-Za-z0-9_.-])\.claude/hooks/(" + "|".join(map(re.escape, guards)) + r")\.sh([^A-Za-z0-9_.-]|$)"
+    )
+    return [command for _event, command in _hook_commands(data) if guards and pattern.search(command)]
+
+
+def migration_state(root: Path, hooks_dir: Path, switch: bool) -> list[str]:
+    """Describe the project's migration to plugin hooks, one message per finding.
+
+    ``root`` is the work tree, ``hooks_dir`` what ``git rev-parse --git-path
+    hooks`` returns and ``switch`` the clone's ``ralph.pluginHooks``. A fully
+    migrated clone yields only the best-effort note.
+    """
+    try:
+        marker: object = json.loads((root / ".claude/ralph.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        marker = {}
+    marker_dict = cast(dict[str, object], marker) if isinstance(marker, dict) else {}
+    local_guards = marker_dict.get("localGuards")
+    local_list = cast(list[object], local_guards) if isinstance(local_guards, list) else []
+    local = [g for g in local_list if isinstance(g, str)]
+    plugin_guards = [g for g in _MANAGED_GUARDS if g not in local]
+    legacy = _legacy_guard_commands(root / ".claude/settings.json", plugin_guards)
+    if marker_dict.get("pluginHooks") is not True:
+        missing = [g for g in _MANAGED_GUARDS if not (root / f".claude/hooks/{g}.sh").is_file()]
+        if missing and len(missing) < len(_MANAGED_GUARDS):
+            return [
+                "partially migrated — .claude/ralph.json does not set pluginHooks, but guard copies are missing "
+                f"from .claude/hooks: {', '.join(missing)} (run bash {_MIGRATE_SCRIPT} tracked)"
+            ]
+        return [
+            f"not migrated — the project runs its own guard copies (run bash {_MIGRATE_SCRIPT} tracked, then clone)"
+        ]
+    found: list[str] = []
+    if legacy:
+        found.append(
+            f"partially migrated — .claude/ralph.json sets pluginHooks, but .claude/settings.json still runs "
+            f"{len(legacy)} legacy guard copies (rerun bash {_MIGRATE_SCRIPT} tracked)"
+        )
+    try:
+        shim = _SHIM.read_bytes()
+    except OSError:
+        shim = b""
+    stale = [n for n in _SHIMMED_HOOKS if not _same_bytes(hooks_dir / n, shim)]
+    if stale or not switch:
+        detail = [f"{', '.join(stale)} not the plugin shim"] if stale else []
+        detail += [] if switch else ["git config ralph.pluginHooks is not true"]
+        found.append(f"shims missing in this clone — {'; '.join(detail)} (run bash {_MIGRATE_SCRIPT} clone)")
+    found.append(
+        "plugin guards are best effort — a plugin guard hook that cannot start does not block the command; "
+        "the git hooks still block when ralph.pluginHooks is true"
+    )
+    return found
+
+
+def _same_bytes(path: Path, data: bytes) -> bool:
+    try:
+        return path.read_bytes() == data
+    except OSError:
+        return False
+
+
+def _check_plugin_hooks(verbose: bool) -> None:
+    """Warn on stderr about the project's migration to plugin hooks; never fail."""
+    top = _git_stdout("rev-parse", "--show-toplevel")
+    hooks = _git_stdout("rev-parse", "--git-path", "hooks")
+    if top is None or hooks is None:
+        _verbose(verbose, "check plugin_hooks: ok (skipped, not a git work tree)")
+        return
+    switch = _git_stdout("config", "--bool", "ralph.pluginHooks") == "true"
+    found = migration_state(Path(top), Path(hooks).resolve(), switch)
+    migrated = len(found) == 1 and "best effort" in found[0]
+    _verbose(verbose, f"check plugin_hooks: {'ok' if migrated else 'WARN'}")
+    for message in found:
+        print(f"WARNING: plugin hooks: {message}", file=sys.stderr)
+
+
 def main(argv: list[str] | None = None) -> int:
     real_argv = sys.argv[1:] if argv is None else argv
     args = _parse_args(real_argv)
@@ -534,6 +642,9 @@ def main(argv: list[str] | None = None) -> int:
 
     # Check 9: user settings miss fragment entries — report only.
     _check_user_settings(args.verbose)
+
+    # Check 10: migration to plugin hooks — report only.
+    _check_plugin_hooks(args.verbose)
 
     print(f"OK RALPH_PATH={args.ralph_path}")
     return 0
