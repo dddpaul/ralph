@@ -70,6 +70,7 @@ devcontainer/lang/
 obsidian/
 root/CLAUDE.conventions.docs.md
 root/CLAUDE.conventions.python.md
+shims/
 ROWS
 }
 
