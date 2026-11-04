@@ -29,6 +29,8 @@ Ralph ships as a single Claude Code plugin (`ralph`) in the `dddpaul-ralph` mark
 /plugin install ralph@dddpaul-ralph
 ```
 
+**Common allow rules:** a plugin cannot ship allow rules, so `plugins/ralph/user-settings.json` holds the common ones for your user settings (`~/.claude/settings.json`): 46 `Bash(...)` rules, `ScheduleWakeup`, `attribution` with an empty commit and PR trailer, and `sandbox` with `enabled` and `autoAllowBashIfSandboxed`. It holds no `Skill(...)` rules, because plugin skills need none. The `/ralph-run` preflight lists the entries your user settings miss in one warning and changes no file. To add them, run `bash <installPath>/skills/ralph-run/scripts/merge-user-settings.sh ~/.claude/settings.json` (configuration management can run it too). It appends missing entries, keeps every other key, and reports a differing value on stderr without overwriting it.
+
 **Updating:** re-run `/plugin marketplace add dddpaul/ralph` (or `/plugin update ralph@dddpaul-ralph`) to pull the latest version. `ralph-init` does not manage `~/.claude/` — the user owns that directory.
 
 ## Setup
@@ -222,7 +224,7 @@ This repo is its own plugin marketplace. Claude Code runs the plugin's skills fr
 - **minor** (`0.3.0`) — a new skill/agent/flag, or a removed/renamed skill.
 - **major** (`1.0.0`) — deferred to a future stable-surface declaration.
 
-A `pre-push` git hook (`.claude/hooks/version-bump-guard.sh`, activated via a `.git/hooks/pre-push` wrapper) enforces this at the push boundary: if a push of `master` changes any shipped-set file (`plugins/ralph/skills/**`, `plugins/ralph/agents/**`, `plugins/ralph/hooks/**`, `plugin.json`, `marketplace.json`) without a strictly-greater version (`sort -V`), it is **blocked**. Non-master pushes, docs/tooling-only ranges, and the first push pass through. This guard is project-specific to this producer repo and is intentionally **not** part of the `ralph-init` template tree (seeded consumer projects ship no manifests).
+A `pre-push` git hook (`.claude/hooks/version-bump-guard.sh`, activated via a `.git/hooks/pre-push` wrapper) enforces this at the push boundary: if a push of `master` changes any shipped-set file (`plugins/ralph/skills/**`, `plugins/ralph/agents/**`, `plugins/ralph/hooks/**`, `plugins/ralph/user-settings.json`, `plugin.json`, `marketplace.json`) without a strictly-greater version (`sort -V`), it is **blocked**. Non-master pushes, docs/tooling-only ranges, and the first push pass through. This guard is project-specific to this producer repo and is intentionally **not** part of the `ralph-init` template tree (seeded consumer projects ship no manifests).
 
 **Examples:**
 

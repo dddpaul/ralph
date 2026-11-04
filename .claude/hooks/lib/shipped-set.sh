@@ -8,7 +8,7 @@
 # because Claude Code's on-disk plugin cache rebuilds ONLY on a version increase
 # (a stale cache silently runs old skill/agent code otherwise):
 #   plugins/ralph/skills/**                     plugins/ralph/agents/**
-#   plugins/ralph/hooks/**
+#   plugins/ralph/hooks/**                      plugins/ralph/user-settings.json
 #   plugins/ralph/.claude-plugin/plugin.json    .claude-plugin/marketplace.json
 # Excluded (docs & tooling, not shipped-and-executed): README, design/,
 # backlog/, .claude/, tests/.
@@ -22,6 +22,7 @@ is_shipped() {
     plugins/ralph/skills/*) return 0 ;;
     plugins/ralph/agents/*) return 0 ;;
     plugins/ralph/hooks/*) return 0 ;;
+    plugins/ralph/user-settings.json) return 0 ;;
     plugins/ralph/.claude-plugin/plugin.json) return 0 ;;
     .claude-plugin/marketplace.json) return 0 ;;
     *) return 1 ;;
