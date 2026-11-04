@@ -430,6 +430,16 @@ The plugin ships the Claude guard hooks in `plugins/ralph/hooks/`: the seven gua
 
 Without the marker the plugin hooks do nothing, so a project keeps its legacy `.claude/hooks/` wiring, and the guards still work there: they take project paths from the git root of `RALPH_PROJECT_ROOT`, else of `$CLAUDE_PROJECT_DIR`. The template copies and this repo's `.claude/hooks/` copies stay byte-identical to the plugin (`tests/python/test_plugin_hooks.py`).
 
+### Plugin git hooks
+
+The plugin ships the git hook bodies in `plugins/ralph/git-hooks/` (`pre-commit`, `commit-msg`, `post-commit`). A clone runs them through one fixed shim, `plugins/ralph/skills/ralph-init/templates/shims/git-hook`, installed under each hook name in the directory `git rev-parse --git-path hooks` returns (which honours `core.hooksPath`). The shim:
+
+- runs the clone's own `<name>.local` hook from that directory first, with the hook's arguments, and stops when it fails; for `pre-push` (and the other stdin-fed hooks `post-rewrite` and `reference-transaction`) it buffers stdin so both hooks read all of it;
+- execs `<installPath>/git-hooks/<name>` found through the registry resolver above, with the same arguments;
+- when the plugin cannot be resolved, prints the resolver's reason and then fails or warns per clone switch: `pre-commit` and `commit-msg` fail when `git config ralph.pluginHooks` is true and name `git commit --no-verify`; `pre-push` fails when `ralph.pluginHooks` or `ralph.sharedBacklog` is true and names `git push --no-verify`; `post-commit` and every hook with neither switch set only warn.
+
+`pre-commit` runs the length guard bundled beside it (`plugins/ralph/hooks/filename-length-guard.sh`) and falls back to `<repo>/.claude/hooks/filename-length-guard.sh` when it runs as a legacy copy in `.git/hooks`. `commit-msg` finds a merge in progress through `git rev-parse --git-path MERGE_MSG`, so it also works in a linked worktree. The `templates/git-hooks/` copies stay byte-identical to the plugin bodies and still work when installed straight into `.git/hooks` (`tests/python/test_git_hook_shim.py`).
+
 ### Double-Run Guard
 
 Ralph refuses to start if another instance is already running. On startup, it checks the status file (`backlog/.ralph-status.json`) — if the state is `"running"` and the heartbeat file is fresh (updated within 15 seconds), Ralph exits with an error. This prevents two instances from picking the same task or creating conflicting branches.
