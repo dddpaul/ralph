@@ -392,45 +392,29 @@ Ralph writes a heartbeat file (`backlog/.ralph-heartbeat`) every 5 seconds while
 
 ### Shim and Canonical Orchestrator
 
-Each project carries a thin `ralph.sh` shim that execs the canonical Python orchestrator bundled by the `ralph` plugin at `plugins/ralph/skills/ralph-run/scripts/ralph_orchestrator.py` (run via `uv run`). The shim resolves the orchestrator by precedence (`$RALPH_ORCHESTRATOR` explicit override, then the newest installed plugin-cache copy, else a clear install-the-plugin error), so a detached `nohup ./ralph.sh` finds the orchestrator from the installed plugin without `${CLAUDE_PLUGIN_ROOT}`. When launching Ralph, the `ralph-run` skill searches for the project shim in priority order:
+Each project carries a thin `ralph.sh` shim that execs the canonical Python orchestrator bundled by the `ralph` plugin at `plugins/ralph/skills/ralph-run/scripts/ralph_orchestrator.py` (run via `uv run`). The shim resolves the orchestrator by precedence (`$RALPH_ORCHESTRATOR` explicit override, then the plugin install Claude Code registered, else a clear install-the-plugin error), so a detached `nohup ./ralph.sh` finds the orchestrator from the installed plugin without `${CLAUDE_PLUGIN_ROOT}`. When launching Ralph, the `ralph-run` skill searches for the project shim in priority order:
 
 1. `./ralph.sh` — project root (created by `ralph-init`)
 2. `scripts/ralph/ralph.sh` — structured project location
 
 The shim sets `RALPH_PROJECT_ROOT` and delegates to the canonical orchestrator, so all projects share one implementation while keeping project-relative paths correct. Run `/ralph-init` to bootstrap the shim in a new project.
 
-### Devcontainer plugin-cache reachability
+### Plugin registry resolver
 
-The plugin-cache resolver tier (the newest `/plugin install` under `$CLAUDE_CONFIG_DIR/plugins/cache`) also works inside the DevContainer. The `.devcontainer/devcontainer.json` mounts bind the **entire** host `~/.claude` — including `plugins/cache/` — into the container, both at `/home/node/.claude` and at its own host path, which is where `CLAUDE_CONFIG_DIR` points. So a plugin the host installs with `/plugin install ralph@dddpaul-ralph` is reachable inside the container, and the shim's plugin-cache glob (`$CLAUDE_CONFIG_DIR/plugins/cache/*/ralph/*/skills/ralph-run/scripts/ralph_orchestrator.py`) finds it. No extra mount is required for the *shim* — the existing whole-directory bind covers the `plugins/` subtree, and the glob resolves the orchestrator by path rather than through a registry. Plugin *components* (the `task-reviewer` agent, the `ralph-*` skills) are a separate matter: those go through the registry's recorded host path and need the second `~/.claude` bind described above, which is why the loop can run fine while every plugin component is silently missing.
+`ralph.sh` and `refine.sh` find the installed plugin through Claude Code's plugin registry, never by sorting cache folders (a `sort -V` over cache paths ranks the marketplace name above the version, so a fork called `ralph` or a leftover folder could win). The lookup is one shell block, `ralph_resolve_plugin <dir> <relpath>`, kept in `plugins/ralph/skills/ralph-init/templates/shims/resolve-plugin.sh`; every embedding copy must match it byte for byte (`tests/python/test_resolve_plugin.py`). It:
 
-To smoke-test this from a shell **inside the container**:
+- finds `jq` on `PATH`, else at `git config ralph.jq`;
+- reads `<config>/plugins/installed_plugins.json`, where the config dir is `$CLAUDE_CONFIG_DIR`, else `git config ralph.claudeConfigDir`, else `$HOME/.claude`, and requires `"version": 2`;
+- takes only the `ralph@dddpaul-ralph` entries: a `scope: "project"` entry whose `projectPath` equals the clone's identity wins over the `scope: "user"` entry;
+- uses `git config ralph.projectPath` as the identity, else the main worktree root (the canonical parent of `git rev-parse --git-common-dir`), so a linked worktree resolves like its main clone; a separate-git-dir layout is rejected;
+- fails with its own message for each of: no jq, no registry, invalid JSON, the wrong registry version, no matching entry, more than one candidate, no `installPath`, a missing `installPath` directory, and a missing target file.
 
-```bash
-# 1. Mount check — the host plugin cache is reachable under CLAUDE_CONFIG_DIR:
-ls -d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/cache"
-# -> /Users/<user>/.claude/plugins/cache   (the host root: CLAUDE_CONFIG_DIR is
-#                                          the host path, not /home/node/.claude)
-
-# 2. Resolver check — the plugin-cache tier resolves the orchestrator from a
-#    plugin-cache layout. A scratch config dir + scratch shim copy (no
-#    $RALPH_ORCHESTRATOR override) plus a stub `uv` that echoes the resolved path
-#    instead of launching the loop. This mirrors what `/plugin install` lays down.
-tmp="$(mktemp -d)"
-cp ./ralph.sh "$tmp/ralph.sh"
-orch="$tmp/cfg/plugins/cache/dddpaul-ralph/ralph/v1.0.0/skills/ralph-run/scripts/ralph_orchestrator.py"
-mkdir -p "$(dirname "$orch")" && : > "$orch"
-mkdir -p "$tmp/bin"
-printf '#!/usr/bin/env bash\nshift\necho "RESOLVED=$1"\n' > "$tmp/bin/uv"
-chmod +x "$tmp/bin/uv"
-PATH="$tmp/bin:$PATH" CLAUDE_CONFIG_DIR="$tmp/cfg" bash "$tmp/ralph.sh" --help
-# -> RESOLVED=<tmp>/cfg/plugins/cache/dddpaul-ralph/ralph/v1.0.0/skills/ralph-run/scripts/ralph_orchestrator.py
-rm -rf "$tmp"
-```
-
-Both lines confirm the plugin-cache tier is reachable in the container: step 1 proves the mount exposes the cache, step 2 proves the resolver traverses that exact layout. If the `ralph` plugin is actually installed on the host, you can confirm the real mounted install resolves too:
+**Inside the DevContainer** the `.devcontainer/devcontainer.json` mounts bind the **entire** host `~/.claude` at its own host path, which is where `CLAUDE_CONFIG_DIR` points, so the registry and the host paths it records are both reachable and a user-scope install resolves as on the host. The clone itself is mounted at `/workspace`, which never equals a host `projectPath`: a project-scope install matches there only when the clone's `git config ralph.projectPath` holds the host path (the config lives in `.git/config`, so it travels with the mount). To check the lookup from a shell inside the container:
 
 ```bash
-ls "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/*/ralph/*/skills/ralph-run/scripts/ralph_orchestrator.py
+. plugins/ralph/skills/ralph-init/templates/shims/resolve-plugin.sh
+ralph_resolve_plugin . skills/ralph-run/scripts/ralph_orchestrator.py
+# -> /Users/<user>/.claude/plugins/cache/dddpaul-ralph/ralph/<version>/skills/ralph-run/scripts/ralph_orchestrator.py
 ```
 
 ### Double-Run Guard
