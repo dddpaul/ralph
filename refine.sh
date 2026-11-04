@@ -22,7 +22,7 @@ export RALPH_PROJECT_ROOT
 #   over the user-scope entry (design/plugin-delivered-project-files-prd.md US-001).
 ralph_resolve_plugin() {
   local dir="$1" rel="$2" common root id jq cfg reg ver sel count install
-  common="$(cd "$dir" 2>/dev/null && c="$(git rev-parse --git-common-dir 2>/dev/null)" && cd "$c" && pwd -P)"
+  common="$(unset CDPATH; cd -- "$dir" 2>/dev/null && c="$(git rev-parse --git-common-dir 2>/dev/null)" && cd -- "$c" && pwd -P)"
   if [ -z "$common" ]; then
     echo "ralph: plugin lookup: $dir is not inside a git work tree" >&2
     return 1

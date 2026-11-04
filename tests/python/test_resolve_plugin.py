@@ -160,6 +160,7 @@ def resolve(
     path: str | None = None,
     home: Path | None = None,
     rel: str = REL,
+    extra: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Source the resolver block and run it from ``start``."""
     env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
@@ -169,6 +170,7 @@ def resolve(
     if path is not None:
         env["PATH"] = path
     env["HOME"] = str(home) if home is not None else env.get("HOME", "/nonexistent")
+    env.update(extra or {})
     script = f'. "{SOURCE}" && ralph_resolve_plugin "$1" "$2"'
     return subprocess.run(
         [BASH, "-c", script, "resolve", str(start), rel],
@@ -252,6 +254,16 @@ def test_project_only_install_from_the_host_path(world: dict[str, Path]) -> None
     sub = world["clone"] / "sub dir"
     sub.mkdir()
     ok(resolve(sub, world["cfg"]), world["proj"])
+
+
+@needs_jq
+def test_exported_cdpath_does_not_change_the_identity(world: dict[str, Path]) -> None:
+    # A relative `cd .git` consults CDPATH and echoes the target; a CDPATH entry
+    # holding another repo's .git must not hijack the lookup either.
+    decoy = make_clone(world["base"] / "decoy")
+    write_registry(world["cfg"], [project(world["proj"], world["clone"])])
+    for cdpath in (".:/nonexistent", str(decoy)):
+        ok(resolve(world["clone"], world["cfg"], extra={"CDPATH": cdpath}), world["proj"])
 
 
 @needs_jq
