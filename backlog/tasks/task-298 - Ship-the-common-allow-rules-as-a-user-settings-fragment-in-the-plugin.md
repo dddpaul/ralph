@@ -4,7 +4,7 @@ title: Ship the common allow rules as a user-settings fragment in the plugin
 status: Done
 assignee: []
 created_date: '2026-11-04T14:52:00Z'
-updated_date: '2026-11-04T16:09:00Z'
+updated_date: '2026-11-04T16:36:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies: []
@@ -31,7 +31,7 @@ Reference: PRD design/plugin-delivered-project-files-prd.md, US-004.
 - [x] #2 The fragment holds no Skill(...) rules
 - [x] #3 The /ralph-run preflight prints one warning listing exactly the fragment entries missing from the user settings and changes no file
 - [x] #4 A merge helper appends missing allow entries to a sample user settings file, keeps every unrelated key and value, and reports a differing scalar without overwriting it
-- [ ] #5 (host) In an interactive session in a project without Skill(...) rules, /ralph-status runs with no permission prompt, and the result is recorded in the notes
+- [x] #5 (host) In an interactive session in a project without Skill(...) rules, /ralph-status runs with no permission prompt, and the result is recorded in the notes
 - [x] #6 ruff, pytest and bats pass
 <!-- AC:END -->
 
@@ -49,4 +49,6 @@ Commit: `68d7747` - task-298: count the user-settings fragment as a shipped plug
 Done: plugins/ralph/user-settings.json (46 Bash rules + ScheduleWakeup, attribution, sandbox; no Skill rules); ralph.user_settings (missing_entries, non-overwriting merge) with merge-user-settings.sh shim; preflight check 9 prints one stderr warning listing missing entries and writes nothing; the preflight fixture pins CLAUDE_CONFIG_DIR to a dir seeded with the fragment; the fragment joins the shipped set. ruff clean, pytest 1112 passed, bats 265/266 (the one failure, R11 settings.local.json shape, is a known local gitignored-file failure that also happens on master). task-reviewer APPROVED after two fixes (AC #5 deferral note, shipped-set entry).
 
 Commit: `a0094a8` - task-298: bump plugin version to 0.16.0 (minor)
+
+macOS host check for AC #5 (2026-11-04). In an interactive Claude Code session in a project with no Skill(...) allow rules (user settings hold none either), typing /ralph:ralph-status ran the skill with no permission prompt: it read the status file path and reported that Ralph had not run there. A user-typed slash command does not exercise the model's Skill tool permission path; that path was covered on 2026-11-04 by claude -p in default permission mode, where the model invoked a plugin skill through the Skill tool with no allow rule, then with a short-name rule, then with a plugin:skill rule, and the permission check passed in 2-5 ms each time. The fragment's omission of Skill(...) rules stands.
 <!-- SECTION:NOTES:END -->
