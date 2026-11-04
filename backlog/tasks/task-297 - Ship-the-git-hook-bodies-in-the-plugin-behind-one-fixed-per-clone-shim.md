@@ -4,10 +4,12 @@ title: Ship the git hook bodies in the plugin behind one fixed per-clone shim
 status: To Do
 assignee: []
 created_date: '2026-11-04T14:52:00Z'
+updated_date: '2026-11-04T16:56:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
   - TASK-295
+  - TASK-321
 priority: high
 ---
 
