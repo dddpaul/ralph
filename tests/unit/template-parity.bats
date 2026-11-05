@@ -121,6 +121,12 @@ migrated_clone() {
   [ "$(git -C "$PROJECT_ROOT" config --bool ralph.pluginHooks 2>/dev/null)" = true ]
 }
 
+# The lines the repo-local TASK-217 auto-bump nudge may consist of, as one ERE:
+# blank lines, comments, the helper lookup, the guarded --nudge call and an
+# optional trailing exit 0. Shared by the legacy post-commit tail check and the
+# migrated clone's post-commit.local check, so the two cannot drift apart.
+NUDGE_LINES='^$|^#|^BUMP_HELPER=|^if \[ -x "\$BUMP_HELPER" \]; then$|^[[:space:]]*"\$BUMP_HELPER" --nudge [|][|] true$|^fi$|^exit 0$'
+
 # Print the absolute path of registry template column $1.
 template_path() {
   case "$1" in
@@ -312,7 +318,7 @@ EOF
     printf '%s\n' "$tail_block" | grep -Fq 'bump-version.sh'
     [ "$(printf '%s\n' "$tail_block" | wc -l)" -le 12 ]
     unexpected="$(printf '%s\n' "$tail_block" \
-      | grep -vE '^$|^#|^BUMP_HELPER=|^if \[ -x "\$BUMP_HELPER" \]; then$|^[[:space:]]*"\$BUMP_HELPER" --nudge [|][|] true$|^fi$' \
+      | grep -vE "$NUDGE_LINES" \
       || true)"
     [ -z "$unexpected" ] || {
       echo "unmirrored trailing content in post-commit:"
@@ -331,7 +337,7 @@ EOF
   # commit in the task notes, so a .local that repeats any of it would record
   # every commit twice. Only the TASK-217 auto-bump nudge may live here.
   grep -Fq 'bump-version.sh' "$local_path"
-  unexpected="$(grep -vE '^$|^#|^BUMP_HELPER=|^if \[ -x "\$BUMP_HELPER" \]; then$|^[[:space:]]*"\$BUMP_HELPER" --nudge [|][|] true$|^fi$|^exit 0$' "$local_path" || true)"
+  unexpected="$(grep -vE "$NUDGE_LINES" "$local_path" || true)"
   [ -z "$unexpected" ] || {
     echo "post-commit.local carries more than the repo-local nudge:"
     echo "$unexpected"
