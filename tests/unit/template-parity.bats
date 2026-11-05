@@ -23,9 +23,13 @@ TEMPLATES="$PLUGIN/skills/ralph-init/templates"
 # repo-relative; the template path is templates/-relative, or plugin-relative
 # when it starts with "plugin:". The Claude guards and the git hook bodies ship
 # in the plugin itself (plugins/ralph/hooks/, plugins/ralph/git-hooks/), not as
-# ralph-init templates, so this repo's live copies are compared with those.
-# This repo keeps its legacy .claude/settings.json wiring until it migrates
-# (TASK-302); ralph-init no longer ships a settings.json, so it has no pair.
+# ralph-init templates, so this repo's live guard copies are compared with
+# those. This repo is migrated to the plugin hooks (TASK-302) but lists all six
+# managed guards in .claude/ralph.json localGuards, so .claude/settings.json
+# stays the wiring for its own copies; ralph-init no longer ships a
+# settings.json, so it has no pair. In a migrated clone the .git/hooks/* are
+# the fixed shim (templates/shims/git-hook), and post-commit.local carries the
+# repo-local part of post-commit; see migrated_clone below.
 #
 # Modes:
 #   exact  — diff must be silent.
@@ -190,7 +194,7 @@ missing live file for $tmpl: $live"
 
     if ! diff -q "$live_path" "$tmpl_path" >/dev/null 2>&1; then
       failures="$failures
-R11 drift: $live vs $tmpl
+R11 drift: $live vs ${tmpl_path#"$PROJECT_ROOT"/}
 $(diff "$live_path" "$tmpl_path" || true)"
     fi
     checked=$((checked + 1))
@@ -277,7 +281,18 @@ EOF
   tmpl_path="$PLUGIN/git-hooks/post-commit"
   [ -f "$tmpl_path" ]
   [ -f "$live_path" ] || skip "git hooks are untracked and not installed here"
-  migrated_clone && skip "migrated clone: post-commit is the shim (see the post-commit.local test)"
+
+  # A migrated clone runs the fixed shim as post-commit; its repo-local part
+  # lives in post-commit.local (checked by the next test).
+  if migrated_clone; then
+    run diff "$live_path" "$TEMPLATES/shims/git-hook"
+    [ "$status" -eq 0 ] || {
+      echo "R11 drift: .git/hooks/post-commit is not the shim in a migrated clone:"
+      echo "$output"
+      return 1
+    }
+    return 0
+  fi
 
   tmpl_len="$(wc -l < "$tmpl_path" | tr -d '[:space:]')"
   [ "$tmpl_len" -ge 20 ]
