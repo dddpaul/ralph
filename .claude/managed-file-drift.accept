@@ -1,5 +1,5 @@
 # Reviewed, deliberate differences from the ralph-init templates (TASK-275).
 # CLAUDE.md: Task Lifecycle step 6 adds the bump-version.sh --auto / --tag steps.
 # post-commit: adds the TASK-217 bump-version.sh --nudge call.
-CLAUDE.md template=e75b750650519c53602bb8ce3152b2eb91f1ec1667b252c010aff1f41f97b611 project=1256bd43287397aaafb2c0e3da50dfd6c498e5fd88fa928562d4a784c80ea4d5
+CLAUDE.md template=d1662347d7412a1ecb84578c9e8a275f0f418174e82ba3c18243108fc823d57d project=a216683f0b6f56d149b03182b8f0a3203ee3cbd642b1ebe4ea68301e0848ba62
 .git/hooks/post-commit template=aa7b7918ce5e5a3bff120e90b3d092b0a3f9554b02aa6c8b5ca35568670e5e51 project=e7bc0dc383dc90c19bac95f06352b5fb69dab7aa76509b873f2df1616caacd26

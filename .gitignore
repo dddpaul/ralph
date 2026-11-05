@@ -19,6 +19,7 @@ backlog/.ralph-heartbeat
 !.claude/brainstorm-rules.md
 !.claude/task-reviewer-rules.md
 !.claude/managed-file-drift.accept
+!.claude/ralph.json
 !.claude/RELEASING.md
 !.claude/hooks/
 !.claude/skills/

@@ -219,13 +219,13 @@ This feature does two things:
 
 - [ ] **This repo's migration.** It is migrated with `migrate-plugin-hooks.sh tracked --local-guards <every live guard>` and `clone`.
   - The live guard copies and their registrations remain.
-  - The repo's own pre-push becomes `pre-push.local` behind the shim.
+  - The repo's own pre-push stays a plain hook until US-017 ships the plugin's pre-push body; until then a pre-push shim could not resolve a body and would block every push.
 - [ ] **(host)** **Interactive sessions.**
   - In a migrated test project, the plugin's commit-message guard blocks a bad `git commit`, including from a subdirectory session.
   - The same command is not blocked in a non-Ralph project.
 - [ ] **(host)** **Devcontainer runs.** A Ralph run in the devcontainer of a migrated test project is blocked by the plugin guard, including on a first run with no plugin data dir.
 - [ ] **(host)** **Plain git commits in a migrated test clone:**
-  - pre-commit rejects a filename that is not NFC-normalized, and a name over 125 bytes;
+  - pre-commit rejects an NFD path that duplicates an NFC tree path, and a name over 125 bytes;
   - the hooks still run with the plugin disabled in Claude;
   - with an isolated registry pointed at a removed install, the commit fails with the repair message;
   - `--no-verify` gets through.
@@ -400,6 +400,7 @@ This feature does two things:
   It passes a deletion and a push of several refs.
 - [ ] **The switch decides.** It keeps enforcing after a commit that removes the marker, while the switch is on.
 - [ ] **Chaining.** An existing hook keeps running as `pre-push.local` with the same stdin.
+- [ ] **This repo's pre-push.** This repo's own pre-push (the version-bump guard) becomes `pre-push.local` behind the plugin's pre-push shim, and a real push of a bumped commit still runs the version-bump guard (moved here from US-008).
 - [ ] **A real push.** A real `create` push through the installed shim triggers this hook while `create` holds the protocol lock. It completes without deadlock. This is tested end to end, with no stub.
 - [ ] Checks pass; **(host)** the shell suite passes under `/bin/bash` 3.2.
 

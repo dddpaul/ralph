@@ -1,0 +1,11 @@
+{
+  "pluginHooks": true,
+  "localGuards": [
+    "commit-msg-guard",
+    "commit-prefix-guard",
+    "master-branch-guard",
+    "naming-guard",
+    "notes-guard",
+    "task-validator"
+  ]
+}
