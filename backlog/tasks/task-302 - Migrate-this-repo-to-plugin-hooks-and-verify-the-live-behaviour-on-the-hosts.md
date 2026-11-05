@@ -4,6 +4,7 @@ title: Migrate this repo to plugin hooks and verify the live behaviour on the ho
 status: To Do
 assignee: []
 created_date: '2026-11-04T14:52:00Z'
+updated_date: '2026-11-05T05:06:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -32,3 +33,14 @@ Reference: PRD design/plugin-delivered-project-files-prd.md, US-008.
 - [ ] #7 (host) With an isolated CLAUDE_CONFIG_DIR whose registry points at a removed install, the commit fails with the repair message and --no-verify gets through
 - [ ] #8 (host) On the second host, after the plugin update and the clone step, a commit runs the plugin hooks
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Blocked in autonomous mode (Ralph iteration, devcontainer, 2026-11-04); nothing was migrated. Three reasons:
+1. AC#2 would block every push in this repo. The plugin ships no git-hooks/pre-push until TASK-311, which is still To Do. With the shim installed as pre-push and ralph.pluginHooks true, the shim runs pre-push.local (version-bump-guard), then fails to resolve git-hooks/pre-push ('not found in the installed plugin') and exits 1 per FR-5. So every git push would need --no-verify, and that also skips version-bump-guard. Either run US-008 after TASK-311, or add TASK-311 as a dependency, or install only the clone-step shims now and convert pre-push later.
+2. The clone step has to run on the host, not in the devcontainer. This container shares the host's .git/config. Here clone would record ralph.projectPath=/workspace (the host identity is the host path that the registry records) and ralph.jq=/usr/bin/jq. Those values would then be wrong for host-side commits.
+3. AC#3 to AC#8 are host checks: an installed plugin, isolated test projects and configs, a devcontainer run, and the second host. A Ralph iteration cannot do them.
+Facts checked: all six live guards in .claude/hooks are managed (so --local-guards lists all six and tracked only writes the marker and the .gitignore exception). .git/hooks pre-commit and commit-msg are byte-identical to plugins/ralph/git-hooks. post-commit differs and is listed in .claude/managed-file-drift.accept with the current hashes, so clone keeps it as post-commit.local. The installed plugin 0.18.2 (user scope) has git-hooks/{pre-commit,commit-msg,post-commit} and no pre-push.
+Recommendation: run this interactively on the host after the pre-push question is settled.
+<!-- SECTION:NOTES:END -->
