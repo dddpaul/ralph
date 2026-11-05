@@ -300,6 +300,7 @@ def _run_loop(
             max_iterations=args.max_iterations,
             whitelist_task_id=next_task if whitelist else None,
             prompt_file_body=prompt_file_body,
+            excluded_task_ids=[entry.task for entry in state.skipped],
         )
 
         done_before = set(tasks_module.done_task_ids())

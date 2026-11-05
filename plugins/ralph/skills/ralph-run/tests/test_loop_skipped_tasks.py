@@ -3,13 +3,14 @@
 Before the fix the loop re-ran :func:`tasks.pick_next_task` after every
 iteration and got the same unchanged task back, so one blocked task could use
 up a whole run. These tests drive the real picker over a stubbed backlog and a
-stub tool that either finishes the picked task (moves it to ``Done``) or leaves
-it in ``To Do``.
+stub tool that picks its task from the prompt the way the agent does, then
+either finishes it (moves it to ``Done``) or leaves it in ``To Do``.
 """
 
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -57,12 +58,25 @@ class _Backlog:
 
 
 class _StubTool(Tool):
-    """Moves the picked task to ``Done`` unless it is in ``stuck``."""
+    """Agent stand-in: moves the task it picks to ``Done`` unless it is in ``stuck``.
 
-    def __init__(self, backlog: _Backlog, picked: list[str], stuck: set[str]) -> None:
+    Whitelist prompts name the task. Otherwise it takes the lowest ``To Do``
+    task the prompt does not exclude, as CLAUDE.md tells the agent to.
+    ``worked`` records each task it picked.
+    """
+
+    def __init__(self, backlog: _Backlog, stuck: set[str]) -> None:
         self._backlog = backlog
-        self._picked = picked
         self._stuck = stuck
+        self.worked: list[str] = []
+
+    def _choose(self, prompt: str) -> str:
+        named = re.search(r"^Execute (TASK-\d+)", prompt, re.MULTILINE)
+        if named:
+            return named.group(1)
+        excluded_line = re.search(r"^Do NOT pick these tasks.*$", prompt, re.MULTILINE)
+        excluded = set(re.findall(r"TASK-\d+", excluded_line.group(0))) if excluded_line else set()
+        return next(tid for tid in self._backlog.ids("To Do") if tid not in excluded)
 
     def run(
         self,
@@ -71,8 +85,9 @@ class _StubTool(Tool):
         *,
         on_spawn: OnSpawn | None = None,
     ) -> ToolResult:
-        _ = (prompt, timeout_sec, on_spawn)
-        task_id = self._picked[-1]
+        _ = (timeout_sec, on_spawn)
+        task_id = self._choose(prompt)
+        self.worked.append(task_id)
         if task_id not in self._stuck:
             self._backlog.statuses[task_id] = "Done"
         return ToolResult(
@@ -101,7 +116,7 @@ def _install(
     picked: list[str],
     statuses: dict[str, str],
     stuck: set[str],
-) -> None:
+) -> _StubTool:
     backlog = _Backlog(statuses)
     monkeypatch.setattr(tasks_module, "fetch_task", backlog.fetch)
     monkeypatch.setattr(tasks_module, "_list_todo_ids", lambda: backlog.ids("To Do"))
@@ -117,8 +132,9 @@ def _install(
         return task_id
 
     monkeypatch.setattr(tasks_module, "pick_next_task", recording_pick)
-    tool = _StubTool(backlog, picked, stuck)
+    tool = _StubTool(backlog, stuck)
     monkeypatch.setattr(loop_module, "build_tool", lambda *_a, **_kw: tool)
+    return tool
 
 
 def _status(tmp_path: Path) -> dict:
@@ -133,12 +149,13 @@ def test_whitelist_head_left_in_todo_lets_second_task_run(
     """AC #1, #2, #3 — the stuck first whitelist task runs once, then the next one."""
     tmp_path, picked = harness
     statuses = {"TASK-302": "To Do", "TASK-304": "To Do", "TASK-305": "To Do"}
-    _install(monkeypatch, picked, statuses, stuck={"TASK-302"})
+    tool = _install(monkeypatch, picked, statuses, stuck={"TASK-302"})
 
     rc = loop_module.run(_args(tasks="302,304,305"), tmp_path)
 
     assert rc == 0
     assert picked == ["TASK-302", "TASK-304", "TASK-305"]
+    assert tool.worked == picked
     status = _status(tmp_path)
     assert status["skipped_tasks"] == [{"task": "TASK-302", "iteration": 1}]
     assert status["tasks_done"] == ["TASK-304", "TASK-305"]
@@ -184,12 +201,13 @@ def test_default_mode_skips_lowest_task_left_in_todo(
     """AC #1, #5 — default mode moves past the lowest eligible task once it stays To Do."""
     tmp_path, picked = harness
     statuses = {"TASK-7": "To Do", "TASK-8": "To Do", "TASK-9": "Done"}
-    _install(monkeypatch, picked, statuses, stuck={"TASK-7"})
+    tool = _install(monkeypatch, picked, statuses, stuck={"TASK-7"})
 
     rc = loop_module.run(_args(), tmp_path)
 
     assert rc == 0
     assert picked == ["TASK-7", "TASK-8"]
+    assert tool.worked == picked  # the prompt steered the agent off TASK-7
     assert _status(tmp_path)["skipped_tasks"] == [{"task": "TASK-7", "iteration": 1}]
     assert "Exit reason:        all tasks done" in capsys.readouterr().out
 
@@ -219,3 +237,18 @@ def test_pick_next_task_honours_exclude(monkeypatch: pytest.MonkeyPatch) -> None
     assert tasks_module.pick_next_task(whitelist=["1", "2"], exclude={"TASK-1"}) == "TASK-2"
     assert tasks_module.pick_next_task(exclude={"TASK-1"}) == "TASK-2"
     assert tasks_module.pick_next_task(exclude={"TASK-1", "TASK-2"}) is None
+
+
+def test_default_mode_every_task_left_in_todo_is_attempted_once(
+    harness: tuple[Path, list[str]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """AC #5 — default mode: each stuck task is worked once, then the run ends."""
+    tmp_path, picked = harness
+    statuses = {"TASK-4": "To Do", "TASK-5": "To Do"}
+    tool = _install(monkeypatch, picked, statuses, stuck=set(statuses))
+
+    loop_module.run(_args(), tmp_path)
+
+    assert picked == ["TASK-4", "TASK-5"]
+    assert tool.worked == picked
+    assert [e["task"] for e in _status(tmp_path)["skipped_tasks"]] == ["TASK-4", "TASK-5"]

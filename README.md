@@ -508,7 +508,7 @@ Key fields:
 | `iteration_started_at` | ISO 8601 string \| `null` | Timestamp when the current iteration began |
 | `timeout_sec` | number | Per-iteration timeout in seconds |
 | `errors` | array of objects | Each error is `{ "iteration": <int>, "at": "<ISO 8601>", "message": "<string>" }` |
-| `skipped_tasks` | array of objects | Each entry is `{ "task": "TASK-<n>", "iteration": <int> }`: a task that iteration left in To Do. The run does not pick it again and moves on to the next eligible task, in both `--tasks` and default mode; the run log and the final summary name it too |
+| `skipped_tasks` | array of objects | Each entry is `{ "task": "TASK-<n>", "iteration": <int> }`: a task that iteration left in To Do. The run does not pick it again and moves on to the next eligible task, in both `--tasks` and default mode. In default and `--prompt-file` mode, where the agent picks its own task, each later prompt names the excluded tasks so the agent does not pick them. The run log and the final summary name each one too |
 
 **Breaking change:** `errors` was previously an array of bare strings. It is now an array of objects with `iteration`, `at`, and `message` fields. Scripts or dashboards that parse this field will need to be updated.
 

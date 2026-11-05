@@ -57,3 +57,30 @@ def test_prefix_and_body_separated_by_blank_line() -> None:
     first, rest = prompt.split("\n\n", 1)
     assert first == "MODE: autonomous (Ralph loop iteration 1 of 2)"
     assert rest.startswith("Pick the next To Do task")
+
+
+def test_excluded_tasks_appended_to_default_body() -> None:
+    prompt = build_prompt(iteration=2, max_iterations=5, excluded_task_ids=["TASK-7", "TASK-9"])
+    assert prompt.endswith(
+        "\nDo NOT pick these tasks — an earlier iteration of this run left them in To Do: TASK-7, TASK-9."
+    )
+
+
+def test_excluded_tasks_appended_to_prompt_file_body() -> None:
+    prompt = build_prompt(
+        iteration=2, max_iterations=5, prompt_file_body="custom body\n", excluded_task_ids=["TASK-7"]
+    )
+    assert prompt.endswith(
+        "custom body\nDo NOT pick these tasks — an earlier iteration of this run left them in To Do: TASK-7."
+    )
+
+
+def test_excluded_tasks_ignored_in_whitelist_mode() -> None:
+    prompt = build_prompt(
+        iteration=2, max_iterations=5, whitelist_task_id="TASK-8", excluded_task_ids=["TASK-7"]
+    )
+    assert "Do NOT pick these tasks" not in prompt
+
+
+def test_no_excluded_line_without_skipped_tasks() -> None:
+    assert "Do NOT pick these tasks" not in build_prompt(iteration=1, max_iterations=5)
