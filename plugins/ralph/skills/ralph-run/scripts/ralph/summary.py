@@ -40,6 +40,8 @@ class RunSummary:
     failed_iterations: int
     wall_time_sec: int
     iter_durations_sec: Sequence[int]
+    skipped_tasks: Sequence[tuple[str, int]] = ()
+    """``(task_id, iteration)`` for each task an iteration left in ``To Do``."""
 
 
 def format_duration(seconds: int) -> str:
@@ -93,4 +95,9 @@ def print_summary(summary: RunSummary, out: IO[str]) -> None:
         print("Per-iteration durations:", file=out)
         for idx, dur in enumerate(summary.iter_durations_sec, start=1):
             print(f"  Iteration {idx}: {format_duration(dur)}", file=out)
+    if summary.skipped_tasks:
+        print(file=out)
+        print("Skipped tasks (left in To Do):", file=out)
+        for task_id, iteration in summary.skipped_tasks:
+            print(f"  {task_id}: left in To Do by iteration {iteration}", file=out)
     print("===============================", file=out)

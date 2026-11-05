@@ -23,6 +23,7 @@ Extract fields using grep from the file content (no jq/python dependency):
 - `tasks_done`, `tasks_remaining`, `current_task`
 - `last_iteration_duration`, `elapsed`, `errors`
 - `completed_at`, `exit_code`
+- `skipped_tasks` — array of `{"task": "TASK-N", "iteration": <int>}` objects: tasks an iteration left in To Do, which the run will not pick again
 - `paused_reason`, `paused_buffer_min`, `paused_remaining_min`, `paused_block_end_time`, `paused_at` (populated only when state=paused)
 
 Then run a **single** Bash call to get heartbeat mtime, current time, and backlog snapshot:
@@ -129,6 +130,13 @@ Errors:
 ```
 
 Extract `iteration` and `message` from each object using grep/pattern matching on the JSON. The `at` field is available but not displayed in the summary (used by ralph-status-watch for time-based detection).
+
+If the `skipped_tasks` array is non-empty, also output:
+
+```
+Skipped (left in To Do, not picked again this run):
+  - <task> (iteration <iteration>)
+```
 
 ---
 

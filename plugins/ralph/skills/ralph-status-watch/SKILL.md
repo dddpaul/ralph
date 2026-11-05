@@ -50,6 +50,7 @@ Extract from the JSON (using grep/pattern matching, no jq):
 - `timeout_sec` — integer seconds
 - `errors` — array of `{"iteration": N, "at": "<ISO>", "message": "<string>"}` objects
 - `completed_at`, `exit_code`, `tasks_done`, `tasks_remaining`, `max_iterations`, `elapsed`
+- `skipped_tasks` — array of `{"task": "TASK-N", "iteration": N}` objects: tasks an iteration left in To Do, which the run will not pick again
 
 Convert `iteration_started_at` to epoch for comparison:
 ```bash
@@ -93,6 +94,12 @@ If `errors` is non-empty, append:
 ```
 Errors:
   - [iteration <N>] <message>
+```
+
+If `skipped_tasks` is non-empty, append:
+```
+Skipped (left in To Do, not picked again this run):
+  - <task> (iteration <iteration>)
 ```
 
 When `state == "paused"`, append the block-end pause reason and the resume hint in addition to the standard exit_code/completed_at lines (which the ralph.sh paused branch populates with the pause timestamp / exit_code=0):

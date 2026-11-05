@@ -24,6 +24,18 @@ class ErrorEntry(BaseModel):
     message: str
 
 
+class SkippedTask(BaseModel):
+    """A task an iteration left in ``To Do``. Field order: ``task``, ``iteration``.
+
+    The loop excludes it from further picking for the rest of the run.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    task: str
+    iteration: int
+
+
 class StatusFile(BaseModel):
     """Ralph autonomous-loop status file.
 
@@ -54,6 +66,7 @@ class StatusFile(BaseModel):
     paused_remaining_min: int | None = None
     paused_block_end_time: str | None = None
     paused_at: str | None = None
+    skipped_tasks: list[SkippedTask] = Field(default_factory=list[SkippedTask])
 
     def to_json_bytes(self) -> bytes:
         """Serialize to compact one-line JSON + trailing newline (bash parity)."""

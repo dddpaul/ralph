@@ -82,7 +82,7 @@ def test_extra_field_rejected() -> None:
         b'"elapsed":0,"errors":[],"completed_at":null,"exit_code":null,'
         b'"iteration_started_at":null,"timeout_sec":60,"paused_reason":null,'
         b'"paused_buffer_min":null,"paused_remaining_min":null,'
-        b'"paused_block_end_time":null,"paused_at":null,"unexpected":"x"}'
+        b'"paused_block_end_time":null,"paused_at":null,"skipped_tasks":[],"unexpected":"x"}'
     )
     with pytest.raises(ValueError):
         StatusFile.model_validate_json(payload)
