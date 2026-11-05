@@ -282,7 +282,7 @@ EOF
 # prefix carve-out: .git/hooks/post-commit
 # --------------------------------------------------------------------------
 
-@test "R11: .git/hooks/post-commit opens with the plugin's body verbatim" {
+@test "R11: .git/hooks/post-commit is the shim (migrated) or opens with the plugin body (legacy)" {
   live_path="$PROJECT_ROOT/.git/hooks/post-commit"
   tmpl_path="$PLUGIN/git-hooks/post-commit"
   [ -f "$tmpl_path" ]
