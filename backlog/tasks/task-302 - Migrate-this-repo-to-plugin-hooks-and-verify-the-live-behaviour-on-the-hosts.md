@@ -4,7 +4,7 @@ title: Migrate this repo to plugin hooks and verify the live behaviour on the ho
 status: Done
 assignee: []
 created_date: '2026-11-04T14:52:00Z'
-updated_date: '2026-11-05T17:35:00Z'
+updated_date: '2026-11-05T18:09:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -30,7 +30,7 @@ Reference: PRD design/plugin-delivered-project-files-prd.md, US-008.
 - [x] #4 (host) In a migrated test clone a plain git commit runs the plugin pre-commit, which rejects an NFD path that duplicates an NFC tree path and a name over 125 bytes
 - [x] #5 (host) The plugin git hooks still run with the plugin disabled in Claude
 - [x] #6 (host) With an isolated CLAUDE_CONFIG_DIR whose registry points at a removed install, the commit fails with the repair message and --no-verify gets through
-- [ ] #7 (host) On the second host, after the plugin update and the clone step, a commit runs the plugin hooks
+- [x] #7 (host) On the second host, after the plugin update and the clone step, a commit runs the plugin hooks
 - [x] #8 (host) The tracked and clone steps for this repo run interactively on the macOS host, never from the devcontainer, and this repo own pre-push stays a plain hook until TASK-311 ships the plugin pre-push body
 <!-- AC:END -->
 
@@ -134,4 +134,6 @@ Commit: `f029db9` - task-302: name the post-commit parity test for both migratio
 task-reviewer round 3: APPROVED (0 blocking, 1 minor, SCORE 9). The minor finding, a parity test named for the legacy state only, was fixed by renaming the test. Done with AC #7 (second host) deferred to agentbox, per the plan in these notes.
 
 Commit: `6ee424c` - task-302: merge origin/master (TASK-304, 323, 324, v0.20.1) into the TASK-302 work
+
+AC #7 verified on agentbox (second host, WSL/Linux): plugin was already at 0.20.1 at the time (now 0.20.2 after task-325). Ran migrate-plugin-hooks.sh clone: installed the plugin shim as pre-commit, commit-msg and post-commit, set git config ralph.pluginHooks=true. Verified a commit runs the plugin hooks on a disposable scratch branch (task-999999-shim-verify, deleted after): a correctly task-prefixed commit succeeded; invoking the installed .git/hooks/commit-msg shim directly with a message carrying a Co-Authored-By trailer returned 'BLOCKED: commit message contains forbidden trailer/heading.' exit 1, independent of the Claude Code PreToolUse layer -- confirming the git-level shim itself enforces, not just the PreToolUse guard. (The task-N prefix policy is PreToolUse-only by design, per TASK-281/TASK-325; the git-level hook backstops the trailer policy, which is what this AC is about.) No commits or branches left behind from the scratch test.
 <!-- SECTION:NOTES:END -->
