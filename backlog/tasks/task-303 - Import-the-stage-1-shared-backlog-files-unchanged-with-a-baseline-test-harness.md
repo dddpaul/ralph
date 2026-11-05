@@ -4,7 +4,7 @@ title: Import the stage-1 shared-backlog files unchanged with a baseline test ha
 status: Done
 assignee: []
 created_date: '2026-11-04T14:53:00Z'
-updated_date: '2026-11-04T20:26:00Z'
+updated_date: '2026-11-05T05:30:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies: []
@@ -50,4 +50,6 @@ Commit: `275c2db` - task-303: import the stage-1 shared-backlog script with a pi
 Commit: `3a6ad75` - task-303: isolate the stage-1 baseline from host env and the live backlog config
 
 task-reviewer: APPROVED (0 blocking, 2 minor, SCORE 8). Both minor findings were fixed before merge. (1) The harness ran the suite with the full host environment, and the reviewer showed an exported SHARED_BACKLOG_CHECKS=true failing 2 of 75 cases. The suite now runs without SHARED_BACKLOG_* and without GIT_DIR/GIT_WORK_TREE/GIT_INDEX_FILE, and with SHARED_BACKLOG_CHECKS=true exported the harness passes 4/4. (2) The harness copied this repo's live backlog/config.yml. It now uses a pinned fixture, tests/shell/stage1/config.yml, so a later config change cannot break the baseline. After the fixes: ruff clean; uv run pytest 1264 passed / 5 skipped; LC_ALL=C bats tests/unit with no failures.
+
+Commit: `a88cdcb` - task-303: bump plugin version to 0.18.4 (patch)
 <!-- SECTION:NOTES:END -->
