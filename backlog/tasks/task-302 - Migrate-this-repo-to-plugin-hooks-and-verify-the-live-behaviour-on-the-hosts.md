@@ -4,7 +4,7 @@ title: Migrate this repo to plugin hooks and verify the live behaviour on the ho
 status: Done
 assignee: []
 created_date: '2026-11-04T14:52:00Z'
-updated_date: '2026-11-05T07:17:00Z'
+updated_date: '2026-11-05T17:35:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -132,4 +132,6 @@ Commit: `876d8f9` - task-302: keep this repo's pre-push plain until US-017 and d
 Commit: `f029db9` - task-302: name the post-commit parity test for both migration states
 
 task-reviewer round 3: APPROVED (0 blocking, 1 minor, SCORE 9). The minor finding, a parity test named for the legacy state only, was fixed by renaming the test. Done with AC #7 (second host) deferred to agentbox, per the plan in these notes.
+
+Commit: `6ee424c` - task-302: merge origin/master (TASK-304, 323, 324, v0.20.1) into the TASK-302 work
 <!-- SECTION:NOTES:END -->
