@@ -94,6 +94,30 @@ teardown() {
   [ "$(plugin_version)" = "0.2.0" ]
 }
 
+@test "auto: patch bump when a change is confined to plugins/ralph/git-hooks/" {
+  git checkout -q -b task-3b
+  mkdir -p plugins/ralph/git-hooks
+  echo "hook body" > plugins/ralph/git-hooks/pre-push          # added (A)
+  git add -A && git commit -q -m "task-3b: add git hook body"
+
+  run bash "$HELPER" --auto
+  [ "$status" -eq 0 ]
+  [ "$(plugin_version)" = "0.1.1" ]  # patch even for an added file
+  [ "$(market_version)" = "0.1.1" ]
+}
+
+@test "auto: patch bump when a change is confined to plugins/ralph/scripts/" {
+  git checkout -q -b task-3c
+  mkdir -p plugins/ralph/scripts
+  echo "script" > plugins/ralph/scripts/shared-backlog.sh      # added (A)
+  git add -A && git commit -q -m "task-3c: add script"
+
+  run bash "$HELPER" --auto
+  [ "$status" -eq 0 ]
+  [ "$(plugin_version)" = "0.1.1" ]  # patch even for an added file
+  [ "$(market_version)" = "0.1.1" ]
+}
+
 @test "auto: idempotent — second run does not bump again" {
   git checkout -q -b task-4
   echo "changed skill" > "$SKILL"

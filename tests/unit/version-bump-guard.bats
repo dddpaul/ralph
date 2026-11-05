@@ -169,6 +169,30 @@ teardown() {
   [[ "$output" == *"BLOCKED"* ]]
 }
 
+@test "blocks: plugin git-hooks body changed without a version bump" {
+  mkdir -p plugins/ralph/git-hooks
+  echo "hook body" > plugins/ralph/git-hooks/pre-push
+  git add -A
+  git commit -q -m "git hook body, no bump"
+  local head; head=$(git rev-parse HEAD)
+
+  run_guard "$head" "$BASE"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"BLOCKED"* ]]
+}
+
+@test "blocks: plugin script changed without a version bump" {
+  mkdir -p plugins/ralph/scripts
+  echo "script" > plugins/ralph/scripts/shared-backlog.sh
+  git add -A
+  git commit -q -m "script, no bump"
+  local head; head=$(git rev-parse HEAD)
+
+  run_guard "$head" "$BASE"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"BLOCKED"* ]]
+}
+
 # --- release tag check (TASK-319) -------------------------------------------
 
 # Commit a 0.2.0 bump on top of $1 that also writes $2 to the docs file $3.
