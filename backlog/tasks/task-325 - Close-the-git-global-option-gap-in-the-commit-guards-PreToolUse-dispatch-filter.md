@@ -3,10 +3,10 @@ id: TASK-325
 title: >-
   Close the git global-option gap in the commit guards' PreToolUse dispatch
   filter
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-05T17:43:00Z'
-updated_date: '2026-11-05T17:54:00Z'
+updated_date: '2026-11-05T18:00:00Z'
 labels: []
 dependencies: []
 priority: high
@@ -45,4 +45,10 @@ Plan: widen the two commit-guard filters from Bash(git commit *) to Bash(git *) 
 gh pr create decision (AC #7): not widened. gh has no global options that can come before the subcommand (--repo/-R are per-command flags placed after pr create; only --help/--version are top-level and do nothing), so Bash(gh pr create *) has no analogous gap. Env-prefixed shapes (GH_REPO=x gh pr create, env git commit) fall under the harness's own permission-rule matching rather than the git global-option class and are out of scope; no follow-up filed.
 
 Correction to the gh decision above: gh does accept the persistent --repo/-R flag before or between the subcommands (gh -R a/b pr create and gh pr -R a/b create both parse, checked with --help), so Bash(gh pr create *) has an analogous gap, and PR bodies have no git-side backstop. Closing it needs a change to the shared lexer (is_pr_create matches gh pr create word by word) as well as the filter, so it is out of scope here and filed as TASK-326.
+
+Commit: `6a150ab` - task-325: dispatch the commit guards on any git command so git global options before commit cannot skip them
+
+Done: commit guards now dispatch on Bash(git *) in .claude/settings.json and plugins/ralph/hooks/hooks.json; live-tested in-session (git -c/-C/--git-dir commits without the prefix denied, trailer via git -c denied, git status and a prefixed git -c commit allowed). pytest 1302 passed / 4 skipped, bats tests/unit 224/224, ruff unchanged from master (53 pre-existing). task-reviewer APPROVED. gh -R gap filed as TASK-326.
+
+Commit: `c2e7e1d` - task-325: bump plugin version to 0.20.2 (patch)
 <!-- SECTION:NOTES:END -->
