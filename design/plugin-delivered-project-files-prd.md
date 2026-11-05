@@ -225,7 +225,7 @@ This feature does two things:
   - The same command is not blocked in a non-Ralph project.
 - [ ] **(host)** **Devcontainer runs.** A Ralph run in the devcontainer of a migrated test project is blocked by the plugin guard, including on a first run with no plugin data dir.
 - [ ] **(host)** **Plain git commits in a migrated test clone:**
-  - pre-commit rejects a filename that is not NFC-normalized, and a name over 125 bytes;
+  - pre-commit rejects an NFD path that duplicates an NFC tree path, and a name over 125 bytes;
   - the hooks still run with the plugin disabled in Claude;
   - with an isolated registry pointed at a removed install, the commit fails with the repair message;
   - `--no-verify` gets through.
