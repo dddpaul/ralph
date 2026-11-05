@@ -116,7 +116,7 @@ def initialized(tmp_path: Path) -> tuple[Path, dict[str, str]]:
     (root / ".claude").mkdir()
     shutil.copyfile(TEMPLATES / "claude/settings.local.json", root / ".claude/settings.local.json")
     snippet = "set -e\n" + step_3_11_snippet()
-    out = subprocess.run(["bash", "-c", snippet], cwd=root, env=env, capture_output=True, text=True)
+    out = subprocess.run(["bash", "-c", snippet], cwd=root, env=env, capture_output=True, text=True, check=False)
     assert out.returncode == 0, out.stdout + out.stderr
     return root.resolve(), env
 
@@ -148,6 +148,7 @@ def test_init_project_blocks_through_the_plugin(initialized: tuple[Path, dict[st
         env=env | {"CLAUDE_PROJECT_DIR": str(root)},
         capture_output=True,
         text=True,
+        check=False,
     )
     assert guard.returncode == 0, guard.stderr
     assert json.loads(guard.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"

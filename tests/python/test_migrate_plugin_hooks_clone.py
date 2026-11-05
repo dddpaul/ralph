@@ -87,7 +87,12 @@ def clone(
         env["RALPH_MIGRATE_STOP_AFTER"] = stop_after
     env.update(extra_env or {})
     return subprocess.run(
-        [BASH, str(SCRIPT), "clone", str(root)], cwd=cwd or root.parent, env=env, capture_output=True, text=True
+        [BASH, str(SCRIPT), "clone", str(root)],
+        cwd=cwd or root.parent,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
     )
 
 

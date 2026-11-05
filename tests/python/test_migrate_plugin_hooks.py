@@ -101,6 +101,7 @@ def migrate(
         env=env,
         capture_output=True,
         text=True,
+        check=False,
     )
 
 
@@ -176,6 +177,7 @@ def notes_guard_denies(root: Path) -> bool:
             env=env,
             capture_output=True,
             text=True,
+            check=False,
         )
         if '"deny"' in result.stdout:
             return True
@@ -433,7 +435,7 @@ def test_usage_errors_exit_2_and_touch_nothing(tmp_path: Path, args: list[str]) 
     root = make_project(tmp_path / "proj")
     before = snapshot(root)
     result = subprocess.run(
-        [BASH, str(SCRIPT), *args], cwd=root, capture_output=True, text=True
+        [BASH, str(SCRIPT), *args], cwd=root, capture_output=True, text=True, check=False
     )
     assert result.returncode == 2
     assert snapshot(root) == before

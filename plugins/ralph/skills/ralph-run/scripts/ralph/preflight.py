@@ -542,8 +542,10 @@ def migration_state(root: Path, hooks_dir: Path, switch: bool) -> list[str]:
         missing = [g for g in _MANAGED_GUARDS if not (root / f".claude/hooks/{g}.sh").is_file()]
         if missing and len(missing) < len(_MANAGED_GUARDS):
             return [
-                "partially migrated — .claude/ralph.json does not set pluginHooks, but guard copies are missing "
-                f"from .claude/hooks: {', '.join(missing)} (run bash {_MIGRATE_SCRIPT} tracked)"
+                (
+                    "partially migrated — .claude/ralph.json does not set pluginHooks, but guard copies are missing "
+                    f"from .claude/hooks: {', '.join(missing)} (run bash {_MIGRATE_SCRIPT} tracked)"
+                )
             ]
         return [
             f"not migrated — the project runs its own guard copies (run bash {_MIGRATE_SCRIPT} tracked, then clone)"

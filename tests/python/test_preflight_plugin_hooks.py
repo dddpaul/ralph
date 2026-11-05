@@ -65,7 +65,7 @@ def migrated_project(root: Path) -> Path:
 def state(root: Path, switch: bool | None = None) -> list[str]:
     if switch is None:
         out = subprocess.run(
-            ["git", "config", "--bool", "ralph.pluginHooks"], cwd=root, capture_output=True, text=True
+            ["git", "config", "--bool", "ralph.pluginHooks"], cwd=root, capture_output=True, text=True, check=False
         ).stdout.strip()
         switch = out == "true"
     return preflight.migration_state(root, root / ".git/hooks", switch)
