@@ -4,10 +4,12 @@ title: Add token-owned lock primitives and command deadlines to shared-backlog
 status: To Do
 assignee: []
 created_date: '2026-11-04T14:53:00Z'
+updated_date: '2026-11-05T04:55:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
   - TASK-303
+  - TASK-322
 priority: medium
 ---
 

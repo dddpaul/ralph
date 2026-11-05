@@ -4,6 +4,7 @@ title: Refuse pushes that carry duplicate task IDs with a plugin pre-push body
 status: To Do
 assignee: []
 created_date: '2026-11-04T14:54:00Z'
+updated_date: '2026-11-05T04:55:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -12,6 +13,7 @@ dependencies:
   - TASK-307
   - TASK-308
   - TASK-310
+  - TASK-322
 priority: medium
 ---
 
