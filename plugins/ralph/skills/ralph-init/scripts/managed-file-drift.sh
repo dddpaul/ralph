@@ -44,7 +44,10 @@
 # six managed Claude guards and the common allow rules: .claude/settings.local.json
 # and the guard copies are no longer compared, and a
 # copy of a guard the marker does not list in "localGuards" is reported as
-# "<path>: legacy copy" (migrate-plugin-hooks.sh tracked deletes it). In a clone
+# "<path>: legacy copy" (migrate-plugin-hooks.sh tracked deletes it). When the
+# clone is shimmed too (below), a missing .claude/hooks/filename-length-guard.sh
+# is not reported either (tracked --retire-legacy deletes it); a present copy is
+# still compared. In a clone
 # whose git config ralph.pluginHooks is true, the three git hooks are compared
 # with the plugin shim (templates/shims/git-hook) instead of the legacy bodies.
 # .claude/settings.json, .devcontainer/Dockerfile (assembled) and .gitignore
@@ -220,6 +223,11 @@ plugin_owned() {
     (.claude/hooks/*.sh) name=${1#.claude/hooks/} name=${name%.sh} ;;
     (*) return 0 ;;
   esac
+  if [ "$name" = filename-length-guard ]; then
+    # tracked --retire-legacy deletes it once this clone runs the shim.
+    [ "$shimmed" -eq 0 ] || [ -e "$project/$1" ] || echo skip
+    return 0
+  fi
   case " $GUARDS " in (*" $name "*) ;; (*) return 0 ;; esac
   if printf '%s\n' "$locals" | grep -Fxq -- "$name" || [ ! -e "$project/$1" ]; then
     echo skip

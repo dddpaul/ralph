@@ -463,12 +463,14 @@ The plugin ships the git hook bodies in `plugins/ralph/git-hooks/` (`pre-commit`
 bash <installPath>/skills/ralph-init/scripts/migrate-plugin-hooks.sh tracked [--local-guards <name>[,<name>...]] .
 # Once per clone; on a second host, this is the only step after git pull
 bash <installPath>/skills/ralph-init/scripts/migrate-plugin-hooks.sh clone .
+# Once every clone has run clone: delete the leftover length guard copy, then commit
+bash <installPath>/skills/ralph-init/scripts/migrate-plugin-hooks.sh tracked --retire-legacy .
 ```
 
-- **`tracked`** writes the marker first, so an interrupted run never leaves a guard unenforced. Then it adds the `.gitignore` exception. It removes only the managed guard entries from `.claude/settings.json` and deletes the managed guard copies that are not local guards. It keeps the project's own hooks and entries.
-- **`clone`** checks every git hook before it writes anything. It saves the switches and installs the shims. A differing hook that `.claude/managed-file-drift.accept` lists is kept as `<name>.local`; any other differing hook stops the run, and an existing `<name>.local` is never overwritten. Last, it drops from `.claude/settings.local.json` the common rules your user settings already hold, and reports the ones it kept.
+- **`tracked`** writes the marker first, so an interrupted run never leaves a guard unenforced. Then it adds the `.gitignore` exception. It removes only the managed guard entries from `.claude/settings.json` and deletes the managed guard copies that are not local guards. It keeps the project's own hooks and entries, and `.claude/hooks/filename-length-guard.sh`, which a legacy pre-commit copy still calls. `--retire-legacy` deletes that copy; it refuses while this clone's pre-commit is not the plugin shim.
+- **`clone`** runs on the host only: it refuses with `DEVCONTAINER=true`, because the container shares the host's `.git/config` and would record its own `jq` and `/workspace`. It checks every git hook before it writes anything. It saves the switches and installs the shims, replacing an unedited copy of any hook body ralph-init has ever shipped (`scripts/shipped-git-hooks.sha256`, checked against git history by `tests/python/test_shipped_git_hooks.py`). A differing hook that `.claude/managed-file-drift.accept` lists is kept as `<name>.local`; any other differing hook stops the run, and an existing `<name>.local` is never overwritten. Last, it drops from `.claude/settings.local.json` the common rules your user settings already hold, and reports the ones it kept.
 
-Neither part commits, and a second run changes nothing. After the migration, a plugin update reaches every guard and git hook with no per-project run. The `/ralph-run` preflight reports a project as not migrated, partially migrated, or with shims missing in this clone, and `managed-file-drift.sh` stops comparing what the plugin owns. This repo keeps its legacy wiring until it migrates itself (TASK-302).
+Neither part commits, and a second run changes nothing. After the migration, a plugin update reaches every guard and git hook with no per-project run. The `/ralph-run` preflight reports a project as not migrated, partially migrated, or with shims missing in this clone, and names a leftover `.claude/hooks/filename-length-guard.sh` as removable once this clone's pre-commit is the shim, and `managed-file-drift.sh` stops comparing what the plugin owns. This repo keeps its legacy wiring until it migrates itself (TASK-302).
 
 ### Double-Run Guard
 

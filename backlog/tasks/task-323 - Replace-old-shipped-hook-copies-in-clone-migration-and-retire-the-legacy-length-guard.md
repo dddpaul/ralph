@@ -3,9 +3,10 @@ id: TASK-323
 title: >-
   Replace old shipped hook copies in clone migration and retire the legacy
   length guard
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-05T05:25:00Z'
+updated_date: '2026-11-05T07:04:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -37,10 +38,18 @@ Why: migrating a real project (a sibling Ralph project, dry run on 2026-11-05) s
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The plugin ships the sha256 of every pre-commit, commit-msg and post-commit body ralph-init has ever shipped, and a test regenerates the list from git history and fails on drift
-- [ ] #2 migrate-plugin-hooks.sh clone replaces a hook whose sha256 is in that list and still refuses a hook with unknown content
-- [ ] #3 A fixture with a pre-commit equal to the v0.14.14 template and a commit-msg equal to the v0.16.0 template migrates with clone exit 0 and both replaced by the shim
-- [ ] #4 An explicit retire step (for example tracked --retire-legacy) deletes .claude/hooks/filename-length-guard.sh, and the preflight names the leftover copy as removable when this clone pre-commit is the shim
-- [ ] #5 clone exits non-zero with a run-it-on-the-host message when DEVCONTAINER=true and writes nothing
-- [ ] #6 ruff, pytest and bats pass, and bash -n plus the bash 3.2 static guard pass on every changed shell file
+- [x] #1 The plugin ships the sha256 of every pre-commit, commit-msg and post-commit body ralph-init has ever shipped, and a test regenerates the list from git history and fails on drift
+- [x] #2 migrate-plugin-hooks.sh clone replaces a hook whose sha256 is in that list and still refuses a hook with unknown content
+- [x] #3 A fixture with a pre-commit equal to the v0.14.14 template and a commit-msg equal to the v0.16.0 template migrates with clone exit 0 and both replaced by the shim
+- [x] #4 An explicit retire step (for example tracked --retire-legacy) deletes .claude/hooks/filename-length-guard.sh, and the preflight names the leftover copy as removable when this clone pre-commit is the shim
+- [x] #5 clone exits non-zero with a run-it-on-the-host message when DEVCONTAINER=true and writes nothing
+- [x] #6 ruff, pytest and bats pass, and bash -n plus the bash 3.2 static guard pass on every changed shell file
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan: ship shipped-git-hooks.sha256 (name sha256 per line) beside migrate-plugin-hooks.sh, regenerated from git history in tests/python/test_shipped_git_hooks.py; clone replaces listed hooks, refuses DEVCONTAINER=true; tracked --retire-legacy deletes .claude/hooks/filename-length-guard.sh (refuses unless this clone's pre-commit is the shim); preflight names the leftover copy; managed-file-drift skips the missing copy in a shimmed migrated clone.
+
+Done: shipped-git-hooks.sha256 (13 bodies from git history across skills/ralph-init/templates, plugins/ralph/skills/ralph-init/templates/git-hooks and plugins/ralph/git-hooks) with a drift test; clone replaces listed hooks, refuses DEVCONTAINER=true; tracked --retire-legacy deletes the length guard copy (refuses unless this clone's pre-commit is the shim) and tracked notes the leftover otherwise; preflight names it removable; managed-file-drift skips the missing copy in a shimmed migrated clone. Tests that run clone/init now drop DEVCONTAINER from their env. Ruff: clean in every changed file; 53 pre-existing errors remain repo-wide in untouched files. task-reviewer APPROVED.
+<!-- SECTION:NOTES:END -->

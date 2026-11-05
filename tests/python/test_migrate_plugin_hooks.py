@@ -101,6 +101,7 @@ def migrate(
         env=env,
         capture_output=True,
         text=True,
+        check=False,
     )
 
 
@@ -176,6 +177,7 @@ def notes_guard_denies(root: Path) -> bool:
             env=env,
             capture_output=True,
             text=True,
+            check=False,
         )
         if '"deny"' in result.stdout:
             return True
@@ -433,7 +435,7 @@ def test_usage_errors_exit_2_and_touch_nothing(tmp_path: Path, args: list[str]) 
     root = make_project(tmp_path / "proj")
     before = snapshot(root)
     result = subprocess.run(
-        [BASH, str(SCRIPT), *args], cwd=root, capture_output=True, text=True
+        [BASH, str(SCRIPT), *args], cwd=root, capture_output=True, text=True, check=False
     )
     assert result.returncode == 2
     assert snapshot(root) == before
@@ -511,3 +513,56 @@ def test_every_interruption_point_still_enforces(
     reference = make_project(tmp_path / "reference")
     assert migrate(reference, *args).returncode == 0
     assert snapshot(root) == snapshot(reference)
+
+
+# --------------------------------------------------------------------------
+# Retiring the legacy length guard copy (TASK-323)
+# --------------------------------------------------------------------------
+
+SHIM = REPO_ROOT / "plugins/ralph/skills/ralph-init/templates/shims/git-hook"
+LENGTH_COPY = ".claude/hooks/filename-length-guard.sh"
+
+
+def shim_pre_commit(root: Path) -> None:
+    """Install the plugin shim as this clone's pre-commit."""
+    shutil.copyfile(SHIM, root / ".git/hooks/pre-commit")
+
+
+def test_retire_legacy_deletes_the_length_guard_copy(tmp_path: Path) -> None:
+    root = make_project(tmp_path / "proj", extras=False)
+    shim_pre_commit(root)
+    result = migrate(root, "--retire-legacy")
+    assert result.returncode == 0, result.stderr
+    assert not (root / LENGTH_COPY).exists()
+    assert not (root / ".claude/hooks").exists()
+    assert f"deleted {LENGTH_COPY}" in result.stdout
+    assert_every_guard_enforced(root)
+    second = migrate(root, "--retire-legacy")
+    assert second.returncode == 0, second.stderr
+    assert "nothing to change" in second.stdout
+
+
+def test_retire_legacy_refuses_before_any_write_without_the_shim(tmp_path: Path) -> None:
+    root = make_project(tmp_path / "proj")
+    before = snapshot(root)
+    result = migrate(root, "--retire-legacy")
+    assert result.returncode == 1
+    assert "pre-commit to be the plugin shim" in result.stderr
+    assert snapshot(root) == before
+
+
+def test_without_retire_the_copy_stays_and_is_named_removable_in_a_shimmed_clone(tmp_path: Path) -> None:
+    root = make_project(tmp_path / "proj")
+    shim_pre_commit(root)
+    result = migrate(root)
+    assert result.returncode == 0, result.stderr
+    assert (root / LENGTH_COPY).exists()
+    assert f"{LENGTH_COPY} is a leftover legacy copy" in result.stdout
+    assert "--retire-legacy" in result.stdout
+
+
+def test_without_the_shim_the_copy_is_not_named_removable(tmp_path: Path) -> None:
+    root = make_project(tmp_path / "proj")
+    result = migrate(root)
+    assert result.returncode == 0, result.stderr
+    assert "leftover" not in result.stdout
