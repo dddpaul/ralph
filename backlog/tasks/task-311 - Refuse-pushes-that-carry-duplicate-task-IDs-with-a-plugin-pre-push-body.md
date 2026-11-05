@@ -4,7 +4,7 @@ title: Refuse pushes that carry duplicate task IDs with a plugin pre-push body
 status: To Do
 assignee: []
 created_date: '2026-11-04T14:54:00Z'
-updated_date: '2026-11-05T05:25:00Z'
+updated_date: '2026-11-05T07:17:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -14,6 +14,7 @@ dependencies:
   - TASK-308
   - TASK-310
   - TASK-322
+  - TASK-302
 priority: medium
 ---
 
@@ -40,3 +41,9 @@ Reference: PRD design/plugin-delivered-project-files-prd.md, US-017.
 - [ ] #7 bash -n, the bash 3.2 static guard and the shell tests pass; (host) the shell suite passes under /bin/bash 3.2
 - [ ] #8 This repo own pre-push (the version-bump guard) becomes pre-push.local behind the plugin pre-push shim, and a real push of a bumped commit to a scratch remote still runs the version-bump guard (moved here from TASK-302)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+From the TASK-302 review (2026-11-05): moving this repo's pre-push behind the plugin pre-push shim (AC #8) needs either a managed-file-drift.accept entry for .git/hooks/pre-push, so that clone keeps it as pre-push.local, or a manual move. clone stops on a differing hook the accept file does not list. Added TASK-302 as a dependency, because the move assumes this repo is already migrated.
+<!-- SECTION:NOTES:END -->
