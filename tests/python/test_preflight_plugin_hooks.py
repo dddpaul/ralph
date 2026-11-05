@@ -83,6 +83,24 @@ def test_migrated_clone_reports_only_best_effort(tmp_path: Path) -> None:
     assert found[0].startswith("plugin guards are best effort")
 
 
+def test_shimmed_clone_names_the_leftover_length_guard_copy_as_removable(tmp_path: Path) -> None:
+    root = migrated_project(tmp_path / "p")
+    (root / ".claude/hooks").mkdir()
+    shutil.copy2(PLUGIN / "hooks/filename-length-guard.sh", root / ".claude/hooks/filename-length-guard.sh")
+    leftover = [f for f in state(root) if f.startswith("leftover legacy copy")]
+    assert len(leftover) == 1
+    assert ".claude/hooks/filename-length-guard.sh is removable" in leftover[0]
+    assert "tracked --retire-legacy" in leftover[0]
+
+
+def test_leftover_copy_is_not_named_while_pre_commit_is_a_legacy_copy(tmp_path: Path) -> None:
+    root = migrated_project(tmp_path / "p")
+    (root / ".claude/hooks").mkdir()
+    shutil.copy2(PLUGIN / "hooks/filename-length-guard.sh", root / ".claude/hooks/filename-length-guard.sh")
+    shutil.copyfile(PLUGIN / "git-hooks/pre-commit", root / ".git/hooks/pre-commit")
+    assert not any(f.startswith("leftover legacy copy") for f in state(root))
+
+
 def test_marker_with_legacy_settings_entries_is_partially_migrated(tmp_path: Path) -> None:
     root = migrated_project(tmp_path / "p")
     (root / ".claude/settings.json").write_text(

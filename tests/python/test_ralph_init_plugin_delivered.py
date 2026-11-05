@@ -105,7 +105,8 @@ def initialized(tmp_path: Path) -> tuple[Path, dict[str, str]]:
     reg.parent.mkdir(parents=True)
     entry = {"scope": "user", "installPath": str(PLUGIN), "version": "0.0.0"}
     reg.write_text(json.dumps({"version": 2, "plugins": {"ralph@dddpaul-ralph": [entry]}}))
-    env = {k: v for k, v in os.environ.items() if k not in ("CLAUDE_CONFIG_DIR", "GIT_DIR", "GIT_WORK_TREE")}
+    dropped = ("CLAUDE_CONFIG_DIR", "GIT_DIR", "GIT_WORK_TREE", "DEVCONTAINER")
+    env = {k: v for k, v in os.environ.items() if k not in dropped}
     env |= {"HOME": str(home), "CLAUDE_PLUGIN_ROOT": str(PLUGIN), "LC_ALL": "C"}
     root = tmp_path / "proj"
     root.mkdir()

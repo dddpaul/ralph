@@ -574,6 +574,15 @@ def test_migrated_project_still_manages_the_length_guard_helper(project: Path) -
 
 
 @needs_jq
+def test_migrated_shimmed_clone_does_not_miss_the_retired_length_guard(project: Path) -> None:
+    shim_clone(project)
+    migrate_tracked(project)
+    (project / ".claude/hooks/filename-length-guard.sh").unlink()
+    result = run("check", str(project))
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+@needs_jq
 def test_accept_refuses_a_path_the_plugin_owns(project: Path) -> None:
     migrate_tracked(project, "notes-guard")
     (project / ".claude/hooks/notes-guard.sh").write_text("#!/bin/sh\n")

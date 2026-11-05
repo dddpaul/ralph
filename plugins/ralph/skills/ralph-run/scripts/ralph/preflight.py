@@ -63,6 +63,7 @@ _DRIFT_SCRIPT = _PLUGIN_ROOT / "skills/ralph-init/scripts/managed-file-drift.sh"
 _HOME_PREFIXES = ("$HOME/", "${HOME}/", "~/")
 _MIGRATE_SCRIPT = _PLUGIN_ROOT / "skills/ralph-init/scripts/migrate-plugin-hooks.sh"
 _SHIM = _PLUGIN_ROOT / "skills/ralph-init/templates/shims/git-hook"
+_LENGTH_GUARD = "filename-length-guard"
 _MANAGED_GUARDS = (
     "commit-msg-guard",
     "commit-prefix-guard",
@@ -524,7 +525,8 @@ def migration_state(root: Path, hooks_dir: Path, switch: bool) -> list[str]:
 
     ``root`` is the work tree, ``hooks_dir`` what ``git rev-parse --git-path
     hooks`` returns and ``switch`` the clone's ``ralph.pluginHooks``. A fully
-    migrated clone yields only the best-effort note.
+    migrated clone yields only the best-effort note, plus the leftover-copy note
+    while ``.claude/hooks/filename-length-guard.sh`` is still tracked.
     """
     try:
         marker: object = json.loads((root / ".claude/ralph.json").read_text(encoding="utf-8"))
@@ -561,6 +563,11 @@ def migration_state(root: Path, hooks_dir: Path, switch: bool) -> list[str]:
         detail = [f"{', '.join(stale)} not the plugin shim"] if stale else []
         detail += [] if switch else ["git config ralph.pluginHooks is not true"]
         found.append(f"shims missing in this clone — {'; '.join(detail)} (run bash {_MIGRATE_SCRIPT} clone)")
+    if _same_bytes(hooks_dir / "pre-commit", shim) and (root / f".claude/hooks/{_LENGTH_GUARD}.sh").exists():
+        found.append(
+            f"leftover legacy copy — .claude/hooks/{_LENGTH_GUARD}.sh is removable: this clone's pre-commit is the "
+            f"plugin shim (once every clone has run clone, run bash {_MIGRATE_SCRIPT} tracked --retire-legacy)"
+        )
     found.append(
         "plugin guards are best effort — a plugin guard hook that cannot start does not block the command; "
         "the git hooks still block when ralph.pluginHooks is true"
@@ -584,7 +591,7 @@ def _check_plugin_hooks(verbose: bool) -> None:
         return
     switch = _git_stdout("config", "--bool", "ralph.pluginHooks") == "true"
     found = migration_state(Path(top), Path(hooks).resolve(), switch)
-    migrated = len(found) == 1 and "best effort" in found[0]
+    migrated = all(m.startswith(("plugin guards are best effort", "leftover legacy copy")) for m in found)
     _verbose(verbose, f"check plugin_hooks: {'ok' if migrated else 'WARN'}")
     for message in found:
         print(f"WARNING: plugin hooks: {message}", file=sys.stderr)

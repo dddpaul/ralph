@@ -30,6 +30,7 @@ SHIM = TEMPLATES / "shims/git-hook"
 FRAGMENT = REPO_ROOT / "plugins/ralph/user-settings.json"
 LOCAL_TEMPLATE = REPO_ROOT / "tests/python/fixtures/legacy-settings.local.json"
 BODIES = REPO_ROOT / "plugins/ralph/git-hooks"
+OLD_HOOKS = REPO_ROOT / "tests/python/fixtures/shipped-git-hooks"
 HOOK_NAMES = ("pre-commit", "commit-msg", "post-commit")
 STOP_POINTS = ("config", *(f"shim:{n}" for n in HOOK_NAMES), "switch")
 BASH = shutil.which("bash") or "/bin/bash"
@@ -62,7 +63,8 @@ def env_for(home: Path, config_dir: Path | None = None) -> dict[str, str]:
     env = {
         k: v
         for k, v in os.environ.items()
-        if k not in ("CLAUDE_PLUGIN_ROOT", "RALPH_MIGRATE_STOP_AFTER", "CLAUDE_CONFIG_DIR") and not k.startswith("GIT_")
+        if k not in ("CLAUDE_PLUGIN_ROOT", "RALPH_MIGRATE_STOP_AFTER", "CLAUDE_CONFIG_DIR", "DEVCONTAINER")
+        and not k.startswith("GIT_")
     }
     env["HOME"] = str(home)
     if config_dir is not None:
@@ -71,12 +73,19 @@ def env_for(home: Path, config_dir: Path | None = None) -> dict[str, str]:
 
 
 def clone(
-    root: Path, home: Path, *, config_dir: Path | None = None, stop_after: str | None = None, cwd: Path | None = None
+    root: Path,
+    home: Path,
+    *,
+    config_dir: Path | None = None,
+    stop_after: str | None = None,
+    cwd: Path | None = None,
+    extra_env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run ``migrate-plugin-hooks.sh clone <root>``."""
     env = env_for(home, config_dir)
     if stop_after:
         env["RALPH_MIGRATE_STOP_AFTER"] = stop_after
+    env.update(extra_env or {})
     return subprocess.run(
         [BASH, str(SCRIPT), "clone", str(root)], cwd=cwd or root.parent, env=env, capture_output=True, text=True
     )
@@ -262,7 +271,36 @@ def test_unaccepted_differing_hook_stops_before_any_write(tmp_path: Path, home: 
     before = snapshot(root)
     result = clone(root, home)
     assert result.returncode == 1
-    assert "commit-msg differs from the plugin's commit-msg hook body" in result.stderr
+    assert "commit-msg differs from every commit-msg hook body ralph-init has shipped" in result.stderr
+    assert snapshot(root) == before
+    assert ralph_config(root) == {}
+
+
+def test_old_shipped_hook_copies_are_replaced_by_the_shim(tmp_path: Path, home: Path) -> None:
+    root = make_clone(tmp_path / "proj")
+    shutil.copyfile(OLD_HOOKS / "pre-commit.v0.14.14", root / ".git/hooks/pre-commit")
+    shutil.copyfile(OLD_HOOKS / "commit-msg.v0.16.0", root / ".git/hooks/commit-msg")
+    result = clone(root, home)
+    assert result.returncode == 0, result.stderr
+    for name in HOOK_NAMES:
+        assert (root / ".git/hooks" / name).read_bytes() == SHIM.read_bytes()
+        assert not (root / f".git/hooks/{name}.local").exists()
+
+
+def test_a_shipped_body_of_another_hook_name_is_refused(tmp_path: Path, home: Path) -> None:
+    root = make_clone(tmp_path / "proj")
+    shutil.copyfile(BODIES / "pre-commit", root / ".git/hooks/commit-msg")
+    before = snapshot(root)
+    assert clone(root, home).returncode == 1
+    assert snapshot(root) == before
+
+
+def test_refuses_inside_the_devcontainer_and_writes_nothing(tmp_path: Path, home: Path) -> None:
+    root = make_clone(tmp_path / "proj")
+    before = snapshot(root)
+    result = clone(root, home, extra_env={"DEVCONTAINER": "true"})
+    assert result.returncode == 1
+    assert "run it on the host" in result.stderr
     assert snapshot(root) == before
     assert ralph_config(root) == {}
 
