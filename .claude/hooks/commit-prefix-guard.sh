@@ -1,6 +1,6 @@
 #!/bin/bash
 # commit-prefix-guard.sh — Enforce task-<id> prefix on commit messages
-# Trigger: Bash(git commit *)
+# Trigger: Bash(git *) (git * so git -c/-C/--git-dir... commit still dispatches)
 # Action: deny JSON (PreToolUse)
 # Input: tool_input JSON on stdin
 #

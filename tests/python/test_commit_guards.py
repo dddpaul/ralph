@@ -1,8 +1,9 @@
 """PreToolUse commit guards deny only real commits (TASK-281).
 
 ``commit-msg-guard.sh`` and ``commit-prefix-guard.sh`` are registered with
-``if: Bash(git commit *)`` / ``if: Bash(gh pr create *)``, but that filter is
-best-effort: Claude Code runs the hook anyway for commands it cannot fully
+``if: Bash(git *)`` / ``if: Bash(gh pr create *)`` (``git *`` because
+``git -c k=v commit`` misses a literal ``git commit *``), and that filter is
+best-effort too: Claude Code runs the hook anyway for commands it cannot fully
 parse (unquoted ``$VAR``, ``$(...)``, backticks). Each guard therefore gates
 itself on a real commit at a command position, and the prefix guard extracts
 the message without a line-bound ``sed`` so multi-line messages parse.
@@ -244,3 +245,60 @@ def test_prefix_guard_option_parsing(
 
 # The two guards' shared lexer block is pinned identical by the bats case
 # "commit-msg-guard and commit-prefix-guard share an identical lexer".
+
+
+# --- git global options and the widened Bash(git *) filter (TASK-325) -------
+
+GLOBAL_OPTS = [
+    "git -c user.name=x -c user.email=y commit",
+    "git -C . commit",
+    "git --git-dir=.git commit",
+    "git --work-tree=. commit",
+]
+
+
+@pytest.mark.parametrize("git_commit", GLOBAL_OPTS)
+def test_guards_see_commit_after_git_global_options(
+    task_repo: Path, git_commit: str
+) -> None:
+    assert is_deny(
+        run_guard("commit-prefix-guard.sh", f'{git_commit} -m "no prefix"', task_repo)
+    )
+    assert (
+        run_guard("commit-prefix-guard.sh", f'{git_commit} -m "task-99: ok"', task_repo)
+        == ""
+    )
+    bad = f'{git_commit} -m "task-99: ok\n\n{TRAILER}"'
+    assert is_deny(run_guard("commit-msg-guard.sh", bad, task_repo))
+
+
+@pytest.mark.parametrize(
+    ("command", "denied"),
+    [
+        (f"{COMMIT} -m $'no prefix\\n\\nbody'", True),
+        (f"{COMMIT} -m $'task-99: ok\\n\\nbody'", False),
+        (f'{COMMIT} -m "task-99: one" && {COMMIT} --allow-empty -m "two"', True),
+        (
+            f'{COMMIT} -m "task-99: one"; {COMMIT} --allow-empty -m "task-99: two"',
+            False,
+        ),
+    ],
+)
+def test_prefix_guard_ansi_c_and_chained(
+    task_repo: Path, command: str, denied: bool
+) -> None:
+    assert is_deny(run_guard("commit-prefix-guard.sh", command, task_repo)) is denied
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "git status --short",
+        "git log --oneline --grep commit",
+        'git -c core.pager=cat log -m --format="%s commit"',
+        "git checkout -b task-99-commit",
+    ],
+)
+def test_guards_allow_non_commit_git(task_repo: Path, command: str) -> None:
+    for name in GUARDS:
+        assert run_guard(name, command, task_repo) == ""

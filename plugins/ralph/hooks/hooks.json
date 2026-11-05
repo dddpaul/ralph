@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "if": "Bash(git commit *)",
+            "if": "Bash(git *)",
             "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/run.sh commit-msg-guard"
           },
           {
@@ -52,7 +52,7 @@
           },
           {
             "type": "command",
-            "if": "Bash(git commit *)",
+            "if": "Bash(git *)",
             "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/run.sh commit-prefix-guard"
           }
         ]

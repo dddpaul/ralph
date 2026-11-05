@@ -1,6 +1,6 @@
 #!/bin/bash
 # commit-msg-guard.sh — Block forbidden trailers and headings in commits and PRs
-# Trigger: Bash(git commit *), Bash(gh pr create *)
+# Trigger: Bash(git *), Bash(gh pr create *) (git * so git -c/-C/--git-dir... commit still dispatches)
 # Action: deny JSON (PreToolUse)
 # Input: tool_input JSON on stdin
 #
