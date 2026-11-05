@@ -4,7 +4,7 @@ title: Refuse pushes that carry duplicate task IDs with a plugin pre-push body
 status: To Do
 assignee: []
 created_date: '2026-11-04T14:54:00Z'
-updated_date: '2026-11-05T04:55:00Z'
+updated_date: '2026-11-05T05:25:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -38,4 +38,5 @@ Reference: PRD design/plugin-delivered-project-files-prd.md, US-017.
 - [ ] #5 An existing hook keeps running as pre-push.local with the same stdin
 - [ ] #6 An end-to-end test runs a real create push through the installed shim while create holds the protocol lock, and it completes without deadlock
 - [ ] #7 bash -n, the bash 3.2 static guard and the shell tests pass; (host) the shell suite passes under /bin/bash 3.2
+- [ ] #8 This repo own pre-push (the version-bump guard) becomes pre-push.local behind the plugin pre-push shim, and a real push of a bumped commit to a scratch remote still runs the version-bump guard (moved here from TASK-302)
 <!-- AC:END -->

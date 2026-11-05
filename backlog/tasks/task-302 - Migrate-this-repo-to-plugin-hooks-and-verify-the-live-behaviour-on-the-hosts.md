@@ -4,7 +4,7 @@ title: Migrate this repo to plugin hooks and verify the live behaviour on the ho
 status: To Do
 assignee: []
 created_date: '2026-11-04T14:52:00Z'
-updated_date: '2026-11-05T05:09:00Z'
+updated_date: '2026-11-05T05:25:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -25,13 +25,13 @@ Reference: PRD design/plugin-delivered-project-files-prd.md, US-008.
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 This repo is migrated with tracked --local-guards listing every live guard, plus clone, and its live guard copies and their registrations remain
-- [ ] #2 This repo own pre-push becomes pre-push.local behind the shim
-- [ ] #3 (host) In a migrated test project the plugin commit-message guard blocks a bad git commit, including from a subdirectory session, and the same command is not blocked in a non-Ralph project
-- [ ] #4 (host) A Ralph run in the devcontainer of a migrated test project is blocked by the plugin guard, including on a first run with no plugin data dir
-- [ ] #5 (host) In a migrated test clone a plain git commit runs the plugin pre-commit, which rejects a non-NFC filename and a name over 125 bytes
-- [ ] #6 (host) The plugin git hooks still run with the plugin disabled in Claude
-- [ ] #7 (host) With an isolated CLAUDE_CONFIG_DIR whose registry points at a removed install, the commit fails with the repair message and --no-verify gets through
-- [ ] #8 (host) On the second host, after the plugin update and the clone step, a commit runs the plugin hooks
+- [ ] #2 (host) In a migrated test project the plugin commit-message guard blocks a bad git commit, including from a subdirectory session, and the same command is not blocked in a non-Ralph project
+- [ ] #3 (host) A Ralph run in the devcontainer of a migrated test project is blocked by the plugin guard, including on a first run with no plugin data dir
+- [ ] #4 (host) In a migrated test clone a plain git commit runs the plugin pre-commit, which rejects a non-NFC filename and a name over 125 bytes
+- [ ] #5 (host) The plugin git hooks still run with the plugin disabled in Claude
+- [ ] #6 (host) With an isolated CLAUDE_CONFIG_DIR whose registry points at a removed install, the commit fails with the repair message and --no-verify gets through
+- [ ] #7 (host) On the second host, after the plugin update and the clone step, a commit runs the plugin hooks
+- [ ] #8 (host) The tracked and clone steps for this repo run interactively on the macOS host, never from the devcontainer, and this repo own pre-push stays a plain hook until TASK-311 ships the plugin pre-push body
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -45,4 +45,6 @@ Facts checked: all six live guards in .claude/hooks are managed (so --local-guar
 Recommendation: run this interactively on the host after the pre-push question is settled.
 
 Re-checked 2026-11-04 (Ralph iteration 8, devcontainer): still blocked for the same reasons. TASK-311 is still To Do, so the plugin has no git-hooks/pre-push. The session still runs in the devcontainer, so the clone step and the host checks (AC#3-#8) cannot run here. Nothing was migrated. A human has to run this on the host, after TASK-311 or with a decision on pre-push.
+
+Reworked on 2026-11-05 after an autonomous run spent seven iterations rediscovering the same blockers. (1) Moved the old AC #2, this repo's pre-push becoming pre-push.local behind the shim, to TASK-311. Until the plugin ships git-hooks/pre-push, the shim cannot resolve a pre-push body and fails closed, which would block every push or force --no-verify, and --no-verify also skips version-bump-guard. (2) This task runs interactively on the host. The devcontainer shares the host's .git/config, so running the clone step there would record container values (ralph.projectPath=/workspace and the container's jq path) as this clone's settings. AC #3 to AC #8 already need the host.
 <!-- SECTION:NOTES:END -->
