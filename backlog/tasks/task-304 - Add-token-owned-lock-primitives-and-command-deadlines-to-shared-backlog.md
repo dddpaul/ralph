@@ -1,10 +1,10 @@
 ---
 id: TASK-304
 title: Add token-owned lock primitives and command deadlines to shared-backlog
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-04T14:53:00Z'
-updated_date: '2026-11-05T17:20:00Z'
+updated_date: '2026-11-05T17:28:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -48,4 +48,6 @@ Reference: PRD design/plugin-delivered-project-files-prd.md, US-010 and FR-7, FR
 Plan: in plugins/ralph/scripts/shared-backlog.sh add a lock primitive (mkdir-atomic dirs shared-backlog-{protocol,run}.lock under the canonical git common dir, owner file with token/host/container/pidns/pid/started), owner-only release, stale reclaim gated on same host + pid namespace + dead pid and serialized by a per-stale-token reclaim marker, run-lock/run-unlock/unlock subcommands, a run-lock gate on sync/claim/release/create/integrate/renumber honouring RALPH_RUN_LOCK_TOKEN, and a total deadline (SHARED_BACKLOG_DEADLINE, default 120 s) that runs each protocol subcommand in its own process group and kills the group on expiry. check-dupes runs under the deadline but takes no lock. New scratch-repo suite tests/shell/shared-backlog-lock-test.sh plus a pytest runner.
 
 Verified: bash -n clean; bash4-builtin static guard passes (plugins/ralph/skills/ralph-run/tests... no, tests/python/test_bash32_syntax.py: 14 passed, 1 skipped); tests/shell/shared-backlog-lock-test.sh: 65 passed, 0 failed under this host's bash 5.2; tests/python/test_shared_backlog_locks.py passes. AC #8's (host) clause (real /bin/bash 3.2 run) not verifiable on this Linux host -- left unchecked pending host verification, same pattern as TASK-277..280. Full repo pytest: 1288 passed/4 skipped plus 1 pre-existing unrelated failure (test_devcontainer_missing_fails in ralph-run/tests/test_preflight.py), confirmed failing on clean master too (reproduced via git stash), not caused by this change.
+
+task-reviewer: APPROVED, score 8, 2 minor non-blocking findings (duplicate guard check in run_lock_gate; lock_acquire's post-deadline retry loop could use a clarifying comment). All AC verified by independent re-run of the test commands. Merging.
 <!-- SECTION:NOTES:END -->
