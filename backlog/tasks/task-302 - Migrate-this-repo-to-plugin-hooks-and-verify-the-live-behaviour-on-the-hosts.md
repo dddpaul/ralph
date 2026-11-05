@@ -4,7 +4,7 @@ title: Migrate this repo to plugin hooks and verify the live behaviour on the ho
 status: To Do
 assignee: []
 created_date: '2026-11-04T14:52:00Z'
-updated_date: '2026-11-05T05:06:00Z'
+updated_date: '2026-11-05T05:09:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -43,4 +43,6 @@ Blocked in autonomous mode (Ralph iteration, devcontainer, 2026-11-04); nothing 
 3. AC#3 to AC#8 are host checks: an installed plugin, isolated test projects and configs, a devcontainer run, and the second host. A Ralph iteration cannot do them.
 Facts checked: all six live guards in .claude/hooks are managed (so --local-guards lists all six and tracked only writes the marker and the .gitignore exception). .git/hooks pre-commit and commit-msg are byte-identical to plugins/ralph/git-hooks. post-commit differs and is listed in .claude/managed-file-drift.accept with the current hashes, so clone keeps it as post-commit.local. The installed plugin 0.18.2 (user scope) has git-hooks/{pre-commit,commit-msg,post-commit} and no pre-push.
 Recommendation: run this interactively on the host after the pre-push question is settled.
+
+Re-checked 2026-11-04 (Ralph iteration 8, devcontainer): still blocked for the same reasons. TASK-311 is still To Do, so the plugin has no git-hooks/pre-push. The session still runs in the devcontainer, so the clone step and the host checks (AC#3-#8) cannot run here. Nothing was migrated. A human has to run this on the host, after TASK-311 or with a decision on pre-push.
 <!-- SECTION:NOTES:END -->
