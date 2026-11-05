@@ -39,6 +39,10 @@ GUARDS = (
 )
 PLUGIN_COMMAND = re.compile(r'\A"\$\{CLAUDE_PLUGIN_ROOT\}"/hooks/run\.sh ([a-z-]+)\Z')
 LEGACY_COMMAND = re.compile(r'\A"\$CLAUDE_PROJECT_DIR"/\.claude/hooks/([a-z-]+)\.sh\Z')
+# The commit guards dispatch on any git command: a literal "git commit *" filter
+# never fires for git -c k=v commit / git -C dir commit, and the guards' own
+# lexer keeps non-commit git commands cheap and allowed.
+WIDENED_FILTERS = {"Bash(git commit *)": "Bash(git *)"}
 BASH = shutil.which("bash") or "/bin/bash"
 PROBE = """#!/bin/bash
 out=${PROBE_OUT:?}
@@ -155,9 +159,20 @@ def test_guard_copies_are_byte_identical_to_the_plugin(guard: str) -> None:
 
 def test_hooks_json_carries_the_legacy_entries_and_filters() -> None:
     plugin = entries(PLUGIN_HOOKS / "hooks.json", PLUGIN_COMMAND)
-    legacy = entries(SETTINGS, LEGACY_COMMAND)
+    legacy = [
+        (event, matcher, WIDENED_FILTERS.get(cond or "", cond), guard)
+        for event, matcher, cond, guard in entries(SETTINGS, LEGACY_COMMAND)
+    ]
     assert len(legacy) == 13
     assert plugin[: len(legacy)] == legacy
+
+
+def test_live_settings_match_hooks_json_filters() -> None:
+    live = entries(REPO_ROOT / ".claude/settings.json", LEGACY_COMMAND)
+    plugin = entries(PLUGIN_HOOKS / "hooks.json", PLUGIN_COMMAND)
+    assert live == plugin[: len(live)]
+    assert ("PreToolUse", "Bash", "Bash(git *)", "commit-prefix-guard") in live
+    assert ("PreToolUse", "Bash", "Bash(git *)", "commit-msg-guard") in live
 
 
 def test_every_hooks_json_entry_names_an_existing_executable() -> None:
