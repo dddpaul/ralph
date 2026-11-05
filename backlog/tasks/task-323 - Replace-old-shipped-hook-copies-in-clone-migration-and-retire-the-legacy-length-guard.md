@@ -3,10 +3,10 @@ id: TASK-323
 title: >-
   Replace old shipped hook copies in clone migration and retire the legacy
   length guard
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-05T05:25:00Z'
-updated_date: '2026-11-05T06:50:00Z'
+updated_date: '2026-11-05T07:04:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -50,4 +50,6 @@ Why: migrating a real project (a sibling Ralph project, dry run on 2026-11-05) s
 
 <!-- SECTION:NOTES:BEGIN -->
 Plan: ship shipped-git-hooks.sha256 (name sha256 per line) beside migrate-plugin-hooks.sh, regenerated from git history in tests/python/test_shipped_git_hooks.py; clone replaces listed hooks, refuses DEVCONTAINER=true; tracked --retire-legacy deletes .claude/hooks/filename-length-guard.sh (refuses unless this clone's pre-commit is the shim); preflight names the leftover copy; managed-file-drift skips the missing copy in a shimmed migrated clone.
+
+Done: shipped-git-hooks.sha256 (13 bodies from git history across skills/ralph-init/templates, plugins/ralph/skills/ralph-init/templates/git-hooks and plugins/ralph/git-hooks) with a drift test; clone replaces listed hooks, refuses DEVCONTAINER=true; tracked --retire-legacy deletes the length guard copy (refuses unless this clone's pre-commit is the shim) and tracked notes the leftover otherwise; preflight names it removable; managed-file-drift skips the missing copy in a shimmed migrated clone. Tests that run clone/init now drop DEVCONTAINER from their env. Ruff: clean in every changed file; 53 pre-existing errors remain repo-wide in untouched files. task-reviewer APPROVED.
 <!-- SECTION:NOTES:END -->
