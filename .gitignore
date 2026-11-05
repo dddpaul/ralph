@@ -34,3 +34,4 @@ __pycache__/
 .pyright_cache/
 .venv/
 uv.lock
+!.claude/ralph.json
