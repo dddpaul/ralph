@@ -110,6 +110,13 @@ generic_region() {
   sed -n '/^## Project-Specific/q;p' "$1"
 }
 
+# True when this clone was migrated to the plugin hooks (TASK-302): the
+# per-clone migration sets ralph.pluginHooks and installs the shim as each git
+# hook. A clone that has not run it yet keeps the legacy plugin-body copies.
+migrated_clone() {
+  [ "$(git -C "$PROJECT_ROOT" config --bool ralph.pluginHooks 2>/dev/null)" = true ]
+}
+
 # Print the absolute path of registry template column $1.
 template_path() {
   case "$1" in
@@ -160,6 +167,13 @@ ROWS
 missing template for $live: $tmpl"
       continue
     fi
+
+    # A clone migrated to the plugin hooks (TASK-302) runs the fixed shim under
+    # every git hook name, so its .git/hooks/* mirror the shim template rather
+    # than the plugin bodies the shim executes.
+    case "$live" in
+      .git/hooks/*) migrated_clone && tmpl_path="$TEMPLATES/shims/git-hook" ;;
+    esac
 
     # .git/hooks/* live outside the work tree and are absent in a fresh
     # checkout (CI). The template side above is still asserted.
@@ -263,6 +277,7 @@ EOF
   tmpl_path="$PLUGIN/git-hooks/post-commit"
   [ -f "$tmpl_path" ]
   [ -f "$live_path" ] || skip "git hooks are untracked and not installed here"
+  migrated_clone && skip "migrated clone: post-commit is the shim (see the post-commit.local test)"
 
   tmpl_len="$(wc -l < "$tmpl_path" | tr -d '[:space:]')"
   [ "$tmpl_len" -ge 20 ]
@@ -290,6 +305,23 @@ EOF
       return 1
     }
   fi
+}
+
+@test "R11: a migrated clone's post-commit.local holds only the repo-local nudge" {
+  migrated_clone || skip "clone not migrated to the plugin hooks"
+  local_path="$PROJECT_ROOT/.git/hooks/post-commit.local"
+  [ -f "$local_path" ] || skip "no post-commit.local in this clone"
+
+  # The plugin's post-commit body runs after this file and already records the
+  # commit in the task notes, so a .local that repeats any of it would record
+  # every commit twice. Only the TASK-217 auto-bump nudge may live here.
+  grep -Fq 'bump-version.sh' "$local_path"
+  unexpected="$(grep -vE '^$|^#|^BUMP_HELPER=|^if \[ -x "\$BUMP_HELPER" \]; then$|^[[:space:]]*"\$BUMP_HELPER" --nudge [|][|] true$|^fi$|^exit 0$' "$local_path" || true)"
+  [ -z "$unexpected" ] || {
+    echo "post-commit.local carries more than the repo-local nudge:"
+    echo "$unexpected"
+    return 1
+  }
 }
 
 # --------------------------------------------------------------------------
