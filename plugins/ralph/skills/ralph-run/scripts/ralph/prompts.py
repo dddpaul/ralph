@@ -7,9 +7,14 @@ Mirrors ``ralph.sh:773-794`` exactly:
 * Body precedence: ``whitelist_task_id`` > ``prompt_file_body`` > default.
 * ``--prompt-file`` REPLACES the inner body; the MODE prefix is still
   prepended (AC #6).
+* Outside whitelist mode the agent picks its own task, so the body names the
+  tasks an earlier iteration of this run left in ``To Do`` (TASK-324). The
+  line is absent until a task is skipped, keeping the bash-parity prompt.
 """
 
 from __future__ import annotations
+
+from collections.abc import Sequence
 
 MODE_PREFIX_TEMPLATE = "MODE: autonomous (Ralph loop iteration {i} of {max_i})"
 
@@ -33,12 +38,20 @@ _DEFAULT_BODY = (
 )
 
 
+def _excluded_line(task_ids: Sequence[str]) -> str:
+    return (
+        "Do NOT pick these tasks — an earlier iteration of this run left them "
+        f"in To Do: {', '.join(task_ids)}."
+    )
+
+
 def build_prompt(
     iteration: int,
     max_iterations: int,
     *,
     whitelist_task_id: str | None = None,
     prompt_file_body: str | None = None,
+    excluded_task_ids: Sequence[str] = (),
 ) -> str:
     """Compose the iteration prompt with bash-parity formatting.
 
@@ -49,6 +62,9 @@ def build_prompt(
             and takes precedence over ``prompt_file_body``.
         prompt_file_body: Already-loaded contents of ``--prompt-file``.
             Used only when ``whitelist_task_id`` is None.
+        excluded_task_ids: Tasks the agent must not pick; appended to the
+            default or prompt-file body. Ignored in whitelist mode, whose
+            body already names the one task to run.
     """
     prefix = MODE_PREFIX_TEMPLATE.format(i=iteration, max_i=max_iterations)
     if whitelist_task_id:
@@ -57,4 +73,6 @@ def build_prompt(
         body = prompt_file_body
     else:
         body = _DEFAULT_BODY
+    if excluded_task_ids and not whitelist_task_id:
+        body = f"{body.rstrip()}\n{_excluded_line(excluded_task_ids)}"
     return f"{prefix}\n\n{body}"

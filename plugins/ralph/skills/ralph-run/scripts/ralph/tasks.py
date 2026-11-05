@@ -16,6 +16,9 @@ Two modes, matching ``ralph.sh``:
   the lowest-ID rule — the user's order wins. Mirrors lines 731-744 of
   ``ralph.sh``.
 
+Both modes skip the IDs in ``exclude`` — tasks an earlier iteration of the
+same run left in ``To Do`` (TASK-324).
+
 Both modes return ``None`` when no candidate is available, which the
 orchestrator surfaces as ``EXIT_REASON="all tasks done"``.
 """
@@ -25,6 +28,7 @@ from __future__ import annotations
 import os
 import re
 import subprocess
+from collections.abc import Collection
 from dataclasses import dataclass
 
 
@@ -226,7 +230,9 @@ def _all_dependencies_done(task: BacklogTask) -> bool:
 
 
 def pick_next_task(
-    whitelist: list[str] | None = None, holder: str | None = None
+    whitelist: list[str] | None = None,
+    holder: str | None = None,
+    exclude: Collection[str] = (),
 ) -> str | None:
     """Return the next task ID the orchestrator should run, or ``None``.
 
@@ -240,15 +246,22 @@ def pick_next_task(
         holder: The run's holder (see :func:`resolve_holder`). In default
             mode a candidate assigned to anyone besides the holder and
             ``@claude`` is skipped.
+        exclude: ``TASK-N`` IDs never returned, in both modes. The loop
+            passes the tasks an earlier iteration of this run left in
+            ``To Do`` so they are not picked again.
     """
     if whitelist:
         for raw in whitelist:
+            if f"TASK-{raw.removeprefix('TASK-')}" in exclude:
+                continue
             task = fetch_task(raw)
             if task is not None and "To Do" in task.status:
                 return task.id
         return None
 
     for tid in _list_todo_ids():
+        if tid in exclude:
+            continue
         task = fetch_task(tid)
         if task is None or held_by_other(task, holder):
             continue

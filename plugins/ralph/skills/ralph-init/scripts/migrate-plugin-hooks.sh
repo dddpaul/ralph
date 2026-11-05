@@ -2,19 +2,24 @@
 # Migrate a project from the legacy copied guard hooks to the ralph plugin's
 # hooks.
 #
-#   migrate-plugin-hooks.sh tracked [--local-guards <name>[,<name>...]] [<project-dir>]
+#   migrate-plugin-hooks.sh tracked [--local-guards <name>[,<name>...]] [--retire-legacy] [<project-dir>]
 #       Migrates the project's tracked files, once per project, on one host.
 #       <project-dir> defaults to the current directory; its git root is
 #       migrated. --local-guards (repeatable; commas or spaces) names guards the
-#       project keeps as its own copies. It commits nothing: review the result
-#       and commit it once, then push; the other host pulls it.
+#       project keeps as its own copies. --retire-legacy also deletes the
+#       leftover .claude/hooks/filename-length-guard.sh (step 5). It commits
+#       nothing: review the result and commit it once, then push; the other
+#       host pulls it.
 #   migrate-plugin-hooks.sh clone [<project-dir>]
-#       Migrates this clone, once per clone on each host; on the second host,
-#       run it after the git pull that brings the tracked part. It commits
-#       nothing and never sets ralph.sharedBacklog (that is an explicit step).
-#   Exit 0 = migrated or nothing to change, 1 = clone refused (a hook it would
-#   have to overwrite or drop; the message says which), 2 = usage error,
-#   unreadable or malformed input, or jq not found.
+#       Migrates this clone, once per clone on each host, on the host itself,
+#       never inside the devcontainer; on the second host, run it after the git
+#       pull that brings the tracked part. It commits nothing and never sets
+#       ralph.sharedBacklog (that is an explicit step).
+#   Exit 0 = migrated or nothing to change, 1 = refused (a hook clone would
+#   have to overwrite or drop, clone inside the devcontainer, or
+#   --retire-legacy in a clone whose pre-commit is not the shim; the message
+#   says which), 2 = usage error, unreadable or malformed input, or jq not
+#   found.
 #
 # The steps run in this order, so an interrupted run never leaves a guard that
 # neither the plugin nor a legacy copy enforces:
@@ -36,18 +41,28 @@
 #                  localGuards are deleted, one by one. A copy that a remaining
 #                  settings.json command still names is kept, with a warning,
 #                  so no entry is left calling a missing script.
+#   5. retire    — only with --retire-legacy: deletes
+#                  .claude/hooks/filename-length-guard.sh. It refuses, before
+#                  writing anything, unless this clone's pre-commit is the
+#                  plugin shim; every other clone must have run clone first,
+#                  because a legacy pre-commit copy silently skips the length
+#                  guard once the copy is gone.
 #
 # Managed guards are the six Claude guards older ralph-init versions copied
 # into .claude/hooks/ and registered in .claude/settings.json. Every other file
 # in .claude/hooks/ is the project's own and is never touched.
-# filename-length-guard.sh is kept too: it is a git hook helper, not a Claude
-# guard, and a clone whose .git/hooks/pre-commit is still the legacy copy falls
-# back to it until that clone runs the plugin shim.
+# filename-length-guard.sh is kept too unless --retire-legacy is given: it is a
+# git hook helper, not a Claude guard, and a clone whose .git/hooks/pre-commit
+# is still the legacy copy falls back to it until that clone runs the plugin
+# shim.
 # A second run changes nothing. RALPH_MIGRATE_STOP_AFTER=<step> (marker,
 # gitignore, settings or hooks:<guard>) exits 3 right after that step; the
 # tests use it to stop the run at every interruption point.
 #
-# clone checks every git hook before it writes anything, then:
+# clone refuses to run when DEVCONTAINER=true: the container shares the host's
+# .git/config, so it would record the container's jq and /workspace as this
+# clone's settings. Outside it, clone checks every git hook before it writes
+# anything, then:
 #
 #   1. config   — saves git config ralph.jq (the jq it found), ralph.projectPath
 #                 (the canonical main worktree root, the identity the plugin
@@ -56,8 +71,9 @@
 #   2. shims    — installs the plugin shim (templates/shims/git-hook) as
 #                 pre-commit, commit-msg and post-commit in the directory
 #                 `git rev-parse --git-path hooks` returns. A hook that is
-#                 absent or a legacy copy of the plugin's hook body
-#                 (git-hooks/<name>) is replaced. A hook that
+#                 absent or an unedited copy of a <name> body ralph-init has
+#                 ever shipped (its sha256 is in shipped-git-hooks.sha256 beside
+#                 this script) is replaced. A hook that
 #                 differs and that .claude/managed-file-drift.accept lists for
 #                 .git/hooks/<name> is kept as <name>.local, which the shim runs
 #                 first. Any other differing hook, or an existing <name>.local
@@ -80,7 +96,7 @@ MANAGED="commit-msg-guard commit-prefix-guard master-branch-guard naming-guard n
 EXCEPTION='!.claude/ralph.json'
 
 usage() {
-  echo "usage: migrate-plugin-hooks.sh tracked [--local-guards <name>[,<name>...]] [<project-dir>]" >&2
+  echo "usage: migrate-plugin-hooks.sh tracked [--local-guards <name>[,<name>...]] [--retire-legacy] [<project-dir>]" >&2
   echo "       migrate-plugin-hooks.sh clone [<project-dir>]" >&2
   exit 2
 }
@@ -168,6 +184,12 @@ copy_into() {
   mv -f "$tmp" "$2"
 }
 
+# Succeed when hook file $1 is an unedited copy of a $2 body ralph-init has
+# shipped: its sha256 is listed for $2 in shipped-git-hooks.sha256.
+shipped_hook() {
+  grep -Fxq -- "$2 $(sha256 <"$1")" "$shipped"
+}
+
 # Decide what clone does with each git hook; print "<name>:<action>" lines.
 # Exits 1, before anything is written, on a hook it may not replace.
 plan_hooks() {
@@ -178,7 +200,7 @@ plan_hooks() {
       echo "$name:install"
     elif cmp -s "$hook" "$shim"; then
       echo "$name:keep"
-    elif [ -r "$tmpl" ] && cmp -s "$hook" "$tmpl"; then
+    elif { [ -r "$tmpl" ] && cmp -s "$hook" "$tmpl"; } || shipped_hook "$hook" "$name"; then
       echo "$name:replace"
     elif accepted_hook "$hook" "$tmpl"; then
       if { [ -e "$loc" ] || [ -L "$loc" ]; } && ! cmp -s "$hook" "$loc"; then
@@ -186,7 +208,7 @@ plan_hooks() {
       fi
       echo "$name:local"
     else
-      refuse "$hook differs from the plugin's $name hook body and .claude/managed-file-drift.accept does not list it; to keep it as $name.local, accept it (managed-file-drift.sh accept . .git/hooks/$name) and rerun, else delete it and rerun"
+      refuse "$hook differs from every $name hook body ralph-init has shipped and .claude/managed-file-drift.accept does not list it; to keep it as $name.local, accept it (managed-file-drift.sh accept . .git/hooks/$name) and rerun, else delete it and rerun"
     fi
   done
 }
@@ -221,7 +243,7 @@ TRIM='
 '
 
 clone_main() {
-  local project="" common main hooks plugin_root templates shim fragment cfg user local_settings plan name action out kept
+  local project="" common main hooks plugin_root templates shim shipped fragment cfg user local_settings plan name action out kept
   while [ $# -gt 0 ]; do
     case $1 in
       -*) usage ;;
@@ -232,6 +254,9 @@ clone_main() {
         ;;
     esac
   done
+  if [ "${DEVCONTAINER:-}" = true ]; then
+    refuse "clone does not run inside the devcontainer: it shares the host's .git/config and would record the container's jq and /workspace as this clone's settings; run it on the host"
+  fi
   root=$(cd "${project:-.}" 2>/dev/null && git rev-parse --show-toplevel 2>/dev/null) ||
     die "${project:-.} is not inside a git repository"
   root=$(cd "$root" && pwd -P)
@@ -250,7 +275,9 @@ clone_main() {
   templates=$plugin_root/skills/ralph-init/templates
   shim=$templates/shims/git-hook
   fragment=$plugin_root/user-settings.json
+  shipped=$plugin_root/skills/ralph-init/scripts/shipped-git-hooks.sha256
   [ -r "$shim" ] || die "cannot read the plugin shim $shim"
+  [ -r "$shipped" ] || die "cannot read the shipped hook list $shipped"
   [ -r "$fragment" ] || die "cannot read the plugin fragment $fragment"
 
   jq=$(command -v jq 2>/dev/null) || jq=$(git -C "$root" config ralph.jq 2>/dev/null) || jq=
@@ -350,8 +377,13 @@ fi
 shift
 requested=""
 project=""
+retire=0
 while [ $# -gt 0 ]; do
   case $1 in
+    --retire-legacy)
+      retire=1
+      shift
+      ;;
     --local-guards)
       [ $# -ge 2 ] || usage
       requested="$requested,$2"
@@ -379,6 +411,7 @@ root=$(cd "${project:-.}" 2>/dev/null && git rev-parse --show-toplevel 2>/dev/nu
 root=$(cd "$root" && pwd -P)
 here=$(cd "$(dirname "$0")" && pwd -P)
 plugin_hooks=${CLAUDE_PLUGIN_ROOT:-$here/../../..}/hooks
+shim=${CLAUDE_PLUGIN_ROOT:-$here/../../..}/skills/ralph-init/templates/shims/git-hook
 
 jq=$(command -v jq 2>/dev/null) || jq=$(git -C "$root" config ralph.jq 2>/dev/null) || jq=
 [ -n "$jq" ] && [ -x "$jq" ] || die "jq not found (PATH or git config ralph.jq)"
@@ -387,7 +420,19 @@ marker=$root/.claude/ralph.json
 gitignore=$root/.gitignore
 settings=$root/.claude/settings.json
 hooks_dir=$root/.claude/hooks
+length_copy=$hooks_dir/filename-length-guard.sh
 changed=0
+
+# Succeed when this clone's pre-commit is the plugin shim.
+clone_shimmed() {
+  local git_hooks
+  git_hooks=$(cd "$root" && git rev-parse --git-path hooks) || return 1
+  case $git_hooks in /*) ;; *) git_hooks=$root/$git_hooks ;; esac
+  [ -r "$shim" ] && cmp -s "$git_hooks/pre-commit" "$shim"
+}
+if [ "$retire" -eq 1 ] && ! clone_shimmed; then
+  refuse "--retire-legacy needs this clone's pre-commit to be the plugin shim: a legacy pre-commit copy skips the length guard once .claude/hooks/filename-length-guard.sh is gone; run clone first (in every clone), then rerun"
+fi
 
 # Read both JSON inputs before writing anything, so a malformed file stops the
 # run with the project untouched.
@@ -489,6 +534,19 @@ for name in $drop; do
   fi
   stop_after "hooks:$name"
 done
+
+# 5. retire
+if [ "$retire" -eq 1 ] && { [ -e "$length_copy" ] || [ -L "$length_copy" ]; }; then
+  if printf '%s\n' "$still" | grep -Fq -- ".claude/hooks/filename-length-guard.sh"; then
+    echo "migrate-plugin-hooks: warning: kept .claude/hooks/filename-length-guard.sh: a .claude/settings.json entry still calls it; remove that entry by hand and rerun" >&2
+  else
+    rm -f "$length_copy"
+    echo "deleted .claude/hooks/filename-length-guard.sh (the legacy length guard copy; a clone whose pre-commit is still a legacy copy now skips the length guard until it runs clone)"
+    changed=1
+  fi
+elif [ "$retire" -eq 0 ] && [ -e "$length_copy" ] && clone_shimmed; then
+  echo "note: .claude/hooks/filename-length-guard.sh is a leftover legacy copy; once every clone has run clone, delete it with tracked --retire-legacy"
+fi
 [ ! -d "$hooks_dir" ] || rmdir "$hooks_dir" 2>/dev/null || true
 
 for name in $locals; do

@@ -31,7 +31,7 @@ from ralph.args import ParsedArgs, timeout_to_seconds
 from ralph.devcontainer import start_devcontainer
 from ralph.heartbeat import Heartbeat
 from ralph.prompts import build_prompt
-from ralph.status import ErrorEntry, StatusFile
+from ralph.status import ErrorEntry, SkippedTask, StatusFile
 from ralph.summary import EXIT_REASONS, RunSummary, print_summary
 from ralph.tools import IterationSignals, Tool, ToolResult
 from ralph.tools._subprocess import TIMEOUT_EXIT_CODE
@@ -67,6 +67,7 @@ class _RunState:
     iter_durations: list[int] = field(default_factory=list[int])
     tasks_done_ids: list[str] = field(default_factory=list[str])
     errors: list[ErrorEntry] = field(default_factory=list[ErrorEntry])
+    skipped: list[SkippedTask] = field(default_factory=list[SkippedTask])
     exit_reason: str = "max iterations reached"
     exit_code: int = 0
 
@@ -184,6 +185,7 @@ def _run_armed(
                 prompt_file_body=prompt_file_body,
                 status=status,
                 status_path=status_path,
+                run_log_path=run_log_path,
                 started_epoch=started_epoch,
                 state=state,
                 installer=installer,
@@ -247,6 +249,7 @@ def _run_loop(
     prompt_file_body: str | None,
     status: StatusFile,
     status_path: Path,
+    run_log_path: Path,
     started_epoch: int,
     state: _RunState,
     installer: _SignalInstaller,
@@ -270,7 +273,11 @@ def _run_loop(
 
         clear_pause(status)
 
-        next_task = tasks_module.pick_next_task(whitelist=whitelist, holder=holder)
+        next_task = tasks_module.pick_next_task(
+            whitelist=whitelist,
+            holder=holder,
+            exclude={entry.task for entry in state.skipped},
+        )
         if next_task is None:
             state.exit_reason = (
                 "all specified tasks done" if whitelist else "all tasks done"
@@ -293,6 +300,7 @@ def _run_loop(
             max_iterations=args.max_iterations,
             whitelist_task_id=next_task if whitelist else None,
             prompt_file_body=prompt_file_body,
+            excluded_task_ids=[entry.task for entry in state.skipped],
         )
 
         done_before = set(tasks_module.done_task_ids())
@@ -320,6 +328,7 @@ def _run_loop(
         if not stopping:
             _warn_task_summary_count(i, result.signals)
             status.current_task = tasks_module.current_in_progress_task()
+            _skip_if_left_in_todo(next_task, i, state, run_log_path)
 
         if result.exit_code == TIMEOUT_EXIT_CODE:
             msg = f"Iteration {i} timed out after {args.timeout}m"
@@ -493,6 +502,29 @@ def _warn_task_summary_count(iteration: int, signals: IterationSignals) -> None:
     )
 
 
+def _skip_if_left_in_todo(
+    task_id: str, iteration: int, state: _RunState, run_log_path: Path
+) -> None:
+    """Exclude ``task_id`` from the rest of the run when it is still ``To Do``.
+
+    Without this the picker returns the same unchanged task every iteration
+    (TASK-324): a blocked whitelist head starves the tasks behind it, and in
+    default mode the lowest eligible task wins again. The exclusion is
+    announced on stdout and appended to the run log.
+    """
+    task = tasks_module.fetch_task(task_id)
+    if task is None or "To Do" not in task.status:
+        return
+    state.skipped.append(SkippedTask(task=task_id, iteration=iteration))
+    line = (
+        f"Ralph: {task_id} left in To Do by iteration {iteration}; "
+        "skipping it for the rest of this run"
+    )
+    print(line, flush=True)
+    with suppress(OSError), run_log_path.open("a", encoding="utf-8") as handle:
+        handle.write(line + "\n")
+
+
 def _update_after_iteration(
     status: StatusFile,
     status_path: Path,
@@ -503,6 +535,7 @@ def _update_after_iteration(
 ) -> None:
     status.tasks_done = list(state.tasks_done_ids)
     status.errors = list(state.errors)
+    status.skipped_tasks = list(state.skipped)
     status.last_iteration_duration = last_iter_dur
     status.elapsed = _now_epoch() - started_epoch
     status.tasks_remaining = tasks_module.count_remaining(whitelist)
@@ -527,6 +560,7 @@ def _finalize(
         status.state = "failed"
     status.tasks_done = list(state.tasks_done_ids)
     status.errors = list(state.errors)
+    status.skipped_tasks = list(state.skipped)
     status.elapsed = elapsed
     status.completed_at = _now_iso()
     status.exit_code = state.exit_code
@@ -542,6 +576,7 @@ def _finalize(
         failed_iterations=state.failed_iterations,
         wall_time_sec=elapsed,
         iter_durations_sec=state.iter_durations,
+        skipped_tasks=[(entry.task, entry.iteration) for entry in state.skipped],
     )
     print_summary(summary, sys.stdout)
 

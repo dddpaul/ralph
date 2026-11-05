@@ -23,9 +23,23 @@
 #                        default origin/master) and commit
 #   install-hooks [--force]
 #                        install scripts/hooks/pre-push into .git/hooks
+#   run-lock [--pid PID] take the run lock for a Ralph run owned by PID
+#                        (default: the caller) and print its token
+#   run-unlock [TOKEN]   release the run lock TOKEN (default
+#                        $RALPH_RUN_LOCK_TOKEN) owns
+#   unlock [--force] [protocol|run]
+#                        remove a dead owner's lock; --force removes it
+#                        whoever holds it
 #
 # The holder defaults to $SHARED_BACKLOG_HOLDER. $SHARED_BACKLOG_CHECKS, when
 # set, replaces the checks integrate reruns (run with `sh -c` at the repo root).
+#
+# sync, claim, release, create, integrate and renumber hold the protocol lock,
+# and refuse while a Ralph run holds the run lock unless $RALPH_RUN_LOCK_TOKEN
+# carries that run's token. check-dupes takes no lock. Every subcommand that
+# touches the network or the clone runs under a total deadline of
+# $SHARED_BACKLOG_DEADLINE seconds (default 120); on expiry its process group
+# is killed and the state is reported, not repaired.
 #
 # Exit codes: 0 ok, 1 refused / conflict / check failed, 2 origin unreachable,
 # 64 usage error. Bash 3.2 clean: no associative arrays, no mapfile.
@@ -55,6 +69,235 @@ task_prefix() {
   p=$(sed -n 's/^task_prefix: *["'\'']\{0,1\}\([^"'\'']*\)["'\'']\{0,1\} *$/\1/p' \
     backlog/config.yml 2>/dev/null | head -1)
   echo "${p:-task}"
+}
+
+# --- locks ------------------------------------------------------------------
+
+# Both locks are directories under the canonical git common dir, so every
+# worktree of a clone shares them: the protocol lock serializes the mutating
+# subcommands, and the run lock admits one Ralph run per clone. mkdir is the
+# atomic step; the owner file inside says who holds the lock.
+
+# lock_path KIND — the lock directory of KIND (protocol or run).
+lock_path() { echo "$LOCK_BASE/shared-backlog-$1.lock"; }
+
+new_token() { od -An -tx1 -N16 /dev/urandom | tr -d ' \n'; }
+container_flag() { if [ -f /.dockerenv ] || [ -f /run/.containerenv ]; then echo 1; else echo 0; fi; }
+pid_ns() { readlink /proc/self/ns/pid 2>/dev/null || echo none; }
+
+# pid_alive PID — 0 unless PID provably no longer exists. A pid we may not
+# signal still exists, and without ps we cannot tell, so it counts as alive.
+pid_alive() {
+  kill -0 "$1" 2>/dev/null && return 0
+  command -v ps >/dev/null 2>&1 || return 0
+  ps -p "$1" >/dev/null 2>&1
+}
+
+# lock_field KIND KEY — a value from KIND's owner file, empty when absent.
+lock_field() { sed -n "s/^$2=//p" "$(lock_path "$1")/owner" 2>/dev/null | head -1; }
+
+# lock_try KIND TOKEN PID — take KIND if it is free: 0 taken, 1 held.
+lock_try() {
+  local l
+  l=$(lock_path "$1")
+  mkdir "$l" 2>/dev/null || return 1
+  printf 'token=%s\nhost=%s\ncontainer=%s\npidns=%s\npid=%s\nstarted=%s\ncommand=%s\n' \
+    "$2" "$(uname -n)" "$(container_flag)" "$(pid_ns)" "$3" "$(date +%s)" "$CMD" \
+    >"$l/owner.tmp" && mv "$l/owner.tmp" "$l/owner" ||
+    { rm -rf "$l"; die "cannot write the owner file of $l"; }
+}
+
+# lock_release KIND TOKEN — remove KIND only when TOKEN owns it.
+lock_release() {
+  [ -n "$2" ] && [ "$(lock_field "$1" token)" = "$2" ] || return 1
+  rm -rf "$(lock_path "$1")"
+}
+
+# lock_reclaimable KIND — 0 when KIND's owner provably died: it ran on this
+# host in this pid namespace, and its pid is gone. Any other lock (another
+# host, the other side of a container boundary, no owner file) is reported
+# and needs unlock --force.
+lock_reclaimable() {
+  local pid
+  pid=$(lock_field "$1" pid)
+  case "$pid" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$(lock_field "$1" host)" = "$(uname -n)" ] || return 1
+  [ "$(lock_field "$1" container)" = "$(container_flag)" ] || return 1
+  [ "$(lock_field "$1" pidns)" = "$(pid_ns)" ] || return 1
+  ! pid_alive "$pid"
+}
+
+# lock_reclaim KIND TOKEN — remove a dead owner's lock. Two contenders can both
+# judge TOKEN's lock stale; the marker directory named after TOKEN lets one at
+# a time recheck that TOKEN still owns the lock, so a late contender never
+# removes the lock the winner has taken since. 0 removed, 1 not.
+lock_reclaim() {
+  local l m rc=1 pid
+  l=$(lock_path "$1")
+  m="$l.reclaim-$2"
+  mkdir "$m" 2>/dev/null || return 1
+  if [ "$(lock_field "$1" token)" = "$2" ] && lock_reclaimable "$1"; then
+    pid=$(lock_field "$1" pid)
+    rm -rf "$l"
+    rc=0
+    say "reclaimed the $1 lock of dead pid $pid"
+  fi
+  rmdir "$m" 2>/dev/null || true
+  return "$rc"
+}
+
+lock_report() {
+  local l
+  l=$(lock_path "$1")
+  if [ -z "$(lock_field "$1" token)" ]; then
+    say "the $1 lock $l has no owner file"
+  else
+    say "the $1 lock is held by pid $(lock_field "$1" pid) on $(lock_field "$1" host)" \
+      "(container=$(lock_field "$1" container), $(lock_field "$1" pidns))," \
+      "running $(lock_field "$1" command) since $(lock_field "$1" started)"
+  fi
+  say "if that owner is gone, remove the lock with: shared-backlog.sh unlock --force $1"
+}
+
+# lock_acquire KIND TOKEN PID UNTIL — take KIND, reclaiming a dead owner's
+# lock and waiting for a live owner until epoch second UNTIL. 0 taken, 1 not.
+lock_acquire() {
+  local tok waited=''
+  while :; do
+    lock_try "$1" "$2" "$3" && return 0
+    tok=$(lock_field "$1" token)
+    if [ -n "$tok" ] && lock_reclaimable "$1"; then
+      # Tests widen the window between the stale check and the reclaim.
+      [ -z "${SHARED_BACKLOG_TEST_RECLAIM_PAUSE:-}" ] || sleep "$SHARED_BACKLOG_TEST_RECLAIM_PAUSE"
+      lock_reclaim "$1" "$tok" && continue
+    fi
+    if [ "$(date +%s)" -ge "$4" ]; then
+      [ -d "$(lock_path "$1")" ] || continue
+      lock_report "$1"
+      return 1
+    fi
+    [ -n "$waited" ] || { say "waiting for the $1 lock (pid $(lock_field "$1" pid))"; waited=1; }
+    sleep 1
+  done
+}
+
+# run_lock_gate — while a Ralph run holds the run lock, only that run (its
+# token in RALPH_RUN_LOCK_TOKEN) may run a mutating subcommand.
+run_lock_gate() {
+  local tok
+  [ -d "$(lock_path run)" ] || return 0
+  tok=$(lock_field run token)
+  [ -n "$tok" ] && [ "${RALPH_RUN_LOCK_TOKEN:-}" = "$tok" ] && return 0
+  [ -n "$tok" ] && lock_reclaimable run && lock_reclaim run "$tok" && return 0
+  [ -d "$(lock_path run)" ] || return 0
+  say "refusing $CMD: a Ralph run holds the run lock; its own calls carry RALPH_RUN_LOCK_TOKEN"
+  lock_report run
+  return 1
+}
+
+cmd_run_lock() {
+  local pid=$PPID tok
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --pid) pid=${2:?--pid needs a pid}; shift 2 ;;
+      *) usage ;;
+    esac
+  done
+  case "$pid" in ''|*[!0-9]*) usage ;; esac
+  tok=$(new_token)
+  lock_acquire run "$tok" "$pid" "$(date +%s)" || die "run lock not taken"
+  echo "$tok"
+}
+
+cmd_run_unlock() {
+  local tok=${1:-${RALPH_RUN_LOCK_TOKEN:-}}
+  [ $# -le 1 ] && [ -n "$tok" ] || usage
+  lock_release run "$tok" || die "the run lock is not held by that token"
+  say "released the run lock"
+}
+
+cmd_unlock() {
+  local force='' kinds='protocol run' k tok rc=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --force) force=1; shift ;;
+      protocol|run) kinds=$1; shift ;;
+      *) usage ;;
+    esac
+  done
+  for k in $kinds; do
+    [ -d "$(lock_path "$k")" ] || continue
+    if [ -n "$force" ]; then
+      rm -rf "$(lock_path "$k")" "$(lock_path "$k")".reclaim-*
+      say "removed the $k lock"
+      continue
+    fi
+    tok=$(lock_field "$k" token)
+    if [ -n "$tok" ] && lock_reclaimable "$k" && lock_reclaim "$k" "$tok"; then continue; fi
+    lock_report "$k"
+    rc=1
+  done
+  return "$rc"
+}
+
+# --- deadlines --------------------------------------------------------------
+
+# git_state — a one-line summary of what a killed subcommand left behind.
+git_state() {
+  local gd s
+  gd=$(git rev-parse --git-dir)
+  s="on $(git symbolic-ref --short -q HEAD || echo 'detached HEAD') at $(git rev-parse --short HEAD 2>/dev/null)"
+  if [ -f "$gd/MERGE_HEAD" ]; then s="$s, merge in progress"; fi
+  if [ -d "$gd/rebase-merge" ] || [ -d "$gd/rebase-apply" ]; then s="$s, rebase in progress"; fi
+  if [ -f "$gd/index.lock" ]; then s="$s, $gd/index.lock left by a killed git"; fi
+  if [ -n "$(git status --porcelain --untracked-files=no 2>/dev/null)" ]; then s="$s, uncommitted changes"; fi
+  echo "$s"
+}
+
+# on_signal CODE — kill the running subcommand's group and exit; the EXIT trap
+# then releases our own lock.
+on_signal() {
+  [ -z "$CHILD_PID" ] || kill -TERM -- "-$CHILD_PID" 2>/dev/null || true
+  exit "$1"
+}
+
+# with_deadline FN ARGS... — run FN in a subshell that leads its own process
+# group, and kill the group once epoch second DEADLINE_AT passes. Our own lock
+# is held by this shell, outside the group, so a kill cannot strand it.
+with_deadline() {
+  local flag watchdog rc=0
+  flag=$(mktemp "${TMPDIR:-/tmp}/shared-backlog-deadline.XXXXXX")
+  set -m
+  ("$@") &
+  CHILD_PID=$!
+  set +m
+  (
+    while [ "$(date +%s)" -lt "$DEADLINE_AT" ]; do sleep 1; done
+    echo expired >"$flag"
+    kill -TERM -- "-$CHILD_PID" 2>/dev/null || true
+  ) </dev/null >/dev/null 2>&1 &
+  watchdog=$!
+  wait "$CHILD_PID" || rc=$?
+  kill "$watchdog" 2>/dev/null || true
+  wait "$watchdog" 2>/dev/null || true
+  if [ -s "$flag" ]; then
+    kill -KILL -- "-$CHILD_PID" 2>/dev/null || true
+    say "$CMD ran past its ${DEADLINE}s deadline (SHARED_BACKLOG_DEADLINE); killed its process group"
+    say "state left as is: $(git_state)"
+    rc=1
+  fi
+  CHILD_PID=''
+  rm -f "$flag"
+  return "$rc"
+}
+
+# protocol_cmd FN ARGS... — a mutating subcommand: take the protocol lock, pass
+# the run-lock gate, run FN under the deadline, release only our own lock.
+protocol_cmd() {
+  PROTOCOL_TOKEN=$(new_token)
+  lock_acquire protocol "$PROTOCOL_TOKEN" "$$" "$DEADLINE_AT" || exit 1
+  run_lock_gate || exit 1
+  with_deadline "$@"
 }
 
 # --- task files -------------------------------------------------------------
@@ -546,16 +789,35 @@ cmd_install_hooks() {
 
 [ $# -gt 0 ] || usage
 cd "$(repo_root)"
-cmd=$1; shift
-case "$cmd" in
-  sync) cmd_sync ;;
-  claim) cmd_claim "$@" ;;
-  release) cmd_release "$@" ;;
-  create) cmd_create "$@" ;;
-  integrate) cmd_integrate "$@" ;;
-  check-dupes) cmd_check_dupes "$@" ;;
-  renumber) cmd_renumber "$@" ;;
+CMD=$1; shift
+LOCK_BASE=$(cd "$(git rev-parse --git-common-dir)" && pwd -P)
+DEADLINE=${SHARED_BACKLOG_DEADLINE:-120}
+case "$DEADLINE" in
+  ''|*[!0-9]*|0) say "SHARED_BACKLOG_DEADLINE must be a whole number of seconds above 0, not '$DEADLINE'"; exit 64 ;;
+esac
+DEADLINE_AT=$(($(date +%s) + DEADLINE))
+CHILD_PID=''
+PROTOCOL_TOKEN=''
+trap 'lock_release protocol "$PROTOCOL_TOKEN" || true' EXIT
+trap 'on_signal 129' HUP
+trap 'on_signal 130' INT
+trap 'on_signal 143' TERM
+case "$CMD" in
+  sync) protocol_cmd cmd_sync "$@" ;;
+  claim) protocol_cmd cmd_claim "$@" ;;
+  release) protocol_cmd cmd_release "$@" ;;
+  create) protocol_cmd cmd_create "$@" ;;
+  integrate) protocol_cmd cmd_integrate "$@" ;;
+  renumber) protocol_cmd cmd_renumber "$@" ;;
+  check-dupes) with_deadline cmd_check_dupes "$@" ;;
   install-hooks) cmd_install_hooks "$@" ;;
+  run-lock)
+    # The protocol lock orders taking the run lock against the gate above.
+    PROTOCOL_TOKEN=$(new_token)
+    lock_acquire protocol "$PROTOCOL_TOKEN" "$$" "$DEADLINE_AT" || exit 1
+    cmd_run_lock "$@" ;;
+  run-unlock) cmd_run_unlock "$@" ;;
+  unlock) cmd_unlock "$@" ;;
   -h|--help|help) usage ;;
   *) usage ;;
 esac
