@@ -14,7 +14,7 @@ The skill is one-way: source → destination. There is no sync of completed stat
 ## What this skill does NOT do
 
 - Run the task. The destination Ralph loop (or destination Claude) runs it after the user confirms.
-- Commit the new task file. The user decides whether to `git add`/`git commit` in the destination repo.
+- Commit the new task file in a destination that does not use the shared-backlog protocol. The user decides whether to `git add`/`git commit` there. (In one that does, the protocol's `create` commits and pushes the task itself — see Step 5.)
 - Write a source-side audit doc. The git history of source + the `Source:` line in the destination task are the audit trail.
 - Copy source files into destination. Reference them by absolute path in `Source:` and inline only the snippets the destination Claude needs verbatim.
 
@@ -38,6 +38,23 @@ If any line ends in `MISSING`, stop and tell the user. Example failure responses
 - `backlog-dir: MISSING` — destination has no `backlog/` directory; run `/ralph-init` there first.
 - `git-repo: MISSING` — destination is not a git repository; cannot record commits/branches.
 - `backlog-cli: MISSING` — `backlog` CLI is missing or fails in that directory; cannot allocate a task ID.
+
+Once preflight passes, read the destination's shared-backlog state — its marker (`"sharedBacklog"` in `.claude/ralph.json`) and its clone switch (`git config ralph.sharedBacklog`):
+
+```bash
+bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-handoff/scripts/handoff-create.sh mode "$DEST"
+```
+
+It prints one mode, used again in Step 5:
+
+| Marker `sharedBacklog` | Switch `ralph.sharedBacklog` | Mode | Behaviour |
+|---|---|---|---|
+| true | true | `protocol` | creates through the plugin's `shared-backlog.sh create`; the ID is final once create returns 0 |
+| true | unset or false | `refuse` | exits 1 — stop and tell the user to run `cd "$DEST" && scripts/shared-backlog.sh enable` first |
+| absent or false | true | `protocol` | the switch is trusted |
+| absent or false | unset or false | `local` | `backlog task create`: an uncommitted file with a provisional ID |
+
+On `refuse`, stop here: do not gather fields for a task that cannot be created yet. Carry the mode into Step 5.
 
 ---
 
@@ -158,18 +175,31 @@ Each AC is its own `--ac` flag. Never comma-join. Each AC ends with a verifiable
 
 ## Step 5: Create the Task in Destination
 
-Run `backlog task create` with destination as CWD. The destination's `backlog` CLI allocates the next available task ID locally — source's IDs are irrelevant.
+Run the helper with the destination path and the `backlog task create` arguments. It re-reads the mode from Step 1 and creates the task that way; the destination's IDs are allocated there — source's IDs are irrelevant.
 
 ```bash
 DEST="<destination-abs-path>"
-(cd "$DEST" && backlog task create "<English title>" \
+bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-handoff/scripts/handoff-create.sh create "$DEST" "<English title>" \
   -d "<composed body from Step 4>" \
   --ac "<atomic outcome 1>" \
   --ac "<atomic outcome 2>" \
   --ac "<atomic outcome 3>" \
   --priority <high|medium|low> \
-  --status "To Do")
+  --status "To Do"
 ```
+
+On success it prints four lines:
+
+```
+mode: protocol|local
+id: TASK-<NNN>
+state: final|provisional
+path: <task file, relative to the destination root>
+```
+
+- **`protocol`** — the plugin's `shared-backlog.sh create` allocated the ID in a temporary worktree at a fresh `origin/master`, committed the task and pushed it. The ID is final. The destination's branch, index and working tree are untouched, so it may be behind origin, ahead of it, dirty or on a task branch; the task reaches its work tree on the next `scripts/shared-backlog.sh sync`. A non-zero exit prints nothing on stdout: report create's stderr and do NOT announce any ID (exit 2 means origin was unreachable and nothing was allocated).
+- **`local`** — `backlog task create` ran in the destination. The ID is provisional (another clone may take it before this file is committed) and the file is uncommitted.
+- **refused** (exit 1, nothing on stdout) — the marker opts in but the clone switch is off; relay the `enable` step from stderr.
 
 If labels were chosen, add `-l "<label>"` per label (repeat the flag — do not comma-join).
 
@@ -179,21 +209,24 @@ Status is explicitly `To Do`, not `Draft`. The user's workflow assumes they will
 
 ### Mandatory self-check
 
-After create succeeds, verify ACs landed as separate items:
+Before create, check that no `--ac` value comma-joins separate outcomes — in `protocol` mode the task is pushed at once. After create succeeds, verify ACs landed as separate items:
 
 ```bash
-(cd "$DEST" && backlog task view <new-id> --plain | grep -A 30 "Acceptance")
+(cd "$DEST" && backlog task view <new-id> --plain | grep -A 30 "Acceptance")   # local
+git -C "$DEST" show "origin/master:<path>" | grep -A 30 "Acceptance"           # protocol
 ```
 
-If a single AC line contains commas joining what should be separate outcomes, fix:
+In `local` mode, if a single AC line contains commas joining what should be separate outcomes, fix:
 
 ```bash
 (cd "$DEST" && backlog task edit <new-id> --remove-ac N --ac "<outcome 1>" --ac "<outcome 2>")
 ```
 
-### Do NOT commit
+In `protocol` mode the task is already on origin; a fix is a normal task edit there, so report the problem to the user instead of editing.
 
-The new task file appears as untracked in destination's `git status`. Do NOT run `git add` or `git commit` in destination — the user decides whether and when to commit (they may want to inspect first, or batch multiple handoffs).
+### Do NOT commit (local mode)
+
+In `local` mode the new task file appears as untracked in destination's `git status`. Do NOT run `git add` or `git commit` in destination — the user decides whether and when to commit (they may want to inspect first, or batch multiple handoffs).
 
 Print a one-line reminder in the final summary (Step 6).
 
@@ -201,7 +234,7 @@ Print a one-line reminder in the final summary (Step 6).
 
 ## Step 6: Print Handoff Confirmation
 
-Output exactly this block (substituting real values for `<...>`):
+Output exactly this block (substituting real values for `<...>`). In `protocol` mode, print `ID:       final (pushed to origin)` instead of `provisional`, and replace the closing note with: `Note: the task is committed and pushed to origin; run \`cd <destination> && scripts/shared-backlog.sh sync\` to bring it into that clone.`
 
 ```
 Handoff complete.
@@ -209,6 +242,7 @@ Handoff complete.
 Created TASK-<NNN> in <destination-abs-path>
 Title:    <task title>
 Status:   To Do
+ID:       provisional (uncommitted)
 ACs:      <count>
 Source:   <abs-path-to-source-repo>@<sha-or-uncommitted>
 
@@ -228,6 +262,8 @@ The verbatim phrase `check new task TASK-<NNN> — do you understand, can you ru
 | Symptom | Cause | Fix |
 |---|---|---|
 | `backlog task create` exits non-zero | CLI syntax error or destination has uncommitted backlog config | Print the exact command + stderr; ask the user to inspect destination state |
+| `handoff-create.sh` refuses naming `scripts/shared-backlog.sh enable` | Destination marker opts in to the shared-backlog protocol, but its clone switch is off | Stop. Ask the user to run `cd <destination> && scripts/shared-backlog.sh enable`, then hand off again |
+| `handoff-create.sh` exits 2 in `protocol` mode | Destination origin unreachable; nothing allocated | Report it; retry when origin is reachable. Never announce an ID |
 | Self-check shows comma-joined AC | `--ac "a,b,c"` mistake | Fix with `--remove-ac N --ac "..." --ac "..."` |
 | `Source:` line missing SHA | Source is not a git repo or has no commits | The fallback `not-a-git-repo` is fine — leave as is |
 | Destination path does not exist | Typo or wrong project | Stop. Re-ask for destination path |
@@ -238,11 +274,12 @@ The verbatim phrase `check new task TASK-<NNN> — do you understand, can you ru
 ## Checklist before stopping
 
 - [ ] Step 1 preflight passed for destination (backlog dir, git repo, backlog CLI all OK)
+- [ ] Step 1: `handoff-create.sh mode` printed `protocol` or `local` (stopped on `refuse`)
 - [ ] Step 2 recon: destination's README/CLAUDE.md were read (or confirmed absent)
 - [ ] Step 3: every required field has a value (derived or asked)
 - [ ] Step 4: `Source:` line built from source's `git describe --always --dirty`
 - [ ] Step 4: Before-starting checklist included verbatim in the body
-- [ ] Step 5: `backlog task create` ran with destination as CWD (via `cd "$DEST" && ...`)
+- [ ] Step 5: the task was created through `handoff-create.sh create "$DEST" ...`, and its ID reported as final only in `protocol` mode after exit 0
 - [ ] Step 5: self-check confirmed no comma-joined ACs
 - [ ] Step 5: did NOT run `git add`/`git commit` in destination
 - [ ] Step 6: handoff confirmation block printed with verbatim magic phrase
