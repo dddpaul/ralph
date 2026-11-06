@@ -1,10 +1,10 @@
 ---
 id: TASK-326
 title: Close the gh flag gap in the commit-msg guard PreToolUse filter and lexer
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-05T17:50:00Z'
-updated_date: '2026-11-06T15:19:00Z'
+updated_date: '2026-11-06T15:21:00Z'
 labels: []
 dependencies: []
 priority: medium
@@ -31,4 +31,10 @@ commit-msg-guard.sh is registered with if: Bash(gh pr create *) and its lexer's 
 Plan: add a skipopts helper to the shared lexer (skip leading -options, two-word for a given regex), reuse it in gitsub and a new is_pr_create that skips gh -R/--repo before and after pr; widen the gh filter to Bash(gh *) in .claude/settings.json and hooks.json; sync lexer into both guards and live copies; extend test_commit_guards.py and test_plugin_hooks.py (WIDENED_FILTERS).
 
 Live test: 'false && gh -R owner/repo pr create --body <trailer>' was BLOCKED by the live hook in this session. Full pytest 1341 passed; ruff errors pre-existing (none in changed lines); bats not installed, shared-lexer equality checked by md5 of the marker block.
+
+Commit: `15ffb88` - task-326: dispatch commit-msg-guard on any gh command and skip gh -R/--repo in the lexer
+
+task-reviewer: APPROVED (0 findings). gh filter widened to Bash(gh *); is_pr_create skips -R/--repo before and after pr via shared skipopts helper (gitsub reuses it).
+
+Commit: `9638c02` - task-326: bump plugin version to 0.21.1 (patch)
 <!-- SECTION:NOTES:END -->
