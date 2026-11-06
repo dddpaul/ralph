@@ -54,4 +54,6 @@ AC7: bash -n, the bash 3.2 static guard (test_bash32_syntax) and all shared-back
 
 Host follow-up for AC7: on the Mac run /bin/bash tests/shell/shared-backlog-integrate-test.sh (and the claim, create, lock, recovery and retry suites); each must end 'failed: 0'.
 Implemented: integrate policy from pre-merge HEAD (.claude/ralph.json sharedBacklog + checks, SHARED_BACKLOG_CHECKS override, SHARED_BACKLOG_CHECKS_EXEC context probe, jq and backlog required); merge of the fetched origin SHA with Integrated-Origin trailer; duplicate stop prints renumber_plan mapping (shared with manual renumber; --amend removed); require_settled refuses over a left merge/rebase/cherry-pick/revert/index.lock; push_master sets PUSH_FAILURE and integrate retries only non-fast-forward (max 3). Tests: tests/shell/shared-backlog-integrate-test.sh (82 checks) via tests/python/test_shared_backlog_integrate.py. Review: APPROVED 06e155d
+
+Commit: `2a2cec7` - task-309: bump plugin version to 0.20.7 (patch)
 <!-- SECTION:NOTES:END -->
