@@ -17,7 +17,8 @@
 #                        sync, create a task, commit and push it at once
 #   integrate [--task N] land local master on origin: merge origin/master,
 #                        renumber our duplicate IDs, rerun checks, push
-#   check-dupes [REV]    exit 1 if REV's tree (default HEAD) has duplicate IDs
+#   check-dupes [REV]    exit 1 if REV's tree (default HEAD) has duplicate task
+#                        or draft IDs, or backlog doctor fails on it
 #   renumber [--base REF]
 #                        renumber our copies of duplicate IDs (those not in REF,
 #                        default origin/master) and commit
@@ -31,8 +32,12 @@
 #                        remove a dead owner's lock; --force removes it
 #                        whoever holds it
 #
-# The holder defaults to $SHARED_BACKLOG_HOLDER. $SHARED_BACKLOG_CHECKS, when
-# set, replaces the checks integrate reruns (run with `sh -c` at the repo root).
+# The holder comes from --as, else $SHARED_BACKLOG_HOLDER, else
+# `git config ralph.holder`; with none of them claim and release refuse. A bare
+# @claude assignee names no host, so it counts as unassigned. Any other
+# assignee besides the holder means the task is taken. $SHARED_BACKLOG_CHECKS,
+# when set, replaces the checks integrate reruns (run with `sh -c` at the repo
+# root).
 #
 # sync, claim, release, create, integrate and renumber hold the protocol lock,
 # and refuse while a Ralph run holds the run lock unless $RALPH_RUN_LOCK_TOKEN
@@ -52,7 +57,11 @@ MAX_TRIES=3
 HOOK_MARKER='shared-backlog pre-push hook'
 
 die() { echo "shared-backlog: $*" >&2; exit 1; }
-usage() { sed -n '/^# Usage:/,/^# Exit codes/p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 64; }
+# help_text — the header comment from "Usage:" to its last line.
+# SELF is absolute, so it still resolves after the cd to the repo root.
+SELF="$(cd "$(dirname "$0")" && pwd -P)/$(basename "$0")"
+help_text() { awk '/^# Usage:/ { p = 1 } p && !/^#/ { exit } p { sub(/^# ?/, ""); print }' "$SELF"; }
+usage() { help_text >&2; exit 64; }
 say() { echo "shared-backlog: $*" >&2; }
 
 # Every network call is bounded and never prompts: BatchMode refuses SSH
@@ -64,11 +73,20 @@ net_git() { git -c http.lowSpeedLimit=1 -c http.lowSpeedTime=10 "$@"; }
 
 repo_root() { git rev-parse --show-toplevel; }
 
+# task_prefix [REV] — the task prefix from the working tree's config, or from
+# REV's tree when REV is given.
 task_prefix() {
   local p
-  p=$(sed -n 's/^task_prefix: *["'\'']\{0,1\}\([^"'\'']*\)["'\'']\{0,1\} *$/\1/p' \
-    backlog/config.yml 2>/dev/null | head -1)
+  if [ $# -gt 0 ]; then
+    p=$(git show "$1:backlog/config.yml" 2>/dev/null | config_prefix)
+  else
+    p=$(config_prefix <backlog/config.yml 2>/dev/null)
+  fi
   echo "${p:-task}"
+}
+
+config_prefix() {
+  sed -n 's/^task_prefix: *["'\'']\{0,1\}\([^"'\'']*\)["'\'']\{0,1\} *$/\1/p' | head -1
 }
 
 # --- locks ------------------------------------------------------------------
@@ -342,12 +360,22 @@ fm_list() {
     }' "$1"
 }
 
-# tree_task_ids REV — "ID<TAB>path" for every task file in REV's tree.
+# tree_task_ids REV [PREFIX] — "ID<TAB>path" for every task file in REV's tree;
+# PREFIX defaults to the working tree's task prefix.
 tree_task_ids() {
-  local pfx
-  pfx=$(task_prefix)
-  git -c core.quotePath=false ls-tree -r --name-only "$1" -- \
-      backlog/tasks backlog/completed backlog/archive/tasks 2>/dev/null |
+  tree_ids "$1" "${2:-$(task_prefix)}" backlog/tasks backlog/completed backlog/archive/tasks
+}
+
+# tree_draft_ids REV — "ID<TAB>path" for every draft in REV's tree. Drafts have
+# their own ID space under the fixed prefix "draft".
+tree_draft_ids() { tree_ids "$1" draft backlog/drafts backlog/archive/drafts; }
+
+# tree_ids REV PREFIX DIR... — "ID<TAB>path" for every PREFIX-N file under the
+# DIRs of REV's tree.
+tree_ids() {
+  local rev=$1 pfx=$2
+  shift 2
+  git -c core.quotePath=false ls-tree -r --name-only "$rev" -- "$@" 2>/dev/null |
     awk -v pfx="$pfx" '{
       n = split($0, parts, "/"); b = parts[n]
       if (index(b, pfx "-") != 1) next
@@ -413,30 +441,42 @@ require_level() {
 # dup_ids REV — the IDs that more than one task file in REV's tree carries.
 dup_ids() { tree_task_ids "$1" | cut -f1 | sort | uniq -d; }
 
+# report_dupes KIND LISTING — name each ID that more than one line of LISTING
+# ("ID<TAB>path") carries; 1 when there is one.
+report_dupes() {
+  local dups id
+  dups=$(printf '%s\n' "$2" | cut -f1 | sort | uniq -d | grep . || true)
+  [ -n "$dups" ] || return 0
+  say "duplicate $1 IDs in $REV:"
+  for id in $dups; do
+    printf '%s\n' "$2" | awk -F'\t' -v id="$id" '$1 == id { print "  " $2 }' >&2
+  done
+  return 1
+}
+
+# cmd_check_dupes [REV] — check REV's tree alone: its task prefix and config
+# come from REV, never from the working tree.
 cmd_check_dupes() {
-  local rev=${1:-HEAD} dups tmp rc=0
-  git rev-parse -q --verify "$rev^{tree}" >/dev/null || die "unknown revision: $rev"
-  dups=$(dup_ids "$rev")
-  if [ -n "$dups" ]; then
-    say "duplicate task IDs in $rev:"
-    for id in $dups; do
-      tree_task_ids "$rev" | awk -F'\t' -v id="$id" '$1 == id { print "  " $2 }' >&2
-    done
-    rc=1
+  local tmp rc=0
+  REV=${1:-HEAD}
+  [ $# -le 1 ] || usage
+  git rev-parse -q --verify "$REV^{tree}" >/dev/null || die "unknown revision: $REV"
+  if ! git cat-file -e "$REV:backlog" 2>/dev/null; then
+    say "$REV has no backlog/ directory; no task IDs to check"
+    return 0
   fi
+  command -v backlog >/dev/null 2>&1 || die "backlog not on PATH; cannot run backlog doctor on $REV"
+  report_dupes task "$(tree_task_ids "$REV" "$(task_prefix "$REV")")" || rc=1
+  report_dupes draft "$(tree_draft_ids "$REV")" || rc=1
   # backlog doctor also sees documents, decisions and drafts, and dependency
   # cycles; run it on an export of exactly this tree, not the working tree.
-  if command -v backlog >/dev/null 2>&1; then
-    tmp=$(mktemp -d "${TMPDIR:-/tmp}/shared-backlog.XXXXXX")
-    git archive "$rev" backlog | tar -x -C "$tmp"
-    if ! (cd "$tmp" && backlog doctor >"$tmp/.doctor.out" 2>&1); then
-      sed 's/^/  doctor: /' "$tmp/.doctor.out" >&2
-      rc=1
-    fi
-    rm -rf "$tmp"
-  else
-    say "backlog not on PATH; checked file names only"
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/shared-backlog.XXXXXX")
+  git archive "$REV" backlog | tar -x -C "$tmp"
+  if ! (cd "$tmp" && backlog doctor >"$tmp/.doctor.out" 2>&1); then
+    sed 's/^/  doctor: /' "$tmp/.doctor.out" >&2
+    rc=1
   fi
+  rm -rf "$tmp"
   return "$rc"
 }
 
@@ -552,8 +592,10 @@ verify_none() { return 0; }
 
 # --- claim / release --------------------------------------------------------
 
+# holder_from_args ARGS... — set TASK_ID, FORCE and HOLDER: --as, else
+# $SHARED_BACKLOG_HOLDER, else git config ralph.holder.
 holder_from_args() {
-  HOLDER=${SHARED_BACKLOG_HOLDER:-}
+  HOLDER=
   FORCE=
   TASK_ID=
   while [ $# -gt 0 ]; do
@@ -565,11 +607,28 @@ holder_from_args() {
     esac
   done
   [ -n "$TASK_ID" ] || usage
-  [ -n "$HOLDER" ] || die "no holder: pass --as @name or set SHARED_BACKLOG_HOLDER"
+  [ -n "$HOLDER" ] || HOLDER=${SHARED_BACKLOG_HOLDER:-}
+  [ -n "$HOLDER" ] || HOLDER=$(git config --get ralph.holder || true)
+  [ -n "$HOLDER" ] ||
+    die "no holder: pass --as @name, set SHARED_BACKLOG_HOLDER or git config ralph.holder"
   case "$HOLDER" in @*) ;; *) HOLDER="@$HOLDER" ;; esac
+  [ "$HOLDER" != @claude ] || die "the holder @claude names no host; pick a per-host name"
 }
 
 assignees() { local f; f=$(task_file "$1") || return 0; fm_list "$f" assignee; }
+
+# real_assignees N — TASK-N's assignees without a bare @claude, which names no
+# host and so counts as unassigned.
+real_assignees() { assignees "$1" | grep -vxE '@?claude' || true; }
+
+# other_assignees N — TASK-N's assignees besides the holder, space-separated.
+other_assignees() {
+  local who
+  who=$(real_assignees "$1" | grep -vxF -e "$HOLDER" | tr '\n' ' ')
+  echo "${who% }"
+}
+
+held_by_holder() { real_assignees "$1" | grep -qxF -e "$HOLDER"; }
 
 deps_done() {
   local f dep df st bad=
@@ -582,11 +641,7 @@ deps_done() {
   [ -z "$bad" ] || { say "TASK-$1 has unfinished dependencies:$bad"; return 1; }
 }
 
-verify_claim() {
-  local who
-  who=$(assignees "$TASK_ID" | tr '\n' ' ')
-  [ "$who" = "$HOLDER " ]
-}
+verify_claim() { [ -z "$(other_assignees "$TASK_ID")" ] && held_by_holder "$TASK_ID"; }
 
 cmd_claim() {
   local f who st base rc=0
@@ -595,13 +650,14 @@ cmd_claim() {
   require_level
   base=$(git rev-parse HEAD)
   f=$(task_file "$TASK_ID") || die "TASK-$TASK_ID not found"
-  who=$(assignees "$TASK_ID" | tr '\n' ' ')
-  who=${who% }
-  if [ "$who" = "$HOLDER" ]; then say "TASK-$TASK_ID is already claimed by $HOLDER"; return 0; fi
+  who=$(other_assignees "$TASK_ID")
   [ -z "$who" ] || die "TASK-$TASK_ID taken by $who"
+  # A claim we already hold passes the same status and dependency checks.
   st=$(fm_scalar "$f" status)
   [ "$st" = "To Do" ] || die "TASK-$TASK_ID is '$st', not To Do"
   [ -n "$FORCE" ] || deps_done "$TASK_ID" || die "claim refused; --force overrides on Paul's say-so"
+  if held_by_holder "$TASK_ID"; then say "TASK-$TASK_ID is already claimed by $HOLDER"; return 0; fi
+  # -a replaces the whole list, so a bare @claude goes with it.
   backlog task edit "$TASK_ID" -a "$HOLDER" >/dev/null
   git add -- "$(task_file "$TASK_ID")"
   git commit -q -m "task-$TASK_ID: claim for $HOLDER"
@@ -618,8 +674,7 @@ cmd_claim() {
   esac
   # A conflict on the task file, or a clean rebase that leaves someone else's
   # name, means the other host claimed it first.
-  who=$(assignees "$TASK_ID" | tr '\n' ' ')
-  die "TASK-$TASK_ID taken by ${who% }"
+  die "TASK-$TASK_ID taken by $(other_assignees "$TASK_ID")"
 }
 
 cmd_release() {
@@ -628,7 +683,7 @@ cmd_release() {
   cmd_sync || return $?
   require_level
   f=$(task_file "$TASK_ID") || die "TASK-$TASK_ID not found"
-  who=$(assignees "$TASK_ID" | tr '\n' ' ')
+  who=$(real_assignees "$TASK_ID" | tr '\n' ' ')
   who=${who% }
   [ -n "$who" ] || { say "TASK-$TASK_ID has no assignee"; return 0; }
   [ "$who" = "$HOLDER" ] || [ -n "$FORCE" ] ||
@@ -788,6 +843,7 @@ cmd_install_hooks() {
 # --- main -------------------------------------------------------------------
 
 [ $# -gt 0 ] || usage
+case "$1" in -h|--help|help) help_text; exit 0 ;; esac
 cd "$(repo_root)"
 CMD=$1; shift
 LOCK_BASE=$(cd "$(git rev-parse --git-common-dir)" && pwd -P)
@@ -818,6 +874,5 @@ case "$CMD" in
     cmd_run_lock "$@" ;;
   run-unlock) cmd_run_unlock "$@" ;;
   unlock) cmd_unlock "$@" ;;
-  -h|--help|help) usage ;;
   *) usage ;;
 esac
