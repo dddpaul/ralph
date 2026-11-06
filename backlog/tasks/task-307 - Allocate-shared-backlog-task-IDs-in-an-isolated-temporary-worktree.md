@@ -1,9 +1,10 @@
 ---
 id: TASK-307
 title: Allocate shared-backlog task IDs in an isolated temporary worktree
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-04T14:53:00Z'
+updated_date: '2026-11-06T14:00:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -26,11 +27,17 @@ Reference: PRD design/plugin-delivered-project-files-prd.md, US-013 and FR-8.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 create runs under the protocol lock in a detached temporary worktree at a freshly fetched origin/master
-- [ ] #2 create commits task-N: add task with a Shared-Backlog-Op trailer whose operation ID is fixed once per create and reused on every retry
-- [ ] #3 Hooks in the temporary worktree resolve the plugin with the original clone project identity, proven by a real commit made there
-- [ ] #4 With origin unreachable, create refuses before allocating with exit 2 and leaves no commit and no task file
-- [ ] #5 Tests run create in clones that are behind origin, ahead of it, dirty and on a task branch; each publishes an ID free on origin and leaves the user branch, index and working tree unchanged
-- [ ] #6 sync and integrate refuse while an untracked task file is in the working tree, and list it
-- [ ] #7 bash -n, the bash 3.2 static guard and the shell tests pass; (host) the shell suite passes under /bin/bash 3.2
+- [x] #1 create runs under the protocol lock in a detached temporary worktree at a freshly fetched origin/master
+- [x] #2 create commits task-N: add task with a Shared-Backlog-Op trailer whose operation ID is fixed once per create and reused on every retry
+- [x] #3 Hooks in the temporary worktree resolve the plugin with the original clone project identity, proven by a real commit made there
+- [x] #4 With origin unreachable, create refuses before allocating with exit 2 and leaves no commit and no task file
+- [x] #5 Tests run create in clones that are behind origin, ahead of it, dirty and on a task branch; each publishes an ID free on origin and leaves the user branch, index and working tree unchanged
+- [x] #6 sync and integrate refuse while an untracked task file is in the working tree, and list it
+- [x] #7 bash -n, the bash 3.2 static guard and the shell tests pass; (host) the shell suite passes under /bin/bash 3.2
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan: cmd_create fixes an op ID (new_token), fetches origin (exit 2 offline before any worktree/task file), adds a detached git worktree at origin/master under a mktemp dir, runs land_reapply create_apply there (commit 'task-N: add task' + Shared-Backlog-Op trailer), then removes the worktree; the user's branch, index and tree are never touched. Linked worktree shares the git common dir, so the shim's resolver keys on the original clone root. sync and integrate refuse while untracked task files exist and list them. New tests/shell/shared-backlog-create-test.sh (+ pytest harness) covers behind/ahead/dirty/task-branch clones, offline refusal, op-ID reuse across a refused push, untracked-file refusals and a real shim commit in the worktree against a project-scope registry entry.
+<!-- SECTION:NOTES:END -->
