@@ -32,7 +32,7 @@ The user may pass overrides as skill arguments. Parse them as space-separated ke
 
 Set `block_end_buffer_min` to N>0 to pause the run when the active 5h Anthropic usage block has <=N minutes remaining. 0 disables the check (default). Requires ccusage to be installed; preflight warns if missing.
 
-**A run pushes `master` to `origin`.** With `push=true` (the default), the orchestrator runs `git push origin master` once at the end of the run whenever `master` moved during it. `push.followTags` carries the version tags along. The push also happens after a `/ralph-stop` or a failed run, because it runs after the loop's cleanup and not inside it. The git `pre-push` hook still runs on that push and can reject it. Set `push=false` to skip the push for this run: Step 4 passes `--no-push`, and the merged work stays on the local `master` only. Accepted values are `true` and `false`; reject anything else:
+**A run pushes `master` to `origin`.** With `push=true` (the default), the orchestrator runs `git push origin master` once at the end of the run whenever `master` moved during it, an `origin` remote exists and `RALPH_NO_PUSH` is not set to a truthy value. `push.followTags` carries the version tags along. The push also happens after a `/ralph-stop` or a failed run, because it runs after the loop's cleanup and not inside it. The git `pre-push` hook still runs on that push and can reject it. Set `push=false` to skip the push for this run: Step 4 passes `--no-push`, and the merged work stays on the local `master` only. Accepted values are `true` and `false`; reject anything else:
 ```
 BLOCKED: push must be true or false.
 ```
