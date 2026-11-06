@@ -60,4 +60,6 @@ Commit: `766a85d` - task-318: flag pre-fork master commits, check all of master 
 Review: APPROVED 766a85d6643c9b71e275b1fdbf604886111fcb02
 
 Follow-up (minor reviewer note): R-INFRA-6 could say that a project with no remote-tracking branch should set master_provenance_since, since the checker then walks all of master. Final checks: pytest 1436 passed, 4 skipped; bats 0 failures; ruff 49 errors, identical to master.
+
+Commit: `e1ee2f3` - task-318: bump plugin version to 0.22.1 (patch)
 <!-- SECTION:NOTES:END -->
