@@ -274,11 +274,11 @@ The verbatim phrase `check new task TASK-<NNN> — do you understand, can you ru
 ## Checklist before stopping
 
 - [ ] Step 1 preflight passed for destination (backlog dir, git repo, backlog CLI all OK)
+- [ ] Step 1: `handoff-create.sh mode` printed `protocol` or `local` (stopped on `refuse`)
 - [ ] Step 2 recon: destination's README/CLAUDE.md were read (or confirmed absent)
 - [ ] Step 3: every required field has a value (derived or asked)
 - [ ] Step 4: `Source:` line built from source's `git describe --always --dirty`
 - [ ] Step 4: Before-starting checklist included verbatim in the body
-- [ ] Step 1: `handoff-create.sh mode` printed `protocol` or `local` (stopped on `refuse`)
 - [ ] Step 5: the task was created through `handoff-create.sh create "$DEST" ...`, and its ID reported as final only in `protocol` mode after exit 0
 - [ ] Step 5: self-check confirmed no comma-joined ACs
 - [ ] Step 5: did NOT run `git add`/`git commit` in destination
