@@ -1,10 +1,10 @@
 ---
 id: TASK-305
 title: Make shared-backlog claims and the duplicate check exact
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-04T14:53:00Z'
-updated_date: '2026-11-06T13:25:00Z'
+updated_date: '2026-11-06T13:32:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -50,4 +50,10 @@ Plan: in plugins/ralph/scripts/shared-backlog.sh resolve the holder --as > SHARE
 Commit: `3f68c18` - task-305: make shared-backlog claims and the duplicate check exact
 
 AC #8 (host) deferred: this Linux container has no /bin/bash 3.2. On a Mac, run: /bin/bash tests/shell/shared-backlog-claim-test.sh && /bin/bash tests/shell/shared-backlog-lock-test.sh (both must end with failed: 0). The bash -n check, the bash 3.2 static guard (tests/python/test_bash32_syntax.py) and both shell suites pass here.
+
+Commit: `42e8f90` - task-305: print the help from any directory and keep the static guard clean
+
+Verified: claim suite 49 passed, lock suite 65 passed, full pytest 1303 passed / 4 skipped (bash 3.2 static guard included), bash -n clean. ruff check . reports 53 pre-existing errors in untouched files, identical on clean master; the new Python file is clean. task-reviewer: APPROVED (score 10) after fixing 3 first-pass findings (a static-guard false positive in the help test, the missing AC #8 host deferral note, and help not found when run by relative path from a subdirectory).
+
+Commit: `e2917fd` - task-305: bump plugin version to 0.20.3 (patch)
 <!-- SECTION:NOTES:END -->
