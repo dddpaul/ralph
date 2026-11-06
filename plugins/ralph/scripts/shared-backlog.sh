@@ -14,7 +14,8 @@
 #   release N [--as @who] [--force]
 #                        clear the holder's assignee on TASK-N and push
 #   create <backlog task create args...>
-#                        sync, create a task, commit and push it at once
+#                        create a task in a temporary worktree at a fresh
+#                        origin/master and push it at once
 #   integrate [--task N] land local master on origin: merge origin/master,
 #                        renumber our duplicate IDs, rerun checks, push
 #   check-dupes [REV]    exit 1 if REV's tree (default HEAD) has duplicate task
@@ -395,6 +396,20 @@ require_master_clean() {
     die "working tree has uncommitted changes; commit or stash them first"
 }
 
+# require_no_untracked_tasks — refuse while the working tree holds an untracked
+# task file: create publishes IDs from a temporary worktree, so a task file
+# made outside it carries an ID nobody else can see, and a later pull may bring
+# the same ID from origin. sync runs it, so claim and release refuse too.
+require_no_untracked_tasks() {
+  local files
+  files=$(git -c core.quotePath=false ls-files --others --exclude-standard -- \
+    backlog/tasks backlog/completed backlog/archive/tasks | grep '\.md$' || true)
+  [ -n "$files" ] || return 0
+  say "untracked task files in the working tree; publish tasks with create, and move or remove these first:"
+  printf '%s\n' "$files" | sed 's/^/  /' >&2
+  exit 1
+}
+
 # fetch_bounded — 0 on success, 2 when origin cannot be reached.
 fetch_bounded() {
   net_git fetch -q "$REMOTE" "$BRANCH" 2>/dev/null && return 0
@@ -421,16 +436,16 @@ push_master() {
 
 cmd_sync() {
   require_master_clean
+  require_no_untracked_tasks
   fetch_bounded || return 2
   git merge -q --ff-only "$REMOTE/$BRANCH" 2>/dev/null ||
     die "local $BRANCH has diverged from $REMOTE/$BRANCH; run integrate first"
   say "synced to $(git rev-parse --short HEAD)"
 }
 
-# require_level — local master carries nothing origin lacks. claim, release
-# and create retry and undo with a reset to origin/master; with unpushed work
-# (an un-integrated Ralph run, a provisional task) on master, the reset would
-# drop it.
+# require_level — local master carries nothing origin lacks. claim and release
+# retry and undo with a reset to origin/master; with unpushed work (an
+# un-integrated Ralph run) on master, the reset would drop it.
 require_level() {
   [ "$(git rev-parse HEAD)" = "$(git rev-parse "$REMOTE/$BRANCH")" ] ||
     die "local $BRANCH is ahead of $REMOTE/$BRANCH; run integrate first"
@@ -506,8 +521,7 @@ renumber_one() {
 # cmd_renumber [--base REF] [--amend] — give our copies of duplicate IDs (the
 # copies not in REF's tree) the next free IDs. Each renumber is its own commit;
 # with --amend they are folded into HEAD instead, so that no commit carrying the
-# duplicate ever reaches origin (create amends its own commit, integrate its
-# merge commit).
+# duplicate ever reaches origin (integrate amends its merge commit).
 cmd_renumber() {
   local base="$REMOTE/$BRANCH" amend='' dups id paths p keep next newpath n=0 log=''
   while [ $# -gt 0 ]; do
@@ -723,7 +737,8 @@ cmd_release() {
 # --- create -----------------------------------------------------------------
 
 # create_apply — create the task from CREATE_ARGS on the current tree and
-# commit it; after a refused push the fresh tree gives it the next free ID.
+# commit it with the Shared-Backlog-Op trailer OP_ID; after a refused push the
+# fresh tree gives it the next free ID, while OP_ID stays the same.
 create_apply() {
   local out file
   out=$(backlog task create "${CREATE_ARGS[@]}" --plain) || { say "backlog task create failed: $out"; return 4; }
@@ -731,27 +746,44 @@ create_apply() {
   [ -n "$NEW_ID" ] || NEW_ID=$(printf '%s\n' "$out" | sed -n 's/^Task [A-Za-z]*-\([0-9.]*\) - .*/\1/p' | head -1)
   [ -n "$NEW_ID" ] || { say "cannot read the new task ID from: $out"; return 4; }
   file=$(task_file "$NEW_ID") || { say "created TASK-$NEW_ID but cannot find its file"; return 4; }
-  git add -- "$file" && git commit -q -m "task-$NEW_ID: add task" ||
+  git add -- "$file" && git commit -q -m "task-$NEW_ID: add task" -m "Shared-Backlog-Op: $OP_ID" ||
     { say "committing TASK-$NEW_ID failed"; return 4; }
 }
 
+# create_cleanup — remove the temporary worktree create allocated in.
+create_cleanup() {
+  [ -n "$CREATE_TMP" ] || return 0
+  git -C "$CREATE_ROOT" worktree remove --force "$CREATE_TMP/wt" 2>/dev/null || true
+  rm -rf "$CREATE_TMP"
+  git -C "$CREATE_ROOT" worktree prune 2>/dev/null || true
+  CREATE_TMP=''
+}
+
+# cmd_create ARGS... — allocate a task ID in a detached temporary worktree at a
+# freshly fetched origin/master and push it, so the ID is on origin before
+# anyone sees it. The user's branch, index and working tree are never touched,
+# whatever state they are in; `sync` brings the task in.
 cmd_create() {
-  local rc=0 offline=
+  local rc=0
   [ $# -gt 0 ] || usage
   CREATE_ARGS=("$@")
-  cmd_sync || { rc=$?; [ "$rc" -eq 2 ] || return "$rc"; offline=1; }
-  if [ -n "$offline" ]; then
-    create_apply || exit 1
-    echo "created TASK-$NEW_ID, provisional: not pushed (origin unreachable); run integrate when origin is back"
-    return 0
-  fi
-  require_level
+  # The operation ID, not the task ID, is fixed once per create.
+  OP_ID=$(new_token)
+  CREATE_ROOT=$(pwd -P)
+  CREATE_TMP=''
+  fetch_bounded || { say "create refused: a task ID nobody can see is not allocated; nothing created"; exit 2; }
+  CREATE_TMP=$(mktemp -d "${TMPDIR:-/tmp}/shared-backlog-create.XXXXXX")
+  trap create_cleanup EXIT
+  git worktree add -q --detach "$CREATE_TMP/wt" "$REMOTE/$BRANCH" ||
+    die "cannot add a temporary worktree at $REMOTE/$BRANCH"
+  cd "$CREATE_TMP/wt"
   land_reapply create_apply || rc=$?
+  cd "$CREATE_ROOT"
   case "$rc" in
-    0) echo "created TASK-$NEW_ID $(git rev-parse --short HEAD)" ;;
-    2) echo "created TASK-$NEW_ID, provisional: not pushed (origin unreachable)" ;;
+    0) echo "created TASK-$NEW_ID $(git rev-parse --short "$REMOTE/$BRANCH") (Shared-Backlog-Op: $OP_ID); run sync to bring it in" ;;
+    2) say "TASK-${NEW_ID:-?} not pushed (origin unreachable); nothing created locally"; exit 2 ;;
     4) exit 1 ;;
-    *) die "TASK-$NEW_ID committed locally, provisional and not pushed" ;;
+    *) die "TASK-${NEW_ID:-?} not pushed; nothing created locally" ;;
   esac
 }
 
@@ -795,6 +827,7 @@ cmd_integrate() {
     esac
   done
   require_master_clean
+  require_no_untracked_tasks
   while :; do
     fetch_bounded || { say "done locally, not pushed"; return 2; }
     local_sha=$(git rev-parse HEAD)
