@@ -439,13 +439,13 @@ Neither part commits. `clone` runs on the host only: with `DEVCONTAINER=true` it
 
 The marker is what *activates* the guards, so it is written last. Writing it activates `master-branch-guard` and the other PreToolUse guards mid-session. Deferring it until after every other Step 3.x template write means subsequent steps (including 3.9's `.obsidian/*` writes on `master`) cannot self-block on a guard this same `/ralph-init` invocation just switched on. The invariant for future template-write steps is durable: **hook activation is the last act of init.** Rationale walked end-to-end in `design/ralph-init-hook-ordering-brainstorm.md` (Options A–E, Q1–Q5, addendum 2026-06-13); the plugin-delivered design is in `design/plugin-delivered-project-files-prd.md`.
 
-**Shared backlog (only if the user said Yes to Q5).** After both migration parts, install the tracked project shim, write the opt-in into the marker, and run `enable` in this clone. `<checks>` is the Q5 checks command, or empty; `<holder>` is the Q5 holder:
+**Shared backlog (only if the user said Yes to Q5).** After both migration parts, install the tracked project shim, write the opt-in into the marker, and run `enable` in this clone. `<checks>` is the Q5 checks command, or empty, with each `'` in it written as `'\''`; `<holder>` is the Q5 holder:
 
 ```sh
 mkdir -p scripts
 cp ${CLAUDE_PLUGIN_ROOT}/skills/ralph-init/templates/shims/shared-backlog.sh scripts/shared-backlog.sh
 chmod +x scripts/shared-backlog.sh
-jq --arg checks "<checks>" '.sharedBacklog = true | if $checks == "" then . else .checks = $checks end' \
+jq --arg checks '<checks>' '.sharedBacklog = true | if $checks == "" then . else .checks = $checks end' \
   .claude/ralph.json > .claude/ralph.json.tmp && mv .claude/ralph.json.tmp .claude/ralph.json
 bash scripts/shared-backlog.sh enable --holder <holder>
 ```
