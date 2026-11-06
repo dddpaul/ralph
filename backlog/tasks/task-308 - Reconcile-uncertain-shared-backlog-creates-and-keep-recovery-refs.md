@@ -51,4 +51,8 @@ Commit: `5e8ee41` - task-308: reconcile uncertain shared-backlog creates and kee
 Commit: `d37371d` - task-308: stop the deadline watchdog and remove its flag on a signal
 
 Done: create reallocates in a fresh worktree with the same op ID after a non-fast-forward (≤3 pushes); any other failed push is reconciled against origin by the Shared-Backlog-Op trailer (found → reported as the result; unreachable → exit 2, no reallocation); an uncertain commit is kept as refs/ralph/recovery/<op-id> with check/drop/finish instructions, by the main shell's EXIT trap before it removes the worktree, so deadline and signal exits are covered. on_signal also stops the deadline watchdog and removes its flag. Tests: tests/shell/shared-backlog-recovery-test.sh via tests/python/test_shared_backlog_recovery.py. task-reviewer APPROVED (after a fix for the watchdog left running on a signal).
+
+Commit: `4fae8ee` - task-308: mark Done
+
+Commit: `e1df34c` - task-308: bump plugin version to 0.20.6 (patch)
 <!-- SECTION:NOTES:END -->
