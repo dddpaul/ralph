@@ -33,7 +33,8 @@ while read -r local_ref local_sha remote_ref _remote_sha; do
   [ -n "$local_ref" ] || continue
   case "$local_sha" in *[!0]*) ;; *) continue ;; esac  # a deletion
   checked=$((checked + 1))
-  if ! bash "$script" check-dupes "$local_sha"; then
+  # </dev/null: a stdin reader in check-dupes would eat the remaining ref lines.
+  if ! bash "$script" check-dupes "$local_sha" </dev/null; then
     echo "ralph pre-push: refusing to push $local_ref -> $remote_ref: duplicate task IDs, or they cannot be checked (above)." >&2
     rc=1
   fi
