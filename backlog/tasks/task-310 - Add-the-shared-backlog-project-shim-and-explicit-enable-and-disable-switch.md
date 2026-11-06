@@ -54,4 +54,6 @@ Commit: `5a69b49` - task-310: add shared-backlog project shim, release gate and 
 Commit: `a67c1db` - task-310: single-quote the checks command in the Init opt-in snippet
 
 Done. enable/disable live in plugins/ralph/scripts/shared-backlog.sh behind RELEASED=0 (TASK-320 opens it). enable keeps an existing pre-push as pre-push.local and refuses before writing when a differing pre-push.local exists; disable unsets ralph.sharedBacklog and leaves the pre-push shim and ralph.holder. Until TASK-311 ships git-hooks/pre-push, an enabled clone's pre-push shim would block pushes; the closed gate prevents that. Init snippet uses an sh fence because test_ralph_init_plugin_delivered requires exactly one bash fence in Step 3.11. task-reviewer: APPROVED (minor checks-quoting note fixed). Full pytest 1331 passed; bats all ok.
+
+Commit: `9a33749` - task-310: bump plugin version to 0.21.0 (minor)
 <!-- SECTION:NOTES:END -->
