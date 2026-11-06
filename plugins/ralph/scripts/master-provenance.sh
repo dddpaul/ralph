@@ -7,7 +7,8 @@
 # Usage: master-provenance.sh [--remote NAME] [--base BRANCH] [RANGE]
 #
 #   RANGE      the commits to check (default REMOTE/BASE..BASE, the commits
-#              master has that origin lacks); task notes are read at its end
+#              master has that origin lacks, or all of BASE when there is no
+#              REMOTE/BASE); task notes are read at its end
 #   --remote   the remote integrate merges from (default origin)
 #   --base     the base branch (default master)
 #
@@ -18,7 +19,8 @@
 #   - a "task-N: " commit that changes only backlog/{tasks,drafts,archive,completed}/;
 #   - task-branch work: a merge whose second parent is at or after a
 #     "Review: APPROVED <sha>" recorded in the notes of the task it names, or a
-#     fast-forwarded "task-N" commit at or before such a SHA. Only bookkeeping
+#     fast-forwarded "task-N" commit at or before such a SHA on master's
+#     first-parent line. Only bookkeeping
 #     commits may follow the SHA: task-N commits that change task files, guard
 #     allowlist paths or the project's master_bookkeeping_paths;
 #   - an integration merge whose "Integrated-Origin: <sha>" trailer names its
@@ -47,6 +49,7 @@ FLAGS=0
 EXTRA_PATHS=''
 TIP=''
 TASK_FILES=''
+FIRST_PARENTS=''
 
 die() { printf 'master-provenance: %s\n' "$*" >&2; exit 2; }
 
@@ -193,6 +196,10 @@ check_commit() {
   n=$(git log -1 --format=%s "$c" | sed -n 's/^task-\([0-9][0-9]*\)[^0-9].*/\1/p')
   if [ -n "$n" ]; then
     for a in $(approved "$n"); do
+      # The reviewed tip must itself be on master's first-parent line: a
+      # task-N commit behind a SHA that came in as a merge's second parent
+      # is a commit made on master before the branch forked.
+      printf '%s\n' "$FIRST_PARENTS" | grep -qx "$a" || continue
       if git merge-base --is-ancestor "$c" "$a" || reviewed_after "$a" "$c" ''; then
         ok "$c" "fast-forwarded TASK-$n work reviewed at $(git rev-parse --short "$a")"
         return
@@ -214,8 +221,8 @@ main() {
   local c parents since
   while [ $# -gt 0 ]; do
     case "$1" in
-      --remote) REMOTE=${2:?--remote needs NAME}; shift 2 ;;
-      --base) BASE=${2:?--base needs BRANCH}; shift 2 ;;
+      --remote) [ $# -ge 2 ] || usage; REMOTE=$2; shift 2 ;;
+      --base) [ $# -ge 2 ] || usage; BASE=$2; shift 2 ;;
       -h|--help) usage ;;
       -*) usage ;;
       *) [ -z "$RANGE" ] || usage; RANGE=$1; shift ;;
@@ -225,6 +232,10 @@ main() {
   since=''
   if [ -z "$RANGE" ]; then
     RANGE="refs/remotes/$REMOTE/$BASE..$BASE"
+    if ! git rev-parse -q --verify "refs/remotes/$REMOTE/$BASE" >/dev/null; then
+      printf 'master-provenance: no %s/%s; checking all of %s\n' "$REMOTE" "$BASE" "$BASE" >&2
+      RANGE=$BASE
+    fi
     since=$(conf_value master_provenance_since)
     if [ -n "$since" ]; then
       since=$(git rev-parse -q --verify "$since^{commit}") || die "cannot resolve master_provenance_since"
@@ -236,6 +247,7 @@ main() {
   git merge-tree --write-tree "$TIP" "$TIP" >/dev/null 2>&1 || die "git merge-tree --write-tree failed (needs git 2.38+)"
   TASK_FILES=$(git -c core.quotePath=false ls-tree -r --name-only "$TIP" -- backlog/tasks backlog/completed backlog/archive backlog/drafts)
   EXTRA_PATHS=$(conf_value master_bookkeeping_paths)
+  FIRST_PARENTS=$(git rev-list --first-parent "$TIP")
   for c in $(git rev-list --first-parent --reverse "$RANGE" ${since:+"^$since"}); do
     parents=$(parent_count "$c")
     if [ "$parents" -gt 3 ]; then flag "$c" "octopus merge"

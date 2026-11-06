@@ -380,7 +380,7 @@ def test_r_infra_6_requires_the_checker_and_names_each_allowed_commit() -> None:
         "`backlog/{tasks,drafts,archive,completed}/`",
         "`Review: APPROVED <sha>`",
         "No branch ref needs to survive.",
-        "A verdict recorded for an earlier SHA does not approve commits made after it",
+        "A verdict recorded for an earlier SHA does not approve any other commit made after it",
         "`Integrated-Origin: <sha>`",
         "reachable from origin's base branch",
         "`git merge-tree --write-tree`",
@@ -404,3 +404,25 @@ def test_review_step_records_the_reviewed_sha(path: str) -> None:
         in step
     )
     assert "run on the task branch tip that was reviewed" in step
+
+
+def test_flags_code_commit_made_on_master_before_a_reviewed_branch_forked(
+    repo: Repo,
+) -> None:
+    sneak = repo.commit("task-5: sneak change on master", {"app.py": "a = 0\n"})
+    approved_task_branch(repo, change="a = 0\nb = 1\n")
+    merge_task_branch(repo)
+    assert_flagged(repo.check(), repo, sneak, "not covered by a Review: APPROVED note")
+
+
+def test_checks_all_of_master_without_a_remote_tracking_branch(repo: Repo) -> None:
+    repo.git("update-ref", "-d", "refs/remotes/origin/master")
+    result = repo.check()
+    assert result.returncode == 1
+    assert "no origin/master; checking all of master" in result.stderr
+    assert "FLAG" in result.stdout
+
+
+@pytest.mark.parametrize("flag", ["--remote", "--base"])
+def test_option_without_value_is_a_usage_error(repo: Repo, flag: str) -> None:
+    assert repo.check(flag).returncode == 2
