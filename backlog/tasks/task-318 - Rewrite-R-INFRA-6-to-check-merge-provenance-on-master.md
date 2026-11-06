@@ -1,10 +1,10 @@
 ---
 id: TASK-318
 title: Rewrite R-INFRA-6 to check merge provenance on master
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-04T14:55:00Z'
-updated_date: '2026-11-06T18:56:00Z'
+updated_date: '2026-11-06T19:04:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -54,4 +54,10 @@ Commit: `6021ec6` - task-318: check merge provenance on master for R-INFRA-6
 Implementation: master-provenance.sh in plugins/ralph/scripts (bash 3.2/BSD-safe, needs git 2.38+ for merge-tree --write-tree). Bookkeeping commits (task-N task-file commits, guard allowlist paths, master_bookkeeping_paths) may follow the APPROVED SHA, because the lifecycle commits the note, Done status and version bump after the review. .claude/task-reviewer.conf (now tracked, also in ralph-init's .gitignore block) sets master_bookkeeping_paths to the two plugin manifests and master_provenance_since to the TASK-317 merge, since older merges carry no Review: APPROVED notes. Tests: tests/python/test_master_provenance.py (6 approved + 4 flagged AC fixtures, plus extra cases). pytest 1432 passed; bats 0 failures; ruff clean on new files (49 pre-existing errors, identical on master).
 
 Review round 1 (CHANGES REQUESTED) fixes: fast-forward approval now needs the APPROVED SHA on master's first-parent line, so a code commit made on master before a --no-ff-merged branch forked is flagged (the pure fast-forward variant is undetectable from a tip SHA; documented in R-INFRA-6); without origin/master the checker walks all of master; --remote/--base without a value exit 2; R-INFRA-6 states the bookkeeping-after-SHA condition directly.
+
+Commit: `766a85d` - task-318: flag pre-fork master commits, check all of master without a remote
+
+Review: APPROVED 766a85d6643c9b71e275b1fdbf604886111fcb02
+
+Follow-up (minor reviewer note): R-INFRA-6 could say that a project with no remote-tracking branch should set master_provenance_since, since the checker then walks all of master. Final checks: pytest 1436 passed, 4 skipped; bats 0 failures; ruff 49 errors, identical to master.
 <!-- SECTION:NOTES:END -->
