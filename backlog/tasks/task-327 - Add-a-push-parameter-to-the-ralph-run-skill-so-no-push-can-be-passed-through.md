@@ -43,4 +43,8 @@ Commit: `3981799` - task-327: add push parameter to ralph-run that passes --no-p
 Verification (AC5/6): built RALPH_CMD per Step 4 (devcontainer=false, tasks=1) in a throwaway repo with a bare origin, with a fake claude that marks the task Done and commits to master; ran the workspace orchestrator directly (the project ralph.sh shim resolves the installed plugin, not this checkout). push=false: argv ends '--no-push', local master advanced to the fake-work commit, origin master stayed at init. push omitted: no --no-push in argv, log 'Publishing master to origin (0e44c1ce8 -> eeb92c8f6)... Published master to origin.', origin == local. AC7: no shell changes; bash -n ralph.sh OK. Gate: pytest 1346 passed, 4 skipped; new test file ruff-clean. 'ruff check .' reports 53 errors in files this task does not touch, and master reports the same set.
 
 task-reviewer: APPROVED (score 9). Applied its minor finding: the push paragraph now names the origin-remote and RALPH_NO_PUSH conditions. Final gate: pytest 1346 passed, 4 skipped.
+
+Commit: `7343a64` - task-327: name origin and RALPH_NO_PUSH push conditions; mark Done
+
+Commit: `514ada0` - task-327: bump plugin version to 0.21.2 (patch)
 <!-- SECTION:NOTES:END -->
