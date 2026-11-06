@@ -678,7 +678,7 @@ cmd_claim() {
   [ "$rc" -ne 3 ] || fetch_bounded || true
   git reset -q --hard "$REMOTE/$BRANCH"
   case "$rc" in
-    2) die "claim not pushed (origin unreachable); undone locally" ;;
+    2) say "claim not pushed (origin unreachable); undone locally"; exit 2 ;;
     3) die "claim push rejected; undone locally" ;;
   esac
   exit 1
@@ -714,7 +714,7 @@ cmd_release() {
   [ "$rc" -ne 3 ] || fetch_bounded || true
   git reset -q --hard "$REMOTE/$BRANCH"
   case "$rc" in
-    2) die "release not pushed (origin unreachable); undone locally" ;;
+    2) say "release not pushed (origin unreachable); undone locally"; exit 2 ;;
     3) die "release push rejected; undone locally" ;;
   esac
   exit 1
