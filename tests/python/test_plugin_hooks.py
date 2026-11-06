@@ -141,6 +141,7 @@ def dispatch(
         env=env,
         capture_output=True,
         text=True,
+        check=False,
     )
     return result, out
 
@@ -357,6 +358,7 @@ def run_plugin_guard(
         env=base_env(CLAUDE_PROJECT_DIR=str(project_dir)),
         capture_output=True,
         text=True,
+        check=False,
     )
 
 
@@ -398,6 +400,7 @@ def run_guard_directly(script: Path, payload: str, run_cwd: Path, **env: str) ->
         env=base_env(**env),
         capture_output=True,
         text=True,
+        check=False,
     )
     return result.stdout
 
@@ -564,6 +567,7 @@ def test_legacy_wired_project_still_blocks(bootstrapped: Path) -> None:
             env=base_env(CLAUDE_PROJECT_DIR=str(root), RALPH_AUTONOMOUS="0"),
             capture_output=True,
             text=True,
+            check=False,
         )
         assert result.returncode == 0, f"{guard} ({condition}) failed: {result.stderr}"
         decision = "additionalContext" if event == "PostToolUse" else '"deny"'

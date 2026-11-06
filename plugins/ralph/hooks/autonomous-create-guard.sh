@@ -14,7 +14,8 @@
 # true. hooks.json calls it directly, not through run.sh: it is not subject to
 # the pluginHooks marker or localGuards. The run's clone is the git root of
 # CLAUDE_PROJECT_DIR, never the command's cwd. Best effort, like every plugin
-# hook: a command spelled in a way the patterns below miss is not refused.
+# hook: a command spelled in a way the patterns below miss is not refused, and a
+# line of a multi-line string that starts with `backlog task create` is.
 
 unset CDPATH
 
@@ -42,10 +43,11 @@ esac
 
 if [ -z "$what" ] && [ -n "$cmd" ]; then
   # `backlog task create` in command position: at a line start or after a shell
-  # separator, past any VAR=value assignments, wrapper words and a path prefix.
+  # separator, past any VAR=value assignments, wrapper words (sh -c "..." too)
+  # and a path prefix.
   sep='(^|[;&|({`!]|\$\()'
   lead='[[:space:]]*([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)*'
-  wrap='((then|do|else|time|command|exec|env|nohup|sudo|npx|bunx|xargs)[[:space:]]+)*'
+  wrap='((then|do|else|time|command|exec|env|nohup|sudo|npx|bunx|xargs)[[:space:]]+|(ba|z)?sh[[:space:]]+-c[[:space:]]+["'"'"']?)*'
   backlog_create="${sep}${lead}${wrap}([^[:space:];&|()]*/)?backlog[[:space:]]+tasks?[[:space:]]+create([[:space:]]|$)"
   # The script name is distinctive enough to match anywhere, quoted or not.
   shared_create="shared-backlog\\.sh[\"']?[[:space:]]+create([[:space:]]|$)"

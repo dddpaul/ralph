@@ -39,6 +39,8 @@ REFUSED = [
     'bash scripts/shared-backlog.sh create "Follow up"',
     '"${CLAUDE_PLUGIN_ROOT}"/scripts/shared-backlog.sh create "Follow up" -l x',
     "x=$(backlog task create 'Follow up' --plain)",
+    'bash -c "backlog task create x"',
+    "sh -c 'cd /tmp && backlog task create x'",
 ]
 ALLOWED = [
     "backlog task list -s 'To Do' --plain",
