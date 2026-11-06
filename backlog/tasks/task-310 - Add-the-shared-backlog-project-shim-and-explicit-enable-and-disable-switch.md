@@ -1,9 +1,10 @@
 ---
 id: TASK-310
 title: Add the shared-backlog project shim and explicit enable and disable switch
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-04T14:54:00Z'
+updated_date: '2026-11-06T15:05:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -42,3 +43,9 @@ Reference: PRD design/plugin-delivered-project-files-prd.md, US-016 and FR-2, FR
 - [ ] #7 ralph-init Init and Upgrade offer the opt-in, write sharedBacklog and an optional checks into the marker, and run enable in that clone
 - [ ] #8 ruff, pytest and bats pass, and bash -n plus the bash 3.2 static guard pass on every changed shell file
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan: release gate (RELEASED=0, SHARED_BACKLOG_ALLOW_UNRELEASED=1 opens it) plus enable/disable in plugins/ralph/scripts/shared-backlog.sh; enable checks marker, holder and pre-push before writing, installs templates/shims/git-hook as pre-push (existing hook kept as pre-push.local), sets ralph.sharedBacklog last. New fixed shim templates/shims/shared-backlog.sh embeds the resolver. ralph-init Init Q5 + Step 3.11 sh snippet, Upgrade U4 opt-in bullet. Tests in tests/python/test_shared_backlog_enable.py.
+<!-- SECTION:NOTES:END -->

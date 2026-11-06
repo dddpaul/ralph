@@ -89,6 +89,11 @@ Ask with lettered options for quick answers (e.g. "0A, 1A, 2C, 3B, 4A"):
 4. Which AI tool will you use with Ralph?
    A. Claude Code
    B. opencode
+
+5. Will several hosts share this project's backlog through one origin (shared-backlog protocol)?
+   A. No (default)
+   B. Yes — opt in. Also give this host's holder (e.g. @laptop) and, optionally,
+      the checks command integrate runs before it pushes
 ```
 
 **Project type behavior:**
@@ -434,7 +439,20 @@ Neither part commits. `clone` runs on the host only: with `DEVCONTAINER=true` it
 
 The marker is what *activates* the guards, so it is written last. Writing it activates `master-branch-guard` and the other PreToolUse guards mid-session. Deferring it until after every other Step 3.x template write means subsequent steps (including 3.9's `.obsidian/*` writes on `master`) cannot self-block on a guard this same `/ralph-init` invocation just switched on. The invariant for future template-write steps is durable: **hook activation is the last act of init.** Rationale walked end-to-end in `design/ralph-init-hook-ordering-brainstorm.md` (Options A–E, Q1–Q5, addendum 2026-06-13); the plugin-delivered design is in `design/plugin-delivered-project-files-prd.md`.
 
-**Second host.** The marker is committed with the rest of the scaffold. Another clone of the project — on a second host, say — needs only the per-clone part after `git pull`: `migrate-plugin-hooks.sh clone`.
+**Shared backlog (only if the user said Yes to Q5).** After both migration parts, install the tracked project shim, write the opt-in into the marker, and run `enable` in this clone. `<checks>` is the Q5 checks command, or empty; `<holder>` is the Q5 holder:
+
+```sh
+mkdir -p scripts
+cp ${CLAUDE_PLUGIN_ROOT}/skills/ralph-init/templates/shims/shared-backlog.sh scripts/shared-backlog.sh
+chmod +x scripts/shared-backlog.sh
+jq --arg checks "<checks>" '.sharedBacklog = true | if $checks == "" then . else .checks = $checks end' \
+  .claude/ralph.json > .claude/ralph.json.tmp && mv .claude/ralph.json.tmp .claude/ralph.json
+bash scripts/shared-backlog.sh enable --holder <holder>
+```
+
+`scripts/shared-backlog.sh` is a fixed shim: it resolves the installed plugin through the same registry resolver as the git hook shims and execs the plugin's `scripts/shared-backlog.sh`, so it is never edited. `enable` requires `"sharedBacklog": true` in the marker, saves `<holder>` as `git config ralph.holder` (without `--holder` it keeps an existing `ralph.holder`, else asks once on a terminal), installs the plugin shim as pre-push (an existing pre-push hook is kept as `pre-push.local`) and sets the trusted switch `ralph.sharedBacklog true`. Only `shared-backlog.sh disable` (or the user) clears the switch; the clone migration never sets it, and a commit that changes the marker does not change it. While the protocol's release gate is closed, `enable` exits 1 with `shared-backlog protocol not released yet` and writes nothing: then delete `scripts/shared-backlog.sh`, remove `sharedBacklog` and `checks` from `.claude/ralph.json` again, and tell the user the protocol is not released yet. Any other exit 1 (for example a differing `pre-push.local`): relay the message.
+
+**Second host.** The marker is committed with the rest of the scaffold. Another clone of the project — on a second host, say — needs only the per-clone part after `git pull`: `migrate-plugin-hooks.sh clone`, and, when the marker sets `"sharedBacklog": true`, `bash scripts/shared-backlog.sh enable --holder <that host's holder>`.
 
 ---
 
@@ -452,7 +470,10 @@ Files created:
   .git/hooks/pre-commit  - Plugin shim: filename-length (125-byte) + Unicode NFC/NFD guards
   .gitignore            - Updated with Ralph entries
   backlog/              - Backlog initialized
-  .claude/ralph.json         - Plugin-hooks marker (the plugin's guards enforce here)
+  .claude/ralph.json         - Plugin-hooks marker (the plugin's guards enforce here;
+                               "sharedBacklog" and "checks" if the user opted in)
+  scripts/shared-backlog.sh  - (if opted in) Shim for the plugin's shared-backlog script
+  .git/hooks/pre-push        - (if opted in) Plugin shim, installed by shared-backlog.sh enable
   .claude/settings.local.json - The project's own Skill(...) permissions
   git config ralph.*         - Per-clone switches (not committed; a second clone runs
                                migrate-plugin-hooks.sh clone after git pull)
@@ -732,6 +753,7 @@ For each file the user approved:
 
      It saves the switches `ralph.jq`, `ralph.projectPath` (and `ralph.claudeConfigDir` off the default). It installs the plugin shim as pre-commit, commit-msg and post-commit, and sets `ralph.pluginHooks true`. It removes from `.claude/settings.local.json` the fragment entries the user settings already hold, and reports the ones it kept. It never sets `ralph.sharedBacklog`. Run it on the host: inside the devcontainer (`DEVCONTAINER=true`) it exits 1 and writes nothing. An unedited copy of any hook body ralph-init has shipped is replaced; a legacy hook that matches none of them stops it with exit 1 before it writes anything. Relay the message: to keep the hook, accept it (`bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-init/scripts/managed-file-drift.sh accept . .git/hooks/<name>`, appended to `.claude/managed-file-drift.accept`), so that it becomes `<name>.local` and the shim runs it first; or delete it. Then rerun. An existing `<name>.local` is never overwritten.
   5. Re-assert `git config --local core.precomposeunicode true` (idempotent) — the macOS NFD-on-write defense that goes with pre-commit.
+- **Shared backlog (opt-in).** Ask Init's Q5 when `.claude/ralph.json` does not set `"sharedBacklog": true`. On Yes, run the Init Step 3.11 shared-backlog snippet (shim, marker keys, `enable`) after the plugin-hooks migration, with the same handling of an `enable` refusal. When the marker already sets it: refresh `scripts/shared-backlog.sh` from `templates/shims/shared-backlog.sh` if it differs, and when `git config --bool ralph.sharedBacklog` is not `true`, ask before running `bash scripts/shared-backlog.sh enable` — the clone may have been turned off on purpose with `disable`, so Upgrade never enables it unasked.
 
   Neither part commits. The tracked changes — the marker, `.gitignore`, `.claude/settings.json` and the deleted guard copies — are committed on the upgrade branch with the rest of U4 and pushed once. **A second host needs only the clone part:** after `git pull` brings the tracked part, run `migrate-plugin-hooks.sh clone .` in that clone. Running the tracked part there too would make a second, diverging commit.
 - **`.claude/settings.local.json`**: never overwritten — it may still hold common rules that the user settings lack. Merge the template's rules in with the same `+ unique` pattern as Step 3.7b:

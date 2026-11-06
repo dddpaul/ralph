@@ -30,6 +30,12 @@
 #                        but a person
 #   install-hooks [--force]
 #                        install scripts/hooks/pre-push into .git/hooks
+#   enable [--holder @who]
+#                        opt this clone in: needs "sharedBacklog": true in
+#                        .claude/ralph.json; saves the host's default holder
+#                        as ralph.holder (asked once), installs the plugin
+#                        pre-push shim and sets ralph.sharedBacklog true
+#   disable              clear ralph.sharedBacklog in this clone
 #   run-lock [--pid PID] take the run lock for a Ralph run owned by PID
 #                        (default: the caller) and print its token
 #   run-unlock [TOKEN]   release the run lock TOKEN (default
@@ -63,6 +69,14 @@
 # $SHARED_BACKLOG_DEADLINE seconds (default 120); on expiry its process group
 # is killed and the state is reported, not repaired.
 #
+# The clone switch ralph.sharedBacklog is set only by enable, cleared only by
+# disable (or the user), and never derived from the marker afterwards: a commit
+# that drops the marker does not turn it off, and the clone migration of
+# migrate-plugin-hooks.sh does not turn it back on. enable keeps an existing
+# pre-push hook as pre-push.local, which the shim runs first. While the release
+# gate below is closed, enable refuses; $SHARED_BACKLOG_ALLOW_UNRELEASED=1
+# opens it for tests only.
+#
 # Exit codes: 0 ok, 1 refused / conflict / check failed, 2 origin unreachable,
 # 64 usage error. Bash 3.2 clean: no associative arrays, no mapfile.
 
@@ -72,6 +86,9 @@ REMOTE=origin
 BRANCH=master
 MAX_TRIES=3
 HOOK_MARKER='shared-backlog pre-push hook'
+# The release gate (design/plugin-delivered-project-files-prd.md FR-13): 0 until
+# the release task opens it; while 0, enable refuses.
+RELEASED=0
 
 die() { echo "shared-backlog: $*" >&2; exit 1; }
 # help_text — the header comment from "Usage:" to its last line.
@@ -1041,6 +1058,84 @@ cmd_install_hooks() {
   echo "installed $dst"
 }
 
+# --- enable / disable -------------------------------------------------------
+
+# release_gate — refuse while the protocol is not released, unless a test opens
+# the gate with SHARED_BACKLOG_ALLOW_UNRELEASED=1.
+release_gate() {
+  [ "$RELEASED" = 1 ] || [ "${SHARED_BACKLOG_ALLOW_UNRELEASED:-}" = 1 ] ||
+    die "shared-backlog protocol not released yet; enable refuses until it is"
+}
+
+# enable_holder [HOLDER] — print the holder enable saves: HOLDER, else the
+# clone's ralph.holder, else one answer read from the terminal.
+enable_holder() {
+  local h=${1:-}
+  [ -n "$h" ] || h=$(git config --get ralph.holder || true)
+  if [ -z "$h" ]; then
+    [ -t 0 ] || die "no holder: pass --holder @name (this host's default holder) or set git config ralph.holder"
+    printf 'Default holder for this host (e.g. @%s): ' "$(uname -n | cut -d. -f1)" >&2
+    IFS= read -r h || true
+    [ -n "$h" ] || die "no holder given; enable changed nothing"
+  fi
+  case "$h" in @*) ;; *) h="@$h" ;; esac
+  case "$h" in @ | *[[:space:]]*) die "holder '$h' is not a single @name" ;; esac
+  [ "$h" != @claude ] || die "the holder @claude names no host; pick a per-host name"
+  echo "$h"
+}
+
+cmd_enable() {
+  local holder='' jq shim hooks
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --holder) holder=${2:?--holder needs @name}; shift 2 ;;
+      *) usage ;;
+    esac
+  done
+  release_gate
+  jq=$(command -v jq 2>/dev/null) || jq=$(git config --get ralph.jq 2>/dev/null) || jq=''
+  [ -n "$jq" ] && [ -x "$jq" ] || die "jq not found (PATH or git config ralph.jq); cannot read .claude/ralph.json"
+  [ -f .claude/ralph.json ] || die "not opted in: no .claude/ralph.json; set \"sharedBacklog\": true in it first"
+  "$jq" -e '.sharedBacklog == true' .claude/ralph.json >/dev/null 2>&1 ||
+    die "not opted in: .claude/ralph.json does not set \"sharedBacklog\": true"
+  shim="$(dirname "$SELF")/../skills/ralph-init/templates/shims/git-hook"
+  [ -r "$shim" ] || die "cannot read the plugin shim $shim"
+  hooks=$(git rev-parse --git-path hooks)
+  # Check everything before writing anything.
+  if [ -e "$hooks/pre-push" ] && ! cmp -s "$hooks/pre-push" "$shim" &&
+    [ -e "$hooks/pre-push.local" ] && ! cmp -s "$hooks/pre-push" "$hooks/pre-push.local"; then
+    die "$hooks/pre-push.local already exists and differs from $hooks/pre-push; merge the two into pre-push.local by hand, delete pre-push, and rerun"
+  fi
+  holder=$(enable_holder "$holder") || exit 1
+  [ "$(git config --get ralph.holder || true)" = "$holder" ] || {
+    git config ralph.holder "$holder"; echo "set git config ralph.holder $holder"
+  }
+  mkdir -p "$hooks"
+  if ! cmp -s "$hooks/pre-push" "$shim" 2>/dev/null; then
+    if [ -e "$hooks/pre-push" ]; then
+      [ -e "$hooks/pre-push.local" ] || mv "$hooks/pre-push" "$hooks/pre-push.local"
+      echo "kept the existing pre-push hook as pre-push.local; the shim runs it first"
+    fi
+    cp "$shim" "$hooks/pre-push.tmp.$$"
+    chmod 755 "$hooks/pre-push.tmp.$$"
+    mv -f "$hooks/pre-push.tmp.$$" "$hooks/pre-push"
+    echo "installed the plugin shim as pre-push"
+  fi
+  # The switch goes last, so an interrupted enable never enforces without its shim.
+  git config ralph.sharedBacklog true
+  echo "set git config ralph.sharedBacklog true; this clone enforces the shared-backlog protocol until disable"
+}
+
+cmd_disable() {
+  [ $# -eq 0 ] || usage
+  if [ -n "$(git config --get ralph.sharedBacklog || true)" ]; then
+    git config --unset-all ralph.sharedBacklog
+    echo "cleared git config ralph.sharedBacklog; this clone no longer enforces the shared-backlog protocol"
+  else
+    echo "ralph.sharedBacklog is not set; nothing to change"
+  fi
+}
+
 # --- main -------------------------------------------------------------------
 
 [ $# -gt 0 ] || usage
@@ -1078,6 +1173,8 @@ case "$CMD" in
   renumber) protocol_cmd cmd_renumber "$@" ;;
   check-dupes) with_deadline cmd_check_dupes "$@" ;;
   install-hooks) cmd_install_hooks "$@" ;;
+  enable) cmd_enable "$@" ;;
+  disable) cmd_disable "$@" ;;
   run-lock)
     # The protocol lock orders taking the run lock against the gate above.
     PROTOCOL_TOKEN=$(new_token)

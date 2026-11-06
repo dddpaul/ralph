@@ -453,7 +453,7 @@ The plugin ships the git hook bodies in `plugins/ralph/git-hooks/` (`pre-commit`
   - `ralph.pluginHooks true` makes `pre-commit` and `commit-msg` block when the plugin cannot be resolved;
   - `ralph.jq` and `ralph.projectPath` (the host's canonical main worktree root) tell the resolver which jq to use and which clone it is;
   - `ralph.claudeConfigDir` is set only when the Claude config dir is not `~/.claude`;
-  - `ralph.sharedBacklog` is never set by the migration.
+  - `ralph.sharedBacklog` is never set by the migration: `scripts/shared-backlog.sh enable` sets it (with `ralph.holder`, the host's default holder, and the pre-push shim) in a project whose marker sets `"sharedBacklog": true`, and `disable` clears it. `scripts/shared-backlog.sh` is a fixed project shim (`templates/shims/shared-backlog.sh`) that execs the plugin's `scripts/shared-backlog.sh`. Until the shared-backlog protocol is released, `enable` refuses.
 - **The shims.** `pre-commit`, `commit-msg` and `post-commit` in each clone are the one fixed shim from [Plugin git hooks](#plugin-git-hooks). A hook of the clone's own survives as `<name>.local` and runs first.
 
 `plugins/ralph/skills/ralph-init/scripts/migrate-plugin-hooks.sh` sets all three up. Init runs both of its parts as its last step. `ralph-init upgrade` runs them once for a project bootstrapped with the legacy copies:
