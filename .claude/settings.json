@@ -11,7 +11,7 @@
           },
           {
             "type": "command",
-            "if": "Bash(gh pr create *)",
+            "if": "Bash(gh *)",
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/commit-msg-guard.sh"
           },
           {

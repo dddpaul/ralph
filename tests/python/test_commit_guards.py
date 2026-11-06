@@ -1,8 +1,8 @@
 """PreToolUse commit guards deny only real commits (TASK-281).
 
 ``commit-msg-guard.sh`` and ``commit-prefix-guard.sh`` are registered with
-``if: Bash(git *)`` / ``if: Bash(gh pr create *)`` (``git *`` because
-``git -c k=v commit`` misses a literal ``git commit *``), and that filter is
+``if: Bash(git *)`` / ``if: Bash(gh *)`` (because ``git -c k=v commit`` and
+``gh -R o/r pr create`` miss a literal ``git commit *`` / ``gh pr create *``), and that filter is
 best-effort too: Claude Code runs the hook anyway for commands it cannot fully
 parse (unquoted ``$VAR``, ``$(...)``, backticks). Each guard therefore gates
 itself on a real commit at a command position, and the prefix guard extracts
@@ -96,11 +96,30 @@ def test_msg_guard_ignores_non_commit(command: str) -> None:
         f'{COMMIT} -m "fix: stuff\n\n## Test plan\n- step"',
         f"cd /tmp && {COMMIT} -m \"$(cat <<'EOF'\nfix\n\n{TRAILER}\nEOF\n)\"",
         f'gh pr create --title "fix" --body "stuff\n{TRAILER}"',
+        f'gh -R owner/repo pr create --body "stuff\n{TRAILER}"',
+        f'gh --repo owner/repo pr create --body "stuff\n{TRAILER}"',
+        f'gh --repo=owner/repo pr create --body "stuff\n{TRAILER}"',
+        f'gh pr -R owner/repo create --body "stuff\n{TRAILER}"',
+        f'gh -R owner/repo pr --repo owner/repo create --body "stuff\n{TRAILER}"',
         'git -C /tmp commit -m "x\nGenerated with Claude Code"',
     ],
 )
 def test_msg_guard_denies_real_commit(command: str) -> None:
     assert is_deny(run_guard("commit-msg-guard.sh", command))
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        f'gh pr list --search "{TRAILER}"',
+        f'gh -R owner/repo pr view 5 --comments # {TRAILER}',
+        f'gh repo view owner/repo --json description # {TRAILER}',
+        f'gh -R owner/repo issue create --body "pr create {TRAILER}"',
+        f'gh pr -R owner/repo list --label create # {TRAILER}',
+    ],
+)
+def test_msg_guard_ignores_non_pr_create_gh(command: str) -> None:
+    assert run_guard("commit-msg-guard.sh", command) == ""
 
 
 def test_msg_guard_allows_clean_commit() -> None:

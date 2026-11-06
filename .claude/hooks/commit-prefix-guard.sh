@@ -61,13 +61,18 @@ def lex:
 def prog: . as $w
   | ([range(0; $w | length) | select($w[.] | test("\\A([A-Za-z_][A-Za-z0-9_]*=|(env|command|time|nice|nohup|exec|if|then|else|elif|do|while|until|!|\\{)\\z)") | not)]
     | .[0] // ($w | length)) as $k | $w[$k:];
-# git's subcommand and its arguments, past git's own options such as -C <dir>.
-def gitsub: prog | select((.[0] // "") | test("(\\A|/)git\\z")) | . as $w
-  | {k: 1} | until(($w[.k] // "") | startswith("-") | not;
-      .k += (if $w[.k] | test("\\A(-C|-c|--git-dir|--work-tree|--namespace|--config-env)\\z") then 2 else 1 end))
+# Words past leading options; an option matching $two also consumes the next word.
+def skipopts($two): . as $w
+  | {k: 0} | until(($w[.k] // "") | startswith("-") | not; .k += (if $w[.k] | test($two) then 2 else 1 end))
   | $w[.k:];
+# git's subcommand and its arguments, past git's own options such as -C <dir>.
+def gitsub: prog | select((.[0] // "") | test("(\\A|/)git\\z"))
+  | .[1:] | skipopts("\\A(-C|-c|--git-dir|--work-tree|--namespace|--config-env)\\z");
 def is_commit: [gitsub | .[0] == "commit"] | any;
-def is_pr_create: prog | ((.[0] // "") | test("(\\A|/)gh\\z")) and .[1] == "pr" and .[2] == "create";
+# gh pr create, with gh's -R/--repo <owner/repo> allowed before or after pr.
+def is_pr_create: [prog | select((.[0] // "") | test("(\\A|/)gh\\z"))
+  | .[1:] | skipopts("\\A(-R|--repo)\\z") | select(.[0] == "pr")
+  | .[1:] | skipopts("\\A(-R|--repo)\\z") | .[0] == "create"] | any;
 # The message of simple command $j in $s: {kind: "m", v: text}, {kind: "f", v: path} or {kind: "n"} (none found).
 def commit_msg($s; $j):
   ($s[$j].hd // (if $s[$j].pin and $j > 0 then $s[$j - 1].hd else null end)) as $in
