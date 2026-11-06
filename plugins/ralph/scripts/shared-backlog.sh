@@ -428,9 +428,9 @@ cmd_sync() {
 }
 
 # require_level — local master carries nothing origin lacks. claim, release
-# and create land with a rebase and undo with a reset; with unpushed work (an
-# un-integrated Ralph run, a provisional task) on master, the rebase would
-# flatten its merges and push it unchecked, and the reset would drop it.
+# and create retry and undo with a reset to origin/master; with unpushed work
+# (an un-integrated Ralph run, a provisional task) on master, the reset would
+# drop it.
 require_level() {
   [ "$(git rev-parse HEAD)" = "$(git rev-parse "$REMOTE/$BRANCH")" ] ||
     die "local $BRANCH is ahead of $REMOTE/$BRANCH; run integrate first"
@@ -561,16 +561,22 @@ EOF
   say "renumbered $n task(s); check references to the old IDs in our unpushed work"
 }
 
-# --- linear landing (claim, release, create) --------------------------------
+# --- landing by refetch and reapply (claim, release, create) ----------------
 
-# land_linear VERIFY — push the commit(s) on top of origin/master; when the
-# push is refused, rebase onto the new origin/master, call VERIFY (a function
-# name; non-zero stops), and push again, at most MAX_TRIES times.
-# Returns 0 pushed, 1 rebase conflict (aborted), 2 unreachable, 3 push
-# rejected or refused MAX_TRIES times, 4 VERIFY failed.
-land_linear() {
-  local verify=$1 try=1 rc
+# land_reapply APPLY — run APPLY (a function name) on top of origin/master and
+# push the commit it makes. APPLY checks the current tree and commits, returns
+# 0 when it committed, 4 when it refuses or fails (it says why) and 5 when the
+# tree already says what it would commit. When the push is refused, fetch, drop
+# our unpushed commit by resetting to the new origin/master and run APPLY
+# again, at most MAX_TRIES pushes. APPLY runs under `||`, so set -e is off in it.
+# A failed fetch keeps the unpushed commit.
+# Returns 0 pushed, 2 unreachable, 3 push rejected or refused MAX_TRIES times,
+# 4 APPLY refused, 5 nothing to push. The caller resets to origin on failure.
+land_reapply() {
+  local apply=$1 try=1 rc
   while :; do
+    rc=0; "$apply" || rc=$?
+    [ "$rc" -eq 0 ] || return "$rc"
     rc=0; push_master || rc=$?
     case "$rc" in
       0) return 0 ;;
@@ -580,15 +586,9 @@ land_linear() {
     [ "$try" -ge "$MAX_TRIES" ] && { say "push refused $MAX_TRIES times"; return 3; }
     try=$((try + 1))
     fetch_bounded || return 2
-    if ! git rebase -q "$REMOTE/$BRANCH" >/dev/null 2>&1; then
-      git rebase --abort >/dev/null 2>&1 || true
-      return 1
-    fi
-    "$verify" || return 4
+    git reset -q --hard "$REMOTE/$BRANCH"
   done
 }
-
-verify_none() { return 0; }
 
 # --- claim / release --------------------------------------------------------
 
@@ -641,101 +641,116 @@ deps_done() {
   [ -z "$bad" ] || { say "TASK-$1 has unfinished dependencies:$bad"; return 1; }
 }
 
-verify_claim() { [ -z "$(other_assignees "$TASK_ID")" ] && held_by_holder "$TASK_ID"; }
+# claim_apply — check TASK_ID against the current tree and commit the claim.
+claim_apply() {
+  local f who st
+  f=$(task_file "$TASK_ID") || { say "TASK-$TASK_ID not found"; return 4; }
+  who=$(other_assignees "$TASK_ID")
+  [ -z "$who" ] || { say "TASK-$TASK_ID taken by $who"; return 4; }
+  # A claim we already hold passes the same status and dependency checks.
+  st=$(fm_scalar "$f" status)
+  [ "$st" = "To Do" ] || { say "TASK-$TASK_ID is '$st', not To Do"; return 4; }
+  if [ -z "$FORCE" ] && ! deps_done "$TASK_ID"; then
+    say "claim refused; --force overrides on Paul's say-so"
+    return 4
+  fi
+  held_by_holder "$TASK_ID" && return 5
+  # -a replaces the whole list, so a bare @claude goes with it.
+  backlog task edit "$TASK_ID" -a "$HOLDER" >/dev/null &&
+    git add -- "$(task_file "$TASK_ID")" &&
+    git commit -q -m "task-$TASK_ID: claim for $HOLDER" ||
+    { say "committing the claim of TASK-$TASK_ID failed"; return 4; }
+}
 
 cmd_claim() {
-  local f who st base rc=0
+  local rc=0
   holder_from_args "$@"
   cmd_sync || { rc=$?; [ "$rc" -eq 2 ] && say "cannot claim TASK-$TASK_ID: a claim nobody can see protects nothing"; return "$rc"; }
   require_level
-  base=$(git rev-parse HEAD)
-  f=$(task_file "$TASK_ID") || die "TASK-$TASK_ID not found"
-  who=$(other_assignees "$TASK_ID")
-  [ -z "$who" ] || die "TASK-$TASK_ID taken by $who"
-  # A claim we already hold passes the same status and dependency checks.
-  st=$(fm_scalar "$f" status)
-  [ "$st" = "To Do" ] || die "TASK-$TASK_ID is '$st', not To Do"
-  [ -n "$FORCE" ] || deps_done "$TASK_ID" || die "claim refused; --force overrides on Paul's say-so"
-  if held_by_holder "$TASK_ID"; then say "TASK-$TASK_ID is already claimed by $HOLDER"; return 0; fi
-  # -a replaces the whole list, so a bare @claude goes with it.
-  backlog task edit "$TASK_ID" -a "$HOLDER" >/dev/null
-  git add -- "$(task_file "$TASK_ID")"
-  git commit -q -m "task-$TASK_ID: claim for $HOLDER"
-  land_linear verify_claim || rc=$?
-  [ "$rc" -eq 0 ] && { echo "claimed TASK-$TASK_ID $(git rev-parse --short HEAD)"; return 0; }
-  # The claim did not land: drop it. Before the claim commit the tree was clean
-  # and level with origin, so going back to that commit loses nothing; then
-  # fast-forward to what origin has now.
-  git reset -q --hard "$base"
-  git merge -q --ff-only "$REMOTE/$BRANCH" 2>/dev/null || true
+  land_reapply claim_apply || rc=$?
   case "$rc" in
-    2) die "claim not pushed (origin unreachable); undone locally" ;;
+    0) echo "claimed TASK-$TASK_ID $(git rev-parse --short HEAD)"; return 0 ;;
+    5) say "TASK-$TASK_ID is already claimed by $HOLDER"; return 0 ;;
+  esac
+  # The claim did not land: drop it. Before it the tree was clean and level
+  # with origin, so going to origin's tip loses nothing. After the last refused
+  # push, fetch once more so that the tip is the one that won.
+  [ "$rc" -ne 3 ] || fetch_bounded || true
+  git reset -q --hard "$REMOTE/$BRANCH"
+  case "$rc" in
+    2) say "claim not pushed (origin unreachable); undone locally"; exit 2 ;;
     3) die "claim push rejected; undone locally" ;;
   esac
-  # A conflict on the task file, or a clean rebase that leaves someone else's
-  # name, means the other host claimed it first.
-  die "TASK-$TASK_ID taken by $(other_assignees "$TASK_ID")"
+  exit 1
+}
+
+# release_apply — check TASK_ID against the current tree and commit the release.
+release_apply() {
+  local f who
+  f=$(task_file "$TASK_ID") || { say "TASK-$TASK_ID not found"; return 4; }
+  who=$(real_assignees "$TASK_ID" | tr '\n' ' ')
+  who=${who% }
+  [ -n "$who" ] || { say "TASK-$TASK_ID has no assignee"; return 5; }
+  if [ "$who" != "$HOLDER" ] && [ -z "$FORCE" ]; then
+    say "TASK-$TASK_ID is held by $who, not $HOLDER; --force overrides on Paul's say-so"
+    return 4
+  fi
+  backlog task edit "$TASK_ID" -a "" >/dev/null &&
+    git add -- "$f" &&
+    git commit -q -m "task-$TASK_ID: release from $who" ||
+    { say "committing the release of TASK-$TASK_ID failed"; return 4; }
 }
 
 cmd_release() {
-  local f who rc=0
+  local rc=0
   holder_from_args "$@"
   cmd_sync || return $?
   require_level
-  f=$(task_file "$TASK_ID") || die "TASK-$TASK_ID not found"
-  who=$(real_assignees "$TASK_ID" | tr '\n' ' ')
-  who=${who% }
-  [ -n "$who" ] || { say "TASK-$TASK_ID has no assignee"; return 0; }
-  [ "$who" = "$HOLDER" ] || [ -n "$FORCE" ] ||
-    die "TASK-$TASK_ID is held by $who, not $HOLDER; --force overrides on Paul's say-so"
-  backlog task edit "$TASK_ID" -a "" >/dev/null
-  git add -- "$f"
-  git commit -q -m "task-$TASK_ID: release from $who"
-  land_linear verify_none || rc=$?
+  land_reapply release_apply || rc=$?
   case "$rc" in
-    0) echo "released TASK-$TASK_ID $(git rev-parse --short HEAD)" ;;
-    1) die "release conflicted with origin (rebase aborted; commit kept locally)" ;;
-    2) die "release committed locally, not pushed (origin unreachable)" ;;
-    *) die "release committed locally, not pushed" ;;
+    0) echo "released TASK-$TASK_ID $(git rev-parse --short HEAD)"; return 0 ;;
+    5) return 0 ;;
   esac
+  [ "$rc" -ne 3 ] || fetch_bounded || true
+  git reset -q --hard "$REMOTE/$BRANCH"
+  case "$rc" in
+    2) say "release not pushed (origin unreachable); undone locally"; exit 2 ;;
+    3) die "release push rejected; undone locally" ;;
+  esac
+  exit 1
 }
 
 # --- create -----------------------------------------------------------------
 
-# After a refused push and a rebase, a task with our ID may have arrived with
-# no conflict at all (the file names differ): renumber our copy.
-verify_create() {
-  local out line
-  [ -n "$(dup_ids HEAD)" ] || return 0
-  out=$(cmd_renumber --amend) || return 1
-  printf '%s\n' "$out"
-  line=$(printf '%s\n' "$out" | grep "^renumbered TASK-$NEW_ID -> " || true)
-  [ -n "$line" ] || return 0
-  NEW_ID=$(printf '%s\n' "$line" | sed 's/^renumbered [^ ]* -> TASK-\([0-9]*\).*/\1/')
-  git commit -q --amend -m "task-$NEW_ID: add task" \
-    -m "$(git log -1 --format=%b)" || return 1
+# create_apply — create the task from CREATE_ARGS on the current tree and
+# commit it; after a refused push the fresh tree gives it the next free ID.
+create_apply() {
+  local out file
+  out=$(backlog task create "${CREATE_ARGS[@]}" --plain) || { say "backlog task create failed: $out"; return 4; }
+  NEW_ID=$(printf '%s\n' "$out" | sed -n 's/^Created task [A-Za-z]*-\([0-9.]*\).*/\1/p' | head -1)
+  [ -n "$NEW_ID" ] || NEW_ID=$(printf '%s\n' "$out" | sed -n 's/^Task [A-Za-z]*-\([0-9.]*\) - .*/\1/p' | head -1)
+  [ -n "$NEW_ID" ] || { say "cannot read the new task ID from: $out"; return 4; }
+  file=$(task_file "$NEW_ID") || { say "created TASK-$NEW_ID but cannot find its file"; return 4; }
+  git add -- "$file" && git commit -q -m "task-$NEW_ID: add task" ||
+    { say "committing TASK-$NEW_ID failed"; return 4; }
 }
 
 cmd_create() {
-  local out file rc=0 offline=
+  local rc=0 offline=
   [ $# -gt 0 ] || usage
+  CREATE_ARGS=("$@")
   cmd_sync || { rc=$?; [ "$rc" -eq 2 ] || return "$rc"; offline=1; }
-  [ -n "$offline" ] || require_level
-  out=$(backlog task create "$@" --plain) || die "backlog task create failed: $out"
-  NEW_ID=$(printf '%s\n' "$out" | sed -n 's/^Created task [A-Za-z]*-\([0-9.]*\).*/\1/p' | head -1)
-  [ -n "$NEW_ID" ] || NEW_ID=$(printf '%s\n' "$out" | sed -n 's/^Task [A-Za-z]*-\([0-9.]*\) - .*/\1/p' | head -1)
-  [ -n "$NEW_ID" ] || die "cannot read the new task ID from: $out"
-  file=$(task_file "$NEW_ID") || die "created TASK-$NEW_ID but cannot find its file"
-  git add -- "$file"
-  git commit -q -m "task-$NEW_ID: add task"
   if [ -n "$offline" ]; then
+    create_apply || exit 1
     echo "created TASK-$NEW_ID, provisional: not pushed (origin unreachable); run integrate when origin is back"
     return 0
   fi
-  land_linear verify_create || rc=$?
+  require_level
+  land_reapply create_apply || rc=$?
   case "$rc" in
     0) echo "created TASK-$NEW_ID $(git rev-parse --short HEAD)" ;;
     2) echo "created TASK-$NEW_ID, provisional: not pushed (origin unreachable)" ;;
+    4) exit 1 ;;
     *) die "TASK-$NEW_ID committed locally, provisional and not pushed" ;;
   esac
 }
