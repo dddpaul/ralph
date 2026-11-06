@@ -1,10 +1,10 @@
 ---
 id: TASK-308
 title: Reconcile uncertain shared-backlog creates and keep recovery refs
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-04T14:53:00Z'
-updated_date: '2026-11-06T14:19:00Z'
+updated_date: '2026-11-06T14:38:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -47,4 +47,8 @@ Plan: rework cmd_create into its own loop: fresh worktree per attempt; non-fast-
 AC #7 (host): container /bin/bash is 5.2, so the bash 3.2 run of test_bash32_syntax skips; on a Mac host run /bin/bash tests/shell/shared-backlog-recovery-test.sh (and the create/retry/lock/claim suites). bash -n, the static bash-4 builtin guard and all shell suites pass under bash 5.2. ruff: 53 pre-existing findings on master, none new.
 
 Commit: `5e8ee41` - task-308: reconcile uncertain shared-backlog creates and keep recovery refs
+
+Commit: `d37371d` - task-308: stop the deadline watchdog and remove its flag on a signal
+
+Done: create reallocates in a fresh worktree with the same op ID after a non-fast-forward (≤3 pushes); any other failed push is reconciled against origin by the Shared-Backlog-Op trailer (found → reported as the result; unreachable → exit 2, no reallocation); an uncertain commit is kept as refs/ralph/recovery/<op-id> with check/drop/finish instructions, by the main shell's EXIT trap before it removes the worktree, so deadline and signal exits are covered. on_signal also stops the deadline watchdog and removes its flag. Tests: tests/shell/shared-backlog-recovery-test.sh via tests/python/test_shared_backlog_recovery.py. task-reviewer APPROVED (after a fix for the watchdog left running on a signal).
 <!-- SECTION:NOTES:END -->

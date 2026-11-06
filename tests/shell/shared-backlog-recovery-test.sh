@@ -83,8 +83,8 @@ op_of() { git --git-dir="$work/origin.git" log -1 --format='%(trailers:key=Share
 worktrees() { git -C "$work/$1" worktree list --porcelain | grep -c '^worktree '; }
 leftover_tmp() { ls -d "${TMPDIR:-/tmp}"/shared-backlog-create.* 2>/dev/null | grep -c . ; }
 leftover_flags() { ls -d "${TMPDIR:-/tmp}"/shared-backlog-deadline.* 2>/dev/null | grep -c . ; }
-# script_procs — processes still running the script under test.
-script_procs() { ps -eo args= | grep -F "$SB" | grep -vc grep; }
+# script_procs — processes still running this suite's interrupted create.
+script_procs() { ps -eo args= | grep -F "$SB create Interrupted" | grep -vc grep; }
 recovery_refs() { git -C "$work/a" for-each-ref --format='%(refname)' refs/ralph/recovery; }
 
 # kill_pusher — the body of an origin post-receive hook that kills the client's
