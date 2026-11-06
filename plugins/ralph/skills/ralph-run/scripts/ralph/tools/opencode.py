@@ -18,7 +18,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from ralph.tools import OnSpawn, Tool, ToolResult
-from ralph.tools._subprocess import execute
+from ralph.tools._subprocess import devcontainer_prefix, execute
 
 __all__ = ["OpencodeTool"]
 
@@ -30,7 +30,8 @@ class OpencodeTool(Tool):
 
     Args:
         devcontainer: When True, prepend ``devcontainer exec
-            --workspace-folder <path>`` to the argv list.
+            --workspace-folder <path> --remote-env RALPH_AUTONOMOUS=1`` to the
+            argv list.
         workspace_folder: Required when ``devcontainer=True``; ignored when
             ``devcontainer=False``. Passed verbatim — no shell quoting.
     """
@@ -59,19 +60,13 @@ class OpencodeTool(Tool):
         Returns:
             The fully-assembled argv as a list. When ``devcontainer=True``
             the list begins with ``["devcontainer", "exec",
-            "--workspace-folder", <path>, "opencode", "run", <prompt>]`` —
+            "--workspace-folder", <path>, "--remote-env",
+            "RALPH_AUTONOMOUS=1", "opencode", "run", <prompt>]`` —
             the prompt is one element, never shell-split.
         """
         argv: list[str] = []
         if self._devcontainer and self._workspace_folder is not None:
-            argv.extend(
-                [
-                    "devcontainer",
-                    "exec",
-                    "--workspace-folder",
-                    str(self._workspace_folder),
-                ]
-            )
+            argv.extend(devcontainer_prefix(self._workspace_folder))
         argv.extend(["opencode", "run", prompt])
         return argv
 

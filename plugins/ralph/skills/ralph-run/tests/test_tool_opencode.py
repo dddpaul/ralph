@@ -29,6 +29,8 @@ def test_argv_with_devcontainer_is_a_list_with_spaces_intact() -> None:
         "exec",
         "--workspace-folder",
         "/workspace with spaces",
+        "--remote-env",
+        "RALPH_AUTONOMOUS=1",
         "opencode",
         "run",
         "the prompt body",

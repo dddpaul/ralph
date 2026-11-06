@@ -40,6 +40,33 @@ thread is a daemon so a hung pipe never strands the orchestrator; the join
 is a best-effort drain so the tee file is fully flushed before
 ``parse_file`` reads it."""
 
+AUTONOMOUS_VAR: Final[str] = "RALPH_AUTONOMOUS"
+"""Set to ``1`` in every tool subprocess, on the host and (through
+``devcontainer exec --remote-env``) in the container, so the plugin's
+autonomous-create-guard can tell an autonomous run from an interactive one."""
+
+
+def devcontainer_prefix(workspace_folder: Path) -> list[str]:
+    """Return the ``devcontainer exec`` argv prefix that runs a tool in the container.
+
+    Args:
+        workspace_folder: The project root, passed as one argv element.
+
+    Returns:
+        ``["devcontainer", "exec", "--workspace-folder", <path>, "--remote-env",
+        "RALPH_AUTONOMOUS=1"]``; the container does not inherit the host
+        environment, so the flag is forwarded explicitly.
+    """
+    return [
+        "devcontainer",
+        "exec",
+        "--workspace-folder",
+        str(workspace_folder),
+        "--remote-env",
+        f"{AUTONOMOUS_VAR}=1",
+    ]
+
+
 def execute(
     argv: list[str],
     prompt: str,
@@ -104,6 +131,7 @@ def _spawn_and_stream(
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         start_new_session=True,
+        env={**os.environ, AUTONOMOUS_VAR: "1"},
     )
     if on_spawn is not None:
         on_spawn(proc)

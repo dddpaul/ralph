@@ -22,7 +22,9 @@ reads both files and changes neither.
 One more report-only check reads the project's migration to plugin hooks
 (``migrate-plugin-hooks.sh``): it prints "not migrated", "partially migrated"
 or "shims missing in this clone" when one applies, and in a project whose
-marker sets ``pluginHooks`` it says that plugin guards are best effort.
+marker sets ``pluginHooks`` it says that plugin guards are best effort. In a
+clone with ``ralph.sharedBacklog`` true it also says that the guard refusing
+task creation in autonomous runs is best effort.
 
 Invariants the AC pins down explicitly:
 
@@ -73,6 +75,11 @@ _MANAGED_GUARDS = (
     "task-validator",
 )
 _SHIMMED_HOOKS = ("pre-commit", "commit-msg", "post-commit")
+_AUTONOMOUS_CREATE_NOTE = (
+    "autonomous task creation is refused — this clone enforces the shared-backlog protocol, so the run records "
+    "follow-ups in its task notes; the guard is best effort, not an absolute boundary (a command it does not "
+    "recognise is not refused)"
+)
 
 
 @dataclass(frozen=True)
@@ -597,6 +604,8 @@ def _check_plugin_hooks(verbose: bool) -> None:
     _verbose(verbose, f"check plugin_hooks: {'ok' if migrated else 'WARN'}")
     for message in found:
         print(f"WARNING: plugin hooks: {message}", file=sys.stderr)
+    if _git_stdout("config", "--bool", "ralph.sharedBacklog") == "true":
+        print(f"WARNING: plugin hooks: {_AUTONOMOUS_CREATE_NOTE}", file=sys.stderr)
 
 
 def main(argv: list[str] | None = None) -> int:

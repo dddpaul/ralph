@@ -290,7 +290,7 @@ The same workflow (branch, implement, review, merge) applies in both modes.
 | `.claude-plugin/marketplace.json` | Marketplace manifest — defines the `dddpaul-ralph` marketplace and its one `ralph` plugin |
 | `plugins/ralph/` | The `ralph` plugin (`.claude-plugin/plugin.json` manifest) — bundles all `ralph-*` skills and both agents |
 | `plugins/ralph/agents/` | Plugin-bundled agents: `task-reviewer` and `ralph-reviewer` |
-| `plugins/ralph/hooks/` | Plugin-delivered Claude guard hooks: `hooks.json`, the `run.sh` marker-gate dispatcher and the seven guards |
+| `plugins/ralph/hooks/` | Plugin-delivered Claude guard hooks: `hooks.json`, the `run.sh` marker-gate dispatcher, the seven guards and the ungated `autonomous-create-guard.sh` |
 | `plugins/ralph/git-hooks/` | Plugin-delivered git hook bodies (`pre-commit`, `commit-msg`, `post-commit`), run through the per-clone shim |
 | `plugins/ralph/user-settings.json` | The common allow rules, `attribution` and `sandbox` for the user settings file |
 | `backlog/` | Task files managed by backlog.md CLI |
@@ -433,6 +433,8 @@ The plugin ships the Claude guard hooks in `plugins/ralph/hooks/`: the seven gua
 - otherwise runs the guard from the payload's `cwd` with the hook input unchanged, exports `RALPH_PROJECT_ROOT`, and returns the guard's exit code. A bad guard name, a missing jq or an unreadable marker is a non-blocking error (exit 1).
 
 Without the marker the plugin hooks do nothing, so a project keeps its legacy `.claude/hooks/` wiring, and the guards still work there: they take project paths from the git root of `RALPH_PROJECT_ROOT`, else of `$CLAUDE_PROJECT_DIR`. ralph-init no longer ships template copies of the guards; this repo's `.claude/hooks/` copies stay byte-identical to the plugin (`tests/python/test_plugin_hooks.py`, `tests/unit/template-parity.bats`).
+
+One more guard sits outside the marker gate. `autonomous-create-guard.sh` is wired straight from `hooks.json` (matcher `Bash|Skill`, no `run.sh`), so neither `pluginHooks` nor `localGuards` affects it, and no project has a copy of it. It acts only when `RALPH_AUTONOMOUS=1` — the orchestrator sets that for every tool run, and forwards it into the devcontainer with `devcontainer exec --remote-env` — and the session's clone (the git root of `$CLAUDE_PROJECT_DIR`, not the command's cwd) has `git config ralph.sharedBacklog` true. Then it refuses `backlog task create` anywhere in a command (so also after a `cd` into another repo), `shared-backlog.sh create` and the `ralph:ralph-handoff` skill with exit 2, and tells the agent to record the follow-up in its task notes: an autonomous run must not allocate a task ID. Like every plugin hook it is best effort, not an absolute boundary: it matches command text, so a spelling its patterns miss is not refused, and a missing jq skips it with a non-blocking error. The `/ralph-run` preflight says so in a clone with `ralph.sharedBacklog` true (`tests/python/test_autonomous_create_guard.py`).
 
 ### Plugin git hooks
 
@@ -623,6 +625,7 @@ uv run pytest plugins/ralph/skills/ralph-run/tests/test_loop_exit_code.py
 **Python (`tests/python/`)** — also run by `uv run pytest`:
 
 - `test_plugin_hooks.py` - Tests the plugin guard hooks: parity of the seven guards with the template and live copies, `hooks.json` against the template `settings.json`, the `run.sh` marker gate (marker present/absent, `localGuards`, subdirectory session, nested repository, input, cwd, `RALPH_PROJECT_ROOT` and exit-code passthrough), the guards' root fallback when run directly, and a template-bootstrapped project still blocking through its legacy wiring
+- `test_autonomous_create_guard.py` - Tests the ungated autonomous-create guard: it refuses `backlog task create` (also in compound commands and after a `cd`), `shared-backlog.sh create` and the `ralph:ralph-handoff` skill when `RALPH_AUTONOMOUS=1` and the session clone has `ralph.sharedBacklog` true, whatever the marker says, and allows them interactively, in clones that do not enforce, and outside a repository
 - `test_shorten_backlog_filenames.py` - Tests `scripts/shorten-backlog-filenames.py` (slug normalizer, byte budget math, collision suffixing, backlog-root discovery and per-repo grouping, plus CLI runs over throwaway git repos with a stubbed `claude`: single project, multi-project sweep, pathspec-scoped commits, hook-blocked commits and `--no-verify`)
 - `test_devcontainer_*.py` - Pin the devcontainer config on both the live `.devcontainer/` and the ralph-init template: the `.venv` volume overlay, the shared `.claude` scheme and its lifecycle hooks, the host-path `~/.claude` bind, the `CLAUDE_CONFIG_DIR` root, the Claude Code version pin (concrete build arg, no floating `ARG` default, the guard run under `sh`), and the language fragments' Python runtime guard. Each module carries a mutated-copy negative case. `devcontainer_config.py` is their shared JSONC reader (it blanks whole-line `//` comments only; inline comments are not supported)
 

@@ -40,11 +40,13 @@ def test_argv_with_devcontainer_is_a_list_with_spaces_intact() -> None:
         workspace_folder=Path("/workspace with spaces"),
     )
     argv = tool.build_argv()
-    assert argv[:5] == [
+    assert argv[:7] == [
         "devcontainer",
         "exec",
         "--workspace-folder",
         "/workspace with spaces",
+        "--remote-env",
+        "RALPH_AUTONOMOUS=1",
         "claude",
     ]
     # Path is one element — not two halves split on the space.
@@ -74,6 +76,22 @@ def test_run_passes_prompt_via_stdin_and_tees_stdout(tmp_path: Path) -> None:
         assert result.stdout_path.read_text() == prompt
         assert result.signals.task_summary_count == 1
         assert result.signals.complete is True
+    finally:
+        result.stdout_path.unlink(missing_ok=True)
+
+
+def test_child_runs_with_ralph_autonomous_set(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every tool subprocess sees RALPH_AUTONOMOUS=1, whatever the parent has."""
+    monkeypatch.delenv("RALPH_AUTONOMOUS", raising=False)
+    result = claude_tool._execute(
+        argv=["sh", "-c", 'printf "%s" "${RALPH_AUTONOMOUS-unset}"'],
+        prompt="",
+        timeout_sec=10,
+    )
+    try:
+        assert result.exit_code == 0
+        assert result.stdout_path.read_text() == "1"
+        assert "RALPH_AUTONOMOUS" not in os.environ
     finally:
         result.stdout_path.unlink(missing_ok=True)
 

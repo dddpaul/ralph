@@ -1,5 +1,5 @@
 {
-  "description": "Ralph guard hooks. run.sh runs a guard only when .claude/ralph.json at the project git root has pluginHooks true and the guard is not in localGuards.",
+  "description": "Ralph guard hooks. run.sh runs a guard only when .claude/ralph.json at the project git root has pluginHooks true and the guard is not in localGuards. autonomous-create-guard is the exception: it runs directly and keys only on RALPH_AUTONOMOUS and git config ralph.sharedBacklog.",
   "hooks": {
     "PreToolUse": [
       {
@@ -63,6 +63,15 @@
           {
             "type": "command",
             "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/run.sh master-branch-guard"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/autonomous-create-guard.sh"
           }
         ]
       }

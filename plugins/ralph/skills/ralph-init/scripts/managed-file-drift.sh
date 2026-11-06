@@ -27,7 +27,8 @@
 #   above:<h> — only the lines above the first line equal to <h> are compared;
 #               a project file without that line is outdated.
 #   hooks     — every plugin hooks/*-guard.sh and task-validator.sh must
-#               match .claude/hooks/<name>.sh.
+#               match .claude/hooks/<name>.sh, except the plugin-only guards
+#               in PLUGIN_ONLY, which never had a project copy.
 #   allow     — JSON equal to the template once permissions.allow is set
 #               aside, and that array holds every template rule; added rules
 #               (the pptx helpers Upgrade U4 merges in) are not drift. Without
@@ -187,6 +188,7 @@ lookup() {
   while IFS='|' read -r path tmpl rule gate; do
     if [ "$rule" = hooks ]; then
       for hook in "$root/$tmpl"*-guard.sh "$root/${tmpl}task-validator.sh"; do
+        plugin_only "$hook" && continue
         [ "$1" = "$path${hook##*/}" ] && { echo "$hook|exact"; return 0; }
       done
     elif [ "$1" = "$path" ]; then
@@ -198,6 +200,15 @@ lookup() {
 }
 
 GUARDS="commit-msg-guard commit-prefix-guard master-branch-guard naming-guard notes-guard task-validator"
+# Guards hooks.json calls directly, outside the marker gate; no project copies them.
+PLUGIN_ONLY="autonomous-create-guard"
+
+# Succeed when plugin hook script $1 is one of PLUGIN_ONLY.
+plugin_only() {
+  local name=${1##*/}
+  case " $PLUGIN_ONLY " in (*" ${name%.sh} "*) return 0 ;; esac
+  return 1
+}
 
 # Set migrated, locals and shimmed for the project (see the header).
 plugin_state() {
@@ -292,6 +303,7 @@ report=$(
     esac
     if [ "$rule" = hooks ]; then
       for hook in "$root/$tmpl"*-guard.sh "$root/${tmpl}task-validator.sh"; do
+        plugin_only "$hook" && continue
         case $(plugin_owned "$path${hook##*/}") in
           (skip) ;;
           (legacy) echo "$path${hook##*/}: legacy copy" ;;

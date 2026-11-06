@@ -168,3 +168,21 @@ def test_check_is_silent_outside_a_git_work_tree(
     captured = capsys.readouterr()
     assert captured.err == ""
     assert "skipped, not a git work tree" in captured.out
+
+
+@pytest.mark.parametrize("shared", [True, False], ids=["enforcing", "not-enforcing"])
+def test_check_names_the_autonomous_create_guard_as_best_effort(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], shared: bool
+) -> None:
+    root = migrated_project(tmp_path / "p")
+    if shared:
+        git(root, "config", "ralph.sharedBacklog", "true")
+    for key in [k for k in os.environ if k.startswith("GIT_")]:
+        monkeypatch.delenv(key)
+    monkeypatch.chdir(root)
+    preflight._check_plugin_hooks(False)
+    err = capsys.readouterr().err
+    line = "WARNING: plugin hooks: autonomous task creation is refused"
+    assert (line in err) == shared
+    if shared:
+        assert "best effort, not an absolute boundary" in err

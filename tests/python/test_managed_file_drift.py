@@ -45,7 +45,10 @@ MANAGED = {
     ".devcontainer/container-settings.local.json": TEMPLATES
     / "devcontainer/container-settings.local.json",
 }
-HOOKS = sorted([*(PLUGIN_ROOT / "hooks").glob("*-guard.sh"), PLUGIN_ROOT / "hooks/task-validator.sh"])
+# The plugin-only guard (hooks.json calls it outside the marker gate) has no project copy.
+PLUGIN_ONLY = PLUGIN_ROOT / "hooks/autonomous-create-guard.sh"
+GUARD_SCRIPTS = (h for h in (PLUGIN_ROOT / "hooks").glob("*-guard.sh") if h != PLUGIN_ONLY)
+HOOKS = sorted([*GUARD_SCRIPTS, PLUGIN_ROOT / "hooks/task-validator.sh"])
 MANAGED.update({f".claude/hooks/{h.name}": h for h in HOOKS})
 
 
@@ -82,6 +85,14 @@ def project(tmp_path: Path) -> Path:
 def test_current_project_is_clean(project: Path) -> None:
     result = run("check", str(project))
     assert (result.returncode, result.stdout) == (0, "")
+
+
+def test_plugin_only_guard_has_no_project_copy(project: Path) -> None:
+    assert PLUGIN_ONLY.is_file()
+    path = f".claude/hooks/{PLUGIN_ONLY.name}"
+    shutil.copyfile(PLUGIN_ONLY, project / path)
+    result = run("accept", str(project), path)
+    assert (result.returncode, result.stderr) == (2, f"managed-file-drift: {path} is not a managed path\n")
 
 
 @pytest.mark.parametrize(
