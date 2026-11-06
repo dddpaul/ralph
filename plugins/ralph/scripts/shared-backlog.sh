@@ -18,13 +18,16 @@
 #                        origin/master and push it at once; after an uncertain
 #                        push, look for it on origin before anything else, and
 #                        keep a commit origin may lack as refs/ralph/recovery/*
-#   integrate [--task N] land local master on origin: merge origin/master,
-#                        renumber our duplicate IDs, rerun checks, push
+#   integrate [--task N] land local master on origin: merge origin/master
+#                        (never rebase), stop on duplicate IDs with the
+#                        old-to-new mapping renumber would apply, run the
+#                        checks, push
 #   check-dupes [REV]    exit 1 if REV's tree (default HEAD) has duplicate task
 #                        or draft IDs, or backlog doctor fails on it
 #   renumber [--base REF]
 #                        renumber our copies of duplicate IDs (those not in REF,
-#                        default origin/master) and commit
+#                        default origin/master) and commit; nothing runs it
+#                        but a person
 #   install-hooks [--force]
 #                        install scripts/hooks/pre-push into .git/hooks
 #   run-lock [--pid PID] take the run lock for a Ralph run owned by PID
@@ -38,9 +41,20 @@
 # The holder comes from --as, else $SHARED_BACKLOG_HOLDER, else
 # `git config ralph.holder`; with none of them claim and release refuse. A bare
 # @claude assignee names no host, so it counts as unassigned. Any other
-# assignee besides the holder means the task is taken. $SHARED_BACKLOG_CHECKS,
-# when set, replaces the checks integrate reruns (run with `sh -c` at the repo
-# root).
+# assignee besides the holder means the task is taken.
+#
+# integrate takes its policy from .claude/ralph.json in HEAD as it was when
+# integrate started, so a merged-in commit cannot change it: "sharedBacklog":
+# true opts in, and "checks" is a command run with `sh -c` at the repo root on
+# the merged tree, after the duplicate check. $SHARED_BACKLOG_CHECKS, when set,
+# replaces "checks". $SHARED_BACKLOG_CHECKS_EXEC, when set, is a command prefix
+# (split on whitespace) the checks run under, such as a devcontainer exec.
+# integrate refuses before it fetches or merges when it is not opted in, no
+# checks are configured, jq or backlog is missing, or `<prefix> sh -c true`
+# fails. It retries a push only when origin refused it as not a fast-forward,
+# at most 3 pushes; it reports an auth failure, a hook refusal or an
+# unreachable origin and stops. It never resets: it refuses to start while a
+# merge, rebase, cherry-pick or index.lock is left in the clone.
 #
 # sync, claim, release, create, integrate and renumber hold the protocol lock,
 # and refuse while a Ralph run holds the run lock unless $RALPH_RUN_LOCK_TOKEN
@@ -432,17 +446,31 @@ fetch_bounded() {
 }
 
 # push_master — 0 pushed, 1 refused (not a fast-forward), 2 unreachable,
-# 3 rejected for another reason (the pre-push hook, a server hook).
+# 3 rejected for another reason (the pre-push hook, a server hook). PUSH_FAILURE
+# names the class of a failed push: non-fast-forward, auth, unreachable, hook
+# or rejected. An auth failure returns 2 or 3, as git words it.
 push_master() {
   local err rc=0
+  PUSH_FAILURE=''
   err=$(net_git push -q "$REMOTE" "HEAD:refs/heads/$BRANCH" 2>&1) || rc=$?
   [ "$rc" -eq 0 ] && return 0
   printf '%s\n' "$err" >&2
   case "$err" in
-    # The last two are a push that lost a race inside the server.
-    *'[rejected]'*|*non-fast-forward*|*'fetch first'*|*'failed to update ref'*|*'cannot lock ref'*) return 1 ;;
-    *'Could not read from remote'*|*'unable to access'*|*'Could not resolve'*) return 2 ;;
+    *'Permission denied'*|*'Authentication failed'*|*'could not read Username'*|*'Access denied'*|*'error: 403'*)
+      PUSH_FAILURE=auth ;;
   esac
+  case "$err" in
+    # The last two are a push that lost a race inside the server.
+    *'[rejected]'*|*non-fast-forward*|*'fetch first'*|*'failed to update ref'*|*'cannot lock ref'*)
+      PUSH_FAILURE=non-fast-forward; return 1 ;;
+    *'Could not read from remote'*|*'unable to access'*|*'Could not resolve'*)
+      PUSH_FAILURE=${PUSH_FAILURE:-unreachable}; return 2 ;;
+    *hook*) PUSH_FAILURE=${PUSH_FAILURE:-hook} ;;
+    *'[remote rejected]'*) ;;
+    # No ref status line at all: our own pre-push hook refused.
+    *'failed to push some refs'*) PUSH_FAILURE=${PUSH_FAILURE:-hook} ;;
+  esac
+  PUSH_FAILURE=${PUSH_FAILURE:-rejected}
   return 3
 }
 
@@ -532,24 +560,14 @@ renumber_one() {
   echo "$newpath"
 }
 
-# cmd_renumber [--base REF] [--amend] — give our copies of duplicate IDs (the
-# copies not in REF's tree) the next free IDs. Each renumber is its own commit;
-# with --amend they are folded into HEAD instead, so that no commit carrying the
-# duplicate ever reaches origin (integrate amends its merge commit).
-cmd_renumber() {
-  local base="$REMOTE/$BRANCH" amend='' dups id paths p keep next newpath n=0 log=''
-  while [ $# -gt 0 ]; do
-    case "$1" in
-      --base) base=${2:?--base needs a ref}; shift 2 ;;
-      --amend) amend=1; shift ;;
-      *) usage ;;
-    esac
-  done
-  git rev-parse -q --verify "$base^{tree}" >/dev/null || die "unknown base: $base"
-  [ -z "$(git status --porcelain --untracked-files=no)" ] ||
-    die "working tree has uncommitted changes; commit them first"
+# renumber_plan BASE — "ID<TAB>PATH<TAB>NEW<TAB>KEPT" for each of our copies of
+# a duplicate ID in HEAD's tree (the copies not in BASE's tree): the next free
+# IDs, in order. KEPT is the copy that keeps the ID. Runs in $(...), so it
+# exits the subshell on refusal.
+renumber_plan() {
+  local base=$1 dups id paths p keep next
   dups=$(dup_ids HEAD)
-  [ -n "$dups" ] || { say "no duplicate task IDs"; return 0; }
+  [ -n "$dups" ] || return 0
   next=$( (tree_task_ids HEAD; tree_task_ids "$base") | cut -f1 | cut -d. -f1 |
     sort -n | tail -1)
   for id in $dups; do
@@ -569,23 +587,38 @@ EOF
       git cat-file -e "$base:$p" 2>/dev/null &&
         die "TASK-$id is duplicated on $base itself ($p); fix origin by hand"
       next=$((next + 1))
-      newpath=$(renumber_one "$p" "$id" "$next") || die "renumbering $p failed"
-      if [ -z "$amend" ]; then
-        git commit -q -m "task-$next: renumber TASK-$id to TASK-$next" \
-          -m "TASK-$id is taken on $base by $keep." || die "commit failed"
-      fi
-      log="${log}Renumbered TASK-$id to TASK-$next: TASK-$id is taken by $keep.
-"
-      echo "renumbered TASK-$id -> TASK-$next ($newpath)"
-      n=$((n + 1))
+      printf '%s\t%s\t%s\t%s\n' "$id" "$p" "$next" "$keep"
     done <<EOF
 $paths
 EOF
   done
-  if [ -n "$amend" ]; then
-    git commit -q --amend -m "$(git log -1 --format=%B)" -m "$log" ||
-      die "amending HEAD failed"
-  fi
+}
+
+# cmd_renumber [--base REF] — give our copies of duplicate IDs (the copies not
+# in REF's tree) the next free IDs, one commit each. Only a person runs it:
+# integrate stops and prints the plan instead.
+cmd_renumber() {
+  local base="$REMOTE/$BRANCH" plan id p new keep newpath n=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --base) base=${2:?--base needs a ref}; shift 2 ;;
+      *) usage ;;
+    esac
+  done
+  git rev-parse -q --verify "$base^{tree}" >/dev/null || die "unknown base: $base"
+  [ -z "$(git status --porcelain --untracked-files=no)" ] ||
+    die "working tree has uncommitted changes; commit them first"
+  plan=$(renumber_plan "$base") || exit 1
+  [ -n "$plan" ] || { say "no duplicate task IDs"; return 0; }
+  while IFS=$'\t' read -r id p new keep; do
+    newpath=$(renumber_one "$p" "$id" "$new") || die "renumbering $p failed"
+    git commit -q -m "task-$new: renumber TASK-$id to TASK-$new" \
+      -m "TASK-$id is taken on $base by $keep." || die "commit failed"
+    echo "renumbered TASK-$id -> TASK-$new ($newpath)"
+    n=$((n + 1))
+  done <<EOF
+$plan
+EOF
   say "renumbered $n task(s); check references to the old IDs in our unpushed work"
 }
 
@@ -872,60 +905,97 @@ cmd_create() {
 
 # --- integrate --------------------------------------------------------------
 
-# run_checks MERGE_BASE — the checks integrate reruns on the merged tree.
-# mycloud has no build, lint or test suite, so they are: no duplicate IDs,
-# `bash -n` on touched shell scripts, and `ansible-playbook --syntax-check` on
-# touched playbooks where Ansible is installed.
-run_checks() {
-  local mb=$1 f rc=0 changed
-  if [ -n "${SHARED_BACKLOG_CHECKS:-}" ]; then
-    sh -c "$SHARED_BACKLOG_CHECKS" || { say "checks failed: $SHARED_BACKLOG_CHECKS"; return 1; }
-    return 0
+# require_settled — refuse while a git operation is left in the clone (one that
+# a deadline or signal interrupted, say); report it and leave it as it is.
+require_settled() {
+  local gd
+  gd=$(git rev-parse --git-dir)
+  if [ -f "$gd/MERGE_HEAD" ] || [ -d "$gd/rebase-merge" ] || [ -d "$gd/rebase-apply" ] ||
+    [ -f "$gd/CHERRY_PICK_HEAD" ] || [ -f "$gd/REVERT_HEAD" ] || [ -f "$gd/index.lock" ]; then
+    die "an interrupted operation is left in this clone ($(git_state)); finish or abort it by hand, then integrate again"
   fi
-  cmd_check_dupes HEAD || rc=1
-  changed=$(git -c core.quotePath=false diff --name-only --diff-filter=d "$mb" HEAD)
-  while IFS= read -r f; do
-    [ -n "$f" ] || continue
-    case "$f" in
-      *.sh|scripts/hooks/*) bash -n "$f" || { say "bash -n failed: $f"; rc=1; } ;;
-      ansible/playbooks/*.yml)
-        if command -v ansible-playbook >/dev/null 2>&1; then
-          ansible-playbook --syntax-check "$f" >/dev/null || { say "syntax-check failed: $f"; rc=1; }
-        else
-          say "ansible-playbook not installed; skipped --syntax-check of $f"
-        fi ;;
-    esac
-  done <<EOF
-$changed
-EOF
+}
+
+# integrate_policy — read the opt-in and CHECKS from .claude/ralph.json in HEAD,
+# once, before anything merges; check that the checks can run. Dies otherwise.
+integrate_policy() {
+  local jq marker
+  jq=$(command -v jq 2>/dev/null) || jq=$(git config --get ralph.jq 2>/dev/null) || jq=''
+  [ -n "$jq" ] && [ -x "$jq" ] || die "jq not found (PATH or git config ralph.jq); cannot read .claude/ralph.json"
+  marker=$(git show HEAD:.claude/ralph.json 2>/dev/null) ||
+    die "not opted in: HEAD has no .claude/ralph.json; not merging"
+  printf '%s\n' "$marker" | "$jq" -e '.sharedBacklog == true' >/dev/null 2>&1 ||
+    die "not opted in: .claude/ralph.json in HEAD does not set \"sharedBacklog\": true; not merging"
+  CHECKS=${SHARED_BACKLOG_CHECKS:-}
+  [ -n "$CHECKS" ] || CHECKS=$(printf '%s\n' "$marker" | "$jq" -r '.checks // "" | strings' 2>/dev/null) || CHECKS=''
+  case "$CHECKS" in
+    *[![:space:]]*) ;;
+    *) die "no checks configured: set \"checks\" in .claude/ralph.json or SHARED_BACKLOG_CHECKS; not merging" ;;
+  esac
+  command -v backlog >/dev/null 2>&1 || die "backlog not on PATH; the duplicate check needs it; not merging"
+  CHECKS_EXEC=${SHARED_BACKLOG_CHECKS_EXEC:-}
+  [ -z "$CHECKS_EXEC" ] || in_checks_context sh -c true >/dev/null 2>&1 ||
+    die "the checks' execution context is missing: '$CHECKS_EXEC sh -c true' failed; not merging"
+}
+
+# in_checks_context CMD... — run CMD under the CHECKS_EXEC prefix, if any.
+in_checks_context() {
+  local rc=0
+  set -f
+  # shellcheck disable=SC2086  # the prefix splits into words on purpose
+  $CHECKS_EXEC "$@" || rc=$?
+  set +f
   return "$rc"
 }
 
+# stop_on_dupes — 1, with the old-to-new mapping renumber would apply, when the
+# merged tree carries a duplicate task ID. It renumbers nothing.
+stop_on_dupes() {
+  local plan id p new keep
+  plan=$(renumber_plan "$REMOTE/$BRANCH") || return 1
+  [ -n "$plan" ] || return 0
+  say "duplicate task IDs on the merged tree; not pushed, nothing renumbered. renumber would map:"
+  while IFS=$'\t' read -r id p new keep; do
+    say "  TASK-$id -> TASK-$new  $p  (TASK-$id stays with $keep)"
+  done <<EOF
+$plan
+EOF
+  say "to apply it: shared-backlog.sh renumber, fix references to the old IDs, then integrate again"
+  return 1
+}
+
+# run_checks — the duplicate check (drafts and backlog doctor too), then the
+# configured checks, on the merged tree.
+run_checks() {
+  cmd_check_dupes HEAD || return 1
+  in_checks_context sh -c "$CHECKS" || { say "checks failed: $CHECKS"; return 1; }
+}
+
 cmd_integrate() {
-  local task='' try=1 rc local_sha remote_sha mb subject files err
+  local task='' try=1 rc remote_sha subject files err
   while [ $# -gt 0 ]; do
     case "$1" in
       --task) task=${2:?--task needs N}; task=${task#*-}; shift 2 ;;
       *) usage ;;
     esac
   done
+  require_settled
   require_master_clean
   require_no_untracked_tasks
+  integrate_policy
   while :; do
     fetch_bounded || { say "done locally, not pushed"; return 2; }
-    local_sha=$(git rev-parse HEAD)
     remote_sha=$(git rev-parse "$REMOTE/$BRANCH")
-    if [ "$local_sha" = "$remote_sha" ]; then echo "origin already has $(git rev-parse --short HEAD)"; return 0; fi
-    if git merge-base --is-ancestor HEAD "$REMOTE/$BRANCH"; then
-      git merge -q --ff-only "$REMOTE/$BRANCH"
+    if [ "$(git rev-parse HEAD)" = "$remote_sha" ]; then echo "origin already has $(git rev-parse --short HEAD)"; return 0; fi
+    if git merge-base --is-ancestor HEAD "$remote_sha"; then
+      git merge -q --ff-only "$remote_sha"
       echo "nothing to push; fast-forwarded to $(git rev-parse --short HEAD)"; return 0
     fi
-    mb=$(git merge-base HEAD "$REMOTE/$BRANCH")
-    if ! git merge-base --is-ancestor "$REMOTE/$BRANCH" HEAD; then
+    if ! git merge-base --is-ancestor "$remote_sha" HEAD; then
       # Merge, never rebase: a rebase would flatten Ralph's --no-ff merges.
       subject="Merge $REMOTE/$BRANCH into $BRANCH"
       [ -z "$task" ] || subject="task-$task: merge $REMOTE/$BRANCH"
-      if ! err=$(git merge -q --no-ff -m "$subject" "$REMOTE/$BRANCH" 2>&1); then
+      if ! err=$(git merge -q --no-ff -m "$subject" -m "Integrated-Origin: $remote_sha" "$remote_sha" 2>&1); then
         if ! git rev-parse -q --verify MERGE_HEAD >/dev/null; then
           # The merge never started (e.g. an untracked file in its way).
           printf '%s\n' "$err" >&2
@@ -940,14 +1010,14 @@ cmd_integrate() {
         return 1
       fi
     fi
-    cmd_renumber --amend >&2 || return 1
-    run_checks "$mb" || { say "checks failed on the merged tree, not pushed; stop and tell Paul"; return 1; }
+    stop_on_dupes || return 1
+    run_checks || { say "checks failed on the merged tree, not pushed; stop and tell Paul"; return 1; }
     rc=0; push_master || rc=$?
-    case "$rc" in
-      0) echo "pushed $(git rev-parse --short HEAD)"; return 0 ;;
-      1) ;;
-      2) say "done locally, not pushed"; return 2 ;;
-      *) say "push rejected, not pushed; stop and tell Paul"; return 1 ;;
+    [ "$rc" -ne 0 ] || { echo "pushed $(git rev-parse --short HEAD)"; return 0; }
+    case "$PUSH_FAILURE" in
+      non-fast-forward) ;;
+      unreachable) say "push failed: origin unreachable; done locally, not pushed, not retried"; return 2 ;;
+      *) say "push failed: $PUSH_FAILURE; not pushed, not retried; stop and tell Paul"; return 1 ;;
     esac
     [ "$try" -ge "$MAX_TRIES" ] && { say "push refused $MAX_TRIES times, not pushed; stop and tell Paul"; return 1; }
     try=$((try + 1))
@@ -987,6 +1057,9 @@ CHILD_PID=''
 WATCHDOG_PID=''
 DEADLINE_FLAG=''
 PROTOCOL_TOKEN=''
+PUSH_FAILURE=''
+CHECKS=''
+CHECKS_EXEC=''
 CREATE_ROOT=$(pwd -P)
 CREATE_TMP=''
 trap 'create_cleanup; lock_release protocol "$PROTOCOL_TOKEN" || true' EXIT
