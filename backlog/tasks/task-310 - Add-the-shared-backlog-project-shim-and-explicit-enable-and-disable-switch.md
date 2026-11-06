@@ -1,10 +1,10 @@
 ---
 id: TASK-310
 title: Add the shared-backlog project shim and explicit enable and disable switch
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-04T14:54:00Z'
-updated_date: '2026-11-06T15:06:00Z'
+updated_date: '2026-11-06T15:13:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -50,4 +50,8 @@ Reference: PRD design/plugin-delivered-project-files-prd.md, US-016 and FR-2, FR
 Plan: release gate (RELEASED=0, SHARED_BACKLOG_ALLOW_UNRELEASED=1 opens it) plus enable/disable in plugins/ralph/scripts/shared-backlog.sh; enable checks marker, holder and pre-push before writing, installs templates/shims/git-hook as pre-push (existing hook kept as pre-push.local), sets ralph.sharedBacklog last. New fixed shim templates/shims/shared-backlog.sh embeds the resolver. ralph-init Init Q5 + Step 3.11 sh snippet, Upgrade U4 opt-in bullet. Tests in tests/python/test_shared_backlog_enable.py.
 
 Commit: `5a69b49` - task-310: add shared-backlog project shim, release gate and enable/disable switch
+
+Commit: `a67c1db` - task-310: single-quote the checks command in the Init opt-in snippet
+
+Done. enable/disable live in plugins/ralph/scripts/shared-backlog.sh behind RELEASED=0 (TASK-320 opens it). enable keeps an existing pre-push as pre-push.local and refuses before writing when a differing pre-push.local exists; disable unsets ralph.sharedBacklog and leaves the pre-push shim and ralph.holder. Until TASK-311 ships git-hooks/pre-push, an enabled clone's pre-push shim would block pushes; the closed gate prevents that. Init snippet uses an sh fence because test_ralph_init_plugin_delivered requires exactly one bash fence in Step 3.11. task-reviewer: APPROVED (minor checks-quoting note fixed). Full pytest 1331 passed; bats all ok.
 <!-- SECTION:NOTES:END -->
