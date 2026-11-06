@@ -1,10 +1,10 @@
 ---
 id: TASK-316
 title: Guard opted-in autonomous runs against creating tasks
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-04T14:54:00Z'
-updated_date: '2026-11-06T17:56:00Z'
+updated_date: '2026-11-06T18:09:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -43,4 +43,10 @@ Commit: `88f3db5` - task-316: refuse task creation in autonomous runs of shared-
 
 AC #1: host — every tool subprocess gets RALPH_AUTONOMOUS=1 via Popen env (test_child_runs_with_ralph_autonomous_set); devcontainer — argv carries --remote-env RALPH_AUTONOMOUS=1 (argv tests), and `npx -y @devcontainers/cli exec --help` run here lists '--remote-env  Remote environment variables of the format name=value'. No docker in this environment, so the in-container run is deferred to a host: `devcontainer exec --workspace-folder . --remote-env RALPH_AUTONOMOUS=1 sh -c 'printf %s "$RALPH_AUTONOMOUS"'` must print 1.
 Review fixes: check=False on the four subprocess.run calls in test_plugin_hooks.py (ruff PLW1510 in a changed file); the guard also matches sh/bash/zsh -c wrappers.
+
+Commit: `3ffe44a` - task-316: match sh -c wrappers, pass check to subprocess.run in plugin hook tests
+
+Done: task-reviewer APPROVED (score 9). Plugin guard autonomous-create-guard.sh runs outside run.sh; managed-file-drift.sh skips plugin-only guards (PLUGIN_ONLY). Final checks: pytest 1384 passed/4 skipped, bats 0 failures, ruff clean on changed files, bash -n ok. Open: in-container RALPH_AUTONOMOUS check deferred to a host with docker (command above). Possible follow-up for a person: backlog draft promote also allocates a task ID and is not guarded.
+
+Commit: `3ccb65a` - task-316: bump plugin version to 0.21.3 (patch)
 <!-- SECTION:NOTES:END -->
