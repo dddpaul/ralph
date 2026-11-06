@@ -1,10 +1,10 @@
 ---
 id: TASK-307
 title: Allocate shared-backlog task IDs in an isolated temporary worktree
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-04T14:53:00Z'
-updated_date: '2026-11-06T14:05:00Z'
+updated_date: '2026-11-06T14:07:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -44,4 +44,10 @@ Plan: cmd_create fixes an op ID (new_token), fetches origin (exit 2 offline befo
 Commit: `1101ac3` - task-307: allocate shared-backlog task IDs in a temporary worktree
 
 AC #7 (host) deferred: the container's /bin/bash is 5.2, so test_bash32_syntax skips its 3.2 run. On a Mac host run: /bin/bash tests/shell/shared-backlog-create-test.sh (and the retry/claim/lock suites). bash -n, the static bash-4 builtin guard and all shell suites pass under bash 5.2.
+
+Commit: `f55ca7d` - task-307: note that claim and release refuse on untracked task files too
+
+Done: create allocates in a detached worktree at a freshly fetched origin/master under the protocol lock, commits task-N: add task with a Shared-Backlog-Op trailer (op ID fixed per create), refuses offline with exit 2 before allocating; sync/integrate (and so claim/release) refuse on untracked task files. Tests: tests/shell/shared-backlog-create-test.sh via tests/python/test_shared_backlog_create.py. task-reviewer APPROVED.
+
+Commit: `d4161cc` - task-307: bump plugin version to 0.20.5 (patch)
 <!-- SECTION:NOTES:END -->
