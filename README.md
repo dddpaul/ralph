@@ -291,7 +291,7 @@ The same workflow (branch, implement, review, merge) applies in both modes.
 | `plugins/ralph/` | The `ralph` plugin (`.claude-plugin/plugin.json` manifest) — bundles all `ralph-*` skills and both agents |
 | `plugins/ralph/agents/` | Plugin-bundled agents: `task-reviewer` and `ralph-reviewer` |
 | `plugins/ralph/hooks/` | Plugin-delivered Claude guard hooks: `hooks.json`, the `run.sh` marker-gate dispatcher and the seven guards |
-| `plugins/ralph/git-hooks/` | Plugin-delivered git hook bodies (`pre-commit`, `commit-msg`, `post-commit`), run through the per-clone shim |
+| `plugins/ralph/git-hooks/` | Plugin-delivered git hook bodies (`pre-commit`, `commit-msg`, `post-commit`, and `pre-push` for shared-backlog clones), run through the per-clone shim |
 | `plugins/ralph/user-settings.json` | The common allow rules, `attribution` and `sandbox` for the user settings file |
 | `backlog/` | Task files managed by backlog.md CLI |
 | `scripts/shorten-backlog-filenames.py` | Remediation for backlog filenames already over the 125-byte cap, across one project or a whole tree of them (dry-run by default, `--apply` renames via `git mv` and commits each project) |
@@ -436,13 +436,13 @@ Without the marker the plugin hooks do nothing, so a project keeps its legacy `.
 
 ### Plugin git hooks
 
-The plugin ships the git hook bodies in `plugins/ralph/git-hooks/` (`pre-commit`, `commit-msg`, `post-commit`). A clone runs them through one fixed shim, `plugins/ralph/skills/ralph-init/templates/shims/git-hook`, installed under each hook name in the directory `git rev-parse --git-path hooks` returns (which honours `core.hooksPath`). The shim:
+The plugin ships the git hook bodies in `plugins/ralph/git-hooks/` (`pre-commit`, `commit-msg`, `post-commit`, `pre-push`). A clone runs them through one fixed shim, `plugins/ralph/skills/ralph-init/templates/shims/git-hook`, installed under each hook name in the directory `git rev-parse --git-path hooks` returns (which honours `core.hooksPath`). The shim:
 
 - runs the clone's own `<name>.local` hook from that directory first, with the hook's arguments, and stops when it fails; for `pre-push` (and the other stdin-fed hooks `post-rewrite` and `reference-transaction`) it buffers stdin so both hooks read all of it;
 - execs `<installPath>/git-hooks/<name>` found through the registry resolver above, with the same arguments;
 - when the plugin cannot be resolved, prints the resolver's reason and then fails or warns per clone switch: `pre-commit` and `commit-msg` fail when `git config ralph.pluginHooks` is true and name `git commit --no-verify`; `pre-push` fails when `ralph.pluginHooks` or `ralph.sharedBacklog` is true and names `git push --no-verify`; `post-commit` and every hook with neither switch set only warn.
 
-`pre-commit` runs the length guard bundled beside it (`plugins/ralph/hooks/filename-length-guard.sh`) and falls back to `<repo>/.claude/hooks/filename-length-guard.sh` when it runs as a legacy copy in `.git/hooks`. `commit-msg` finds a merge in progress through `git rev-parse --git-path MERGE_MSG`, so it also works in a linked worktree. The plugin bodies still work as legacy copies installed straight into `.git/hooks` (`tests/python/test_git_hook_shim.py`); ralph-init no longer ships template copies of them.
+`pre-commit` runs the length guard bundled beside it (`plugins/ralph/hooks/filename-length-guard.sh`) and falls back to `<repo>/.claude/hooks/filename-length-guard.sh` when it runs as a legacy copy in `.git/hooks`. `pre-push` acts only in a clone whose trusted switch `git config ralph.sharedBacklog` is true (set by `shared-backlog.sh enable`, which installs the shim as pre-push), never on the marker: it runs the read-only `shared-backlog.sh check-dupes` on every pushed SHA, skips ref deletions and takes no lock, so a `create`, `claim` or `integrate` push that holds the protocol lock passes through it without deadlock. It refuses a tip with a duplicate task or draft ID, or when the `backlog` CLI is missing (`tests/shell/shared-backlog-prepush-test.sh`). `commit-msg` finds a merge in progress through `git rev-parse --git-path MERGE_MSG`, so it also works in a linked worktree. The plugin bodies still work as legacy copies installed straight into `.git/hooks` (`tests/python/test_git_hook_shim.py`); ralph-init no longer ships template copies of them.
 
 ### Plugin-hooks migration
 

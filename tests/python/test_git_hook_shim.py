@@ -28,6 +28,8 @@ TEMPLATES = REPO_ROOT / "plugins/ralph/skills/ralph-init/templates"
 SHIM = TEMPLATES / "shims/git-hook"
 LEGACY_GUARD = PLUGIN / "hooks/filename-length-guard.sh"
 HOOK_NAMES = ("pre-commit", "commit-msg", "post-commit")
+# pre-push ships too, but only shared-backlog enable installs its shim (TASK-311).
+BODY_NAMES = (*HOOK_NAMES, "pre-push")
 GIT = shutil.which("git") or "/usr/bin/git"
 LONG_NAME = "x" * 130 + ".md"
 
@@ -99,13 +101,13 @@ def commit_file(world: dict[str, Path], name: str, message: str = "add") -> subp
 # ---------------------------------------------------------------- parity
 
 
-@pytest.mark.parametrize("name", HOOK_NAMES)
+@pytest.mark.parametrize("name", BODY_NAMES)
 def test_plugin_body_is_executable(name: str) -> None:
     assert os.access(BODIES / name, os.X_OK)
 
 
 def test_plugin_ships_exactly_the_shimmed_hooks_and_no_template_copies() -> None:
-    assert sorted(p.name for p in BODIES.iterdir()) == sorted(HOOK_NAMES)
+    assert sorted(p.name for p in BODIES.iterdir()) == sorted(BODY_NAMES)
     assert not (TEMPLATES / "git-hooks").exists()
 
 
