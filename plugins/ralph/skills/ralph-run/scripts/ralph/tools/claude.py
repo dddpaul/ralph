@@ -29,6 +29,7 @@ from ralph.tools._subprocess import (
     READER_JOIN_SEC,
     TERMINATE_GRACE_SEC,
     TIMEOUT_EXIT_CODE,
+    devcontainer_prefix,
     execute,
     terminate_tree,
 )
@@ -60,7 +61,8 @@ class ClaudeTool(Tool):
         model: Value for ``claude --model`` (e.g. ``"claude-opus-4-7"``).
         effort: Value for ``claude --effort`` (e.g. ``"max"``).
         devcontainer: When True, prepend ``devcontainer exec
-            --workspace-folder <path>`` to the argv list.
+            --workspace-folder <path> --remote-env RALPH_AUTONOMOUS=1`` to the
+            argv list.
         workspace_folder: Required when ``devcontainer=True``; ignored when
             ``devcontainer=False``. Passed verbatim — no shell quoting.
     """
@@ -90,19 +92,13 @@ class ClaudeTool(Tool):
         Returns:
             The fully-assembled argv as a list. When ``devcontainer=True``
             the list begins with ``["devcontainer", "exec",
-            "--workspace-folder", <path>, ...]`` — never a single joined
+            "--workspace-folder", <path>, "--remote-env",
+            "RALPH_AUTONOMOUS=1", ...]`` — never a single joined
             string.
         """
         argv: list[str] = []
         if self._devcontainer and self._workspace_folder is not None:
-            argv.extend(
-                [
-                    "devcontainer",
-                    "exec",
-                    "--workspace-folder",
-                    str(self._workspace_folder),
-                ]
-            )
+            argv.extend(devcontainer_prefix(self._workspace_folder))
         argv.extend(
             [
                 "claude",

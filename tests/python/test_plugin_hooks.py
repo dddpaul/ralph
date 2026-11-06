@@ -38,6 +38,9 @@ GUARDS = (
     "filename-length-guard",
 )
 PLUGIN_COMMAND = re.compile(r'\A"\$\{CLAUDE_PLUGIN_ROOT\}"/hooks/run\.sh ([a-z-]+)\Z')
+# The one guard hooks.json calls directly, outside the marker gate (TASK-316).
+UNGATED = "autonomous-create-guard"
+UNGATED_COMMAND = f'"${{CLAUDE_PLUGIN_ROOT}}"/hooks/{UNGATED}.sh'
 LEGACY_COMMAND = re.compile(r'\A"\$CLAUDE_PROJECT_DIR"/\.claude/hooks/([a-z-]+)\.sh\Z')
 # The commit guards dispatch on any git / gh command: a literal "git commit *" or
 # "gh pr create *" filter never fires for git -c k=v commit / git -C dir commit or
@@ -63,6 +66,8 @@ def entries(
     for event, groups in json.loads(path.read_text())["hooks"].items():
         for group in groups:
             for hook in group["hooks"]:
+                if hook["command"] == UNGATED_COMMAND:
+                    continue
                 match = pattern.match(hook["command"])
                 assert match, f"unexpected command shape in {path}: {hook['command']}"
                 rows.append(
@@ -136,6 +141,7 @@ def dispatch(
         env=env,
         capture_output=True,
         text=True,
+        check=False,
     )
     return result, out
 
@@ -175,6 +181,18 @@ def test_live_settings_match_hooks_json_filters() -> None:
     assert ("PreToolUse", "Bash", "Bash(git *)", "commit-prefix-guard") in live
     assert ("PreToolUse", "Bash", "Bash(git *)", "commit-msg-guard") in live
     assert ("PreToolUse", "Bash", "Bash(gh *)", "commit-msg-guard") in live
+
+
+def test_the_ungated_guard_is_wired_directly_for_bash_and_skill() -> None:
+    groups = json.loads((PLUGIN_HOOKS / "hooks.json").read_text())["hooks"]["PreToolUse"]
+    direct = [
+        (group["matcher"], hook.get("if"))
+        for group in groups
+        for hook in group["hooks"]
+        if hook["command"] == UNGATED_COMMAND
+    ]
+    assert direct == [("Bash|Skill", None)]
+    assert os.access(PLUGIN_HOOKS / f"{UNGATED}.sh", os.X_OK)
 
 
 def test_every_hooks_json_entry_names_an_existing_executable() -> None:
@@ -340,6 +358,7 @@ def run_plugin_guard(
         env=base_env(CLAUDE_PROJECT_DIR=str(project_dir)),
         capture_output=True,
         text=True,
+        check=False,
     )
 
 
@@ -381,6 +400,7 @@ def run_guard_directly(script: Path, payload: str, run_cwd: Path, **env: str) ->
         env=base_env(**env),
         capture_output=True,
         text=True,
+        check=False,
     )
     return result.stdout
 
@@ -547,6 +567,7 @@ def test_legacy_wired_project_still_blocks(bootstrapped: Path) -> None:
             env=base_env(CLAUDE_PROJECT_DIR=str(root), RALPH_AUTONOMOUS="0"),
             capture_output=True,
             text=True,
+            check=False,
         )
         assert result.returncode == 0, f"{guard} ({condition}) failed: {result.stderr}"
         decision = "additionalContext" if event == "PostToolUse" else '"deny"'
