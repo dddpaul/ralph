@@ -25,11 +25,17 @@ The user may pass overrides as skill arguments. Parse them as space-separated ke
 | devcontainer | true | --devcontainer |
 | rebuild | false | --rebuild |
 | verbose | false | --verbose |
+| push | true | --no-push (when false) |
 | watch | (none) | — |
 | block_end_buffer_min | 0 | --block-end-buffer-min |
 | max_iterations | 10 | (positional, last arg) |
 
 Set `block_end_buffer_min` to N>0 to pause the run when the active 5h Anthropic usage block has <=N minutes remaining. 0 disables the check (default). Requires ccusage to be installed; preflight warns if missing.
+
+**A run pushes `master` to `origin`.** With `push=true` (the default), the orchestrator runs `git push origin master` once at the end of the run whenever `master` moved during it, an `origin` remote exists and `RALPH_NO_PUSH` is not set to a truthy value. `push.followTags` carries the version tags along. The push also happens after a `/ralph-stop` or a failed run, because it runs after the loop's cleanup and not inside it. The git `pre-push` hook still runs on that push and can reject it. Set `push=false` to skip the push for this run: Step 4 passes `--no-push`, and the merged work stays on the local `master` only. Accepted values are `true` and `false`; reject anything else:
+```
+BLOCKED: push must be true or false.
+```
 
 Set `rebuild=true` to force a **fresh** container instead of reusing the existing one — the orchestrator then runs `devcontainer up ... --remove-existing-container`. Needed only after editing `.devcontainer/devcontainer.json`, because mounts and other container config apply at container **creation**: a reused container silently ignores them. Without `rebuild=true`, the orchestrator refuses to reuse a container created before the last change to `.devcontainer/devcontainer.json` or `.devcontainer/Dockerfile`: the launch fails the heartbeat check and the launch log shows a `STALE DEVCONTAINER` banner with both timestamps — relaunch with `rebuild=true`. Off by default (a rebuild is expensive), and a no-op unless `devcontainer=true`. It does **not** refresh the image: cached layers are reused wherever their inputs are unchanged, so a floating version tag would stay frozen. The Claude Code version is therefore pinned as `CLAUDE_CODE_VERSION` in `devcontainer.json` (bumping it invalidates the npm layer); to force a fresh image regardless, run `devcontainer build --workspace-folder . --no-cache` by hand.
 
@@ -57,6 +63,7 @@ The `tasks` parameter accepts comma-separated numeric task IDs only (e.g. `62,64
 - `/ralph-run` — all defaults
 - `/ralph-run tool=opencode timeout=30 max_iterations=5`
 - `/ralph-run devcontainer=false effort=high`
+- `/ralph-run push=false` — run without pushing `master` to `origin` at the end
 - `/ralph-run rebuild=true` — recreate the container so devcontainer.json mount changes take effect
 - `/ralph-run tasks=62` — only TASK-62
 - `/ralph-run tasks=62,64,65 max_iterations=3`
@@ -124,6 +131,7 @@ Append conditional flags as array elements (never string concatenation):
 - devcontainer=true **and** rebuild=true → `RALPH_CMD+=(--rebuild)` (skip it when devcontainer=false — the flag is a no-op there)
 - `tasks` is set → `RALPH_CMD+=(--tasks <ids>)`
 - `block_end_buffer_min > 0` → `RALPH_CMD+=(--block-end-buffer-min <N>)`
+- push=false → `RALPH_CMD+=(--no-push)` (push=true adds nothing: the orchestrator pushes by default, see Step 1)
 
 Launch fully detached, capturing early output to a launch log. **You MUST set `dangerouslyDisableSandbox: true`** on this Bash tool call — the orchestrator needs full OS access (mktemp, /dev/fd, tee, docker) which the sandbox blocks.
 
@@ -154,7 +162,7 @@ On success:
 **If `watch` is empty (not set or `false`):** output one line plus a hint:
 
 ```
-Ralph launched (PID <pid>, tool=<tool>, model=<model>, effort=<effort>, timeout=<timeout>m, max=<max_iterations>, devcontainer=<true|false>). /ralph-status to monitor, /ralph-stop to halt.
+Ralph launched (PID <pid>, tool=<tool>, model=<model>, effort=<effort>, timeout=<timeout>m, max=<max_iterations>, devcontainer=<true|false>, push=<true|false>). /ralph-status to monitor, /ralph-stop to halt.
 
 Hint: pass watch=5m to /ralph-run for automatic progress alerts.
 ```
@@ -162,7 +170,7 @@ Hint: pass watch=5m to /ralph-run for automatic progress alerts.
 **If `watch` is set (e.g. `5m`):** output the launch line AND schedule the first watch tick directly via `ScheduleWakeup`:
 
 ```
-Ralph launched (PID <pid>, tool=<tool>, model=<model>, effort=<effort>, timeout=<timeout>m, max=<max_iterations>, devcontainer=<true|false>). Watching every <watch>.
+Ralph launched (PID <pid>, tool=<tool>, model=<model>, effort=<effort>, timeout=<timeout>m, max=<max_iterations>, devcontainer=<true|false>, push=<true|false>). Watching every <watch>.
 ```
 
 Convert the `watch` duration to seconds using the same regex parser from Step 1 (e.g. `2m` → 120, `5m` → 300, `1h` → 3600).
