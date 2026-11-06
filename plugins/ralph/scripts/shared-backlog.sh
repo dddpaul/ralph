@@ -399,7 +399,7 @@ require_master_clean() {
 # require_no_untracked_tasks — refuse while the working tree holds an untracked
 # task file: create publishes IDs from a temporary worktree, so a task file
 # made outside it carries an ID nobody else can see, and a later pull may bring
-# the same ID from origin.
+# the same ID from origin. sync runs it, so claim and release refuse too.
 require_no_untracked_tasks() {
   local files
   files=$(git -c core.quotePath=false ls-files --others --exclude-standard -- \

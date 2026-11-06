@@ -4,7 +4,7 @@ title: Allocate shared-backlog task IDs in an isolated temporary worktree
 status: In Progress
 assignee: []
 created_date: '2026-11-04T14:53:00Z'
-updated_date: '2026-11-06T14:00:00Z'
+updated_date: '2026-11-06T14:05:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -40,4 +40,8 @@ Reference: PRD design/plugin-delivered-project-files-prd.md, US-013 and FR-8.
 
 <!-- SECTION:NOTES:BEGIN -->
 Plan: cmd_create fixes an op ID (new_token), fetches origin (exit 2 offline before any worktree/task file), adds a detached git worktree at origin/master under a mktemp dir, runs land_reapply create_apply there (commit 'task-N: add task' + Shared-Backlog-Op trailer), then removes the worktree; the user's branch, index and tree are never touched. Linked worktree shares the git common dir, so the shim's resolver keys on the original clone root. sync and integrate refuse while untracked task files exist and list them. New tests/shell/shared-backlog-create-test.sh (+ pytest harness) covers behind/ahead/dirty/task-branch clones, offline refusal, op-ID reuse across a refused push, untracked-file refusals and a real shim commit in the worktree against a project-scope registry entry.
+
+Commit: `1101ac3` - task-307: allocate shared-backlog task IDs in a temporary worktree
+
+AC #7 (host) deferred: the container's /bin/bash is 5.2, so test_bash32_syntax skips its 3.2 run. On a Mac host run: /bin/bash tests/shell/shared-backlog-create-test.sh (and the retry/claim/lock suites). bash -n, the static bash-4 builtin guard and all shell suites pass under bash 5.2.
 <!-- SECTION:NOTES:END -->
