@@ -58,7 +58,9 @@ HOOK_MARKER='shared-backlog pre-push hook'
 
 die() { echo "shared-backlog: $*" >&2; exit 1; }
 # help_text — the header comment from "Usage:" to its last line.
-help_text() { awk '/^# Usage:/ { p = 1 } p && !/^#/ { exit } p { sub(/^# ?/, ""); print }' "$0"; }
+# SELF is absolute, so it still resolves after the cd to the repo root.
+SELF="$(cd "$(dirname "$0")" && pwd -P)/$(basename "$0")"
+help_text() { awk '/^# Usage:/ { p = 1 } p && !/^#/ { exit } p { sub(/^# ?/, ""); print }' "$SELF"; }
 usage() { help_text >&2; exit 64; }
 say() { echo "shared-backlog: $*" >&2; }
 

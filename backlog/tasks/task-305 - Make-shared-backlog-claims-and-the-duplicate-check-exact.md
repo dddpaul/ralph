@@ -4,7 +4,7 @@ title: Make shared-backlog claims and the duplicate check exact
 status: In Progress
 assignee: []
 created_date: '2026-11-04T14:53:00Z'
-updated_date: '2026-11-06T13:21:00Z'
+updated_date: '2026-11-06T13:25:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -46,4 +46,8 @@ Reference: PRD design/plugin-delivered-project-files-prd.md, US-011 and FR-6.
 
 <!-- SECTION:NOTES:BEGIN -->
 Plan: in plugins/ralph/scripts/shared-backlog.sh resolve the holder --as > SHARED_BACKLOG_HOLDER > git config ralph.holder (missing = error, @claude refused as holder); add real_assignees/other_assignees/held_by_holder so a bare @claude is unassigned and any other assignee besides the holder means taken; run the To Do and dependency checks before accepting an already-held claim; check-dupes REV reads the prefix via git show REV:backlog/config.yml, adds a draft ID check (backlog/drafts + archive/drafts, fixed prefix draft), passes with a message when REV has no backlog/, and fails when backlog is not on PATH; --help prints the whole header via awk to stdout and exits 0 before any git call. New scratch-repo suite tests/shell/shared-backlog-claim-test.sh plus pytest runner.
+
+Commit: `3f68c18` - task-305: make shared-backlog claims and the duplicate check exact
+
+AC #8 (host) deferred: this Linux container has no /bin/bash 3.2. On a Mac, run: /bin/bash tests/shell/shared-backlog-claim-test.sh && /bin/bash tests/shell/shared-backlog-lock-test.sh (both must end with failed: 0). The bash -n check, the bash 3.2 static guard (tests/python/test_bash32_syntax.py) and both shell suites pass here.
 <!-- SECTION:NOTES:END -->

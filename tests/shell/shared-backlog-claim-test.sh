@@ -201,12 +201,15 @@ out=$(cd "$work" && bash "$SB" --help 2>/dev/null); rc=$?
 check "--help exits 0 outside a repo (rc=$rc)" test "$rc" -eq 0
 check "--help prints the usage" has "$out" "Usage: scripts/shared-backlog.sh"
 check "--help prints the exit codes in full" has "$out" "64 usage error"
-check "--help prints the last header line" has "$out" "no associative arrays, no mapfile."
+check "--help prints the last header line" has "$out" "64 usage error. Bash 3.2 clean"
 out=$(sb -h 2>/dev/null); rc=$?
 check "-h exits 0 and prints the help (rc=$rc)" sh -c 'test "$1" -eq 0 && case "$2" in *"64 usage error"*) ;; *) exit 1 ;; esac' _ "$rc" "$out"
 out=$(sb no-such-command 2>&1 >/dev/null); rc=$?
 check "an unknown command is still a usage error (rc=$rc)" test "$rc" -eq 64
 check "the usage error prints the whole help on stderr" has "$out" "64 usage error"
+mkdir -p "$work/bin" && cp "$SB" "$work/bin/sb.sh"
+out=$( (cd "$work/a/backlog" && bash ../../bin/sb.sh no-such-command) 2>&1); rc=$?
+check "a usage error from a subdirectory still prints the help (rc=$rc)" sh -c 'test "$1" -eq 64 && case "$2" in *"64 usage error"*) ;; *) exit 1 ;; esac' _ "$rc" "$out"
 
 echo
 echo "passed: $pass, failed: $fail"
