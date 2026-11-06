@@ -60,11 +60,22 @@ Entries in `.claude/settings.json` under `hooks.<event>.<n>.hooks[].command` MUS
 
 ## R-INFRA-6: Do not bypass `master-branch-guard.sh`
 
-Edit/Write to any path outside `.claude/` requires a `task-*` branch. The `master-branch-guard.sh` hook enforces this. The reviewer MUST reject any diff or commit that:
+Edit/Write to any path outside the guard's allowlist requires a `task-*` branch. The `master-branch-guard.sh` hook enforces this. The reviewer MUST reject any diff or commit that:
 
-- was committed directly to `master` and touches files outside `.claude/`
 - used `dangerouslyDisableSandbox: true` to bypass the master-branch guard
 - was created by disabling, renaming, or temporarily removing the guard hook
+- landed on `master` in any way other than those listed below
+
+Only these commits are allowed on `master`:
+
+- **Guard allowlist paths.** A commit that changes only paths the guard lets through: `.claude/`, `design/`, `.obsidian/`, `.vscode/`, `.idea/`, `.cursor/`, `.zed/`, `.fleet/` and `.gitignore` files.
+- **Task-file commits.** A `task-N: ` commit that changes only files under `backlog/{tasks,drafts,archive,completed}/`.
+- **Reviewed task-branch work.** The Review step records the verdict with the commit the reviewer saw, as `Review: APPROVED <sha>` in the task's notes, where `<sha>` is the task branch tip. A merge is allowed when its second parent equals such a SHA of the task its subject names, and a fast-forward landing when every landed `task-N` commit is equal to or an ancestor of one. No branch ref needs to survive. A verdict recorded for an earlier SHA does not approve commits made after it; only bookkeeping commits may follow it — `task-N: ` commits that change task files, guard allowlist paths, or the paths a project lists in `master_bookkeeping_paths` (for example a version bump).
+- **Integration merges.** A merge whose `Integrated-Origin: <sha>` trailer, written by `shared-backlog.sh integrate`, names its second parent, where that SHA is reachable from origin's base branch.
+
+Every merge, of either kind, must also have the tree `git merge-tree --write-tree` makes of its parents. That equality only shows nothing was resolved by hand; it is not proof of approval. A merge whose tree differs is allowed only when a task's notes record `Integration review: APPROVED <merge-sha>` for exactly that merge.
+
+The reviewer MUST check this by running the plugin's checker, `scripts/master-provenance.sh` in the plugin root this bundle was read from (the directory that holds `skills/`), from the project root with no arguments. It walks the first-parent commits master has that origin lacks and prints `ok <sha> <reason>` or `FLAG <sha> <reason>` per commit. Every `FLAG` line is a blocking R-INFRA-6 finding; exit status 2 (a usage or git error) is reported as a load error, not as a pass. A project sets `master_bookkeeping_paths=` (space-separated path prefixes) and `master_provenance_since=<commit>` (leave out that commit and its history, from before the project recorded `Review: APPROVED` notes) in `.claude/task-reviewer.conf`.
 
 The correct workflow is `git checkout -b task-N` BEFORE the first edit. Sandbox bypass is reserved for tools that the sandbox blocks for unrelated reasons (e.g. `nohup`, `mktemp` in `/tmp`), never for circumventing project hooks.
 

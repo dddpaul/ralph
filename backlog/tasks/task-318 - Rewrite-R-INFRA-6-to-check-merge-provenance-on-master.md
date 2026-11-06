@@ -1,9 +1,10 @@
 ---
 id: TASK-318
 title: Rewrite R-INFRA-6 to check merge provenance on master
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-04T14:55:00Z'
+updated_date: '2026-11-06T18:36:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -40,4 +41,11 @@ Reference: PRD design/plugin-delivered-project-files-prd.md, US-024.
 - [ ] #7 Fixtures approve a design/ commit, a task-file commit, a reviewed merge with its branch deleted, a reviewed fast-forward, a clean integration merge and a hand-resolved merge with an integration review
 - [ ] #8 Fixtures flag a clean merge from an unreviewed task branch, a clean merge from an arbitrary side branch, a stale-verdict merge and a hand-edited merge without an integration review
 - [ ] #9 ruff, pytest and bats pass
+- [ ] #10 After the CLAUDE.md Review step wording changes, .claude/managed-file-drift.accept's CLAUDE.md line is refreshed to the new template and project hashes (via managed-file-drift.sh accept), so the drift warning does not return
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan: ship plugins/ralph/scripts/master-provenance.sh, a deterministic checker the reviewer runs for R-INFRA-6 over the unpushed master range (origin/master..master by default). It walks first-parent commits: allowlist-path commits and task-N task-file commits pass; task merges pass when P2 is reachable from a recorded 'Review: APPROVED <sha>' of the named task with only bookkeeping commits after it and the tree equals git merge-tree; fast-forwarded task commits pass at or behind such a SHA; integration merges pass on a matching Integrated-Origin trailer reachable from origin base and merge-tree equality; differing trees need 'Integration review: APPROVED <merge-sha>'. Rewrite R-INFRA-6 to require it, update the CLAUDE.md Review step (template + repo) to record the SHA, refresh the drift accept line, and add pytest fixtures.
+<!-- SECTION:NOTES:END -->
