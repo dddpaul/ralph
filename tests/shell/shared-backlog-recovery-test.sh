@@ -82,6 +82,9 @@ op_ids() { sort -u "$work/pushes.log" | wc -l | tr -d ' '; }
 op_of() { git --git-dir="$work/origin.git" log -1 --format='%(trailers:key=Shared-Backlog-Op,valueonly)' "$1" | grep .; }
 worktrees() { git -C "$work/$1" worktree list --porcelain | grep -c '^worktree '; }
 leftover_tmp() { ls -d "${TMPDIR:-/tmp}"/shared-backlog-create.* 2>/dev/null | grep -c . ; }
+leftover_flags() { ls -d "${TMPDIR:-/tmp}"/shared-backlog-deadline.* 2>/dev/null | grep -c . ; }
+# script_procs — processes still running the script under test.
+script_procs() { ps -eo args= | grep -F "$SB" | grep -vc grep; }
 recovery_refs() { git -C "$work/a" for-each-ref --format='%(refname)' refs/ralph/recovery; }
 
 # kill_pusher — the body of an origin post-receive hook that kills the client's
@@ -214,6 +217,7 @@ check "no temporary directory left" test "$(leftover_tmp)" -eq "$tmp_before"
 echo "# a signal mid-push keeps a recovery ref and removes the worktree"
 fresh
 tmp_before=$(leftover_tmp)
+flags_before=$(leftover_flags)
 post_receive "touch '$work/receiving.flag'; sleep 60"
 (cd "$work/a" && exec bash "$SB" create "Interrupted") >"$work/sig.log" 2>&1 &
 pid=$!
@@ -230,6 +234,8 @@ check "the commit is kept as refs/ralph/recovery/$op" test "$(recovery_refs)" = 
 check "no temporary worktree left" test "$(worktrees a)" -eq 1
 check "no temporary directory left" test "$(leftover_tmp)" -eq "$tmp_before"
 check "the protocol lock is released" test ! -d "$work/a/.git/shared-backlog-protocol.lock"
+check "no deadline flag file left" test "$(leftover_flags)" -eq "$flags_before"
+check "no watchdog or other script process left" test "$(script_procs)" -eq 0
 
 echo
 echo "passed: $pass, failed: $fail"

@@ -275,13 +275,19 @@ git_state() {
   echo "$s"
 }
 
-# on_signal CODE — kill the running subcommand's group, wait for it and exit;
-# the EXIT trap then cleans up after create and releases our own lock.
+# on_signal CODE — kill the running subcommand's group, wait for it, stop its
+# watchdog and exit; the EXIT trap then cleans up after create and releases our
+# own lock.
 on_signal() {
   if [ -n "$CHILD_PID" ]; then
     kill -TERM -- "-$CHILD_PID" 2>/dev/null || true
     wait "$CHILD_PID" 2>/dev/null || true
   fi
+  if [ -n "$WATCHDOG_PID" ]; then
+    kill "$WATCHDOG_PID" 2>/dev/null || true
+    wait "$WATCHDOG_PID" 2>/dev/null || true
+  fi
+  [ -z "$DEADLINE_FLAG" ] || rm -f "$DEADLINE_FLAG"
   exit "$1"
 }
 
@@ -289,8 +295,9 @@ on_signal() {
 # group, and kill the group once epoch second DEADLINE_AT passes. Our own lock
 # is held by this shell, outside the group, so a kill cannot strand it.
 with_deadline() {
-  local flag watchdog rc=0
+  local flag rc=0
   flag=$(mktemp "${TMPDIR:-/tmp}/shared-backlog-deadline.XXXXXX")
+  DEADLINE_FLAG=$flag
   set -m
   ("$@") &
   CHILD_PID=$!
@@ -300,10 +307,11 @@ with_deadline() {
     echo expired >"$flag"
     kill -TERM -- "-$CHILD_PID" 2>/dev/null || true
   ) </dev/null >/dev/null 2>&1 &
-  watchdog=$!
+  WATCHDOG_PID=$!
   wait "$CHILD_PID" || rc=$?
-  kill "$watchdog" 2>/dev/null || true
-  wait "$watchdog" 2>/dev/null || true
+  kill "$WATCHDOG_PID" 2>/dev/null || true
+  wait "$WATCHDOG_PID" 2>/dev/null || true
+  WATCHDOG_PID=''
   if [ -s "$flag" ]; then
     kill -KILL -- "-$CHILD_PID" 2>/dev/null || true
     say "$CMD ran past its ${DEADLINE}s deadline (SHARED_BACKLOG_DEADLINE); killed its process group"
@@ -312,6 +320,7 @@ with_deadline() {
   fi
   CHILD_PID=''
   rm -f "$flag"
+  DEADLINE_FLAG=''
   return "$rc"
 }
 
@@ -781,7 +790,7 @@ create_reconcile() {
 # create_report SHA — print the task that SHA, a commit on origin, added.
 create_report() {
   local id path
-  id=$(git log -1 --format=%s "$1" | sed -n 's/^[A-Za-z]*-\([0-9.]*\): add task$/\1/p')
+  id=$(git log -1 --format=%s "$1" | sed -n 's/^task-\([0-9.]*\): add task$/\1/p')
   path=$(git -c core.quotePath=false diff-tree -r --no-commit-id --name-only --diff-filter=A "$1" -- \
     backlog/tasks | head -1)
   echo "created TASK-$id $(git rev-parse --short "$1") $path (Shared-Backlog-Op: $OP_ID); run sync to bring it in"
@@ -975,6 +984,8 @@ case "$DEADLINE" in
 esac
 DEADLINE_AT=$(($(date +%s) + DEADLINE))
 CHILD_PID=''
+WATCHDOG_PID=''
+DEADLINE_FLAG=''
 PROTOCOL_TOKEN=''
 CREATE_ROOT=$(pwd -P)
 CREATE_TMP=''
