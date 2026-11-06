@@ -15,7 +15,9 @@
 #                        clear the holder's assignee on TASK-N and push
 #   create <backlog task create args...>
 #                        create a task in a temporary worktree at a fresh
-#                        origin/master and push it at once
+#                        origin/master and push it at once; after an uncertain
+#                        push, look for it on origin before anything else, and
+#                        keep a commit origin may lack as refs/ralph/recovery/*
 #   integrate [--task N] land local master on origin: merge origin/master,
 #                        renumber our duplicate IDs, rerun checks, push
 #   check-dupes [REV]    exit 1 if REV's tree (default HEAD) has duplicate task
@@ -273,10 +275,13 @@ git_state() {
   echo "$s"
 }
 
-# on_signal CODE — kill the running subcommand's group and exit; the EXIT trap
-# then releases our own lock.
+# on_signal CODE — kill the running subcommand's group, wait for it and exit;
+# the EXIT trap then cleans up after create and releases our own lock.
 on_signal() {
-  [ -z "$CHILD_PID" ] || kill -TERM -- "-$CHILD_PID" 2>/dev/null || true
+  if [ -n "$CHILD_PID" ]; then
+    kill -TERM -- "-$CHILD_PID" 2>/dev/null || true
+    wait "$CHILD_PID" 2>/dev/null || true
+  fi
   exit "$1"
 }
 
@@ -750,9 +755,57 @@ create_apply() {
     { say "committing TASK-$NEW_ID failed"; return 4; }
 }
 
-# create_cleanup — remove the temporary worktree create allocated in.
+# create_worktree — replace the temporary worktree with a fresh detached one at
+# origin/master and cd into it.
+create_worktree() {
+  cd "$CREATE_ROOT"
+  if [ -d "$CREATE_TMP/wt" ]; then
+    git worktree remove --force "$CREATE_TMP/wt" 2>/dev/null || rm -rf "$CREATE_TMP/wt"
+    git worktree prune
+  fi
+  git worktree add -q --detach "$CREATE_TMP/wt" "$REMOTE/$BRANCH" ||
+    die "cannot add a temporary worktree at $REMOTE/$BRANCH"
+  cd "$CREATE_TMP/wt"
+}
+
+# create_reconcile — after a push with an uncertain outcome, fetch and look on
+# origin/master, since the base create started from, for a commit carrying
+# OP_ID. 0 found (FOUND_SHA set), 1 not on origin, 2 origin unreachable.
+create_reconcile() {
+  fetch_bounded || return 2
+  FOUND_SHA=$(git log -1 --format=%H -F --grep="Shared-Backlog-Op: $OP_ID" \
+    "$CREATE_BASE..$REMOTE/$BRANCH")
+  [ -n "$FOUND_SHA" ]
+}
+
+# create_report SHA — print the task that SHA, a commit on origin, added.
+create_report() {
+  local id path
+  id=$(git log -1 --format=%s "$1" | sed -n 's/^[A-Za-z]*-\([0-9.]*\): add task$/\1/p')
+  path=$(git -c core.quotePath=false diff-tree -r --no-commit-id --name-only --diff-filter=A "$1" -- \
+    backlog/tasks | head -1)
+  echo "created TASK-$id $(git rev-parse --short "$1") $path (Shared-Backlog-Op: $OP_ID); run sync to bring it in"
+}
+
+# create_cleanup — remove create's temporary directory and worktree. A commit
+# whose acceptance by origin is uncertain (named in $CREATE_TMP/uncertain) is
+# first kept under refs/ralph/recovery/<op-id>, so it outlives the worktree.
+# The main shell runs it on every exit, after a deadline or signal kill too.
 create_cleanup() {
+  local sha op id ref
   [ -n "$CREATE_TMP" ] || return 0
+  if [ -s "$CREATE_TMP/uncertain" ] && read -r sha op id <"$CREATE_TMP/uncertain"; then
+    ref="refs/ralph/recovery/$op"
+    if git -C "$CREATE_ROOT" update-ref "$ref" "$sha"; then
+      say "origin may or may not have TASK-$id (Shared-Backlog-Op: $op); its commit is kept as $ref"
+      say "  check:    git fetch $REMOTE $BRANCH && git log --oneline -F --grep='Shared-Backlog-Op: $op' $REMOTE/$BRANCH"
+      say "  if listed, it landed; drop the ref:  git update-ref -d $ref"
+      say "  if not, finish it:  git push $REMOTE $ref:refs/heads/$BRANCH && git update-ref -d $ref"
+      say "  if that push is refused, drop the ref and run create again"
+    else
+      say "cannot store $sha as $ref; TASK-$id may be on origin (Shared-Backlog-Op: $op)"
+    fi
+  fi
   git -C "$CREATE_ROOT" worktree remove --force "$CREATE_TMP/wt" 2>/dev/null || true
   rm -rf "$CREATE_TMP"
   git -C "$CREATE_ROOT" worktree prune 2>/dev/null || true
@@ -763,28 +816,49 @@ create_cleanup() {
 # freshly fetched origin/master and push it, so the ID is on origin before
 # anyone sees it. The user's branch, index and working tree are never touched,
 # whatever state they are in; `sync` brings the task in.
+#
+# A refused push (non-fast-forward) lost a race: create fetches and allocates
+# again in a fresh worktree with the same operation ID, at most MAX_TRIES
+# pushes. Any other failed push may still have landed, so create first looks
+# for its operation ID on origin: found, that is the result; origin unreachable,
+# it stops without allocating again and keeps the commit as a recovery ref;
+# not found, it retries after an unreachable push and stops after a rejection.
 cmd_create() {
-  local rc=0
+  local try=1 rc urc sha
   [ $# -gt 0 ] || usage
   CREATE_ARGS=("$@")
   # The operation ID, not the task ID, is fixed once per create.
   OP_ID=$(new_token)
-  CREATE_ROOT=$(pwd -P)
-  CREATE_TMP=''
   fetch_bounded || { say "create refused: a task ID nobody can see is not allocated; nothing created"; exit 2; }
-  CREATE_TMP=$(mktemp -d "${TMPDIR:-/tmp}/shared-backlog-create.XXXXXX")
-  trap create_cleanup EXIT
-  git worktree add -q --detach "$CREATE_TMP/wt" "$REMOTE/$BRANCH" ||
-    die "cannot add a temporary worktree at $REMOTE/$BRANCH"
-  cd "$CREATE_TMP/wt"
-  land_reapply create_apply || rc=$?
-  cd "$CREATE_ROOT"
-  case "$rc" in
-    0) echo "created TASK-$NEW_ID $(git rev-parse --short "$REMOTE/$BRANCH") (Shared-Backlog-Op: $OP_ID); run sync to bring it in" ;;
-    2) say "TASK-${NEW_ID:-?} not pushed (origin unreachable); nothing created locally"; exit 2 ;;
-    4) exit 1 ;;
-    *) die "TASK-${NEW_ID:-?} not pushed; nothing created locally" ;;
-  esac
+  CREATE_BASE=$(git rev-parse "$REMOTE/$BRANCH")
+  while :; do
+    create_worktree
+    create_apply || exit 1
+    sha=$(git rev-parse HEAD)
+    printf '%s %s %s\n' "$sha" "$OP_ID" "$NEW_ID" >"$CREATE_TMP/uncertain"
+    rc=0; push_master || rc=$?
+    if [ "$rc" -eq 0 ]; then
+      rm -f "$CREATE_TMP/uncertain"
+      create_report "$sha"
+      return 0
+    fi
+    if [ "$rc" -eq 1 ]; then
+      rm -f "$CREATE_TMP/uncertain"
+      [ "$try" -lt "$MAX_TRIES" ] || die "push refused $MAX_TRIES times; nothing created"
+      fetch_bounded || { say "TASK-$NEW_ID not pushed (origin unreachable); nothing created"; exit 2; }
+    else
+      say "the push of TASK-$NEW_ID may have landed; looking for Shared-Backlog-Op: $OP_ID on origin"
+      urc=0; create_reconcile || urc=$?
+      case "$urc" in
+        0) rm -f "$CREATE_TMP/uncertain"; say "origin has it"; create_report "$FOUND_SHA"; return 0 ;;
+        2) say "cannot reconcile TASK-$NEW_ID; not allocating again"; exit 2 ;;
+      esac
+      rm -f "$CREATE_TMP/uncertain"
+      [ "$rc" -eq 2 ] || die "TASK-$NEW_ID push rejected and not on origin; nothing created"
+      [ "$try" -lt "$MAX_TRIES" ] || die "push failed $MAX_TRIES times and is not on origin; nothing created"
+    fi
+    try=$((try + 1))
+  done
 }
 
 # --- integrate --------------------------------------------------------------
@@ -902,7 +976,9 @@ esac
 DEADLINE_AT=$(($(date +%s) + DEADLINE))
 CHILD_PID=''
 PROTOCOL_TOKEN=''
-trap 'lock_release protocol "$PROTOCOL_TOKEN" || true' EXIT
+CREATE_ROOT=$(pwd -P)
+CREATE_TMP=''
+trap 'create_cleanup; lock_release protocol "$PROTOCOL_TOKEN" || true' EXIT
 trap 'on_signal 129' HUP
 trap 'on_signal 130' INT
 trap 'on_signal 143' TERM
@@ -910,7 +986,10 @@ case "$CMD" in
   sync) protocol_cmd cmd_sync "$@" ;;
   claim) protocol_cmd cmd_claim "$@" ;;
   release) protocol_cmd cmd_release "$@" ;;
-  create) protocol_cmd cmd_create "$@" ;;
+  create)
+    # Made here, so that this shell removes it even after a kill.
+    CREATE_TMP=$(mktemp -d "${TMPDIR:-/tmp}/shared-backlog-create.XXXXXX")
+    protocol_cmd cmd_create "$@" ;;
   integrate) protocol_cmd cmd_integrate "$@" ;;
   renumber) protocol_cmd cmd_renumber "$@" ;;
   check-dupes) with_deadline cmd_check_dupes "$@" ;;
