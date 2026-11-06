@@ -149,6 +149,7 @@ backlog/.ralph-heartbeat
 !.claude/ralph.json
 !.claude/settings.json
 !.claude/task-reviewer-rules.md
+!.claude/task-reviewer.conf
 !.claude/brainstorm-rules.md
 !.claude/hooks/
 

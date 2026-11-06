@@ -42,7 +42,7 @@ In an **interactive session**, before implementing ANY backlog task — whether 
 1. **Gate:** verify a backlog task exists and is "In Progress" — create or update status first.
 2. **Plan:** read task, AC, and relevant code. Record plan: `backlog task edit <id> --append-notes "Plan: ..."`.
 3. **Implement:** write code, run build/linter/tests, check off AC with `backlog task edit <id> --check-ac <n>`.
-4. **Review:** after tests pass, spawn the `task-reviewer` agent (NOT `general-purpose` or any other) on `git diff master..HEAD`. Do not proceed to step 5 (Done) or step 6 (Merge) without an APPROVED verdict from the task-reviewer agent.
+4. **Review:** after tests pass, spawn the `task-reviewer` agent (NOT `general-purpose` or any other) on `git diff master..HEAD`. Do not proceed to step 5 (Done) or step 6 (Merge) without an APPROVED verdict from the task-reviewer agent. Record the verdict with the commit the reviewer saw: `backlog task edit <id> --append-notes "Review: APPROVED $(git rev-parse HEAD)"`, run on the task branch tip that was reviewed. R-INFRA-6 lets only bookkeeping commits (task files, and paths listed in `master_bookkeeping_paths`) follow that SHA; after any other change, review again and record the new SHA.
 5. **Done:** final build+lint+tests must pass. `backlog task edit <id> -s "Done" --append-notes "..."`.
 6. **Merge:** commit task file, `git checkout master && git merge <branch> && git branch -d <branch>`.
 
