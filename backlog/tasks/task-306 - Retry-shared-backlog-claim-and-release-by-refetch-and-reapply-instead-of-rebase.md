@@ -3,9 +3,10 @@ id: TASK-306
 title: >-
   Retry shared-backlog claim and release by refetch and reapply instead of
   rebase
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-04T14:53:00Z'
+updated_date: '2026-11-06T13:33:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
