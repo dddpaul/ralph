@@ -12,7 +12,7 @@
           },
           {
             "type": "command",
-            "if": "Bash(gh pr create *)",
+            "if": "Bash(gh *)",
             "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/run.sh commit-msg-guard"
           },
           {
