@@ -266,6 +266,8 @@ A `pre-push` git hook (`.claude/hooks/version-bump-guard.sh`, run by a thin wrap
 
 The same hook also checks release tags: the release commit of `vX.Y.Z` is the first commit along origin's `master` first-parent history where both manifests read `X.Y.Z` (or, for a merge pull of another host's release, that release), and origin's tag (peeled) must point there. It refuses the push when origin tags that version elsewhere (two hosts released the same version with different content), when the two manifests disagree on the pushed tip, or when `git ls-remote origin` does not answer within `VERSION_GUARD_LS_REMOTE_TIMEOUT` seconds (default 20). An existing tag is never moved; the manual re-bump is in [`.claude/RELEASING.md`](.claude/RELEASING.md).
 
+Nothing under `.git/` is committed, so each clone installs these hooks itself: run `.claude/hooks/install-clone-hooks.sh` once per clone, after `migrate-plugin-hooks.sh clone`. It installs the version-bump wrapper as `pre-push.local` behind the plugin's pre-push shim (or as `pre-push` in a clone with no pre-push) and the bump nudge as `post-commit.local` behind the post-commit shim. A hook file that differs from what it would install is left untouched and named, and the run exits non-zero; a second run changes nothing. `--check` only reports. A SessionStart hook in `.claude/settings.json` runs `--check` and tells the session which hooks are missing and how to install them.
+
 **Examples:**
 
 ```bash

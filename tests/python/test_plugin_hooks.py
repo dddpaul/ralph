@@ -176,7 +176,12 @@ def test_hooks_json_carries_the_legacy_entries_and_filters() -> None:
 
 
 def test_live_settings_match_hooks_json_filters() -> None:
-    live = entries(REPO_ROOT / ".claude/settings.json", LEGACY_COMMAND)
+    # The SessionStart clone-hooks check (TASK-331) is this repo's own, not a plugin guard.
+    live = [
+        row
+        for row in entries(REPO_ROOT / ".claude/settings.json", LEGACY_COMMAND)
+        if row[3] != "clone-hooks-session-check"
+    ]
     plugin = entries(PLUGIN_HOOKS / "hooks.json", PLUGIN_COMMAND)
     assert live == plugin[: len(live)]
     assert ("PreToolUse", "Bash", "Bash(git *)", "commit-prefix-guard") in live
