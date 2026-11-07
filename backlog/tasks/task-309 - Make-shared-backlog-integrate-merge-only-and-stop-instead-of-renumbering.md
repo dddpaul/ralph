@@ -4,7 +4,7 @@ title: Make shared-backlog integrate merge-only and stop instead of renumbering
 status: Done
 assignee: []
 created_date: '2026-11-04T14:53:00Z'
-updated_date: '2026-11-06T14:56:00Z'
+updated_date: '2026-11-07T21:30:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -40,7 +40,7 @@ Reference: PRD design/plugin-delivered-project-files-prd.md, US-015 and FR-9.
 - [x] #4 On duplicate IDs integrate stops with an old-to-new mapping and neither pushes nor renumbers
 - [x] #5 An interrupted merge is preserved rather than reset, and a retry first checks for a clean state
 - [x] #6 integrate retries a push only on a non-fast-forward rejection, at most 3 times, and reports auth, hook and unreachable failures without retrying
-- [ ] #7 bash -n, the bash 3.2 static guard and the shell tests pass; (host) the shell suite passes under /bin/bash 3.2
+- [x] #7 bash -n, the bash 3.2 static guard and the shell tests pass; (host) the shell suite passes under /bin/bash 3.2
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -56,4 +56,6 @@ Host follow-up for AC7: on the Mac run /bin/bash tests/shell/shared-backlog-inte
 Implemented: integrate policy from pre-merge HEAD (.claude/ralph.json sharedBacklog + checks, SHARED_BACKLOG_CHECKS override, SHARED_BACKLOG_CHECKS_EXEC context probe, jq and backlog required); merge of the fetched origin SHA with Integrated-Origin trailer; duplicate stop prints renumber_plan mapping (shared with manual renumber; --amend removed); require_settled refuses over a left merge/rebase/cherry-pick/revert/index.lock; push_master sets PUSH_FAILURE and integrate retries only non-fast-forward (max 3). Tests: tests/shell/shared-backlog-integrate-test.sh (82 checks) via tests/python/test_shared_backlog_integrate.py. Review: APPROVED 06e155d
 
 Commit: `2a2cec7` - task-309: bump plugin version to 0.20.7 (patch)
+
+Host check (macOS, /bin/bash 3.2.57 with nested bash also 3.2 through a PATH wrapper, master 18591c8, 2026-11-08): bash -n clean on the script and the shim; tests/python/test_bash32_syntax.py 15 passed, none skipped; tests/shell/shared-backlog-integrate-test.sh 82 passed, 0 failed. AC #7 host clause verified.
 <!-- SECTION:NOTES:END -->
