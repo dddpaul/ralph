@@ -4,6 +4,7 @@ title: Release the shared-backlog protocol once every part is done
 status: To Do
 assignee: []
 created_date: '2026-11-04T14:55:00Z'
+updated_date: '2026-11-07T12:37:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -33,4 +34,5 @@ Reference: PRD design/plugin-delivered-project-files-prd.md, US-026 and FR-13.
 - [ ] #3 `README.md` and the ralph-init docs describe the protocol: opt-in, enable, disable and the commands
 - [ ] #4 (host) On two clones of one test origin, enable plus two racing creates, two racing default-mode Ralph claims and one integrate produce no duplicate ID and no double claim
 - [ ] #5 ruff, pytest and bats pass
+- [ ] #6 On the macOS host /bin/bash tests/shell/shared-backlog-retry-test.sh ends with failed: 0: its sneak_hook strips the padding BSD wc -l adds (n=$(wc -l <file | tr -d ' ')), so the subject is exactly "unrelated 0"
 <!-- AC:END -->
