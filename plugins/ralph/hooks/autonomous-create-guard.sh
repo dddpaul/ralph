@@ -10,9 +10,10 @@
 # it records follow-ups in its task notes instead. This guard refuses
 # `backlog task create`, `backlog draft create` and `backlog draft promote`
 # (anywhere in a compound command, so also after a cd into another repo),
-# `shared-backlog.sh create` and the ralph:ralph-handoff skill when RALPH_AUTONOMOUS=1 and the run's clone has ralph.sharedBacklog
-# true. hooks.json calls it directly, not through run.sh: it is not subject to
-# the pluginHooks marker or localGuards. The run's clone is the git root of
+# `shared-backlog.sh create` and the ralph:ralph-handoff skill when
+# RALPH_AUTONOMOUS=1 and the run's clone has ralph.sharedBacklog true.
+# hooks.json calls it directly, not through run.sh: it is not subject to the
+# pluginHooks marker or localGuards. The run's clone is the git root of
 # CLAUDE_PROJECT_DIR, never the command's cwd. Best effort, like every plugin
 # hook: a command spelled in a way the patterns below miss is not refused, and a
 # line of a multi-line string that starts with `backlog task create` is. A
@@ -69,5 +70,5 @@ fi
 
 [ -n "$what" ] || exit 0
 
-echo "BLOCKED: $what during an autonomous run: this clone enforces the shared-backlog protocol (git config ralph.sharedBacklog true), and an autonomous run must not allocate a task ID. Record the follow-up in the current task's notes instead (backlog task edit <id> --append-notes \"Follow-up: ...\"); a person creates the task later." >&2
+echo "BLOCKED: $what during an autonomous run: this clone enforces the shared-backlog protocol (git config ralph.sharedBacklog true), and an autonomous run must not allocate a task or draft ID. Record the follow-up in the current task's notes instead (backlog task edit <id> --append-notes \"Follow-up: ...\"); a person creates the task later." >&2
 exit 2
