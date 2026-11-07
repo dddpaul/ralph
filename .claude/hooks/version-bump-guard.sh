@@ -8,19 +8,24 @@
 # change but the version stays put, update no-ops and consumers silently run a
 # stale cache. This guard blocks such a push. See TASK-214.
 #
-# Installed via .git/hooks/pre-push (a thin wrapper that execs this tracked,
-# reviewable script). git passes the remote name as $1 and feeds the wrapper
-# one line per ref update on stdin:
+# Installed via .git/hooks/pre-push.local, a thin wrapper that execs this
+# tracked, reviewable script. The plugin's pre-push shim at .git/hooks/pre-push
+# runs that wrapper first, with the same arguments and the buffered stdin
+# (TASK-328); a clone that has not moved its pre-push yet runs the wrapper
+# directly as .git/hooks/pre-push. git passes the remote name as $1 and feeds
+# the hook one line per ref update on stdin:
 #     <local ref> SP <local sha> SP <remote ref> SP <remote sha> LF
 # For the master ref, both shas are already local at push time, so the
 # remote-sha..local-sha diff needs no network.
 #
-# Shipped set (a change here requires a strictly-greater version):
+# Shipped set (a change here requires a strictly-greater version; the list
+# lives in lib/shipped-set.sh):
 #   plugins/ralph/skills/**                     plugins/ralph/agents/**
-#   plugins/ralph/hooks/**
+#   plugins/ralph/hooks/**                      plugins/ralph/git-hooks/**
+#   plugins/ralph/scripts/**                    plugins/ralph/user-settings.json
 #   plugins/ralph/.claude-plugin/plugin.json    .claude-plugin/marketplace.json
 # Excluded (docs & tooling, not shipped-and-executed): README, design/,
-# backlog/, .claude/.
+# backlog/, .claude/, tests/.
 #
 # Release tag check (TASK-319): two hosts can each bump to the same version
 # with different content. The release commit of vX.Y.Z is the first commit,
