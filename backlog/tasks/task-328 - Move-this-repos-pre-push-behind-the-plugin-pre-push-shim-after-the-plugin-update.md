@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-06T17:47:00Z'
-updated_date: '2026-11-07T14:44:00Z'
+updated_date: '2026-11-07T16:22:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -46,4 +46,6 @@ Commit: `114a4c1` - task-328: word the pre-push state per clone and list tests/ 
 
 Review: APPROVED 114a4c1cdbe51a92c187323c3061c3b5b1a107f1
 AC#3 live part deferred: the scratch part is met (reproduced by the reviewer too); the live part, a bumped push of master landing on origin through this clone's pre-push shim, happens at the first shipped push from this Mac after the other host lands TASK-312/313/315 (planned: TASK-320). Status plan: TASK-328 stays In Progress after its merge; at that push, record the command, rc and origin range here, --check-ac 3, then set Done. TASK-320 gets a pointer note back here when this Mac's master is rebuilt on top of the other host's push. The other host moves its own clone's pre-push the same way after its batch lands (per-clone step, no task).
+
+AC#3 partial live evidence (2026-11-07): git push origin master from this Mac went through .git/hooks/pre-push (plugin shim), then pre-push.local (version-bump guard) and the plugin body: 58c4512..3e6ae10, rc=0. That push changed no shipped file, so it carried no bump; AC#3 still waits for a bumped push (TASK-320).
 <!-- SECTION:NOTES:END -->
