@@ -84,7 +84,8 @@ ROWS
 }
 
 # Live hooks with no template counterpart by design: plugin-marketplace
-# governance that exists only in this repo (CLAUDE.md step 6 says so).
+# governance that exists only in this repo (CLAUDE.md step 6 says so), and
+# the per-clone installer for its git hooks (TASK-331).
 #
 # Same lookup-only shape as non_mirrored_templates, and the same stale-entry
 # test below: a removed hook must lose its exemption rather than keep it
@@ -92,6 +93,8 @@ ROWS
 repo_local_hooks() {
   cat <<'ROWS'
 .claude/hooks/bump-version.sh
+.claude/hooks/clone-hooks-session-check.sh
+.claude/hooks/install-clone-hooks.sh
 .claude/hooks/version-bump-guard.sh
 .claude/hooks/lib/shipped-set.sh
 ROWS

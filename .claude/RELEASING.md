@@ -2,6 +2,16 @@
 
 Repo-specific tooling under `.claude/`; not shipped in the plugin and not mirrored to the `ralph-init` templates.
 
+## Once per clone
+
+The pre-push guard and the post-commit bump nudge live in `.git/hooks/`, which is not committed. In every clone, after `migrate-plugin-hooks.sh clone`, run once:
+
+```bash
+.claude/hooks/install-clone-hooks.sh
+```
+
+It installs the version-bump wrapper (`pre-push.local` behind the plugin shim, or `pre-push` in a clone without one) and the nudge (`post-commit.local`). It never overwrites a differing hook: it names it and exits non-zero. `.claude/hooks/install-clone-hooks.sh --check` only reports, and the repo's SessionStart hook runs it to warn a session in a clone that lacks the hooks. Without them, pushes from that clone skip the guard below.
+
 ## Normal release
 
 1. On the task branch, `.claude/hooks/bump-version.sh --auto` sets both manifests (`plugins/ralph/.claude-plugin/plugin.json` `version` and `.claude-plugin/marketplace.json` `metadata.version`) to the next version and commits, iff a shipped file changed.
