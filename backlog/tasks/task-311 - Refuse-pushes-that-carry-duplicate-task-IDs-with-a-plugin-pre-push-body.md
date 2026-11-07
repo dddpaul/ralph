@@ -65,4 +65,6 @@ Commit: `ca909a2` - task-311: trace the pre-push body through a PATH bash wrappe
 AC #7 host part, macOS host (2026-11-07): with a /bin/bash 3.2.57 symlink first on PATH, /bin/bash tests/shell/shared-backlog-prepush-test.sh gives passed: 44, failed: 0, and the trace shows the plugin pre-push body and check-dupes running under 3.2; the same suite gives 44/44 with the default bash 5.3. The earlier BASH_ENV trace could not see the body under bash 3.2 (task-reviewer B1), fixed in ca909a2 by tracing through a PATH bash wrapper; README now names TASK-328 as the gate for moving this repo's pre-push.
 Review: APPROVED ca909a21ce97a25812109cc4ad6c46e0decb9f29
 Follow-up: tests/shell/shared-backlog-prepush-test.sh:136 has "duplicate task IDs in", which also matches the success line "no duplicate task IDs in 1 pushed ref(s)"; the refusal is still proven by the section's other checks (task-reviewer minor, 9887fd7).
+
+Commit: `8a4591c` - task-311: bump plugin version to 0.22.2, past origin's 0.22.1
 <!-- SECTION:NOTES:END -->
