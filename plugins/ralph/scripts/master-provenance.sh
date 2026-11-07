@@ -12,6 +12,12 @@
 #   --remote   the remote integrate merges from (default origin)
 #   --base     the base branch (default master)
 #
+# The project root is CLAUDE_PROJECT_DIR when it is set, else the working
+# directory. A project in a subdirectory of its git repo (a nested project) has
+# its task files, task notes and master_bookkeeping_paths under that
+# subdirectory, and only the first-parent commits that change a path under it
+# are judged; the rest print "ok <sha> outside the project".
+#
 # Allowed on master:
 #   - a commit that changes only master-branch-guard allowlist paths (.claude/,
 #     design/, .obsidian/, .vscode/, .idea/, .cursor/, .zed/, .fleet/,
@@ -29,7 +35,7 @@
 # parents, unless some task's notes record "Integration review: APPROVED
 # <merge-sha>" for exactly that merge.
 #
-# .claude/task-reviewer.conf may set (the last line of each wins):
+# The project's .claude/task-reviewer.conf may set (the last line of each wins):
 #   master_bookkeeping_paths=  a space-separated list of extra path prefixes,
 #                              for files a project's lifecycle changes after
 #                              the review, such as a version bump;
@@ -50,6 +56,7 @@ EXTRA_PATHS=''
 TIP=''
 TASK_FILES=''
 FIRST_PARENTS=''
+PREFIX=''
 
 die() { printf 'master-provenance: %s\n' "$*" >&2; exit 2; }
 
@@ -71,7 +78,8 @@ guard_path() {
 
 task_path() {
   case "$1" in
-    backlog/tasks/*|backlog/drafts/*|backlog/archive/*|backlog/completed/*) return 0 ;;
+    "$PREFIX"backlog/tasks/*|"$PREFIX"backlog/drafts/*) return 0 ;;
+    "$PREFIX"backlog/archive/*|"$PREFIX"backlog/completed/*) return 0 ;;
   esac
   return 1
 }
@@ -79,6 +87,7 @@ task_path() {
 extra_path() {
   local p
   for p in $EXTRA_PATHS; do
+    p=$PREFIX$p
     case "$1" in "$p"|"$p"/*|"${p%/}"/*) return 0 ;; esac
   done
   return 1
@@ -96,6 +105,18 @@ all_paths() {
 $(git diff-tree --no-commit-id --name-only -r --root "$c")
 EOF
   return 0
+}
+
+# in_project COMMIT — 0 when COMMIT changes a path under PREFIX, compared with
+# its first parent.
+in_project() {
+  local changed
+  if git rev-parse -q --verify "$1^1" >/dev/null; then
+    changed=$(git diff-tree --name-only -r "$1^1" "$1" -- ":(top)$PREFIX")
+  else
+    changed=$(git diff-tree --no-commit-id --name-only -r --root "$1" -- ":(top)$PREFIX")
+  fi
+  [ -n "$changed" ]
 }
 
 # parent_count COMMIT — the number of words in "COMMIT PARENT...".
@@ -209,10 +230,9 @@ check_commit() {
   flag "$c" "direct commit outside the guard allowlist and task files, not covered by a Review: APPROVED note"
 }
 
-# conf_value KEY — the last value of KEY in .claude/task-reviewer.conf.
+# conf_value KEY — the last value of KEY in the project's .claude/task-reviewer.conf.
 conf_value() {
-  local conf
-  conf="$(git rev-parse --show-toplevel)/.claude/task-reviewer.conf"
+  local conf=.claude/task-reviewer.conf
   [ -f "$conf" ] || return 0
   sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" "$conf" | tail -n 1 | sed 's/[[:space:]]*$//'
 }
@@ -228,7 +248,11 @@ main() {
       *) [ -z "$RANGE" ] || usage; RANGE=$1; shift ;;
     esac
   done
+  if [ -n "${CLAUDE_PROJECT_DIR:-}" ]; then
+    cd "$CLAUDE_PROJECT_DIR" >/dev/null 2>&1 || die "cannot enter CLAUDE_PROJECT_DIR $CLAUDE_PROJECT_DIR"
+  fi
   git rev-parse --git-dir >/dev/null 2>&1 || die "not a git repository"
+  PREFIX=$(git rev-parse --show-prefix)
   since=''
   if [ -z "$RANGE" ]; then
     RANGE="refs/remotes/$REMOTE/$BASE..$BASE"
@@ -245,10 +269,11 @@ main() {
   TIP=$(git rev-parse -q --verify "${TIP:-HEAD}^{commit}") || die "cannot resolve the end of $RANGE"
   git rev-list -n 1 "$RANGE" >/dev/null 2>&1 || die "cannot resolve range $RANGE"
   git merge-tree --write-tree "$TIP" "$TIP" >/dev/null 2>&1 || die "git merge-tree --write-tree failed (needs git 2.38+)"
-  TASK_FILES=$(git -c core.quotePath=false ls-tree -r --name-only "$TIP" -- backlog/tasks backlog/completed backlog/archive backlog/drafts)
+  TASK_FILES=$(git -c core.quotePath=false ls-tree -r --name-only --full-name "$TIP" -- backlog/tasks backlog/completed backlog/archive backlog/drafts)
   EXTRA_PATHS=$(conf_value master_bookkeeping_paths)
   FIRST_PARENTS=$(git rev-list --first-parent "$TIP")
   for c in $(git rev-list --first-parent --reverse "$RANGE" ${since:+"^$since"}); do
+    if [ -n "$PREFIX" ] && ! in_project "$c"; then ok "$c" "outside the project"; continue; fi
     parents=$(parent_count "$c")
     if [ "$parents" -gt 3 ]; then flag "$c" "octopus merge"
     elif [ "$parents" -eq 3 ]; then check_merge "$c"

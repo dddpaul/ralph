@@ -3,10 +3,10 @@ id: TASK-329
 title: >-
   master-provenance.sh supports a Ralph project nested in a subdirectory of its
   git repo
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-07T14:13:00Z'
-updated_date: '2026-11-07T15:05:00Z'
+updated_date: '2026-11-07T18:03:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies: []
@@ -66,17 +66,29 @@ If anything is unclear or any check fails: STOP and ask the user. Do NOT start w
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Run from a project that is a subdirectory of its repo, master-provenance.sh reads that project's .claude/task-reviewer.conf (master_provenance_since, master_bookkeeping_paths) and ignores one at the repo root (pytest fixture)
-- [ ] #2 In a nested project a task-N commit that changes only <prefix>backlog/{tasks,drafts,archive,completed}/ is ok as a task-file commit, and a Review: APPROVED <sha> note in <prefix>backlog/tasks/ covers that task's reviewed work, with no 'fatal: path' lines on stderr (pytest)
-- [ ] #3 In a nested project a first-parent master commit that changes nothing under the prefix is not flagged (pytest with a direct commit outside the project)
-- [ ] #4 In a nested project a commit under the prefix that is neither allowlist, task file nor reviewed work is still flagged (pytest)
-- [ ] #5 For a project at the repo root the output is unchanged: the existing tests/python/test_master_provenance.py cases pass without edits
-- [ ] #6 R-INFRA-6 in plugins/ralph/skills/ralph-init/rules/task-reviewer-rules.infra.md describes the nested-project behaviour, the script stays bash 3.2 and BSD/GNU portable (R-INFRA-3), and uv run pytest plus uv run ruff check . pass
-- [ ] #7 The script takes the project root from CLAUDE_PROJECT_DIR when it is set, else from the working directory, and computes the prefix there; run from a subdirectory of a root project with CLAUDE_PROJECT_DIR set to the repo root, its output is identical to a run from the root (pytest)
+- [x] #1 Run from a project that is a subdirectory of its repo, master-provenance.sh reads that project's .claude/task-reviewer.conf (master_provenance_since, master_bookkeeping_paths) and ignores one at the repo root (pytest fixture)
+- [x] #2 In a nested project a task-N commit that changes only <prefix>backlog/{tasks,drafts,archive,completed}/ is ok as a task-file commit, and a Review: APPROVED <sha> note in <prefix>backlog/tasks/ covers that task's reviewed work, with no 'fatal: path' lines on stderr (pytest)
+- [x] #3 In a nested project a first-parent master commit that changes nothing under the prefix is not flagged (pytest with a direct commit outside the project)
+- [x] #4 In a nested project a commit under the prefix that is neither allowlist, task file nor reviewed work is still flagged (pytest)
+- [x] #5 For a project at the repo root the output is unchanged: the existing tests/python/test_master_provenance.py cases pass without edits
+- [x] #6 R-INFRA-6 in plugins/ralph/skills/ralph-init/rules/task-reviewer-rules.infra.md describes the nested-project behaviour, the script stays bash 3.2 and BSD/GNU portable (R-INFRA-3), and uv run pytest plus uv run ruff check . pass
+- [x] #7 The script takes the project root from CLAUDE_PROJECT_DIR when it is set, else from the working directory, and computes the prefix there; run from a subdirectory of a root project with CLAUDE_PROJECT_DIR set to the repo root, its output is identical to a run from the root (pytest)
 <!-- AC:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 Acceptance check on the destination (2026-11-07): yellow, clarified by the owner. All (exists) paths are present, the description matches the code (conf at show-toplevel, line 215; task notes from the root backlog/tasks, line 248), every AC is pass/fail, and there are no dependencies. Clarification: the project root comes from CLAUDE_PROJECT_DIR, the same source the task-reviewer agent uses for PROJECT_CONF, else the working directory (owner's choice A over an explicit --project flag or a bare working directory); added as AC #7. Run after the other host lands TASK-312/313/315, which may touch the integrate side of this checker; this task changes shipped files and needs a version bump.
+
+Plan: cd to CLAUDE_PROJECT_DIR (else stay in cwd), PREFIX=git rev-parse --show-prefix; conf from project .claude/; task_path/extra_path anchored at PREFIX; ls-tree --full-name; skip first-parent commits with no change under :(top)PREFIX vs first parent; R-INFRA-6 text; nested-project pytest fixtures.
+
+Commit: `8ca29be` - task-329: master-provenance.sh judges a project nested in a subdirectory of its repo
+
+Commit: `6c1d161` - task-329: scope the mixed-commit sentence of R-INFRA-6 and isolate tests from CLAUDE_PROJECT_DIR
+
+Review: APPROVED 6c1d1616de5dedd31feeb68335a439fbc9297d8e
+
+Done: master-provenance.sh takes the project root from CLAUDE_PROJECT_DIR (else cwd), computes the prefix with git rev-parse --show-prefix, reads the project's .claude/task-reviewer.conf, anchors task files/notes and master_bookkeeping_paths at the prefix (ls-tree --full-name), and in a nested project prints 'ok <sha> outside the project' for first-parent commits changing nothing under the prefix. Root projects unchanged. R-INFRA-6 documents it. 9 new pytest cases; Repo helper drops an inherited CLAUDE_PROJECT_DIR. Full pytest 1495 passed, ruff clean. agterm can drop R-PROJ-1 once it updates the plugin.
+
+Commit: `57d5ce3` - task-329: bump plugin version to 0.25.2 (patch)
 <!-- SECTION:NOTES:END -->
