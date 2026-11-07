@@ -508,7 +508,7 @@ def test_missing_author_role_file_returns_1(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     out = tmp_path / "iterations"
-    _, reviewer = roles
+    _, _reviewer = roles
     args = _args(roles, out)
     args = RefineArgs(**{**args.__dict__, "author": str(tmp_path / "ghost.md")})
     tool = FakeTool(tmp_path, scores=[9])

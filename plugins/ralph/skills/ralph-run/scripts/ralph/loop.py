@@ -25,6 +25,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
+from ralph import claims as claims_module
 from ralph import push as push_module
 from ralph import tasks as tasks_module
 from ralph.args import ParsedArgs, timeout_to_seconds
@@ -52,7 +53,7 @@ def _now_epoch() -> int:
 
 
 @dataclass
-class _Interrupted(BaseException):  # noqa: N818
+class _Interrupted(BaseException):
     """Signal-handler trampoline; raised inside the loop on SIGINT/SIGTERM."""
 
     signum: int = 0
@@ -77,6 +78,8 @@ class _RunState:
     last_task: str | None = None
     # TASK-313: integrate runs its checks in the devcontainer the run used.
     devcontainer: bool = False
+    # TASK-315: the run lock and holder of a run in an enforcing clone.
+    session: claims_module.RunSession | None = None
 
 
 def build_tool(
@@ -135,10 +138,30 @@ def run(args: ParsedArgs, project_root: Path) -> int:
     # only sets the pending flag.
     installer = _SignalInstaller()
     installer.install()
+    session: claims_module.RunSession | None = None
     try:
-        return _run_armed(args, project_root, prompt_file_body, installer)
+        # TASK-315: an enforcing clone holds the run lock for the whole run,
+        # the end-of-run publish included, and refuses a run with no holder.
+        # Each prompt there names the claimed task, so a prompt file has no place.
+        holder = tasks_module.resolve_holder(project_root)
+        if push_module.shared_backlog_enforced(project_root):
+            if args.prompt_file:
+                print(
+                    "Error: --prompt-file in a clone that enforces the shared-backlog protocol: "
+                    "each iteration's prompt names the task the run claimed",
+                    file=sys.stderr,
+                )
+                return 1
+            try:
+                session = claims_module.RunSession.open(project_root, holder)
+            except claims_module.ClaimError as exc:
+                print(f"Error: {exc}", file=sys.stderr)
+                return exc.exit_code
+        return _run_armed(args, project_root, prompt_file_body, installer, holder, session)
     finally:
         installer.restore()
+        if session is not None:
+            session.close()
 
 
 def _run_armed(
@@ -146,6 +169,8 @@ def _run_armed(
     project_root: Path,
     prompt_file_body: str | None,
     installer: _SignalInstaller,
+    holder: str | None,
+    session: claims_module.RunSession | None,
 ) -> int:
     """Body of :func:`run`, executed with the signal handlers already armed."""
     # --rebuild is scoped to this call, which is why it is a no-op unless
@@ -166,9 +191,10 @@ def _run_armed(
     status = _initial_status(args, timeout_sec)
 
     push_is_enabled = push_module.push_enabled(args.push)
-    enforced = push_module.shared_backlog_enforced(project_root)
+    enforced = session is not None
     state.shared_publish = enforced and push_is_enabled
     state.devcontainer = args.devcontainer
+    state.session = session
     rev_before: str | None = None
     try:
         # A stop that arrived during the devcontainer bring-up exits here,
@@ -200,6 +226,7 @@ def _run_armed(
                 started_epoch=started_epoch,
                 state=state,
                 installer=installer,
+                holder=holder,
             )
     except _Interrupted:
         # 130 for SIGTERM as well as SIGINT (TASK-256 decision): matches
@@ -269,9 +296,9 @@ def _run_loop(
     started_epoch: int,
     state: _RunState,
     installer: _SignalInstaller,
+    holder: str | None,
 ) -> None:
     whitelist = args.task_whitelist or None
-    holder = tasks_module.resolve_holder()
 
     for i in range(1, args.max_iterations + 1):
         installer.raise_if_pending()
@@ -288,11 +315,13 @@ def _run_loop(
 
         clear_pause(status)
 
-        next_task = tasks_module.pick_next_task(
-            whitelist=whitelist,
-            holder=holder,
-            exclude={entry.task for entry in state.skipped},
-        )
+        exclude = {entry.task for entry in state.skipped}
+        if state.session is None:
+            next_task = tasks_module.pick_next_task(whitelist=whitelist, holder=holder, exclude=exclude)
+        else:
+            next_task = _claim_next_task(project_root, args, whitelist, exclude, i, state)
+            if state.exit_reason == "error":
+                return
         if next_task is None:
             state.exit_reason = (
                 "all specified tasks done" if whitelist else "all tasks done"
@@ -317,7 +346,8 @@ def _run_loop(
         prompt = build_prompt(
             iteration=i,
             max_iterations=args.max_iterations,
-            whitelist_task_id=next_task if whitelist else None,
+            # An enforcing run works on the task it claimed, so the prompt names it.
+            whitelist_task_id=next_task if whitelist or state.session else None,
             prompt_file_body=prompt_file_body,
             excluded_task_ids=[entry.task for entry in state.skipped],
         )
@@ -423,6 +453,41 @@ def _run_loop(
 
     if state.tasks_completed == 0 or state.failed_iterations > 0:
         state.exit_code = 1
+
+
+def _claim_next_task(
+    project_root: Path,
+    args: ParsedArgs,
+    whitelist: list[str] | None,
+    exclude: set[str],
+    iteration: int,
+    state: _RunState,
+) -> str | None:
+    """Claim the iteration's task in an enforcing clone (TASK-315).
+
+    A refused or failed claim records the error and sets ``exit_reason`` to
+    ``"error"``, which stops the run before the iteration.
+    """
+    assert state.session is not None
+    try:
+        task_id = claims_module.claim_next(
+            project_root,
+            holder=state.session.holder,
+            whitelist=whitelist,
+            exclude=exclude,
+            force=args.force_claim,
+        )
+    except claims_module.ClaimError as exc:
+        message = f"No task claimed for iteration {iteration}: {exc}. Stopping the run."
+        print(f"ERROR: {message}", file=sys.stderr)
+        state.errors.append(ErrorEntry(iteration=iteration, at=_now_iso(), message=message))
+        state.exit_reason = "error"
+        state.exit_code = exc.exit_code
+        return None
+    # The claim is on origin already; the publish baseline moves past it.
+    if task_id is not None and state.shared_publish:
+        state.published_rev = push_module.current_rev(project_root)
+    return task_id
 
 
 def _publish_iteration(

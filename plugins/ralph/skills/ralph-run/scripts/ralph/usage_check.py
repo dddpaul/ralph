@@ -55,8 +55,8 @@ def evaluate(buffer_min_raw: str) -> tuple[int, str, str]:
         return (
             2,
             "",
-            "usage-check.sh: BUFFER_MIN must be a non-negative integer "
-            f"(got '{display}')\n",
+            ("usage-check.sh: BUFFER_MIN must be a non-negative integer "
+             f"(got '{display}')\n"),
         )
 
     buffer_min = int(buffer_min_raw)
@@ -92,8 +92,8 @@ def evaluate(buffer_min_raw: str) -> tuple[int, str, str]:
         return (
             2,
             "",
-            f"usage-check.sh: ccusage exited {proc.returncode} — "
-            "block-end check skipped\n",
+            (f"usage-check.sh: ccusage exited {proc.returncode} — "
+             "block-end check skipped\n"),
         )
 
     try:
@@ -102,8 +102,8 @@ def evaluate(buffer_min_raw: str) -> tuple[int, str, str]:
         return (
             2,
             "",
-            "usage-check.sh: ccusage produced unparseable JSON — "
-            "block-end check skipped\n",
+            ("usage-check.sh: ccusage produced unparseable JSON — "
+             "block-end check skipped\n"),
         )
 
     if not isinstance(data, dict):
@@ -126,8 +126,8 @@ def evaluate(buffer_min_raw: str) -> tuple[int, str, str]:
         return (
             2,
             "",
-            "usage-check.sh: ccusage JSON missing blocks[0].endTime — "
-            "block-end check skipped\n",
+            ("usage-check.sh: ccusage JSON missing blocks[0].endTime — "
+             "block-end check skipped\n"),
         )
     end_time: str = end_time_any
 
@@ -136,8 +136,8 @@ def evaluate(buffer_min_raw: str) -> tuple[int, str, str]:
         return (
             2,
             "",
-            f"usage-check.sh: could not parse endTime '{end_time}' — "
-            "block-end check skipped\n",
+            (f"usage-check.sh: could not parse endTime '{end_time}' — "
+             "block-end check skipped\n"),
         )
 
     now_epoch = int(datetime.now(tz=UTC).timestamp())

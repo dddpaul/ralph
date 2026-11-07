@@ -48,7 +48,7 @@ def stubbed_loop(
     # on the exit_reason split.
     monkeypatch.setattr(loop_module.tasks_module, "pick_next_task", lambda **_: None)
     monkeypatch.setattr(loop_module.tasks_module, "count_remaining", lambda *_a, **_kw: 0)
-    monkeypatch.setattr(loop_module.tasks_module, "done_task_ids", lambda: [])
+    monkeypatch.setattr(loop_module.tasks_module, "done_task_ids", list)
     monkeypatch.setattr(loop_module, "check_and_pause", lambda *_a, **_kw: False)
     monkeypatch.setattr(loop_module, "build_tool", lambda *_a, **_kw: None)
     monkeypatch.setattr(loop_module, "ITER_SLEEP_SEC", 0)

@@ -26,6 +26,7 @@ The user may pass overrides as skill arguments. Parse them as space-separated ke
 | rebuild | false | --rebuild |
 | verbose | false | --verbose |
 | push | true | --no-push (when false) |
+| force_claim | false | --force-claim (when true) |
 | watch | (none) | — |
 | block_end_buffer_min | 0 | --block-end-buffer-min |
 | max_iterations | 10 | (positional, last arg) |
@@ -36,6 +37,8 @@ Set `block_end_buffer_min` to N>0 to pause the run when the active 5h Anthropic 
 ```
 BLOCKED: push must be true or false.
 ```
+
+**A shared-backlog run claims each task before it works on it.** In a clone with `git config ralph.sharedBacklog` true the run needs a holder (`SHARED_BACKLOG_HOLDER`, else `git config ralph.holder`, not `@claude`) and refuses to start without one. It holds the shared-backlog run lock for the whole run, so a second run and any `shared-backlog.sh sync` or `claim` in the clone refuse until it ends; its own protocol calls pass `RALPH_RUN_LOCK_TOKEN`, and the holder and token reach the devcontainer as `--remote-env` variables. Before each iteration it syncs, picks the lowest eligible task, claims it with `shared-backlog.sh claim`, which pushes the claim, then syncs again and checks the claim; when the claim loses to another host, it tries the next candidate. The iteration prompt names the claimed task. With `tasks`, a task another holder holds stops the run unless `force_claim=true`, which takes the task over and skips its dependency check. A task this holder already holds is accepted once it is To Do with its dependencies Done. `force_claim` needs `tasks`; accepted values are `true` and `false`.
 
 Set `rebuild=true` to force a **fresh** container instead of reusing the existing one — the orchestrator then runs `devcontainer up ... --remove-existing-container`. Needed only after editing `.devcontainer/devcontainer.json`, because mounts and other container config apply at container **creation**: a reused container silently ignores them. Without `rebuild=true`, the orchestrator refuses to reuse a container created before the last change to `.devcontainer/devcontainer.json` or `.devcontainer/Dockerfile`: the launch fails the heartbeat check and the launch log shows a `STALE DEVCONTAINER` banner with both timestamps — relaunch with `rebuild=true`. Off by default (a rebuild is expensive), and a no-op unless `devcontainer=true`. It does **not** refresh the image: cached layers are reused wherever their inputs are unchanged, so a floating version tag would stay frozen. The Claude Code version is therefore pinned as `CLAUDE_CODE_VERSION` in `devcontainer.json` (bumping it invalidates the npm layer); to force a fresh image regardless, run `devcontainer build --workspace-folder . --no-cache` by hand.
 
@@ -134,6 +137,7 @@ Append conditional flags as array elements (never string concatenation):
 - `tasks` is set → `RALPH_CMD+=(--tasks <ids>)`
 - `block_end_buffer_min > 0` → `RALPH_CMD+=(--block-end-buffer-min <N>)`
 - push=false → `RALPH_CMD+=(--no-push)` (push=true adds nothing: the orchestrator pushes by default, see Step 1)
+- force_claim=true → `RALPH_CMD+=(--force-claim)`
 
 Launch fully detached, capturing early output to a launch log. **You MUST set `dangerouslyDisableSandbox: true`** on this Bash tool call — the orchestrator needs full OS access (mktemp, /dev/fd, tee, docker) which the sandbox blocks.
 

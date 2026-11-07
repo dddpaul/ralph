@@ -57,7 +57,7 @@ _POST_MORTEM_TAIL = 4000
 
 
 @dataclass
-class _Interrupted(BaseException):  # noqa: N818
+class _Interrupted(BaseException):
     """Raised inside the loop when a pending SIGINT/SIGTERM is observed."""
 
     signum: int = 0

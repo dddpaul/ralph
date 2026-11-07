@@ -76,7 +76,7 @@ def print_summary(summary: RunSummary, out: IO[str]) -> None:
         exit_reason_text = (
             f"max iterations reached ({summary.tasks_completed} task(s) completed)"
         )
-    print("", file=out)
+    print(file=out)
     print("===============================", file=out)
     print("  Ralph Run Summary", file=out)
     print("===============================", file=out)
@@ -91,7 +91,7 @@ def print_summary(summary: RunSummary, out: IO[str]) -> None:
     print(f"Failed iterations:  {summary.failed_iterations}", file=out)
     print(f"Total wall time:    {format_duration(summary.wall_time_sec)}", file=out)
     if summary.iter_durations_sec:
-        print("", file=out)
+        print(file=out)
         print("Per-iteration durations:", file=out)
         for idx, dur in enumerate(summary.iter_durations_sec, start=1):
             print(f"  Iteration {idx}: {format_duration(dur)}", file=out)

@@ -97,6 +97,19 @@ out=$(sb claim 8 --as @host-a 2>&1); rc=$?
 check "@claude beside another holder still means taken (rc=$rc)" test "$rc" -eq 1
 check "the refusal leaves @claude out" sh -c 'case "$1" in *"taken by @host-b"*) ! printf "%s" "$1" | grep -q "taken by.*@claude" ;; *) exit 1 ;; esac' _ "$out"
 check "refused claims push nothing" test "$(origin_sha)" = "$before"
+check "the refusal points at --force" has "$out" "--force takes it over"
+
+# --- --force takes over -----------------------------------------------------
+
+fresh
+out=$(sb claim 3 --as @host-a --force 2>&1); rc=$?
+check "--force takes over another holder's task (rc=$rc)" test "$rc" -eq 0
+check "the takeover names the old holder" has "$out" "taken by @host-b; --force takes it over"
+check "the takeover leaves only the holder" test "$(who 3)" = "@host-a"
+check "--force takes over a task the holder shares with another" sb claim 4 --as @host-a --force
+check "the shared task keeps only the holder" test "$(who 4)" = "@host-a"
+fresh
+before=$(origin_sha)
 
 # --- already held -----------------------------------------------------------
 

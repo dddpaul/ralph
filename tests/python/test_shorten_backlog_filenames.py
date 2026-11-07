@@ -506,6 +506,7 @@ def _run_script(
         capture_output=True,
         text=True,
         env=env,
+        check=False,
     )
 
 
@@ -854,6 +855,7 @@ def _dubious_ownership_is_simulable(repo: Path) -> bool:
         capture_output=True,
         text=True,
         env={**os.environ, **DUBIOUS, "LC_ALL": "C"},
+        check=False,
     )
     return proc.returncode != 0 and "dubious ownership" in proc.stderr
 

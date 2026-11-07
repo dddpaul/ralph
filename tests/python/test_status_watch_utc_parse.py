@@ -50,14 +50,14 @@ def run_in_zone(command: str, zone: str) -> str:
     script = command.replace(PLACEHOLDER, STAMP)
     env = {**os.environ, "TZ": zone}
     return subprocess.run(
-        ["bash", "-c", script], env=env, capture_output=True, text=True
+        ["bash", "-c", script], env=env, capture_output=True, text=True, check=False
     ).stdout.strip()
 
 
 def has_bsd_date() -> bool:
     """Report whether the host ``date`` accepts BSD ``-j -f``."""
     probe = subprocess.run(
-        ["date", "-j", "-f", "%s", "0", "+%s"], capture_output=True, text=True
+        ["date", "-j", "-f", "%s", "0", "+%s"], capture_output=True, text=True, check=False
     )
     return probe.returncode == 0 and probe.stdout.strip() == "0"
 

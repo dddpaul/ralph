@@ -38,7 +38,7 @@ def load_json_object(path: Path) -> dict[str, object]:
         return {}
     data: object = json.loads(text)
     if not isinstance(data, dict):
-        raise ValueError(f"{path}: top level is not a JSON object")
+        raise ValueError(f"{path}: top level is not a JSON object")  # noqa: TRY004 — callers catch ValueError for every malformed file
     return cast(dict[str, object], data)
 
 

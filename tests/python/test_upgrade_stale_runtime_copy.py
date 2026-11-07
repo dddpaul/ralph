@@ -185,8 +185,8 @@ MATRIX = (
     (
         "FROM node:20\n",
         "FROM golang:1.25 AS golang\n",
-        "COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv\n"
-        "COPY --from=golang /usr/local/go /usr/local/go\n",
+        ("COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv\n"
+         "COPY --from=golang /usr/local/go /usr/local/go\n"),
     ),
     ("FROM node:20\n", "", "COPY --from=python:3.14 /usr/local/lib /usr/local/lib\n"),
 )

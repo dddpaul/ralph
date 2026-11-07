@@ -10,7 +10,9 @@
 #
 #   sync                 bounded `git pull --ff-only origin master`
 #   claim N [--as @who] [--force]
-#                        assign TASK-N to the holder and push the claim
+#                        assign TASK-N to the holder and push the claim;
+#                        --force skips the dependency check and takes over
+#                        a task another holder holds
 #   release N [--as @who] [--force]
 #                        clear the holder's assignee on TASK-N and push
 #   create <backlog task create args...>
@@ -47,7 +49,8 @@
 # The holder comes from --as, else $SHARED_BACKLOG_HOLDER, else
 # `git config ralph.holder`; with none of them claim and release refuse. A bare
 # @claude assignee names no host, so it counts as unassigned. Any other
-# assignee besides the holder means the task is taken.
+# assignee besides the holder means the task is taken, and claim refuses it
+# unless --force replaces every assignee with the holder.
 #
 # integrate takes its policy from .claude/ralph.json in HEAD as it was when
 # integrate started, so a merged-in commit cannot change it: "sharedBacklog":
@@ -738,7 +741,10 @@ claim_apply() {
   local f who st
   f=$(task_file "$TASK_ID") || { say "TASK-$TASK_ID not found"; return 4; }
   who=$(other_assignees "$TASK_ID")
-  [ -z "$who" ] || { say "TASK-$TASK_ID taken by $who"; return 4; }
+  if [ -n "$who" ]; then
+    [ -n "$FORCE" ] || { say "TASK-$TASK_ID taken by $who; --force takes it over"; return 4; }
+    say "TASK-$TASK_ID taken by $who; --force takes it over"
+  fi
   # A claim we already hold passes the same status and dependency checks.
   st=$(fm_scalar "$f" status)
   [ "$st" = "To Do" ] || { say "TASK-$TASK_ID is '$st', not To Do"; return 4; }
@@ -746,7 +752,7 @@ claim_apply() {
     say "claim refused; --force overrides on Paul's say-so"
     return 4
   fi
-  held_by_holder "$TASK_ID" && return 5
+  [ -z "$who" ] && held_by_holder "$TASK_ID" && return 5
   # -a replaces the whole list, so a bare @claude goes with it.
   backlog task edit "$TASK_ID" -a "$HOLDER" >/dev/null &&
     git add -- "$(task_file "$TASK_ID")" &&

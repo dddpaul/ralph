@@ -71,7 +71,7 @@ def stubbed_loop(
 ) -> Path:
     monkeypatch.setattr(loop_module.tasks_module, "pick_next_task", lambda **_: "TASK-1")
     monkeypatch.setattr(loop_module.tasks_module, "count_remaining", lambda *_a, **_kw: 1)
-    monkeypatch.setattr(loop_module.tasks_module, "done_task_ids", lambda: [])
+    monkeypatch.setattr(loop_module.tasks_module, "done_task_ids", list)
     monkeypatch.setattr(
         loop_module.tasks_module, "current_in_progress_task", lambda: None
     )

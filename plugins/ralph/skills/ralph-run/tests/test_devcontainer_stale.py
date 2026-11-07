@@ -137,7 +137,7 @@ def test_rebuild_skips_the_check_and_argv_is_unchanged(
 
     monkeypatch.setattr(devcontainer_module, "container_created_at", must_not_probe)
 
-    rc, out, err = _start(ws, rebuild=True)
+    rc, _out, err = _start(ws, rebuild=True)
 
     assert rc == 0
     assert up_calls == [

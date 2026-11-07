@@ -32,7 +32,7 @@ _PROBE_ERRORS = (OSError, subprocess.SubprocessError)
 def _docker(*args: str) -> str | None:
     """Run ``docker <args>`` and return stripped stdout, or ``None`` on any failure."""
     try:
-        result = subprocess.run(  # noqa: S603 — argv list, no shell.
+        result = subprocess.run(
             ["docker", *args],
             check=False,
             capture_output=True,
@@ -107,8 +107,8 @@ def _report_stale(
         "would silently ignore these changes. Recreate it:",
         "  /ralph-run rebuild=true   (CLI: --devcontainer --rebuild)",
         "or by hand:",
-        f"  devcontainer up --workspace-folder {shlex.quote(str(workspace_folder))}"
-        " --remove-existing-container",
+        (f"  devcontainer up --workspace-folder {shlex.quote(str(workspace_folder))}"
+         " --remove-existing-container"),
         bar,
     ]
     print("\n".join(lines), file=err)
@@ -171,7 +171,7 @@ def start_devcontainer(
         print("Rebuilding devcontainer (removing existing container)...", file=out)
     else:
         print("Starting devcontainer...", file=out)
-    result = subprocess.run(  # noqa: S603 — argv list, no shell.
+    result = subprocess.run(
         argv,
         check=False,
         capture_output=True,

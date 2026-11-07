@@ -166,6 +166,7 @@ Default is 10 iterations. Use `--tool claude` (default) or `--tool opencode` to 
 | `--devcontainer` | Run inside a devcontainer | off |
 | `--rebuild` | With `--devcontainer`, recreate the container from scratch (`devcontainer up --remove-existing-container`) so `devcontainer.json` mount/config changes take effect. Does **not** refresh cached image layers — use `devcontainer build --workspace-folder . --no-cache` for that. No-op without `--devcontainer`. Without it, a `--devcontainer` launch whose existing container is older than `.devcontainer/devcontainer.json` or `.devcontainer/Dockerfile` (container `Created` vs file mtime, looked up by the `devcontainer.local_folder` label) **refuses to start** and prints both timestamps plus this remedy; the probe is skipped silently when docker or the container is unavailable | off |
 | `--no-push` | Opt out of pushing `master` to `origin` after the loop finishes (see [Publishing to origin](#publishing-to-origin)) | push on |
+| `--force-claim` | With `--tasks`, in a clone that enforces the shared-backlog protocol, take over a task another holder holds instead of refusing it (see [Claiming tasks in shared-backlog clones](#claiming-tasks-in-shared-backlog-clones)) | off |
 | `--help` | Show help message and exit | |
 | `--version` | Show version and exit | |
 
@@ -202,6 +203,18 @@ To disable the push for a single run, pass `--no-push` or set `RALPH_NO_PUSH=1`:
 # Same, via environment
 RALPH_NO_PUSH=1 ./ralph.sh
 ```
+
+### Claiming tasks in shared-backlog clones
+
+In a clone with `git config ralph.sharedBacklog` true, a run works only on a task whose claim it has pushed:
+
+- The run needs a holder: `SHARED_BACKLOG_HOLDER`, else `git config ralph.holder`, but not `@claude`. With none, it refuses to start. The holder is resolved once per run.
+- The run holds the shared-backlog run lock (`shared-backlog.sh run-lock`) for its whole duration, the end-of-run publish included. A second run refuses, and so does any `shared-backlog.sh sync` or `claim` in the clone. The run's own protocol calls pass the lock's token in `RALPH_RUN_LOCK_TOKEN`. The orchestrator forwards the holder and the token into the devcontainer with `devcontainer exec --remote-env`, so a claim made there is made as the run's holder.
+- Before each iteration the run syncs, picks the lowest eligible task, claims it with `shared-backlog.sh claim`, which pushes the claim, then syncs again and checks the claim. When the claim loses to another host, it tries the next candidate. The iteration prompt names the claimed task.
+- With `--tasks`, a task another holder holds stops the run, unless `--force-claim` is given. That passes `--force` to `claim`, which then replaces every assignee with the holder and skips the dependency check. A task this holder already holds is accepted once it is To Do with its dependencies Done.
+- `--prompt-file` is refused in such a clone, because each prompt names the claimed task.
+
+Tests: `plugins/ralph/skills/ralph-run/tests/test_claims.py`.
 
 ### Releasing plugin updates (version bump)
 

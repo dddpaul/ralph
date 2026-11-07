@@ -30,6 +30,7 @@ import re
 import subprocess
 from collections.abc import Collection
 from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -93,11 +94,12 @@ def _parse_assignees(view_output: str) -> tuple[str, ...]:
     return tuple(name for name in names if name)
 
 
-def resolve_holder() -> str | None:
+def resolve_holder(cwd: Path | None = None) -> str | None:
     """Return the holder: ``SHARED_BACKLOG_HOLDER``, else ``git config ralph.holder``.
 
-    Returns ``None`` when neither is set; every real assignee then counts as
-    someone else.
+    ``cwd`` is the clone whose git config is read (default: the current
+    directory). Returns ``None`` when neither is set; every real assignee then
+    counts as someone else.
     """
     env_holder = _normalize_assignee(os.environ.get("SHARED_BACKLOG_HOLDER", ""))
     if env_holder:
@@ -105,6 +107,7 @@ def resolve_holder() -> str | None:
     try:
         result = subprocess.run(
             ["git", "config", "--get", "ralph.holder"],
+            cwd=cwd,
             capture_output=True,
             text=True,
             check=False,

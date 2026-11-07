@@ -87,6 +87,8 @@ class _AdvancingTool(Tool):
 def stubbed(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     picks = iter(["TASK-1", "TASK-2", "TASK-3", "TASK-4"])
     monkeypatch.setattr(loop_module.tasks_module, "pick_next_task", lambda **_: next(picks))
+    # An enforcing run claims its task first (TASK-315); here the claim is the stubbed pick.
+    monkeypatch.setattr(loop_module.claims_module, "claim_next", lambda *_a, **_k: next(picks))
     monkeypatch.setattr(loop_module.tasks_module, "count_remaining", lambda *_a, **_k: 0)
     monkeypatch.setattr(loop_module.tasks_module, "done_task_ids", list)
     monkeypatch.setattr(loop_module.tasks_module, "current_in_progress_task", lambda: None)
@@ -128,7 +130,20 @@ def _wire(
     monkeypatch.setattr(push_module, "shared_backlog_enforced", lambda _root: enforced)
     monkeypatch.setattr(push_module, "integrate", fake_integrate)
     monkeypatch.setattr(push_module, "maybe_push_after_loop", fake_push)
+    fake_session(monkeypatch)
     return tool, integrates, pushes
+
+
+class _FakeSession:
+    holder = "@tester"
+
+    def close(self) -> None:
+        pass
+
+
+def fake_session(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Stand in for the run lock of an enforcing run (TASK-315)."""
+    monkeypatch.setattr(loop_module.claims_module.RunSession, "open", lambda *_a: _FakeSession())
 
 
 def test_integrate_runs_after_each_iteration_that_advanced_master(

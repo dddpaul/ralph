@@ -159,6 +159,7 @@ def test_orchestrator_completes_against_fake_claude_success(
         capture_output=True,
         text=True,
         timeout=120,
+        check=False,
     )
 
     assert proc.returncode == 0, (

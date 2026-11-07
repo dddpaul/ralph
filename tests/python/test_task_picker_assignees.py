@@ -71,7 +71,7 @@ def test_fetch_task_parses_assignees(
 
 def test_parses_assignees_from_real_backlog_output(tmp_path: Path) -> None:
     """The regex matches what the installed backlog CLI actually prints."""
-    if subprocess.run(["which", "backlog"], capture_output=True).returncode != 0:
+    if subprocess.run(["which", "backlog"], capture_output=True, check=False).returncode != 0:
         pytest.skip("backlog CLI not installed")
 
     def run(*args: str) -> str:

@@ -22,9 +22,9 @@ _HERE = Path(__file__).resolve().parent
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
-from ralph import args as args_module  # noqa: E402
-from ralph import push as push_module  # noqa: E402
-from ralph.loop import run as run_loop  # noqa: E402
+from ralph import args as args_module
+from ralph import push as push_module
+from ralph.loop import run as run_loop
 
 
 def resolve_project_root() -> Path:

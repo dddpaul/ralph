@@ -91,7 +91,7 @@ def env_opt_out() -> bool:
 
 def _git(args: list[str], project_root: Path) -> subprocess.CompletedProcess[str]:
     """Run ``git <args>`` anchored at ``project_root`` (argv list, no shell)."""
-    return subprocess.run(  # noqa: S603 — argv list, no shell.
+    return subprocess.run(
         ["git", *args],
         cwd=project_root,
         check=False,
