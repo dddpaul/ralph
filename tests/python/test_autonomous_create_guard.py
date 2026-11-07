@@ -1,7 +1,8 @@
-"""The autonomous-create guard: no task IDs from an autonomous run in an opted-in clone (TASK-316).
+"""The autonomous-create guard: no task IDs from an autonomous run in an opted-in clone (TASK-316, TASK-332).
 
 ``plugins/ralph/hooks/autonomous-create-guard.sh`` refuses ``backlog task
-create``, ``shared-backlog.sh create`` and the ``ralph:ralph-handoff`` skill when
+create``, ``backlog draft create``, ``backlog draft promote``, ``shared-backlog.sh
+create`` and the ``ralph:ralph-handoff`` skill when
 ``RALPH_AUTONOMOUS=1`` and the session's clone has ``ralph.sharedBacklog`` true.
 hooks.json calls it directly, so the tests run that exact command line with
 ``CLAUDE_PLUGIN_ROOT`` set: the ``pluginHooks`` marker, ``localGuards`` and the
@@ -42,6 +43,19 @@ REFUSED = [
     'bash -c "backlog task create x"',
     "sh -c 'cd /tmp && backlog task create x'",
 ]
+# The same command positions as REFUSED, for the two draft commands that allocate an ID.
+DRAFT_REFUSED = [
+    "backlog draft {sub} {arg}",
+    "cd ../other && backlog draft {sub} {arg}",
+    "cd /tmp; backlog draft {sub} {arg}",
+    "git pull && \\\n  backlog draft {sub} {arg}",
+    "FOO=1 npx backlog draft {sub} {arg}",
+    "/usr/local/bin/backlog draft {sub} {arg}",
+    "x=$(backlog draft {sub} {arg} --plain)",
+    'bash -c "backlog draft {sub} {arg}"',
+    "sh -c 'cd /tmp && backlog draft {sub} {arg}'",
+]
+DRAFT_COMMANDS = {"create": "'Follow up'", "promote": "3"}
 ALLOWED = [
     "backlog task list -s 'To Do' --plain",
     'backlog task edit 7 --append-notes "Follow-up: create a task for X"',
@@ -49,6 +63,13 @@ ALLOWED = [
     "echo backlog task create",
     "bash scripts/shared-backlog.sh claim 7",
     "git status",
+    "backlog draft list --plain",
+    "backlog draft view 3 --plain",
+    "backlog draft edit 3 -t 'New title'",
+    "backlog draft archive 3",
+    "cd ../other && backlog draft list",
+    'grep -n "backlog draft promote" README.md',
+    "echo backlog draft create x",
 ]
 
 
@@ -105,6 +126,13 @@ def test_autonomous_run_refuses_task_creation(opted_in: Path, command: str) -> N
     assert_refused(run_guard(opted_in, {"command": command}, RALPH_AUTONOMOUS="1"), what)
 
 
+@pytest.mark.parametrize("sub", sorted(DRAFT_COMMANDS))
+@pytest.mark.parametrize("template", DRAFT_REFUSED)
+def test_autonomous_run_refuses_draft_id_allocation(opted_in: Path, template: str, sub: str) -> None:
+    command = template.format(sub=sub, arg=DRAFT_COMMANDS[sub])
+    assert_refused(run_guard(opted_in, {"command": command}, RALPH_AUTONOMOUS="1"), f"backlog draft {sub}")
+
+
 @pytest.mark.parametrize("skill", ["ralph:ralph-handoff", "ralph-handoff"])
 def test_autonomous_run_refuses_the_handoff_skill(opted_in: Path, skill: str) -> None:
     result = run_guard(opted_in, {"skill": skill}, tool="Skill", RALPH_AUTONOMOUS="1")
@@ -156,6 +184,8 @@ def test_interactive_session_is_allowed(opted_in: Path, autonomous: str | None) 
     for tool_input, tool in (
         ({"command": 'backlog task create "x"'}, "Bash"),
         ({"command": 'scripts/shared-backlog.sh create "x"'}, "Bash"),
+        ({"command": 'backlog draft create "x"'}, "Bash"),
+        ({"command": "backlog draft promote 3"}, "Bash"),
         ({"skill": "ralph:ralph-handoff"}, "Skill"),
     ):
         result = run_guard(opted_in, tool_input, tool=tool, **env)
@@ -169,6 +199,8 @@ def test_clone_that_does_not_enforce_is_allowed(tmp_path: Path, shared: str | No
     for tool_input, tool in (
         ({"command": 'backlog task create "x"'}, "Bash"),
         ({"command": 'scripts/shared-backlog.sh create "x"'}, "Bash"),
+        ({"command": 'backlog draft create "x"'}, "Bash"),
+        ({"command": "backlog draft promote 3"}, "Bash"),
         ({"skill": "ralph:ralph-handoff"}, "Skill"),
     ):
         result = run_guard(clone, tool_input, tool=tool, RALPH_AUTONOMOUS="1")

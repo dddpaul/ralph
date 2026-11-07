@@ -6,7 +6,7 @@ If the prompt starts with `MODE: autonomous`: complete exactly **ONE** task, the
 
 Task selection: if the prompt names a task, work on that task only. Otherwise, run `backlog task list -s "To Do" --plain` and pick the lowest-ID task whose dependencies are all "Done" and that nobody else holds: skip a task whose `Assignee` names anyone besides the holder (`SHARED_BACKLOG_HOLDER`, else `git config ralph.holder`). A bare `@claude` counts as unassigned.
 
-In a clone that enforces the shared-backlog protocol (`git config ralph.sharedBacklog` is true), do not create tasks: no `backlog task create`, no `scripts/shared-backlog.sh create`, no `/ralph-handoff`. Record each follow-up in the current task's notes (`backlog task edit <id> --append-notes "Follow-up: ..."`) for a person to create later. A plugin guard refuses those commands in autonomous runs, but it is best effort, not an absolute boundary.
+In a clone that enforces the shared-backlog protocol (`git config ralph.sharedBacklog` is true), do not create tasks: no `backlog task create`, no `backlog draft create`, no `backlog draft promote`, no `scripts/shared-backlog.sh create`, no `/ralph-handoff`. Record each follow-up in the current task's notes (`backlog task edit <id> --append-notes "Follow-up: ..."`) for a person to create later. A plugin guard refuses those commands in autonomous runs, but it is best effort, not an absolute boundary.
 
 After completing the task, output:
 
