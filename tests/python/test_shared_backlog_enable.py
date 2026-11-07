@@ -1,8 +1,7 @@
 """The shared-backlog project shim and the clone switch's enable and disable (TASK-310).
 
-``shared-backlog.sh enable`` refuses while the release gate is closed (only
-``SHARED_BACKLOG_ALLOW_UNRELEASED=1`` opens it here), needs ``"sharedBacklog":
-true`` in ``.claude/ralph.json``, saves the host's default holder as
+``shared-backlog.sh enable`` needs ``"sharedBacklog": true`` in
+``.claude/ralph.json``, saves the host's default holder as
 ``ralph.holder`` (asked once), installs the plugin shim as pre-push and sets
 ``ralph.sharedBacklog true``. ``disable`` clears the switch; neither the clone
 migration nor a commit that drops the marker changes it afterwards. The project
@@ -30,7 +29,6 @@ HOOK_SHIM = SHIMS / "git-hook"
 PROJECT_SHIM = SHIMS / "shared-backlog.sh"
 MIGRATE = PLUGIN / "skills/ralph-init/scripts/migrate-plugin-hooks.sh"
 BASH = shutil.which("bash") or "/bin/bash"
-UNRELEASED = "shared-backlog protocol not released yet"
 
 pytestmark = pytest.mark.skipif(
     shutil.which("jq") is None, reason="jq is not installed"
@@ -81,19 +79,15 @@ def run(
     repo: Path,
     env: dict[str, str],
     *args: str,
-    released: bool = True,
     script: Path = SCRIPT,
     **kw: object,
 ) -> subprocess.CompletedProcess[str]:
-    """Run ``script`` in ``repo``; ``released`` opens the release gate."""
-    e = dict(env)
-    if released:
-        e["SHARED_BACKLOG_ALLOW_UNRELEASED"] = "1"
+    """Run ``script`` in ``repo``."""
     kw.setdefault("stdin", subprocess.DEVNULL)
     return subprocess.run(
         [BASH, str(script), *args],
         cwd=repo,
-        env=e,
+        env=env,
         capture_output=True,
         text=True,
         check=False,
@@ -110,23 +104,14 @@ def pre_push(repo: Path) -> Path:
 
 
 # --------------------------------------------------------------------------
-# Release gate and opt-in
+# Release and opt-in
 # --------------------------------------------------------------------------
 
 
-def test_the_release_gate_is_closed_in_the_shipped_script() -> None:
-    assert "\nRELEASED=0\n" in SCRIPT.read_text()
-
-
-def test_enable_refuses_while_the_release_gate_is_closed(
-    repo: Path, env: dict[str, str]
-) -> None:
-    before = (pre_push(repo).exists(), config(repo, "ralph.holder"))
-    result = run(repo, env, "enable", "--holder", "@host-a", released=False)
-    assert result.returncode == 1
-    assert UNRELEASED in result.stderr
-    assert config(repo, "ralph.sharedBacklog") == ""
-    assert (pre_push(repo).exists(), config(repo, "ralph.holder")) == before
+def test_the_shipped_script_has_no_release_gate() -> None:
+    text = SCRIPT.read_text()
+    assert "RELEASED" not in text
+    assert "not released yet" not in text
 
 
 @pytest.mark.parametrize(
@@ -256,7 +241,7 @@ def test_disable_clears_the_switch_and_the_clone_migration_does_not_turn_it_back
     repo: Path, env: dict[str, str]
 ) -> None:
     assert run(repo, env, "enable", "--holder", "@host-a").returncode == 0
-    result = run(repo, env, "disable", released=False)
+    result = run(repo, env, "disable")
     assert result.returncode == 0, result.stderr
     assert config(repo, "ralph.sharedBacklog") == ""
     migrated = subprocess.run(
@@ -321,8 +306,6 @@ def test_project_shim_execs_the_registered_plugin_script(
     helped = run(repo, env, "--help", script=shim)
     assert helped.returncode == 0, helped.stderr
     assert "enable [--holder @who]" in helped.stdout
-    gated = run(repo, env, "enable", "--holder", "@host-a", script=shim, released=False)
-    assert gated.returncode == 1 and UNRELEASED in gated.stderr
     enabled = run(repo, env, "enable", "--holder", "@host-a", script=shim)
     assert enabled.returncode == 0, enabled.stderr
     assert config(repo, "ralph.sharedBacklog") == "true"
@@ -368,7 +351,7 @@ def test_init_snippet_writes_the_marker_installs_the_shim_and_enables(
     snippet = snippet.replace("<checks>", checks).replace("<holder>", "@host-a")
     write_registry(env, PLUGIN)
     (repo / ".claude/ralph.json").write_text('{"pluginHooks": true}\n')
-    e = dict(env, CLAUDE_PLUGIN_ROOT=str(PLUGIN), SHARED_BACKLOG_ALLOW_UNRELEASED="1")
+    e = dict(env, CLAUDE_PLUGIN_ROOT=str(PLUGIN))
     result = subprocess.run(
         [BASH, "-c", "set -e\n" + snippet],
         cwd=repo,

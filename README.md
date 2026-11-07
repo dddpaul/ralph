@@ -204,6 +204,30 @@ To disable the push for a single run, pass `--no-push` or set `RALPH_NO_PUSH=1`:
 RALPH_NO_PUSH=1 ./ralph.sh
 ```
 
+### Shared backlog across hosts
+
+Several hosts can run Ralph on one project at once when they share one origin. The shared-backlog protocol keeps them from allocating the same task ID or working on the same task: every claim, task ID and finished iteration lands on origin by a fast-forward push, so of two competing ones only one lands. It is off by default and switched on per project, then per clone:
+
+- **Opt in (per project):** set `"sharedBacklog": true` in `.claude/ralph.json`, and `"checks"` to the command `integrate` runs on the merged tree before it pushes (for example `"uv run pytest"`). Commit the marker and the project shim `scripts/shared-backlog.sh`, which execs the installed plugin's script. `/ralph-init` does both when you answer Yes to its shared-backlog question.
+- **Enable (per clone):** `bash scripts/shared-backlog.sh enable --holder @<host>` saves the host's holder as `git config ralph.holder`, installs the plugin pre-push shim (an existing pre-push hook is kept as `pre-push.local` and runs first) and sets the trusted switch `git config ralph.sharedBacklog true`. Run it once in every clone, on every host, each with its own holder; `@claude` is refused because it names no host.
+- **Disable (per clone):** `bash scripts/shared-backlog.sh disable` clears `ralph.sharedBacklog`. The pre-push shim and `ralph.holder` stay. Only `enable` sets the switch and only `disable` (or you) clears it: a commit that changes the marker does not, and neither does the plugin-hooks migration.
+
+The commands, each run as `bash scripts/shared-backlog.sh <command>` (`--help` prints the full usage):
+
+| Command | What it does |
+|---------|--------------|
+| `sync` | `git pull --ff-only origin master` under a deadline |
+| `claim N [--as @who] [--force]` | assign TASK-N to the holder and push the claim; `--force` takes over a task another holder holds |
+| `release N [--as @who] [--force]` | clear the holder's assignee on TASK-N and push |
+| `create <backlog task create args...>` | create a task at a fresh `origin/master` in a temporary worktree and push it at once, so the ID is final |
+| `integrate [--task N]` | merge `origin/master` into local master (never rebase), stop on duplicate IDs, run the checks, push |
+| `check-dupes [REV]` | exit 1 when REV's tree has duplicate task or draft IDs; the pre-push hook runs it on every pushed tip |
+| `renumber [--base REF]` | renumber our copies of duplicate IDs; only a person runs it, after `integrate` stopped |
+| `enable [--holder @who]` / `disable` | switch this clone on or off |
+| `run-lock` / `run-unlock` / `unlock` | the run lock a Ralph run holds, and removal of a dead owner's lock |
+
+With the switch on, a Ralph run claims each task before it works on it (below), publishes each completed iteration through `integrate` instead of a plain `git push`, and an autonomous run may not create tasks: it records follow-ups in the task's notes. `/ralph-handoff` into such a project creates the task through `create`.
+
 ### Claiming tasks in shared-backlog clones
 
 In a clone with `git config ralph.sharedBacklog` true, a run works only on a task whose claim it has pushed:
@@ -468,7 +492,7 @@ The plugin ships the git hook bodies in `plugins/ralph/git-hooks/` (`pre-commit`
   - `ralph.pluginHooks true` makes `pre-commit` and `commit-msg` block when the plugin cannot be resolved;
   - `ralph.jq` and `ralph.projectPath` (the host's canonical main worktree root) tell the resolver which jq to use and which clone it is;
   - `ralph.claudeConfigDir` is set only when the Claude config dir is not `~/.claude`;
-  - `ralph.sharedBacklog` is never set by the migration: `scripts/shared-backlog.sh enable` sets it (with `ralph.holder`, the host's default holder, and the pre-push shim) in a project whose marker sets `"sharedBacklog": true`, and `disable` clears it. `scripts/shared-backlog.sh` is a fixed project shim (`templates/shims/shared-backlog.sh`) that execs the plugin's `scripts/shared-backlog.sh`. Until the shared-backlog protocol is released, `enable` refuses.
+  - `ralph.sharedBacklog` is never set by the migration: `scripts/shared-backlog.sh enable` sets it (with `ralph.holder`, the host's default holder, and the pre-push shim) in a project whose marker sets `"sharedBacklog": true`, and `disable` clears it. `scripts/shared-backlog.sh` is a fixed project shim (`templates/shims/shared-backlog.sh`) that execs the plugin's `scripts/shared-backlog.sh`.
 - **The shims.** `pre-commit`, `commit-msg` and `post-commit` in each clone are the one fixed shim from [Plugin git hooks](#plugin-git-hooks). A hook of the clone's own survives as `<name>.local` and runs first.
 
 `plugins/ralph/skills/ralph-init/scripts/migrate-plugin-hooks.sh` sets all three up. Init runs both of its parts as its last step. `ralph-init upgrade` runs them once for a project bootstrapped with the legacy copies:

@@ -28,8 +28,7 @@ protocol and publishes differently: the loop runs the plugin's
 advanced master, and once more at the end of the run unless a publish failed
 (:func:`integrate`). There ``--no-push`` is allowed only for a run whose
 ``--tasks`` names one task (:func:`no_push_refusal`); it stops publishing the
-work, not pushing the claim. Only ``shared-backlog.sh enable`` sets the switch,
-and it refuses while the protocol's release gate is closed.
+work, not pushing the claim. Only ``shared-backlog.sh enable`` sets the switch.
 """
 
 from __future__ import annotations

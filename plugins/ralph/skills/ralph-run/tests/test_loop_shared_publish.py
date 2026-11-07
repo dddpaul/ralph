@@ -4,8 +4,7 @@ A clone with ``ralph.sharedBacklog`` true publishes each completed iteration
 that advanced master through ``shared-backlog.sh integrate --task N`` and once
 more at the end of the run; a failed publish stops the run. The stubbed tests
 pin the loop wiring; the last ones run the real script against a bare origin,
-with the release gate opened by ``SHARED_BACKLOG_ALLOW_UNRELEASED=1`` so that
-``enable`` can set the switch.
+where ``enable`` sets the switch.
 """
 
 from __future__ import annotations
@@ -293,7 +292,7 @@ def git_home(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
     for name in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "RALPH_RUN_LOCK_TOKEN", "SHARED_BACKLOG_HOLDER",
-                 "SHARED_BACKLOG_CHECKS", "SHARED_BACKLOG_CHECKS_EXEC", "SHARED_BACKLOG_ALLOW_UNRELEASED"):
+                 "SHARED_BACKLOG_CHECKS", "SHARED_BACKLOG_CHECKS_EXEC"):
         monkeypatch.delenv(name, raising=False)
     for key, value in (("user.name", "tester"), ("user.email", "t@example.invalid"),
                        ("init.defaultBranch", "master"), ("commit.gpgsign", "false")):
@@ -332,10 +331,9 @@ def _origin_and_clone(tmp_path: Path, marker: dict[str, Any] | None = None) -> t
     return origin, clone
 
 
-def _enable(clone: Path, *, gate_open: bool) -> subprocess.CompletedProcess[str]:
-    env_prefix = ["env", "SHARED_BACKLOG_ALLOW_UNRELEASED=1"] if gate_open else []
+def _enable(clone: Path) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [*env_prefix, "bash", str(push_module.SHARED_BACKLOG_SCRIPT), "enable", "--holder", "@tester"],
+        ["bash", str(push_module.SHARED_BACKLOG_SCRIPT), "enable", "--holder", "@tester"],
         cwd=clone, check=False, capture_output=True, text=True,
     )
 
@@ -343,19 +341,6 @@ def _enable(clone: Path, *, gate_open: bool) -> subprocess.CompletedProcess[str]
 needs_tools = pytest.mark.skipif(
     shutil.which("backlog") is None or shutil.which("jq") is None, reason="needs the backlog CLI and jq"
 )
-
-
-@needs_tools
-def test_enable_cannot_set_the_switch_while_the_release_gate_is_closed(git_home: Path, tmp_path: Path) -> None:
-    """AC #6 — with the gate closed the shared-mode lifecycle stays unreachable."""
-    _ = git_home
-    _, clone = _origin_and_clone(tmp_path)
-
-    result = _enable(clone, gate_open=False)
-
-    assert result.returncode != 0
-    assert "not released yet" in result.stderr
-    assert push_module.shared_backlog_enforced(clone) is False
 
 
 class _CommittingTool(Tool):
@@ -374,10 +359,10 @@ class _CommittingTool(Tool):
 def test_enforcing_clone_publishes_each_iteration_through_integrate(
     git_home: Path, stubbed: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """AC #1, #6 — the gate opened for the test; each iteration's work reaches origin by a merge."""
+    """AC #1 — enable sets the switch; each iteration's work reaches origin by a merge."""
     _ = git_home
     origin, clone = _origin_and_clone(tmp_path)
-    assert _enable(clone, gate_open=True).returncode == 0
+    assert _enable(clone).returncode == 0
     assert push_module.shared_backlog_enforced(clone) is True
     (clone / ".git" / "hooks" / "pre-push").unlink()  # the plugin shim needs an installed plugin
     other = tmp_path / "other"
@@ -405,7 +390,7 @@ def test_enforcing_clone_stops_on_a_failed_integrate(
     """AC #2 — checks failing on the merged tree stop the run; origin keeps its master."""
     _ = git_home
     origin, clone = _origin_and_clone(tmp_path, {"sharedBacklog": True, "checks": "false"})
-    assert _enable(clone, gate_open=True).returncode == 0
+    assert _enable(clone).returncode == 0
     (clone / ".git" / "hooks" / "pre-push").unlink()
     origin_before = _git(origin, "rev-parse", "master")
     tool = _CommittingTool(clone)
