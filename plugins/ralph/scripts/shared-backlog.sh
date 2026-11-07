@@ -79,9 +79,7 @@
 # disable (or the user), and never derived from the marker afterwards: a commit
 # that drops the marker does not turn it off, and the clone migration of
 # migrate-plugin-hooks.sh does not turn it back on. enable keeps an existing
-# pre-push hook as pre-push.local, which the shim runs first. While the release
-# gate below is closed, enable refuses; $SHARED_BACKLOG_ALLOW_UNRELEASED=1
-# opens it for tests only.
+# pre-push hook as pre-push.local, which the shim runs first.
 #
 # Exit codes: 0 ok, 1 refused / conflict / check failed, 2 origin unreachable,
 # 64 usage error. Bash 3.2 clean: no associative arrays, no mapfile.
@@ -92,9 +90,6 @@ REMOTE=origin
 BRANCH=master
 MAX_TRIES=3
 HOOK_MARKER='shared-backlog pre-push hook'
-# The release gate (design/plugin-delivered-project-files-prd.md FR-13): 0 until
-# the release task opens it; while 0, enable refuses.
-RELEASED=0
 
 die() { echo "shared-backlog: $*" >&2; exit 1; }
 # help_text — the header comment from "Usage:" to its last line.
@@ -1080,13 +1075,6 @@ cmd_install_hooks() {
 
 # --- enable / disable -------------------------------------------------------
 
-# release_gate — refuse while the protocol is not released, unless a test opens
-# the gate with SHARED_BACKLOG_ALLOW_UNRELEASED=1.
-release_gate() {
-  [ "$RELEASED" = 1 ] || [ "${SHARED_BACKLOG_ALLOW_UNRELEASED:-}" = 1 ] ||
-    die "shared-backlog protocol not released yet; enable refuses until it is"
-}
-
 # enable_holder [HOLDER] — print the holder enable saves: HOLDER, else the
 # clone's ralph.holder, else one answer read from the terminal.
 enable_holder() {
@@ -1112,7 +1100,6 @@ cmd_enable() {
       *) usage ;;
     esac
   done
-  release_gate
   jq=$(command -v jq 2>/dev/null) || jq=$(git config --get ralph.jq 2>/dev/null) || jq=''
   [ -n "$jq" ] && [ -x "$jq" ] || die "jq not found (PATH or git config ralph.jq); cannot read .claude/ralph.json"
   [ -f .claude/ralph.json ] || die "not opted in: no .claude/ralph.json; set \"sharedBacklog\": true in it first"

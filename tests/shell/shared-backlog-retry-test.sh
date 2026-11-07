@@ -96,7 +96,7 @@ sneak_hook() {
   cat >"$work/a/.git/hooks/pre-push" <<EOF
 #!/bin/sh
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
-n=\$(wc -l <"$work/sneaks")
+n=\$(wc -l <"$work/sneaks" | tr -d ' ')
 [ "\$n" -lt $1 ] || exit 0
 echo x >>"$work/sneaks"
 cd "$work/b" && git pull -q --ff-only origin master &&
