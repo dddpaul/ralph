@@ -134,6 +134,21 @@ def test_a_missing_holder_refuses_the_run(
     assert tool.prompts == []
 
 
+@needs_tools
+def test_a_prompt_file_refuses_the_run(
+    shared: tuple[Path, Path, Path], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Each enforcing prompt names the claimed task, so --prompt-file is refused before the lock."""
+    _, a, _ = shared
+    prompt = tmp_path / "prompt.md"
+    prompt.write_text("Pick any task.\n")
+    tool = _RecordingTool()
+    monkeypatch.setattr(loop_module, "build_tool", lambda *_a, **_k: tool)
+    assert loop_module.run(replace(_args(max_iterations=1), prompt_file=str(prompt)), a) == 1
+    assert tool.prompts == []
+    assert not (a / ".git" / "shared-backlog-run.lock").exists()
+
+
 # --- claiming ----------------------------------------------------------------
 
 

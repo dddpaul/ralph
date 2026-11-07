@@ -47,7 +47,9 @@ def env_for(cfg: Path) -> dict[str, str]:
 
 def run_git(cwd: Path, cfg: Path, *args: str, stdin: str | None = None) -> subprocess.CompletedProcess[str]:
     """Run git in ``cwd`` with ``cfg`` as the Claude config dir; never raises."""
-    return subprocess.run([GIT, *args], cwd=cwd, env=env_for(cfg), input=stdin, capture_output=True, text=True)
+    return subprocess.run(
+        [GIT, *args], cwd=cwd, env=env_for(cfg), input=stdin, capture_output=True, text=True, check=False
+    )
 
 
 def git_ok(cwd: Path, cfg: Path, *args: str) -> str:
@@ -244,7 +246,8 @@ def test_unresolved_plugin_blocks_only_per_switch(
     for switch in switches:
         git_ok(clone, cfg, "config", switch, "true")
     result = subprocess.run(
-        [str(clone / ".git/hooks" / name), "arg"], cwd=clone, env=env_for(cfg), input="", capture_output=True, text=True
+        [str(clone / ".git/hooks" / name), "arg"],
+        cwd=clone, env=env_for(cfg), input="", capture_output=True, text=True, check=False,
     )
     assert result.returncode == code
     assert "no project- or local-scope entry" in result.stderr
@@ -295,7 +298,9 @@ def test_commit_msg_recognises_a_merge_in_a_linked_worktree(world: dict[str, Pat
     msg.write_text("Merge\n\nCo-Authored-By: x <x@x>\n")
 
     def run_hook() -> int:
-        return subprocess.run([str(hook), str(msg)], cwd=linked, env=env_for(cfg), capture_output=True).returncode
+        return subprocess.run(
+            [str(hook), str(msg)], cwd=linked, env=env_for(cfg), capture_output=True, check=False
+        ).returncode
 
     assert run_hook() == 1
     git_ok(linked, cfg, "merge", "-q", "--no-ff", "--no-commit", "side")

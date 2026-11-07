@@ -52,7 +52,7 @@ def test_empty_buffer_returns_2(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_non_numeric_buffer_returns_2(monkeypatch: pytest.MonkeyPatch) -> None:
-    rc, out, err = usage_check.evaluate("abc")
+    rc, _out, err = usage_check.evaluate("abc")
     assert rc == 2
     assert "got 'abc'" in err
 
@@ -61,7 +61,7 @@ def test_ccusage_missing_returns_2(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setenv("PATH", "/nonexistent")
-    rc, out, err = usage_check.evaluate("5")
+    rc, _out, err = usage_check.evaluate("5")
     assert rc == 2
     assert "ccusage not found on PATH" in err
 

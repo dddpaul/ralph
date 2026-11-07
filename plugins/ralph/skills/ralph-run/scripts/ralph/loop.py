@@ -53,7 +53,7 @@ def _now_epoch() -> int:
 
 
 @dataclass
-class _Interrupted(BaseException):  # noqa: N818
+class _Interrupted(BaseException):
     """Signal-handler trampoline; raised inside the loop on SIGINT/SIGTERM."""
 
     signum: int = 0
@@ -142,8 +142,16 @@ def run(args: ParsedArgs, project_root: Path) -> int:
     try:
         # TASK-315: an enforcing clone holds the run lock for the whole run,
         # the end-of-run publish included, and refuses a run with no holder.
+        # Each prompt there names the claimed task, so a prompt file has no place.
         holder = tasks_module.resolve_holder(project_root)
         if push_module.shared_backlog_enforced(project_root):
+            if args.prompt_file:
+                print(
+                    "Error: --prompt-file in a clone that enforces the shared-backlog protocol: "
+                    "each iteration's prompt names the task the run claimed",
+                    file=sys.stderr,
+                )
+                return 1
             try:
                 session = claims_module.RunSession.open(project_root, holder)
             except claims_module.ClaimError as exc:

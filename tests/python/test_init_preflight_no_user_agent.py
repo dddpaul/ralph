@@ -63,7 +63,9 @@ def run_step1(tmp_path: Path, registered: bool) -> list[subprocess.CompletedProc
     snippets = step1_snippets()
     assert len(snippets) == 2
     return [
-        subprocess.run(["bash", "-c", "set -e\n" + snippet], cwd=repo, env=env, capture_output=True, text=True)
+        subprocess.run(
+            ["bash", "-c", "set -e\n" + snippet], cwd=repo, env=env, capture_output=True, text=True, check=False
+        )
         for snippet in snippets
     ]
 

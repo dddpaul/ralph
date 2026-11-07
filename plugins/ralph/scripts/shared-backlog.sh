@@ -742,7 +742,7 @@ claim_apply() {
   f=$(task_file "$TASK_ID") || { say "TASK-$TASK_ID not found"; return 4; }
   who=$(other_assignees "$TASK_ID")
   if [ -n "$who" ]; then
-    [ -n "$FORCE" ] || { say "TASK-$TASK_ID taken by $who; --force takes it over on Paul's say-so"; return 4; }
+    [ -n "$FORCE" ] || { say "TASK-$TASK_ID taken by $who; --force takes it over"; return 4; }
     say "TASK-$TASK_ID taken by $who; --force takes it over"
   fi
   # A claim we already hold passes the same status and dependency checks.

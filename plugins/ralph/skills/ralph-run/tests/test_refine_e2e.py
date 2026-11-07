@@ -96,7 +96,7 @@ def _run_refine(
         *(extra or []),
     ]
     return subprocess.run(
-        argv, env=env, capture_output=True, text=True, timeout=120
+        argv, env=env, capture_output=True, text=True, timeout=120, check=False
     )
 
 

@@ -23,7 +23,7 @@ _HERE = Path(__file__).resolve().parent
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
-from ralph.refine.cli import main  # noqa: E402
+from ralph.refine.cli import main
 
 if __name__ == "__main__":
     sys.exit(main())

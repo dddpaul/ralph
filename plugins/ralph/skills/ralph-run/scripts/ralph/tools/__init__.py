@@ -20,7 +20,7 @@ from pathlib import Path
 
 from ralph.signals import IterationSignals
 
-__all__ = ["OnSpawn", "Tool", "ToolResult", "IterationSignals"]
+__all__ = ["IterationSignals", "OnSpawn", "Tool", "ToolResult"]
 
 OnSpawn = Callable[[subprocess.Popen[bytes]], None]
 """Callback invoked synchronously with the live ``Popen`` immediately after

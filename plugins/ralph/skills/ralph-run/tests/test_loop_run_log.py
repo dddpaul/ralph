@@ -132,6 +132,7 @@ def _run_orchestrator(
             str(max_iter),
         ],
         cwd=project_dir, env=env, capture_output=True, text=True, timeout=180,
+        check=False,
     )
 
 

@@ -401,8 +401,8 @@ def test_managed_file_drift_warns_without_aborting(
         ("exit 0", ""),
         (
             "echo 'managed-file-drift: boom' >&2; exit 2",
-            "WARNING: could not check ralph-init managed files — "
-            "managed-file-drift: boom\n",
+            ("WARNING: could not check ralph-init managed files — "
+             "managed-file-drift: boom\n"),
         ),
     ],
 )

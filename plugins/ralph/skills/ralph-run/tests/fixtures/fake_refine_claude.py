@@ -40,7 +40,7 @@ _SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from ralph.refine.roles import REVIEW_INSTRUCTION  # noqa: E402
+from ralph.refine.roles import REVIEW_INSTRUCTION
 
 
 def _bump_counter(state_path: Path) -> int:
