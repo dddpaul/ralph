@@ -19,7 +19,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "scripts" / "shorten-backlog-filenames.py"
-GUARD = REPO_ROOT / ".claude" / "hooks" / "filename-length-guard.sh"
+GUARD = REPO_ROOT / "plugins" / "ralph" / "hooks" / "filename-length-guard.sh"
 
 
 def _load_script():

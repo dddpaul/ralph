@@ -156,7 +156,8 @@ def payload_for(cwd: Path, **tool_input: str) -> str:
 # --------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("guard", GUARDS)
+# This repo keeps copies of its six local guards only; the length guard runs from the plugin.
+@pytest.mark.parametrize("guard", [g for g in GUARDS if g != "filename-length-guard"])
 def test_guard_copies_are_byte_identical_to_the_plugin(guard: str) -> None:
     plugin = PLUGIN_HOOKS / f"{guard}.sh"
     assert os.access(plugin, os.X_OK), f"{plugin} is not executable"

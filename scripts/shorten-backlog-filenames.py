@@ -3,7 +3,7 @@
 # ///
 """Shorten over-limit backlog filenames using a ``claude -p`` semantic slug.
 
-Retroactive counterpart to ``.claude/hooks/filename-length-guard.sh``
+Retroactive counterpart to ``plugins/ralph/hooks/filename-length-guard.sh``
 (TASK-227): the pre-commit guard blocks *new* paths whose name components
 exceed the 125-byte cap the ecryptfs sync target imposes, while this script
 repairs backlog artifacts that are *already* over it.
