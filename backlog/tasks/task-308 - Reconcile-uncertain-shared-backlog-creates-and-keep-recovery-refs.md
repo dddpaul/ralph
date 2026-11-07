@@ -4,7 +4,7 @@ title: Reconcile uncertain shared-backlog creates and keep recovery refs
 status: Done
 assignee: []
 created_date: '2026-11-04T14:53:00Z'
-updated_date: '2026-11-06T14:38:00Z'
+updated_date: '2026-11-07T21:30:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -55,4 +55,6 @@ Done: create reallocates in a fresh worktree with the same op ID after a non-fas
 Commit: `4fae8ee` - task-308: mark Done
 
 Commit: `e1df34c` - task-308: bump plugin version to 0.20.6 (patch)
+
+Host check (macOS, /bin/bash 3.2.57 with nested bash also 3.2 through a PATH wrapper, master 18591c8, 2026-11-08): bash -n clean on the script and the shim; tests/python/test_bash32_syntax.py 15 passed, none skipped; tests/shell/shared-backlog-recovery-test.sh 52 passed, 0 failed, run outside the Claude Code sandbox (inside it the suite cannot kill the git push client, so 8 checks fail there). Records the AC #7 host clause deferred above.
 <!-- SECTION:NOTES:END -->
