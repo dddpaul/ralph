@@ -4,7 +4,7 @@ title: Allocate shared-backlog task IDs in an isolated temporary worktree
 status: Done
 assignee: []
 created_date: '2026-11-04T14:53:00Z'
-updated_date: '2026-11-06T14:07:00Z'
+updated_date: '2026-11-07T21:30:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -50,4 +50,6 @@ Commit: `f55ca7d` - task-307: note that claim and release refuse on untracked ta
 Done: create allocates in a detached worktree at a freshly fetched origin/master under the protocol lock, commits task-N: add task with a Shared-Backlog-Op trailer (op ID fixed per create), refuses offline with exit 2 before allocating; sync/integrate (and so claim/release) refuse on untracked task files. Tests: tests/shell/shared-backlog-create-test.sh via tests/python/test_shared_backlog_create.py. task-reviewer APPROVED.
 
 Commit: `d4161cc` - task-307: bump plugin version to 0.20.5 (patch)
+
+Host check (macOS, /bin/bash 3.2.57 with nested bash also 3.2 through a PATH wrapper, master 18591c8, 2026-11-08): bash -n clean on the script and the shim; tests/python/test_bash32_syntax.py 15 passed, none skipped; tests/shell/shared-backlog-create-test.sh 56 passed, 0 failed. Records the AC #7 host clause deferred above.
 <!-- SECTION:NOTES:END -->
