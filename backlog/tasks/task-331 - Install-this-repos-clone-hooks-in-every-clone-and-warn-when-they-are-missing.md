@@ -4,7 +4,7 @@ title: Install this repo's clone hooks in every clone and warn when they are mis
 status: Done
 assignee: []
 created_date: '2026-11-07T17:25:00Z'
-updated_date: '2026-11-07T18:51:00Z'
+updated_date: '2026-11-07T19:21:00Z'
 labels: []
 dependencies: []
 priority: high
@@ -43,7 +43,7 @@ Design: one script, .claude/hooks/install-clone-hooks.sh [--check], resolving th
 - [x] #5 README.md (Releasing plugin updates) and .claude/RELEASING.md tell each clone to run the installer once, after migrate-plugin-hooks.sh clone
 - [x] #6 Nothing new appears under plugins/ralph/skills/ralph-init/templates (git diff --stat shows no path there)
 - [x] #7 bash -n and the bash 3.2 static guard pass on the script; ruff, pytest and bats pass
-- [ ] #8 (host) install-clone-hooks.sh --check exits 0 in the macOS clone, and in the agentbox clone after running the installer there
+- [x] #8 (host) install-clone-hooks.sh --check exits 0 in the macOS clone, and in the agentbox clone after running the installer there
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -58,4 +58,6 @@ Deferred AC #8 (host-only): the macOS and agentbox clones are not reachable from
 Review: APPROVED 8c4a833c6c82e54f733026eebc14dbd24b83ab89
 
 Implemented .claude/hooks/install-clone-hooks.sh [--check] (wrapper as pre-push.local behind the shim or as pre-push when absent; nudge as post-commit.local behind the shim; differing files left untouched and named, exit 1) and the SessionStart hook clone-hooks-session-check.sh (one additionalContext line, silent when in place). Tests: tests/python/test_install_clone_hooks.py; test_plugin_hooks.py skips the repo-only SessionStart command; template-parity.bats lists both scripts in repo_local_hooks. Gates: ruff clean, pytest 1511 passed/4 skipped, bats 283/283.
+
+AC #8 host checks (2026-11-07): macOS clone: .claude/hooks/install-clone-hooks.sh --check exits 0 with no output (both hooks were hand-installed earlier); /bin/bash 3.2 -n passes on the installer; .claude/hooks/clone-hooks-session-check.sh prints nothing there. agentbox clone, after pulling af62537: install-clone-hooks.sh printed 'installed .git/hooks/post-commit.local' and exited 0, leaving its byte-identical pre-push.local alone; --check then exits 0 with no output. The Ralph run had set Done with this host criterion still open; it is now checked.
 <!-- SECTION:NOTES:END -->
