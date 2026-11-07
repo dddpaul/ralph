@@ -204,10 +204,17 @@ echo "# a real create through the installed shims runs the hook under create's l
 fresh
 mkdir -p "$work/a/scripts"
 cp "$PROJECT_SHIM" "$work/a/scripts/shared-backlog.sh"
-printf 'case "$0" in */git-hooks/pre-push|*/scripts/shared-backlog.sh) echo "$0 $*" >>"%s" ;; esac\n' \
-  "$work/trace.log" >"$work/trace.sh"
+# Trace through a bash wrapper first on PATH, not BASH_ENV: bash 3.2 runs
+# BASH_ENV with $0 set to bash itself, so the script path is lost there.
+mkdir -p "$work/tracebin"
+cat >"$work/tracebin/bash" <<EOF
+#!/bin/sh
+case "\${1-}" in */git-hooks/pre-push|*/scripts/shared-backlog.sh) echo "\$*" >>"$work/trace.log" ;; esac
+exec "$(command -v bash)" "\$@"
+EOF
+chmod +x "$work/tracebin/bash"
 start=$(date +%s)
-out=$(cd "$work/a" && BASH_ENV="$work/trace.sh" SHARED_BACKLOG_DEADLINE=60 bash scripts/shared-backlog.sh create "Through the hook" 2>&1); rc=$?
+out=$(cd "$work/a" && PATH="$work/tracebin:$PATH" SHARED_BACKLOG_DEADLINE=60 bash scripts/shared-backlog.sh create "Through the hook" 2>&1); rc=$?
 elapsed=$(($(date +%s) - start))
 printf '%s\n' "$out" | sed 's/^/    /'
 sed 's/^/    trace: /' "$work/trace.log"
