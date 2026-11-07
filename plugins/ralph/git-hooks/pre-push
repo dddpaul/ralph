@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Plugin pre-push body (TASK-311): refuse a push that carries a duplicate task
+# ID. A duplicate arrives with no git conflict, because the two files have
+# different names, so only a check of each pushed tree catches it
+# (design/plugin-delivered-project-files-prd.md US-017).
+#
+# The plugin shim (templates/shims/git-hook) execs this body after the clone's
+# own pre-push.local, with the same stdin. It acts only when the trusted clone
+# switch ralph.sharedBacklog is true, never on the marker, so a commit that
+# drops the marker does not stop it. It runs the read-only check-dupes of the
+# plugin's shared-backlog.sh on every pushed SHA and takes no lock, so it never
+# waits on a create, claim or integrate whose push triggered it. It skips ref
+# deletions, and refuses when the backlog executable is missing. Bash 3.2 clean.
+
+set -u
+
+# stdin: <local ref> <local sha> <remote ref> <remote sha>, one line per ref.
+# Read all of it first, so git never sees a closed pipe.
+refs=$(cat)
+
+[ "$(git config --bool ralph.sharedBacklog 2>/dev/null)" = true ] || exit 0
+
+script="$(cd "$(dirname "$0")/.." && pwd -P)/scripts/shared-backlog.sh"
+if [ ! -f "$script" ]; then
+  echo "ralph pre-push: $script is missing, so duplicate task IDs cannot be checked." >&2
+  echo "ralph pre-push: reinstall the ralph plugin, or bypass this once with git push --no-verify" >&2
+  exit 1
+fi
+
+rc=0
+checked=0
+while read -r local_ref local_sha remote_ref _remote_sha; do
+  [ -n "$local_ref" ] || continue
+  case "$local_sha" in *[!0]*) ;; *) continue ;; esac  # a deletion
+  checked=$((checked + 1))
+  # </dev/null: a stdin reader in check-dupes would eat the remaining ref lines.
+  if ! bash "$script" check-dupes "$local_sha" </dev/null; then
+    echo "ralph pre-push: refusing to push $local_ref -> $remote_ref: duplicate task IDs, or they cannot be checked (above)." >&2
+    rc=1
+  fi
+done <<EOF
+$refs
+EOF
+
+if [ "$rc" -ne 0 ]; then
+  echo "ralph pre-push: fix the duplicates (shared-backlog.sh renumber) and push again; git push --no-verify bypasses this check." >&2
+else
+  echo "ralph pre-push: no duplicate task IDs in $checked pushed ref(s)" >&2
+fi
+exit "$rc"
