@@ -104,7 +104,7 @@ def harness(
     """Patch the backlog CLI seams; return ``(tmp_path, picked task log)``."""
     monkeypatch.setattr(loop_module, "ITER_SLEEP_SEC", 0)
     monkeypatch.setattr(loop_module, "check_and_pause", lambda *_a, **_kw: False)
-    monkeypatch.setattr(tasks_module, "resolve_holder", lambda: None)
+    monkeypatch.setattr(tasks_module, "resolve_holder", lambda *_a: None)
     monkeypatch.setenv("RALPH_STATUS_FILE", str(tmp_path / "status.json"))
     monkeypatch.setenv("RALPH_HEARTBEAT_FILE", str(tmp_path / "heartbeat"))
     monkeypatch.setenv("RALPH_RUN_LOG", str(tmp_path / "run.log"))

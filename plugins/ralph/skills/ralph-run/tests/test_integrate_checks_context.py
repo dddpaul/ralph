@@ -30,6 +30,7 @@ from test_loop_shared_publish import (
     _git,
     _origin_and_clone,
     _result,
+    fake_session,
     git_home,  # noqa: F401
     needs_tools,
     stubbed,  # noqa: F401
@@ -196,6 +197,7 @@ def test_the_loop_passes_the_runs_devcontainer_to_integrate(
     monkeypatch.setattr(push_module, "current_rev", lambda *_a, **_k: f"SHA{master[0]}")
     monkeypatch.setattr(push_module, "shared_backlog_enforced", lambda _root: True)
     monkeypatch.setattr(push_module, "integrate", fake_integrate)
+    fake_session(monkeypatch)
 
     rc = loop_module.run(replace(_args(max_iterations=1), devcontainer=devcontainer), stubbed)
 

@@ -49,6 +49,7 @@ class ParsedArgs:
     max_iterations: int
     push: bool = True
     rebuild: bool = False
+    force_claim: bool = False
 
     @property
     def task_whitelist(self) -> list[str]:
@@ -102,6 +103,9 @@ def build_parser() -> argparse.ArgumentParser:
     # push time by ralph.push.push_enabled (kept out of validation so the env
     # can override per-run without re-parsing).
     parser.add_argument("--no-push", dest="push", action="store_false", default=True)
+    # In a clone that enforces the shared-backlog protocol, --tasks refuses a
+    # task another holder holds; --force-claim takes it over (TASK-315).
+    parser.add_argument("--force-claim", dest="force_claim", action="store_true", default=False)
     parser.add_argument("max_iterations", type=int, nargs="?", default=10)
     return parser
 
@@ -129,6 +133,7 @@ def parse(argv: list[str]) -> ParsedArgs:
         max_iterations=ns.max_iterations,
         push=ns.push,
         rebuild=ns.rebuild,
+        force_claim=ns.force_claim,
     )
 
 
@@ -173,6 +178,9 @@ def validate(args: ParsedArgs) -> str | None:
             )
         if args.prompt_file:
             return "Error: --tasks and --prompt-file are mutually exclusive"
+
+    if args.force_claim and not args.tasks:
+        return "Error: --force-claim needs --tasks"
 
     if args.block_end_buffer_min < 0:
         return (

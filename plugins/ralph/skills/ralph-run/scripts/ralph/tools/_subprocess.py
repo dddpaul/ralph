@@ -20,6 +20,7 @@ import threading
 from pathlib import Path
 from typing import IO, Final
 
+from ralph.claims import DELEGATED_ENV
 from ralph.signals import parse_file
 from ralph.tools import OnSpawn, ToolResult
 
@@ -55,9 +56,12 @@ def devcontainer_prefix(workspace_folder: Path) -> list[str]:
     Returns:
         ``["devcontainer", "exec", "--workspace-folder", <path>, "--remote-env",
         "RALPH_AUTONOMOUS=1"]``; the container does not inherit the host
-        environment, so the flag is forwarded explicitly.
+        environment, so the flag is forwarded explicitly. So are the run's
+        ``SHARED_BACKLOG_HOLDER`` and ``RALPH_RUN_LOCK_TOKEN`` when set
+        (TASK-315): the run acts as its holder inside the container, and its
+        protocol calls there pass the run lock.
     """
-    return [
+    argv = [
         "devcontainer",
         "exec",
         "--workspace-folder",
@@ -65,6 +69,11 @@ def devcontainer_prefix(workspace_folder: Path) -> list[str]:
         "--remote-env",
         f"{AUTONOMOUS_VAR}=1",
     ]
+    for name in DELEGATED_ENV:
+        value = os.environ.get(name)
+        if value:
+            argv += ["--remote-env", f"{name}={value}"]
+    return argv
 
 
 def execute(
