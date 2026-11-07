@@ -1,9 +1,10 @@
 ---
 id: TASK-332
 title: Refuse backlog draft create and draft promote in opted-in autonomous runs
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-07T17:25:00Z'
+updated_date: '2026-11-07T19:03:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies: []
@@ -23,9 +24,25 @@ Scope: extend the guard's patterns to these two commands, in the same command po
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 With RALPH_AUTONOMOUS=1 in a clone whose git config ralph.sharedBacklog is true, the guard refuses backlog draft promote <N> and backlog draft create <title> with exit 2 and the record-the-follow-up-in-notes message, in the same command positions as backlog task create (pytest in tests/python/test_autonomous_create_guard.py)
-- [ ] #2 The same two commands pass when RALPH_AUTONOMOUS is unset or ralph.sharedBacklog is not true (pytest)
-- [ ] #3 backlog draft list, view, edit and archive are not refused in an enforcing autonomous run (pytest)
-- [ ] #4 CLAUDE.md's autonomous-mode paragraph and its ralph-init template counterpart (R11 parity) name draft create and draft promote among the forbidden commands, and the README's guard paragraph lists them
-- [ ] #5 bash -n and the bash 3.2 static guard pass on the hook; ruff, pytest and bats pass
+- [x] #1 With RALPH_AUTONOMOUS=1 in a clone whose git config ralph.sharedBacklog is true, the guard refuses backlog draft promote <N> and backlog draft create <title> with exit 2 and the record-the-follow-up-in-notes message, in the same command positions as backlog task create (pytest in tests/python/test_autonomous_create_guard.py)
+- [x] #2 The same two commands pass when RALPH_AUTONOMOUS is unset or ralph.sharedBacklog is not true (pytest)
+- [x] #3 backlog draft list, view, edit and archive are not refused in an enforcing autonomous run (pytest)
+- [x] #4 CLAUDE.md's autonomous-mode paragraph and its ralph-init template counterpart (R11 parity) name draft create and draft promote among the forbidden commands, and the README's guard paragraph lists them
+- [x] #5 bash -n and the bash 3.2 static guard pass on the hook; ruff, pytest and bats pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Commit: `7855f62` - task-332: refuse backlog draft create and draft promote in opted-in autonomous runs
+
+Plan: add draft create / draft promote patterns to autonomous-create-guard.sh sharing the task-create command-position prefix; parametrized pytest over the same positions; allowed list/view/edit/archive; docs in CLAUDE.md + template, README, ralph-run SKILL.md preflight paragraph.
+
+Commit: `55b3648` - task-332: rewrap the guard header and name draft IDs in the refusal
+
+Review: APPROVED 55b3648d330001d9fc82280a2a90ccbff4bbb32e
+
+Guard now refuses backlog draft create / draft promote in the same command positions as task create (shared backlog_cmd prefix); draft list/view/edit/archive pass. Refusal message says 'task or draft ID'. Docs: CLAUDE.md + template, README guard + test list, ralph-run SKILL.md preflight. ruff ok, pytest 1536 passed/4 skipped, bats 283 ok.
+
+Commit: `e15cb10` - task-332: bump plugin version to 0.25.3 (patch)
+<!-- SECTION:NOTES:END -->
