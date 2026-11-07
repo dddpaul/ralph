@@ -1,14 +1,14 @@
 #!/usr/bin/env bats
-# Unit tests for .claude/hooks/filename-length-guard.sh
+# Unit tests for plugins/ralph/hooks/filename-length-guard.sh
 #
-# The guard is called from .git/hooks/pre-commit and rejects a commit when any
-# component of a staged path exceeds 125 bytes — the cap that keeps names
+# The guard is called from the plugin pre-commit hook and rejects a commit
+# when any component of a staged path exceeds 125 bytes — the cap that keeps names
 # inside the ~140-byte ecryptfs limit on the Syncthing target once Syncthing's
 # `.syncthing.<name>.tmp` transfer name (+15 bytes) is accounted for.
 # See TASK-227.
 
 load '../helpers/common'
-GUARD="$PROJECT_ROOT/.claude/hooks/filename-length-guard.sh"
+GUARD="$PROJECT_ROOT/plugins/ralph/hooks/filename-length-guard.sh"
 
 setup() {
   TEST_DIR="$(make_temp_dir)"

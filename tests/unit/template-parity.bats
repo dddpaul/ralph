@@ -48,7 +48,6 @@ registry() {
 keys|.claude/settings.local.json|claude/settings.local.json
 exact|.claude/hooks/commit-msg-guard.sh|plugin:hooks/commit-msg-guard.sh
 exact|.claude/hooks/commit-prefix-guard.sh|plugin:hooks/commit-prefix-guard.sh
-exact|.claude/hooks/filename-length-guard.sh|plugin:hooks/filename-length-guard.sh
 exact|.claude/hooks/master-branch-guard.sh|plugin:hooks/master-branch-guard.sh
 exact|.claude/hooks/naming-guard.sh|plugin:hooks/naming-guard.sh
 exact|.claude/hooks/notes-guard.sh|plugin:hooks/notes-guard.sh
