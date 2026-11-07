@@ -70,6 +70,11 @@ class _RunState:
     skipped: list[SkippedTask] = field(default_factory=list[SkippedTask])
     exit_reason: str = "max iterations reached"
     exit_code: int = 0
+    # TASK-312: publishing through shared-backlog integrate in an enforcing clone.
+    shared_publish: bool = False
+    published_rev: str | None = None
+    publish_failed: bool = False
+    last_task: str | None = None
 
 
 def build_tool(
@@ -159,6 +164,8 @@ def _run_armed(
     status = _initial_status(args, timeout_sec)
 
     push_is_enabled = push_module.push_enabled(args.push)
+    enforced = push_module.shared_backlog_enforced(project_root)
+    state.shared_publish = enforced and push_is_enabled
     rev_before: str | None = None
     try:
         # A stop that arrived during the devcontainer bring-up exits here,
@@ -174,6 +181,7 @@ def _run_armed(
             rev_before = push_module.current_rev(
                 project_root, push_module.DEFAULT_MASTER_REF
             )
+            state.published_rev = rev_before
 
         tool = build_tool(args, project_root, run_log_path=run_log_path)
         with Heartbeat(heartbeat_path):
@@ -203,12 +211,17 @@ def _run_armed(
     # publish the advanced master ref to origin. Skips cleanly when opted out,
     # when no origin remote exists, or when master did not advance. A push
     # failure is surfaced by carrying its non-zero code into the run's exit
-    # code (without masking an already-failing loop).
-    outcome = push_module.maybe_push_after_loop(
-        project_root=project_root,
-        enabled=push_is_enabled,
-        rev_before=rev_before,
-    )
+    # code (without masking an already-failing loop). An enforcing clone
+    # publishes through integrate instead and never runs the plain push
+    # (TASK-312).
+    if enforced:
+        outcome = _publish_end_of_run(project_root, state)
+    else:
+        outcome = push_module.maybe_push_after_loop(
+            project_root=project_root,
+            enabled=push_is_enabled,
+            rev_before=rev_before,
+        )
     if outcome.exit_code != 0 and state.exit_code == 0:
         state.exit_code = outcome.exit_code
 
@@ -254,7 +267,6 @@ def _run_loop(
     state: _RunState,
     installer: _SignalInstaller,
 ) -> None:
-    _ = project_root  # reserved for future per-iteration relative paths
     whitelist = args.task_whitelist or None
     holder = tasks_module.resolve_holder()
 
@@ -285,6 +297,10 @@ def _run_loop(
             state.exit_code = 0
             return
 
+        state.last_task = next_task
+        rev_iter_before = (
+            push_module.current_rev(project_root) if state.shared_publish else None
+        )
         iteration_started_at = _now_iso()
         iter_start = _now_epoch()
         status.iteration = i
@@ -387,6 +403,13 @@ def _run_loop(
             status, status_path, started_epoch, state, iter_elapsed, whitelist
         )
 
+        # TASK-312: a failed publish stops the run before the next claim,
+        # whatever --on-error says.
+        if state.shared_publish and not _publish_iteration(
+            project_root, next_task, rev_iter_before, i, state
+        ):
+            return
+
         if result.signals.complete:
             state.exit_reason = "all tasks done"
             state.exit_code = 0
@@ -397,6 +420,56 @@ def _run_loop(
 
     if state.tasks_completed == 0 or state.failed_iterations > 0:
         state.exit_code = 1
+
+
+def _publish_iteration(
+    project_root: Path,
+    task_id: str,
+    rev_iter_before: str | None,
+    iteration: int,
+    state: _RunState,
+) -> bool:
+    """Run integrate when the iteration advanced master; ``False`` when that publish failed.
+
+    A failure records the error and ends the run with the script's exit code.
+    """
+    rev_after = push_module.current_rev(project_root)
+    if rev_iter_before is None or rev_after is None or rev_after == rev_iter_before:
+        return True
+    outcome = push_module.integrate(project_root=project_root, task_id=task_id)
+    if outcome.exit_code == 0:
+        state.published_rev = push_module.current_rev(project_root)
+        return True
+    message = (
+        f"Publishing {task_id} after iteration {iteration} failed (exit {outcome.exit_code}); "
+        f"{push_module.local_state(project_root)}. Stopping before the next task; not retried."
+    )
+    print(f"ERROR: {message}", file=sys.stderr)
+    state.errors.append(ErrorEntry(iteration=iteration, at=_now_iso(), message=message))
+    state.publish_failed = True
+    state.exit_reason = "error"
+    state.exit_code = outcome.exit_code
+    return False
+
+
+def _publish_end_of_run(project_root: Path, state: _RunState) -> push_module.PushOutcome:
+    """Run the end-of-run integrate in an enforcing clone, unless a publish already failed."""
+    if not state.shared_publish:
+        return push_module.PushOutcome("skipped", "push disabled (opt-out)", 0)
+    if state.publish_failed:
+        print("A publish failed during this run; the end-of-run publish is not attempted.", file=sys.stderr)
+        return push_module.PushOutcome("skipped", "an earlier publish failed", 0)
+    rev_now = push_module.current_rev(project_root)
+    if state.published_rev is None or rev_now is None or rev_now == state.published_rev:
+        return push_module.PushOutcome("skipped", "master did not advance since the last publish", 0)
+    outcome = push_module.integrate(project_root=project_root, task_id=state.last_task)
+    if outcome.exit_code != 0:
+        print(
+            f"ERROR: end-of-run publish failed (exit {outcome.exit_code}); "
+            f"{push_module.local_state(project_root)}.",
+            file=sys.stderr,
+        )
+    return outcome
 
 
 def _invoke_tool(
