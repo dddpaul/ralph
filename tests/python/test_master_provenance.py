@@ -426,3 +426,170 @@ def test_checks_all_of_master_without_a_remote_tracking_branch(repo: Repo) -> No
 @pytest.mark.parametrize("flag", ["--remote", "--base"])
 def test_option_without_value_is_a_usage_error(repo: Repo, flag: str) -> None:
     assert repo.check(flag).returncode == 2
+
+
+# --- a project nested in a subdirectory of its repo (TASK-329) --------------
+
+PROJECT = "proj"
+NESTED_TASK_FILE = f"{PROJECT}/{TASK_FILE}"
+
+
+def run_check(
+    repo: Repo, cwd: Path, project_dir: Path | None = None, *args: str
+) -> subprocess.CompletedProcess[str]:
+    env = {k: v for k, v in repo.env.items() if k != "CLAUDE_PROJECT_DIR"}
+    if project_dir is not None:
+        env["CLAUDE_PROJECT_DIR"] = str(project_dir)
+    return subprocess.run(
+        ["bash", str(SCRIPT), *args],
+        cwd=cwd,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def check_nested(repo: Repo) -> subprocess.CompletedProcess[str]:
+    result = run_check(repo, repo.work / PROJECT)
+    assert "fatal:" not in result.stderr, result.stderr
+    return result
+
+
+def nested_note(repo: Repo, text: str) -> str:
+    path = repo.work / NESTED_TASK_FILE
+    return repo.commit(
+        "task-5: record review",
+        {NESTED_TASK_FILE: path.read_text("utf-8") + text + "\n"},
+    )
+
+
+def nested_reviewed_merge(repo: Repo, bookkeeping: dict[str, str] | None = None) -> str:
+    """Merge a reviewed task-5 branch of the nested project; return the reviewed SHA."""
+    repo.git("checkout", "-q", "-b", "task-5")
+    reviewed = repo.commit("task-5: add feature", {f"{PROJECT}/app.py": "a = 10\n"})
+    nested_note(repo, f"Review: APPROVED {reviewed}")
+    if bookkeeping:
+        repo.commit("task-5: bump version", bookkeeping)
+    merge_task_branch(repo)
+    return reviewed
+
+
+@pytest.fixture
+def nested(tmp_path: Path) -> Repo:
+    r = Repo(tmp_path)
+    r.commit(
+        "init",
+        {
+            "dotfile": "x\n",
+            # A repo-root conf the nested project must not read: its since
+            # value cannot resolve and would end the run with exit 2.
+            ".claude/task-reviewer.conf": "master_provenance_since=0000000\n",
+            f"{PROJECT}/app.py": "a = 1\n",
+            NESTED_TASK_FILE: "# TASK-5\n\n## Notes\n",
+        },
+    )
+    r.git("push", "-q", "origin", "master")
+    return r
+
+
+def test_nested_project_reads_its_own_conf(nested: Repo) -> None:
+    old = nested.commit(
+        "task-5: unreviewed code from before the convention",
+        {f"{PROJECT}/app.py": "a = 0\n"},
+    )
+    nested.commit(
+        "adopt",
+        {
+            f"{PROJECT}/.claude/task-reviewer.conf": (
+                f"master_provenance_since={old}\nmaster_bookkeeping_paths=VERSION\n"
+            )
+        },
+    )
+    nested_reviewed_merge(nested, {f"{PROJECT}/VERSION": "2\n"})
+    result = check_nested(nested)
+    assert_approved(result)
+    assert nested.git("rev-parse", "--short", old) not in result.stdout
+
+
+def test_nested_task_file_commit_and_reviewed_merge(nested: Repo) -> None:
+    reviewed = nested_reviewed_merge(nested)
+    nested_note(nested, "Status: Done")
+    result = check_nested(nested)
+    assert_approved(result)
+    assert "task-file commit" in result.stdout
+    assert (
+        f"reviewed at {nested.git('rev-parse', '--short', reviewed)}" in result.stdout
+    )
+
+
+def test_nested_reviewed_fast_forward(nested: Repo) -> None:
+    nested.git("checkout", "-q", "-b", "task-5")
+    reviewed = nested.commit("task-5: add feature", {f"{PROJECT}/app.py": "a = 10\n"})
+    nested_note(nested, f"Review: APPROVED {reviewed}")
+    nested.git("checkout", "-q", "master")
+    nested.git("merge", "-q", "--ff-only", "task-5")
+    result = check_nested(nested)
+    assert_approved(result)
+    assert "fast-forwarded TASK-5 work" in result.stdout
+
+
+def test_nested_skips_commits_outside_the_project(nested: Repo) -> None:
+    outside = nested.commit(
+        "tweak my shell", {"dotfile": "y\n", "other/tool.sh": "z\n"}
+    )
+    result = check_nested(nested)
+    assert_approved(result)
+    assert (
+        f"ok {nested.git('rev-parse', '--short', outside)} outside the project"
+        in result.stdout
+    )
+
+
+def test_nested_flags_unreviewed_commit_under_the_project(nested: Repo) -> None:
+    sha = nested.commit("task-5: unreviewed", {f"{PROJECT}/app.py": "a = 2\n"})
+    assert_flagged(
+        check_nested(nested), nested, sha, "direct commit outside the guard allowlist"
+    )
+
+
+def test_nested_flags_task_file_at_the_repo_root(nested: Repo) -> None:
+    sha = nested.commit(
+        "task-5: root task file",
+        {TASK_FILE: "# TASK-5\n", f"{PROJECT}/app.py": "a = 3\n"},
+    )
+    assert_flagged(
+        check_nested(nested), nested, sha, "direct commit outside the guard allowlist"
+    )
+
+
+def test_nested_project_comes_from_claude_project_dir(nested: Repo) -> None:
+    nested.commit("tweak my shell", {"dotfile": "y\n"})
+    sha = nested.commit("task-5: unreviewed", {f"{PROJECT}/app.py": "a = 2\n"})
+    from_env = run_check(nested, nested.work, nested.work / PROJECT)
+    assert from_env.stdout == check_nested(nested).stdout
+    assert_flagged(from_env, nested, sha, "direct commit outside the guard allowlist")
+
+
+def test_root_project_from_a_subdirectory_with_claude_project_dir(repo: Repo) -> None:
+    repo.commit("Sketch the design", {"design/feature-brainstorm.md": "idea\n"})
+    reviewed = approved_task_branch(repo)
+    merge_task_branch(repo)
+    repo.commit("task-5: unreviewed", {"app.py": "a = 0\n"})
+    root = run_check(repo, repo.work)
+    sub = run_check(repo, repo.work / "design", repo.work)
+    assert root.returncode == sub.returncode == 1
+    assert (root.stdout, root.stderr) == (sub.stdout, sub.stderr)
+    assert f"reviewed at {repo.git('rev-parse', '--short', reviewed)}" in sub.stdout
+
+
+def test_r_infra_6_describes_nested_projects() -> None:
+    text = flat(
+        (
+            REPO_ROOT
+            / "plugins/ralph/skills/ralph-init/rules/task-reviewer-rules.infra.md"
+        ).read_text("utf-8")
+    )
+    body = text[text.index("## R-INFRA-6: ") : text.index("## R-INFRA-7: ")]
+    for needle in ("`CLAUDE_PROJECT_DIR`", "nested project", "outside the project"):
+        assert needle in body, needle
