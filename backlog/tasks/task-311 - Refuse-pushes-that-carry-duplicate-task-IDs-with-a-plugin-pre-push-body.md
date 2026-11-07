@@ -4,7 +4,7 @@ title: Refuse pushes that carry duplicate task IDs with a plugin pre-push body
 status: Done
 assignee: []
 created_date: '2026-11-04T14:54:00Z'
-updated_date: '2026-11-06T18:02:00Z'
+updated_date: '2026-11-07T11:45:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -59,4 +59,10 @@ Commit: `821de4c` - task-311: keep check-dupes off the hook's ref list and scope
 Review: task-reviewer APPROVED (score 8, 0 blocking). Both minor findings are fixed: check-dupes now reads </dev/null, so a future stdin reader cannot swallow ref lines, and the README legacy-copy sentence is limited to the three shimmed hooks. Final checks: ruff clean, pytest 1348 passed / 4 skipped, bats 0 failures, pre-push suite 44/44. The live move of this clone's pre-push is TASK-328 (host, after the plugin update).
 
 Commit: `95b2a16` - task-311: bump plugin version to 0.21.3 (patch)
+
+Commit: `ca909a2` - task-311: trace the pre-push body through a PATH bash wrapper so the bash 3.2 run covers it
+
+AC #7 host part, macOS host (2026-11-07): with a /bin/bash 3.2.57 symlink first on PATH, /bin/bash tests/shell/shared-backlog-prepush-test.sh gives passed: 44, failed: 0, and the trace shows the plugin pre-push body and check-dupes running under 3.2; the same suite gives 44/44 with the default bash 5.3. The earlier BASH_ENV trace could not see the body under bash 3.2 (task-reviewer B1), fixed in ca909a2 by tracing through a PATH bash wrapper; README now names TASK-328 as the gate for moving this repo's pre-push.
+Review: APPROVED ca909a21ce97a25812109cc4ad6c46e0decb9f29
+Follow-up: tests/shell/shared-backlog-prepush-test.sh:136 has "duplicate task IDs in", which also matches the success line "no duplicate task IDs in 1 pushed ref(s)"; the refusal is still proven by the section's other checks (task-reviewer minor, 9887fd7).
 <!-- SECTION:NOTES:END -->
