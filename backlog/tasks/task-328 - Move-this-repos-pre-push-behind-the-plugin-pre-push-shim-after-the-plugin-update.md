@@ -39,4 +39,6 @@ AC#2 (macOS host, 2026-11-07): .git/hooks/pre-push (the TASK-214 version-bump wr
 AC#3 (scratch part): from a temporary worktree of this clone (same .git/hooks), pushes to a scratch bare remote seeded at 5dc8d66: an unbumped shipped change (a comment in plugins/ralph/skills/ralph-run/SKILL.md) was refused by the version-bump guard ('BLOCKED: shipped plugin files changed but the plugin version was not bumped', rc=1, remote unchanged); a commit bumping both manifests to 0.22.3 then landed (5dc8d66..b1608a1, rc=0). Worktree, branch and remote removed. The live part (a bumped push of master landing on origin) is still open: the box lands TASK-312/313/315 first, and the next shipped push from this host is TASK-320.
 AC#4: README (version-bump guard paragraph and this repo's migration sentence) and the version-bump-guard.sh header now describe the wrapper as pre-push.local behind the plugin shim, with the unmoved-clone case. Both shipped-set lists there were stale since TASK-322 and now name git-hooks/** and scripts/** too.
 Checks: ruff clean; /bin/bash -n on the guard; bats 224/224; pytest outside the sandbox 1436 passed, 5 skipped, 1 failed: test_shared_backlog_retry, the known macOS BSD wc bug that TASK-320 AC#6 fixes.
+
+Commit: `59ad0b7` - task-328: describe the version-bump wrapper as pre-push.local behind the plugin pre-push shim
 <!-- SECTION:NOTES:END -->

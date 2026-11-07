@@ -25,7 +25,7 @@
 #   plugins/ralph/scripts/**                    plugins/ralph/user-settings.json
 #   plugins/ralph/.claude-plugin/plugin.json    .claude-plugin/marketplace.json
 # Excluded (docs & tooling, not shipped-and-executed): README, design/,
-# backlog/, .claude/.
+# backlog/, .claude/, tests/.
 #
 # Release tag check (TASK-319): two hosts can each bump to the same version
 # with different content. The release commit of vX.Y.Z is the first commit,
