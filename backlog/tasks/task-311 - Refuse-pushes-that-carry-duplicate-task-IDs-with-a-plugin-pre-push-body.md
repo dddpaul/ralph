@@ -4,7 +4,7 @@ title: Refuse pushes that carry duplicate task IDs with a plugin pre-push body
 status: Done
 assignee: []
 created_date: '2026-11-04T14:54:00Z'
-updated_date: '2026-11-07T11:45:00Z'
+updated_date: '2026-11-07T11:55:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -67,4 +67,6 @@ Review: APPROVED ca909a21ce97a25812109cc4ad6c46e0decb9f29
 Follow-up: tests/shell/shared-backlog-prepush-test.sh:136 has "duplicate task IDs in", which also matches the success line "no duplicate task IDs in 1 pushed ref(s)"; the refusal is still proven by the section's other checks (task-reviewer minor, 9887fd7).
 
 Commit: `8a4591c` - task-311: bump plugin version to 0.22.2, past origin's 0.22.1
+
+Integration review: APPROVED e81cbbc6a78165481a3f28f64031613184740eff
 <!-- SECTION:NOTES:END -->
