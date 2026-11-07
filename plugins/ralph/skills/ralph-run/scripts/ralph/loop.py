@@ -75,6 +75,8 @@ class _RunState:
     published_rev: str | None = None
     publish_failed: bool = False
     last_task: str | None = None
+    # TASK-313: integrate runs its checks in the devcontainer the run used.
+    devcontainer: bool = False
 
 
 def build_tool(
@@ -166,6 +168,7 @@ def _run_armed(
     push_is_enabled = push_module.push_enabled(args.push)
     enforced = push_module.shared_backlog_enforced(project_root)
     state.shared_publish = enforced and push_is_enabled
+    state.devcontainer = args.devcontainer
     rev_before: str | None = None
     try:
         # A stop that arrived during the devcontainer bring-up exits here,
@@ -436,7 +439,7 @@ def _publish_iteration(
     rev_after = push_module.current_rev(project_root)
     if rev_iter_before is None or rev_after is None or rev_after == rev_iter_before:
         return True
-    outcome = push_module.integrate(project_root=project_root, task_id=task_id)
+    outcome = push_module.integrate(project_root=project_root, task_id=task_id, devcontainer=state.devcontainer)
     if outcome.exit_code == 0:
         state.published_rev = push_module.current_rev(project_root)
         return True
@@ -462,7 +465,9 @@ def _publish_end_of_run(project_root: Path, state: _RunState) -> push_module.Pus
     rev_now = push_module.current_rev(project_root)
     if state.published_rev is None or rev_now is None or rev_now == state.published_rev:
         return push_module.PushOutcome("skipped", "master did not advance since the last publish", 0)
-    outcome = push_module.integrate(project_root=project_root, task_id=state.last_task)
+    outcome = push_module.integrate(
+        project_root=project_root, task_id=state.last_task, devcontainer=state.devcontainer
+    )
     if outcome.exit_code != 0:
         print(
             f"ERROR: end-of-run publish failed (exit {outcome.exit_code}); "

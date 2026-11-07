@@ -55,6 +55,9 @@
 # the merged tree, after the duplicate check. $SHARED_BACKLOG_CHECKS, when set,
 # replaces "checks". $SHARED_BACKLOG_CHECKS_EXEC, when set, is a command prefix
 # (split on whitespace) the checks run under, such as a devcontainer exec.
+# $SHARED_BACKLOG_CHECKS_KILL, when set, is a command run with `sh -c` after a
+# deadline or signal kill and before the lock is released, to stop what the
+# checks left running in that context (a process tree inside a container).
 # integrate refuses before it fetches or merges when it is not opted in, no
 # checks are configured, jq or backlog is missing, or `<prefix> sh -c true`
 # fails. It retries a push only when origin refused it as not a fast-forward,
@@ -313,6 +316,7 @@ on_signal() {
   if [ -n "$CHILD_PID" ]; then
     kill -TERM -- "-$CHILD_PID" 2>/dev/null || true
     wait "$CHILD_PID" 2>/dev/null || true
+    checks_kill
   fi
   if [ -n "$WATCHDOG_PID" ]; then
     kill "$WATCHDOG_PID" 2>/dev/null || true
@@ -320,6 +324,15 @@ on_signal() {
   fi
   [ -z "$DEADLINE_FLAG" ] || rm -f "$DEADLINE_FLAG"
   exit "$1"
+}
+
+# checks_kill — run $CHECKS_KILL once, to stop what a killed subcommand's
+# checks left running outside its process group.
+checks_kill() {
+  local k=$CHECKS_KILL
+  [ -n "$k" ] || return 0
+  CHECKS_KILL=''
+  sh -c "$k" </dev/null >&2 || say "SHARED_BACKLOG_CHECKS_KILL failed; check processes may survive in the checks' context"
 }
 
 # with_deadline FN ARGS... — run FN in a subshell that leads its own process
@@ -346,6 +359,7 @@ with_deadline() {
   if [ -s "$flag" ]; then
     kill -KILL -- "-$CHILD_PID" 2>/dev/null || true
     say "$CMD ran past its ${DEADLINE}s deadline (SHARED_BACKLOG_DEADLINE); killed its process group"
+    checks_kill
     say "state left as is: $(git_state)"
     rc=1
   fi
@@ -1155,6 +1169,8 @@ PROTOCOL_TOKEN=''
 PUSH_FAILURE=''
 CHECKS=''
 CHECKS_EXEC=''
+CHECKS_KILL=''
+[ "$CMD" != integrate ] || CHECKS_KILL=${SHARED_BACKLOG_CHECKS_KILL:-}
 CREATE_ROOT=$(pwd -P)
 CREATE_TMP=''
 trap 'create_cleanup; lock_release protocol "$PROTOCOL_TOKEN" || true' EXIT

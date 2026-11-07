@@ -37,9 +37,12 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TextIO
+
+from ralph import checks_context
 
 DEFAULT_MASTER_REF = "master"
 """The ref this repo publishes as mesh canon (task body: 'Master ref: master')."""
@@ -49,6 +52,17 @@ PUSH_DISABLE_ENV = "RALPH_NO_PUSH"
 
 SHARED_BACKLOG_SCRIPT = Path(__file__).resolve().parents[4] / "scripts" / "shared-backlog.sh"
 """The plugin's shared-backlog script (push.py → ralph/ → scripts/ → ralph-run/ → skills/ → plugin root)."""
+
+INTEGRATE_TIMEOUT_ENV = "RALPH_INTEGRATE_TIMEOUT"
+"""Seconds the orchestrator gives one integrate call, checks included (TASK-313)."""
+
+DEFAULT_INTEGRATE_TIMEOUT_SEC = 1800
+
+INTEGRATE_TERM_GRACE_SEC = 30
+"""Seconds between the SIGTERM and the SIGKILL of a timed-out integrate; its
+traps stop the checks in the container and release the lock in that time."""
+
+INTEGRATE_TIMEOUT_EXIT_CODE = 124
 
 _ORIGIN = "origin"
 _TRUTHY = frozenset({"1", "true", "yes", "on"})
@@ -230,42 +244,99 @@ def maybe_push_after_loop(
     return PushOutcome("pushed", "push succeeded", 0)
 
 
+def integrate_timeout() -> int:
+    """Return ``RALPH_INTEGRATE_TIMEOUT`` in seconds, or the default when it is unset or invalid."""
+    raw = os.environ.get(INTEGRATE_TIMEOUT_ENV, "").strip()
+    if raw.isdigit() and int(raw) > 0:
+        return int(raw)
+    if raw:
+        print(
+            f"WARNING: {INTEGRATE_TIMEOUT_ENV}={raw!r} is not a whole number of seconds above 0; "
+            f"using {DEFAULT_INTEGRATE_TIMEOUT_SEC}",
+            file=sys.stderr,
+        )
+    return DEFAULT_INTEGRATE_TIMEOUT_SEC
+
+
+def _script_deadline(timeout: int) -> int:
+    """The script's own deadline: early enough that it can stop the checks and report first."""
+    return timeout - INTEGRATE_TERM_GRACE_SEC if timeout > 2 * INTEGRATE_TERM_GRACE_SEC else timeout
+
+
 def integrate(
     *,
     project_root: Path,
     task_id: str | None,
+    devcontainer: bool = False,
+    timeout_sec: int | None = None,
     out: TextIO | None = None,
     err: TextIO | None = None,
 ) -> PushOutcome:
     """Publish local master through ``shared-backlog.sh integrate [--task N]``.
 
     The script merges ``origin/master`` (never rebases), runs the duplicate
-    check and the configured checks, and pushes under its own deadline. Its
-    output is relayed to ``out`` and ``err``.
+    check and the configured checks, and pushes. With ``devcontainer`` the
+    checks run inside the run's devcontainer (TASK-313). The call has a total
+    timeout (:func:`integrate_timeout` by default); unless
+    ``SHARED_BACKLOG_DEADLINE`` is set, the script gets its own deadline
+    :data:`INTEGRATE_TERM_GRACE_SEC` earlier, so it can stop cleanly first. On expiry the
+    script's process groups are killed, the checks' process tree inside the
+    container is killed, and the local state (an interrupted merge included) is
+    reported, not reset. The script's output is relayed to ``out`` and ``err``.
 
     Returns:
         ``"pushed"`` with exit code 0, or ``"failed"`` with the script's
-        non-zero exit code (1 refused or check failed, 2 origin unreachable).
+        non-zero exit code (1 refused or check failed, 2 origin unreachable,
+        124 timed out).
     """
     out_stream: TextIO = out if out is not None else sys.stdout
     err_stream: TextIO = err if err is not None else sys.stderr
+    timeout = timeout_sec if timeout_sec is not None else integrate_timeout()
     argv = ["bash", str(SHARED_BACKLOG_SCRIPT), "integrate"]
     if task_id:
         argv += ["--task", task_id.removeprefix("TASK-")]
-    print(f"Publishing master through shared-backlog integrate{f' for {task_id}' if task_id else ''}...",
+    env = {**os.environ}
+    env.setdefault("SHARED_BACKLOG_DEADLINE", str(_script_deadline(timeout)))
+    tag = checks_context.new_tag()
+    if devcontainer:
+        try:
+            env.update(checks_context.devcontainer_env(project_root, tag))
+        except ValueError as exc:
+            print(f"ERROR: {exc}", file=err_stream)
+            return PushOutcome("failed", "integrate cannot reach the devcontainer", 1)
+    where = " (checks in the devcontainer)" if devcontainer else ""
+    print(f"Publishing master through shared-backlog integrate{f' for {task_id}' if task_id else ''}{where}...",
           file=out_stream)
-    result = subprocess.run(
-        argv,
-        cwd=project_root,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    out_stream.write(result.stdout)
-    err_stream.write(result.stderr)
-    if result.returncode == 0:
+    with tempfile.TemporaryFile() as out_file, tempfile.TemporaryFile() as err_file:
+        proc = subprocess.Popen(
+            argv, cwd=project_root, env=env, stdin=subprocess.DEVNULL, stdout=out_file, stderr=err_file,
+            start_new_session=True,
+        )
+        try:
+            returncode = proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            checks_context.kill_tree(proc, INTEGRATE_TERM_GRACE_SEC)
+            returncode = None
+        for stream, file in ((out_stream, out_file), (err_stream, err_file)):
+            file.seek(0)
+            stream.write(file.read().decode(errors="replace"))
+    if returncode is None:
+        return _integrate_timed_out(project_root, timeout, devcontainer, tag, err_stream)
+    if returncode == 0:
         return PushOutcome("pushed", "integrate succeeded", 0)
-    return PushOutcome("failed", f"shared-backlog integrate failed (exit {result.returncode})", result.returncode)
+    return PushOutcome("failed", f"shared-backlog integrate failed (exit {returncode})", returncode)
+
+
+def _integrate_timed_out(
+    project_root: Path, timeout: int, devcontainer: bool, tag: str, err_stream: TextIO
+) -> PushOutcome:
+    """Stop the checks left in the container and report the state a timed-out integrate left."""
+    print(f"ERROR: shared-backlog integrate ran past its {timeout}s timeout ({INTEGRATE_TIMEOUT_ENV}); "
+          "killed its process groups.", file=err_stream)
+    if devcontainer:
+        print(checks_context.reap(project_root, tag), file=err_stream)
+    print(f"State left as is, not reset: {local_state(project_root)}.", file=err_stream)
+    return PushOutcome("failed", "shared-backlog integrate timed out", INTEGRATE_TIMEOUT_EXIT_CODE)
 
 
 def local_state(project_root: Path, ref: str = DEFAULT_MASTER_REF) -> str:
