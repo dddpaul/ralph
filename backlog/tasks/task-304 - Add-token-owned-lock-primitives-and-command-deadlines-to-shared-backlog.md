@@ -4,7 +4,7 @@ title: Add token-owned lock primitives and command deadlines to shared-backlog
 status: Done
 assignee: []
 created_date: '2026-11-04T14:53:00Z'
-updated_date: '2026-11-05T17:28:00Z'
+updated_date: '2026-11-07T21:30:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -39,7 +39,7 @@ Reference: PRD design/plugin-delivered-project-files-prd.md, US-010 and FR-7, FR
 - [x] #5 While a run lock is held, sync, claim, release, create, integrate and renumber refuse unless RALPH_RUN_LOCK_TOKEN carries that run token
 - [x] #6 check-dupes takes and checks no lock, and runs while the protocol lock is held (tested)
 - [x] #7 Every protocol subcommand that touches the network or the clone runs under a total deadline (default 120 s, SHARED_BACKLOG_DEADLINE) that kills its process group, reports state and releases only its own lock
-- [ ] #8 bash -n, the bash 3.2 static guard and the shell tests pass; (host) the shell suite passes under /bin/bash 3.2
+- [x] #8 bash -n, the bash 3.2 static guard and the shell tests pass; (host) the shell suite passes under /bin/bash 3.2
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -50,4 +50,6 @@ Plan: in plugins/ralph/scripts/shared-backlog.sh add a lock primitive (mkdir-ato
 Verified: bash -n clean; bash4-builtin static guard passes (plugins/ralph/skills/ralph-run/tests... no, tests/python/test_bash32_syntax.py: 14 passed, 1 skipped); tests/shell/shared-backlog-lock-test.sh: 65 passed, 0 failed under this host's bash 5.2; tests/python/test_shared_backlog_locks.py passes. AC #8's (host) clause (real /bin/bash 3.2 run) not verifiable on this Linux host -- left unchecked pending host verification, same pattern as TASK-277..280. Full repo pytest: 1288 passed/4 skipped plus 1 pre-existing unrelated failure (test_devcontainer_missing_fails in ralph-run/tests/test_preflight.py), confirmed failing on clean master too (reproduced via git stash), not caused by this change.
 
 task-reviewer: APPROVED, score 8, 2 minor non-blocking findings (duplicate guard check in run_lock_gate; lock_acquire's post-deadline retry loop could use a clarifying comment). All AC verified by independent re-run of the test commands. Merging.
+
+Host check (macOS, /bin/bash 3.2.57 with nested bash also 3.2 through a PATH wrapper, master 18591c8, 2026-11-08): bash -n clean on the script and the shim; tests/python/test_bash32_syntax.py 15 passed, none skipped; tests/shell/shared-backlog-lock-test.sh 65 passed, 0 failed. AC #8 host clause verified.
 <!-- SECTION:NOTES:END -->
