@@ -37,6 +37,7 @@ class Repo:
             GIT_COMMITTER_NAME="t",
             GIT_COMMITTER_EMAIL="t@example.com",
         )
+        self.env.pop("CLAUDE_PROJECT_DIR", None)
         subprocess.run(
             ["git", "init", "-q", "--bare", "-b", "master", str(root / "origin.git")],
             check=True,
@@ -437,7 +438,7 @@ NESTED_TASK_FILE = f"{PROJECT}/{TASK_FILE}"
 def run_check(
     repo: Repo, cwd: Path, project_dir: Path | None = None, *args: str
 ) -> subprocess.CompletedProcess[str]:
-    env = {k: v for k, v in repo.env.items() if k != "CLAUDE_PROJECT_DIR"}
+    env = dict(repo.env)
     if project_dir is not None:
         env["CLAUDE_PROJECT_DIR"] = str(project_dir)
     return subprocess.run(

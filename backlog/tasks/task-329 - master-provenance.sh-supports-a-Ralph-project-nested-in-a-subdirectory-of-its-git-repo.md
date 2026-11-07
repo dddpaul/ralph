@@ -81,4 +81,6 @@ If anything is unclear or any check fails: STOP and ask the user. Do NOT start w
 Acceptance check on the destination (2026-11-07): yellow, clarified by the owner. All (exists) paths are present, the description matches the code (conf at show-toplevel, line 215; task notes from the root backlog/tasks, line 248), every AC is pass/fail, and there are no dependencies. Clarification: the project root comes from CLAUDE_PROJECT_DIR, the same source the task-reviewer agent uses for PROJECT_CONF, else the working directory (owner's choice A over an explicit --project flag or a bare working directory); added as AC #7. Run after the other host lands TASK-312/313/315, which may touch the integrate side of this checker; this task changes shipped files and needs a version bump.
 
 Plan: cd to CLAUDE_PROJECT_DIR (else stay in cwd), PREFIX=git rev-parse --show-prefix; conf from project .claude/; task_path/extra_path anchored at PREFIX; ls-tree --full-name; skip first-parent commits with no change under :(top)PREFIX vs first parent; R-INFRA-6 text; nested-project pytest fixtures.
+
+Commit: `8ca29be` - task-329: master-provenance.sh judges a project nested in a subdirectory of its repo
 <!-- SECTION:NOTES:END -->
