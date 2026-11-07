@@ -82,7 +82,9 @@ def devcontainer_env(workspace_folder: Path, tag: str) -> dict[str, str]:
     if any(c.isspace() for c in folder):
         raise ValueError(f"cannot run integrate's checks in the devcontainer: {folder!r} contains whitespace")
     return {
-        "SHARED_BACKLOG_CHECKS_EXEC": shlex.join([*exec_prefix(workspace_folder), "--remote-env", tag]),
+        # The script splits this on whitespace and removes no quotes, so it is
+        # joined plainly; the check above keeps that split lossless.
+        "SHARED_BACKLOG_CHECKS_EXEC": " ".join([*exec_prefix(workspace_folder), "--remote-env", tag]),
         "SHARED_BACKLOG_CHECKS_KILL": reap_command(workspace_folder, tag),
     }
 
@@ -106,20 +108,27 @@ def reap(workspace_folder: Path, tag: str, timeout_sec: int = 60) -> str:
     return result.stdout.strip()
 
 
-def process_groups_under(pid: int) -> set[int]:
-    """Return the process groups of ``pid`` and of every process descended from it."""
+def _process_table() -> list[tuple[int, int, int]]:
+    """Return ``(pid, ppid, pgid)`` for every process ``ps`` lists."""
     try:
         listing = subprocess.run(
             ["ps", "-A", "-o", "pid=,ppid=,pgid="], check=False, capture_output=True, text=True
         ).stdout
     except OSError:
-        return {pid}
-    children: dict[int, list[tuple[int, int]]] = {}
+        return []
+    rows: list[tuple[int, int, int]] = []
     for line in listing.splitlines():
         fields = line.split()
         if len(fields) == 3 and all(f.isdigit() for f in fields):
-            child, parent, group = (int(f) for f in fields)
-            children.setdefault(parent, []).append((child, group))
+            rows.append((int(fields[0]), int(fields[1]), int(fields[2])))
+    return rows
+
+
+def process_groups_under(pid: int) -> set[int]:
+    """Return the process groups of ``pid`` and of every process descended from it."""
+    children: dict[int, list[tuple[int, int]]] = {}
+    for child, parent, group in _process_table():
+        children.setdefault(parent, []).append((child, group))
     groups = {pid}
     todo = [pid]
     while todo:
@@ -140,12 +149,13 @@ def kill_tree(proc: subprocess.Popen[bytes], grace_sec: float) -> None:
 
     SIGTERM goes to ``proc``'s group first, so the script's traps can stop the
     checks and release the lock; whatever is left after ``grace_sec`` is
-    SIGKILLed, the groups noted before the SIGTERM included.
+    SIGKILLed, the groups noted before the SIGTERM included if they still exist.
     """
     groups = process_groups_under(proc.pid)
     _signal_groups({proc.pid}, signal.SIGTERM)
     deadline = time.monotonic() + grace_sec
     while proc.poll() is None and time.monotonic() < deadline:
         time.sleep(0.1)
-    _signal_groups(groups | process_groups_under(proc.pid), signal.SIGKILL)
+    live = {group for _pid, _ppid, group in _process_table()}
+    _signal_groups((groups & live) | process_groups_under(proc.pid), signal.SIGKILL)
     proc.wait()

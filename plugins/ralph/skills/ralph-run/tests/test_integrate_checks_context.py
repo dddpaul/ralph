@@ -144,6 +144,13 @@ def test_devcontainer_env_runs_the_checks_through_devcontainer_exec_with_a_tag()
     assert "--remote-env" not in kill  # the reaper must not carry the tag itself
 
 
+def test_devcontainer_env_keeps_shell_characters_in_the_path_unquoted() -> None:
+    """The script splits the prefix on whitespace only, so no shell quotes may reach it."""
+    env = checks_context.devcontainer_env(Path("/work/a&b'c"), checks_context.new_tag())
+
+    assert env["SHARED_BACKLOG_CHECKS_EXEC"].split()[3] == "/work/a&b'c"
+
+
 def test_devcontainer_env_refuses_a_path_with_whitespace() -> None:
     with pytest.raises(ValueError, match="whitespace"):
         checks_context.devcontainer_env(Path("/work/my proj"), checks_context.new_tag())
