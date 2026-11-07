@@ -4,7 +4,7 @@ title: Release the shared-backlog protocol once every part is done
 status: To Do
 assignee: []
 created_date: '2026-11-04T14:55:00Z'
-updated_date: '2026-11-07T12:37:00Z'
+updated_date: '2026-11-07T16:10:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -36,3 +36,9 @@ Reference: PRD design/plugin-delivered-project-files-prd.md, US-026 and FR-13.
 - [ ] #5 ruff, pytest and bats pass
 - [ ] #6 On the macOS host /bin/bash tests/shell/shared-backlog-retry-test.sh ends with failed: 0: its sneak_hook strips the padding BSD wc -l adds (n=$(wc -l <file | tr -d ' ')), so the subject is exactly "unrelated 0"
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Pointer: TASK-328 AC #3 is still open (live part). The push that lands this task bumps the plugin version through this Mac's pre-push shim (pre-push.local runs the version-bump guard first). Record that push's command, rc and origin range in TASK-328, then check its AC #3 and set it Done.
+<!-- SECTION:NOTES:END -->
