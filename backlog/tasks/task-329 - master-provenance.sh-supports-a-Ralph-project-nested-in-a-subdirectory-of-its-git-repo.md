@@ -3,10 +3,10 @@ id: TASK-329
 title: >-
   master-provenance.sh supports a Ralph project nested in a subdirectory of its
   git repo
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-07T14:13:00Z'
-updated_date: '2026-11-07T17:45:00Z'
+updated_date: '2026-11-07T18:03:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies: []
@@ -83,4 +83,10 @@ Acceptance check on the destination (2026-11-07): yellow, clarified by the owner
 Plan: cd to CLAUDE_PROJECT_DIR (else stay in cwd), PREFIX=git rev-parse --show-prefix; conf from project .claude/; task_path/extra_path anchored at PREFIX; ls-tree --full-name; skip first-parent commits with no change under :(top)PREFIX vs first parent; R-INFRA-6 text; nested-project pytest fixtures.
 
 Commit: `8ca29be` - task-329: master-provenance.sh judges a project nested in a subdirectory of its repo
+
+Commit: `6c1d161` - task-329: scope the mixed-commit sentence of R-INFRA-6 and isolate tests from CLAUDE_PROJECT_DIR
+
+Review: APPROVED 6c1d1616de5dedd31feeb68335a439fbc9297d8e
+
+Done: master-provenance.sh takes the project root from CLAUDE_PROJECT_DIR (else cwd), computes the prefix with git rev-parse --show-prefix, reads the project's .claude/task-reviewer.conf, anchors task files/notes and master_bookkeeping_paths at the prefix (ls-tree --full-name), and in a nested project prints 'ok <sha> outside the project' for first-parent commits changing nothing under the prefix. Root projects unchanged. R-INFRA-6 documents it. 9 new pytest cases; Repo helper drops an inherited CLAUDE_PROJECT_DIR. Full pytest 1495 passed, ruff clean. agterm can drop R-PROJ-1 once it updates the plugin.
 <!-- SECTION:NOTES:END -->
