@@ -32,7 +32,7 @@ The user may pass overrides as skill arguments. Parse them as space-separated ke
 
 Set `block_end_buffer_min` to N>0 to pause the run when the active 5h Anthropic usage block has <=N minutes remaining. 0 disables the check (default). Requires ccusage to be installed; preflight warns if missing.
 
-**A run pushes `master` to `origin`.** With `push=true` (the default), the orchestrator runs `git push origin master` once at the end of the run whenever `master` moved during it, an `origin` remote exists and `RALPH_NO_PUSH` is not set to a truthy value. `push.followTags` carries the version tags along. The push also happens after a `/ralph-stop` or a failed run, because it runs after the loop's cleanup and not inside it. The git `pre-push` hook still runs on that push and can reject it. Set `push=false` to skip the push for this run: Step 4 passes `--no-push`, and the merged work stays on the local `master` only. Accepted values are `true` and `false`; reject anything else:
+**A run pushes `master` to `origin`.** With `push=true` (the default), the orchestrator runs `git push origin master` once at the end of the run whenever `master` moved during it, an `origin` remote exists and `RALPH_NO_PUSH` is not set to a truthy value. `push.followTags` carries the version tags along. The push also happens after a `/ralph-stop` or a failed run, because it runs after the loop's cleanup and not inside it. The git `pre-push` hook still runs on that push and can reject it; a failed push is reported with its class: non-fast-forward, auth, hook or unreachable (anything else is "rejected"). In a clone with `git config ralph.sharedBacklog` true the run publishes through `shared-backlog.sh integrate --task N` instead: after each completed iteration that moved `master`, and once more at the end of the run. A failed publish stops the run before the next task, even with `on_error=continue`, and nothing retries it; the run reports the failure and the local `master` state. Set `push=false` to skip the push for this run: Step 4 passes `--no-push`, and the merged work stays on the local `master` only; in a shared-backlog clone only a run whose `tasks` names one task may do that. Accepted values are `true` and `false`; reject anything else:
 ```
 BLOCKED: push must be true or false.
 ```
@@ -90,7 +90,7 @@ Error: ralph.sh not found. Checked ./ralph.sh and scripts/ralph/ralph.sh. Run /r
 Run the preflight check via its bash launcher shim (`preflight.sh` in the `scripts/` directory next to this SKILL.md — i.e. `${CLAUDE_PLUGIN_ROOT}/skills/ralph-run/scripts`) with the ralph path from Step 2 and the devcontainer flag from Step 1. The shim resolves its own directory as `PYTHONPATH` and execs `python -m ralph.preflight`. The harness renders `${CLAUDE_PLUGIN_ROOT}` to the installed plugin directory; preflight is read-only, so sandbox auto-allow covers it and no allow-rule is needed (measured on Claude Code 2.1.280; a host on an older build that prompts here should upgrade Claude Code — see ralph-init Step 3.7a):
 
 ```bash
-bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-run/scripts/preflight.sh "$RALPH_PATH" <devcontainer:true|false> [--verbose] [--tasks <ids>] [--block-end-buffer-min <N>]
+bash ${CLAUDE_PLUGIN_ROOT}/skills/ralph-run/scripts/preflight.sh "$RALPH_PATH" <devcontainer:true|false> [--verbose] [--tasks <ids>] [--block-end-buffer-min <N>] [--no-push]
 ```
 
 When `verbose=true`, append `--verbose` to the preflight command. This prints one `check <name>: <result>` line per check before the final OK/ERROR line.
@@ -98,6 +98,8 @@ When `verbose=true`, append `--verbose` to the preflight command. This prints on
 When `tasks` is set, append `--tasks <ids>` to the preflight command.
 
 When `block_end_buffer_min > 0`, append `--block-end-buffer-min <N>` to the preflight command.
+
+When `push=false`, append `--no-push` to the preflight command. In a clone with `git config ralph.sharedBacklog` true, preflight then refuses unless `tasks` names exactly one task: `ERROR: --no-push (or RALPH_NO_PUSH) in a clone that enforces the shared-backlog protocol needs --tasks naming exactly one task.` The orchestrator refuses the same run at startup.
 
 If the output has a line starting with `OK`, parse `RALPH_PATH` from it (format: `OK RALPH_PATH=<path>`) and proceed to Step 4 — `WARNING:` lines may precede it.
 

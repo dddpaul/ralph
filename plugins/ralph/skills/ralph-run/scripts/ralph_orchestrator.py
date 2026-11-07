@@ -23,6 +23,7 @@ if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
 from ralph import args as args_module  # noqa: E402
+from ralph import push as push_module  # noqa: E402
 from ralph.loop import run as run_loop  # noqa: E402
 
 
@@ -57,6 +58,14 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     project_root = resolve_project_root()
+    refusal = push_module.no_push_refusal(
+        enforced=push_module.shared_backlog_enforced(project_root),
+        enabled=push_module.push_enabled(parsed.push),
+        task_whitelist=parsed.task_whitelist,
+    )
+    if refusal is not None:
+        print(refusal, file=sys.stderr)
+        return 1
     return run_loop(parsed, project_root)
 
 

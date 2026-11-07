@@ -51,6 +51,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
+from ralph import push as _push
 from ralph import usage_check as _usage_check
 from ralph import user_settings as _user_settings
 
@@ -89,17 +90,19 @@ class _Args:
     verbose: bool
     tasks_raw: str
     block_end_buffer_min: str
+    no_push: bool = False
 
 
 def _print_usage() -> None:
     print(
         "Usage: preflight.sh <ralph_path> <devcontainer:true|false> "
-        "[--verbose] [--tasks <ids>] [--block-end-buffer-min <N>]"
+        "[--verbose] [--tasks <ids>] [--block-end-buffer-min <N>] [--no-push]"
     )
 
 
 def _parse_args(argv: list[str]) -> _Args | None:
     verbose = False
+    no_push = False
     tasks_raw = ""
     block_end_buffer_min = "0"
     positional: list[str] = []
@@ -109,6 +112,9 @@ def _parse_args(argv: list[str]) -> _Args | None:
         arg = argv[i]
         if arg == "--verbose":
             verbose = True
+            i += 1
+        elif arg == "--no-push":
+            no_push = True
             i += 1
         elif arg == "--tasks":
             if i + 1 >= len(argv):
@@ -138,6 +144,7 @@ def _parse_args(argv: list[str]) -> _Args | None:
         verbose=verbose,
         tasks_raw=tasks_raw,
         block_end_buffer_min=block_end_buffer_min,
+        no_push=no_push,
     )
 
 
@@ -591,6 +598,20 @@ def _same_bytes(path: Path, data: bytes) -> bool:
         return False
 
 
+def _check_no_push(no_push: bool, tasks_raw: str, verbose: bool) -> int:
+    """Refuse an opted-out run in a clone that enforces the shared-backlog protocol unless it names one task."""
+    enforced = _git_stdout("config", "--bool", "ralph.sharedBacklog") == "true"
+    enabled = not no_push and not _push.env_opt_out()
+    refusal = _push.no_push_refusal(
+        enforced=enforced, enabled=enabled, task_whitelist=[t for t in tasks_raw.split(",") if t]
+    )
+    if refusal is not None:
+        print(f"ERROR: {refusal.removeprefix('Error: ')}")
+        return 1
+    _verbose(verbose, "check no_push: ok")
+    return 0
+
+
 def _check_plugin_hooks(verbose: bool) -> None:
     """Warn on stderr about the project's migration to plugin hooks; never fail."""
     top = _git_stdout("rev-parse", "--show-toplevel")
@@ -624,6 +645,11 @@ def main(argv: list[str] | None = None) -> int:
         if args.tasks_raw
         else _check_todo_tasks(args.verbose)
     )
+    if rc != 0:
+        return rc
+
+    # Check 1b: --no-push in a shared-backlog clone needs one task (TASK-312).
+    rc = _check_no_push(args.no_push, args.tasks_raw, args.verbose)
     if rc != 0:
         return rc
 
