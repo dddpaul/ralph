@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-06T17:47:00Z'
-updated_date: '2026-11-07T14:20:00Z'
+updated_date: '2026-11-07T14:44:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -41,4 +41,9 @@ AC#4: README (version-bump guard paragraph and this repo's migration sentence) a
 Checks: ruff clean; /bin/bash -n on the guard; bats 224/224; pytest outside the sandbox 1436 passed, 5 skipped, 1 failed: test_shared_backlog_retry, the known macOS BSD wc bug that TASK-320 AC#6 fixes.
 
 Commit: `59ad0b7` - task-328: describe the version-bump wrapper as pre-push.local behind the plugin pre-push shim
+
+Commit: `114a4c1` - task-328: word the pre-push state per clone and list tests/ as excluded
+
+Review: APPROVED 114a4c1cdbe51a92c187323c3061c3b5b1a107f1
+AC#3 live part deferred: the scratch part is met (reproduced by the reviewer too); the live part, a bumped push of master landing on origin through this clone's pre-push shim, happens at the first shipped push from this Mac after the other host lands TASK-312/313/315 (planned: TASK-320). Status plan: TASK-328 stays In Progress after its merge; at that push, record the command, rc and origin range here, --check-ac 3, then set Done. TASK-320 gets a pointer note back here when this Mac's master is rebuilt on top of the other host's push. The other host moves its own clone's pre-push the same way after its batch lands (per-clone step, no task).
 <!-- SECTION:NOTES:END -->
