@@ -89,4 +89,6 @@ Commit: `6c1d161` - task-329: scope the mixed-commit sentence of R-INFRA-6 and i
 Review: APPROVED 6c1d1616de5dedd31feeb68335a439fbc9297d8e
 
 Done: master-provenance.sh takes the project root from CLAUDE_PROJECT_DIR (else cwd), computes the prefix with git rev-parse --show-prefix, reads the project's .claude/task-reviewer.conf, anchors task files/notes and master_bookkeeping_paths at the prefix (ls-tree --full-name), and in a nested project prints 'ok <sha> outside the project' for first-parent commits changing nothing under the prefix. Root projects unchanged. R-INFRA-6 documents it. 9 new pytest cases; Repo helper drops an inherited CLAUDE_PROJECT_DIR. Full pytest 1495 passed, ruff clean. agterm can drop R-PROJ-1 once it updates the plugin.
+
+Commit: `57d5ce3` - task-329: bump plugin version to 0.25.2 (patch)
 <!-- SECTION:NOTES:END -->
