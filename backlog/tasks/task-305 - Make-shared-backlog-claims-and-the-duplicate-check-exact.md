@@ -4,7 +4,7 @@ title: Make shared-backlog claims and the duplicate check exact
 status: Done
 assignee: []
 created_date: '2026-11-04T14:53:00Z'
-updated_date: '2026-11-06T13:32:00Z'
+updated_date: '2026-11-07T21:30:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -39,7 +39,7 @@ Reference: PRD design/plugin-delivered-project-files-prd.md, US-011 and FR-6.
 - [x] #5 check-dupes REV reads the task prefix and config from the REV tree, includes drafts and passes explicitly when REV has no backlog directory
 - [x] #6 check-dupes fails when the backlog executable is missing
 - [x] #7 --help prints the whole help including exit codes and exits 0
-- [ ] #8 bash -n, the bash 3.2 static guard and the shell tests pass; (host) the shell suite passes under /bin/bash 3.2
+- [x] #8 bash -n, the bash 3.2 static guard and the shell tests pass; (host) the shell suite passes under /bin/bash 3.2
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -56,4 +56,6 @@ Commit: `42e8f90` - task-305: print the help from any directory and keep the sta
 Verified: claim suite 49 passed, lock suite 65 passed, full pytest 1303 passed / 4 skipped (bash 3.2 static guard included), bash -n clean. ruff check . reports 53 pre-existing errors in untouched files, identical on clean master; the new Python file is clean. task-reviewer: APPROVED (score 10) after fixing 3 first-pass findings (a static-guard false positive in the help test, the missing AC #8 host deferral note, and help not found when run by relative path from a subdirectory).
 
 Commit: `e2917fd` - task-305: bump plugin version to 0.20.3 (patch)
+
+Host check (macOS, /bin/bash 3.2.57 with nested bash also 3.2 through a PATH wrapper, master 18591c8, 2026-11-08): bash -n clean on the script and the shim; tests/python/test_bash32_syntax.py 15 passed, none skipped; tests/shell/shared-backlog-claim-test.sh 55 passed, 0 failed. AC #8 host clause verified.
 <!-- SECTION:NOTES:END -->
