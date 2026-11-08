@@ -1,8 +1,9 @@
 """Publishing through shared-backlog integrate in enforcing clones (TASK-312).
 
-A clone with ``ralph.sharedBacklog`` true publishes each completed iteration
-that advanced master through ``shared-backlog.sh integrate --task N`` and once
-more at the end of the run; a failed publish stops the run. The stubbed tests
+A clone with ``ralph.sharedBacklog`` true publishes each iteration that
+advanced master and did not stop the run (a timed-out or on-error=continue one
+too, TASK-337) through ``shared-backlog.sh integrate --task N``, and once more
+at the end of the run; a failed publish stops the run. The stubbed tests
 pin the loop wiring; the last ones run the real script against a bare origin,
 where ``enable`` sets the switch.
 """
@@ -27,6 +28,7 @@ from ralph.args import ParsedArgs
 from ralph.signals import IterationSignals
 from ralph.status import StatusFile
 from ralph.tools import OnSpawn, Tool, ToolResult
+from ralph.tools._subprocess import TIMEOUT_EXIT_CODE
 
 
 def _args(**over: Any) -> ParsedArgs:
@@ -161,12 +163,74 @@ def test_integrate_runs_after_each_iteration_that_advanced_master(
 def test_end_of_run_integrate_covers_an_advance_no_iteration_published(
     stubbed: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AC #1 — a failed iteration that still moved master is published at the end of the run."""
+    """AC #1 — a failed iteration that stopped the run and still moved master is published at the end."""
     _, integrates, _ = _wire(monkeypatch, [(0, True), (1, True)], integrate_rc=0)
 
-    loop_module.run(_args(max_iterations=2), stubbed)
+    loop_module.run(_args(max_iterations=2, on_error="stop"), stubbed)
 
     assert integrates == ["TASK-1", "TASK-2"]
+
+
+def _record_claims(monkeypatch: pytest.MonkeyPatch, events: list[str]) -> None:
+    claim = loop_module.claims_module.claim_next
+
+    def recording_claim(*a: Any, **k: Any) -> str | None:
+        task = claim(*a, **k)
+        events.append(f"claim {task}")
+        return task
+
+    monkeypatch.setattr(loop_module.claims_module, "claim_next", recording_claim)
+
+
+@pytest.mark.parametrize("exit_code", [TIMEOUT_EXIT_CODE, 1])
+def test_a_failed_iteration_that_moved_master_is_published_before_the_next_claim(
+    stubbed: Path, monkeypatch: pytest.MonkeyPatch, exit_code: int
+) -> None:
+    """TASK-337 AC #1, #2 — a timed-out or on-error=continue iteration publishes like a successful one."""
+    _, integrates, _ = _wire(monkeypatch, [(exit_code, True), (0, False)])
+    events: list[str] = []
+    _record_claims(monkeypatch, events)
+    integrate = push_module.integrate
+
+    def recording_integrate(**kw: Any) -> push_module.PushOutcome:
+        events.append(f"integrate {kw['task_id']}")
+        return integrate(**kw)
+
+    monkeypatch.setattr(push_module, "integrate", recording_integrate)
+
+    rc = loop_module.run(_args(max_iterations=2, on_error="continue"), stubbed)
+
+    assert rc == 1  # the failed iteration still fails the run
+    assert integrates == ["TASK-1"]
+    assert events == ["claim TASK-1", "integrate TASK-1", "claim TASK-2"]
+
+
+@pytest.mark.parametrize("exit_code", [TIMEOUT_EXIT_CODE, 1])
+def test_a_failed_iteration_that_did_not_move_master_publishes_nothing(
+    stubbed: Path, monkeypatch: pytest.MonkeyPatch, exit_code: int
+) -> None:
+    """TASK-337 AC #3."""
+    tool, integrates, _ = _wire(monkeypatch, [(exit_code, False), (exit_code, False)])
+
+    loop_module.run(_args(max_iterations=2, on_error="continue"), stubbed)
+
+    assert tool.runs == 2
+    assert integrates == []
+
+
+@pytest.mark.parametrize("exit_code", [TIMEOUT_EXIT_CODE, 1])
+def test_a_failed_publish_after_a_failed_iteration_ends_the_run(
+    stubbed: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], exit_code: int
+) -> None:
+    """TASK-337 AC #4 — no next iteration and no end-of-run retry."""
+    tool, integrates, _ = _wire(monkeypatch, [(exit_code, True), (0, True)], integrate_rc=2)
+
+    rc = loop_module.run(_args(max_iterations=2, on_error="continue"), stubbed)
+
+    assert rc == 2
+    assert tool.runs == 1
+    assert integrates == ["TASK-1"]
+    assert "end-of-run publish is not attempted" in capsys.readouterr().err
 
 
 def test_failed_publish_stops_the_run_even_with_on_error_continue(
@@ -211,6 +275,64 @@ def test_a_clone_that_does_not_enforce_keeps_the_end_of_run_push(
     assert pushes == [1]
 
 
+def _refusal_status(path: Path) -> StatusFile:
+    status = StatusFile.model_validate_json(path.read_text())
+    assert status.state == "failed"
+    assert status.exit_code == 1
+    assert status.completed_at is not None
+    return status
+
+
+def test_a_prompt_file_refusal_writes_a_failed_status(
+    stubbed: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """TASK-337 AC #5 — the refusal message lands in the status file."""
+    _wire(monkeypatch, [])
+    prompt = tmp_path / "prompt.md"
+    prompt.write_text("Pick any task.\n")
+
+    assert loop_module.run(_args(prompt_file=str(prompt)), stubbed) == 1
+
+    status = _refusal_status(stubbed / "status.json")
+    assert "--prompt-file in a clone that enforces the shared-backlog protocol" in status.errors[0].message
+
+
+def test_a_refused_run_lock_writes_a_failed_status(stubbed: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """TASK-337 AC #5 — a holder or run-lock refusal is recorded the same way."""
+    _wire(monkeypatch, [])
+
+    def refuse(*_a: Any) -> None:
+        raise loop_module.claims_module.ClaimError("the run has no holder")
+
+    monkeypatch.setattr(loop_module.claims_module.RunSession, "open", refuse)
+
+    assert loop_module.run(_args(), stubbed) == 1
+
+    assert _refusal_status(stubbed / "status.json").errors[0].message == "the run has no holder"
+
+
+def test_a_refusal_leaves_a_live_runs_status_alone(stubbed: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """TASK-337 AC #5 — the run that holds the lock stays visible to /ralph-status."""
+    _wire(monkeypatch, [])
+    live = subprocess.Popen(["sleep", "30"])
+    try:
+        path = stubbed / "status.json"
+        running = loop_module._initial_status(_args(), 900)  # pyright: ignore[reportPrivateUsage]
+        running.pid = live.pid
+        running.write_atomic(path)
+        before = path.read_bytes()
+
+        loop_module.write_refusal_status(_args(), stubbed, "the run lock is not taken", 1)
+
+        assert path.read_bytes() == before
+    finally:
+        live.kill()
+        live.wait()
+
+    loop_module.write_refusal_status(_args(), stubbed, "the run lock is not taken", 1)
+    assert _refusal_status(path).errors[0].message == "the run lock is not taken"
+
+
 @pytest.mark.parametrize(
     ("enforced", "enabled", "tasks", "refused"),
     [
@@ -233,12 +355,15 @@ def test_orchestrator_refuses_no_push_without_one_task(
     """AC #4 — the refusal comes before the loop starts."""
     monkeypatch.setenv("RALPH_PROJECT_ROOT", str(tmp_path))
     monkeypatch.setattr(push_module, "shared_backlog_enforced", lambda _root: True)
+    monkeypatch.setenv("RALPH_STATUS_FILE", str(tmp_path / "status.json"))
+    monkeypatch.setattr(loop_module.tasks_module, "count_remaining", lambda *_a, **_k: 0)
     started: list[int] = []
     monkeypatch.setattr(ralph_orchestrator, "run_loop", lambda *_a: started.append(1) or 0)
 
     assert ralph_orchestrator.main(["--no-push", "--tasks", "1,2"]) == 1
     assert "needs --tasks naming exactly one task" in capsys.readouterr().err
     assert started == []
+    assert "needs --tasks naming exactly one task" in _refusal_status(tmp_path / "status.json").errors[0].message
 
     monkeypatch.setenv(push_module.PUSH_DISABLE_ENV, "1")
     assert ralph_orchestrator.main([]) == 1

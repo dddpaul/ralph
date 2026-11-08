@@ -25,6 +25,7 @@ if str(_HERE) not in sys.path:
 from ralph import args as args_module
 from ralph import push as push_module
 from ralph.loop import run as run_loop
+from ralph.loop import write_refusal_status
 
 
 def resolve_project_root() -> Path:
@@ -65,6 +66,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     if refusal is not None:
         print(refusal, file=sys.stderr)
+        write_refusal_status(parsed, project_root, refusal, 1)
         return 1
     return run_loop(parsed, project_root)
 
