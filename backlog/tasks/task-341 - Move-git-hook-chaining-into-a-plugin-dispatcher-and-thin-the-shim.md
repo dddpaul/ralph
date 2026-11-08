@@ -4,7 +4,7 @@ title: Move git hook chaining into a plugin dispatcher and thin the shim
 status: Done
 assignee: []
 created_date: '2026-11-08T09:41:00Z'
-updated_date: '2026-11-08T13:59:00Z'
+updated_date: '2026-11-08T14:30:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -110,7 +110,7 @@ This repo: .claude/hooks/install-clone-hooks.sh --check compares pre-push byte f
 - [x] #6 .claude/hooks/install-clone-hooks.sh --check accepts a pre-push equal to any shim version recorded in shipped-git-hooks.sha256 (pytest)
 - [x] #7 README.md and .claude/RELEASING.md say to run /plugin update first, then migrate-plugin-hooks.sh clone in each clone
 - [x] #8 bash -n, the bash 3.2 static guard, ruff, pytest and bats pass
-- [ ] #9 (host) Both clones are refreshed with clone after /plugin update, and a live commit and push through the new shim are recorded in the notes
+- [x] #9 (host) Both clones are refreshed with clone after /plugin update, and a live commit and push through the new shim are recorded in the notes
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -131,4 +131,6 @@ Done: plugins/ralph/git-hooks/run chains <name>.local then the plugin body (pre-
 Commit: `f42977d` - task-341: bump plugin version to 0.25.11 (patch)
 
 Host check (macOS, installed plugin 0.25.11 at user scope, master 78c0e96, 2026-11-08): preflight first reported 'shims outdated in this clone' for pre-commit, commit-msg and post-commit. migrate-plugin-hooks.sh clone from the installed plugin replaced all three with shim v2 (sha256 1520d251...) with rc 0. It also removed 44 entries from .claude/settings.local.json that user settings already hold. clone does not manage pre-push, and this clone moved its pre-push by hand (TASK-328) with ralph.sharedBacklog unset, so shared-backlog.sh enable does not apply either. I replaced the v1 pre-push shim (79d1376a...) with the template by hand. Afterwards preflight shows no plugin-hooks shim warning and install-clone-hooks.sh --check exits 0. The commit that records this note is the live commit through the v2 pre-commit, commit-msg and post-commit.
+
+Host check (WSL/agentbox, installed plugin 0.25.11 at user scope, master c33f756, 2026-11-08): preflight (plugin_hooks check) reported no shim drift before I looked closer — but pre-commit/commit-msg/post-commit were still sha256 79d1376a... (v1, TASK-297). migrate-plugin-hooks.sh clone from the installed 0.25.11 plugin replaced all three with shim v2 (sha256 1520d251...), rc 0. clone does not touch pre-push; this clone has ralph.sharedBacklog unset (not true) and ralph.pluginHooks=true, so I copied the plugin's shim template over the v1 pre-push by hand (same path as the macOS clone). Afterwards preflight shows plugin_hooks: ok (no shim-drift warning) and .claude/hooks/install-clone-hooks.sh --check exits 0. All four hooks now sha256 1520d251.... This note's commit is the live commit through the v2 pre-commit/commit-msg/post-commit; not pushed yet per claude-mac's instruction.
 <!-- SECTION:NOTES:END -->
