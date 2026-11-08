@@ -1,10 +1,10 @@
 ---
 id: TASK-338
 title: Refuse direct handoff-create.sh create calls in opted-in autonomous runs
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-07T21:35:00Z'
-updated_date: '2026-11-08T09:02:00Z'
+updated_date: '2026-11-08T09:08:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies: []
@@ -31,4 +31,12 @@ Why: plugins/ralph/hooks/autonomous-create-guard.sh refuses backlog task create,
 Plan: add a handoff-create.sh create pattern to autonomous-create-guard.sh matched anywhere (like shared-backlog.sh create, quoted or not); pytest for refused plain/quoted/bash-prefixed paths, allowed mode, and interactive/non-enforcing passes; update ralph-run SKILL.md guard list.
 
 Commit: `6ca72c7` - task-338: refuse direct handoff-create.sh create in opted-in autonomous runs
+
+Commit: `8bb3604` - task-338: list handoff-create.sh create among the guard's refusals in README
+
+Review: APPROVED 8bb36045b653ac142c575ff0ef8c6e479e4dab40
+
+Guard matches handoff-create.sh create anywhere in a Bash command (quoted or not, like shared-backlog.sh create); mode stays allowed. README and ralph-run SKILL.md list it. Full pytest 1563 passed, 4 skipped; ruff clean.
+
+Commit: `821b373` - task-338: bump plugin version to 0.25.9 (patch)
 <!-- SECTION:NOTES:END -->
