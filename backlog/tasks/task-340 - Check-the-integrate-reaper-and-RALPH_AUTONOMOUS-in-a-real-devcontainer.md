@@ -1,10 +1,10 @@
 ---
 id: TASK-340
 title: Check the integrate reaper and RALPH_AUTONOMOUS in a real devcontainer
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-07T21:35:00Z'
-updated_date: '2026-11-08T16:58:00Z'
+updated_date: '2026-11-08T17:14:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies: []
@@ -55,4 +55,10 @@ My host watcher in run 1 was invalid and is not evidence. It ran the grep as doc
 The next run first refused with 'local master has diverged from origin/master; run integrate first', which is correct after a publish that timed out. I ran SHARED_BACKLOG_CHECKS=true bash scripts/shared-backlog.sh integrate by hand, which pushed 048ad00, and added TASK-2 with shared-backlog.sh create.
 
 Run 2 (TASK-2, 16:55:47Z to 16:57:17Z, exit 124) printed the same four lines: killed 2, timeout, killed 0, state left as is. The watcher, running docker exec <id> sh -c 'grep -l RALPH_INTEGRATE_TAG /proc/[0-9]*/environ' every 5 s, logged the tagged checks from 19:56:20 to 19:57:12 local time, PIDs 2098 'sh -c sleep 600' and 2104 'sleep 600', and none from 19:57:17 on. After the run, the task's exact command docker exec 6c2aecaf6832 sh -c 'grep -l RALPH_INTEGRATE_TAG /proc/[0-9]*/environ' printed nothing and exited 1.
+
+Review: APPROVED 741a3ad6725f17abe1651d90edb35ddb9ca89c67
+
+Correction to the notes above, from task-reviewer's two minor findings on 741a3ad. (1) The order between the runs: I first added TASK-2 with shared-backlog.sh create (d960843 on the test origin, on top of the claim 8651283). Only then did the next run refuse with 'local master has diverged from origin/master; run integrate first', because origin's new TASK-2 commit sat on top of run 1's unpublished 881b45b. A timed-out publish alone leaves master 1 ahead and 0 behind, which sync accepts. After that I ran SHARED_BACKLOG_CHECKS=true bash scripts/shared-backlog.sh integrate, which merged and pushed 048ad00, and relaunched. (2) The run-2 watcher ran that grep in a loop that also printed each matching PID's cmdline, and its stderr still went to 2>/dev/null. Its validity rests on the positive controls instead: it listed a tagged self-test sleep at 19:54:40 and run 2's tagged checks from 19:56:20 to 19:57:12. It also rests on the final plain command, which printed nothing and exited 1 with no stderr; exit 1 means grep read every environ file. Watcher times are local, UTC+03:00, so 19:57:17 local is 16:57:17Z, the run's completed_at.
+
+Done: both host checks pass on macOS with the installed plugin 0.25.11. The integrate reaper leaves no tagged check process in a real devcontainer after a timeout, and a real --devcontainer run hands RALPH_AUTONOMOUS=1, the holder and the run lock token to the agent, which cannot create a task in an enforcing clone. No code changed. ruff is clean and pytest passes 1579 with 8 skipped (outside the sandbox). The test project, its container, its two volumes and its image tags were removed afterwards.
 <!-- SECTION:NOTES:END -->
