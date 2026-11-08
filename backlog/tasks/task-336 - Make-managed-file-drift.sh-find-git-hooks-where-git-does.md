@@ -1,9 +1,10 @@
 ---
 id: TASK-336
 title: Make managed-file-drift.sh find git hooks where git does
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-07T21:35:00Z'
+updated_date: '2026-11-08T08:19:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies: []

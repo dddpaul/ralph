@@ -37,7 +37,13 @@
 #               template with the file's own extra "runArgs" elements kept.
 #
 # Gates skip a row silently: "devcontainer" without a .devcontainer/ directory,
-# "git" without a .git/ directory.
+# "git" without a .git directory or file.
+#
+# A .git/hooks/<name> row is read from the directory git runs hooks from, the
+# one `git rev-parse --git-path hooks` returns (core.hooksPath, or the common
+# dir's hooks/ in a linked worktree), the way migrate-plugin-hooks.sh clone
+# writes them. Reports and accept-file lines still name it .git/hooks/<name>.
+# When git cannot resolve it, <project>/.git/hooks is read.
 #
 # Plugin hooks (design/plugin-delivered-project-files-prd.md US-006) change two
 # things. In a project whose .claude/ralph.json sets "pluginHooks": true (read
@@ -107,7 +113,8 @@ allow_current() {
 # Print "missing" or "outdated" when project file $1 differs from template $2
 # under rule $3; print nothing when it is current.
 state() {
-  local path=$1 tmpl=$2 rule=$3 file=$project/$1
+  local path=$1 tmpl=$2 rule=$3 file
+  file=$(file_of "$1")
   [ -r "$tmpl" ] || { echo "managed-file-drift: cannot read $tmpl" >&2; exit 2; }
   if [ ! -e "$file" ]; then
     echo missing
@@ -149,7 +156,7 @@ digest() {
 accept_line() {
   local t p
   t=$(digest "$2" "$3") || exit 2
-  p=$(digest "$project/$1" "$3") || exit 2
+  p=$(digest "$(file_of "$1")" "$3") || exit 2
   echo "$1 template=$t project=$p"
 }
 
@@ -218,7 +225,7 @@ plugin_state() {
     migrated=1
     locals=$(jq -r '.localGuards // [] | .[]? | strings' "$marker" 2>/dev/null || true)
   fi
-  if [ -d "$project/.git" ] && [ "$(git -C "$project" config --bool ralph.pluginHooks 2>/dev/null || true)" = true ]; then
+  if [ -n "$hooks_dir" ] && [ "$(git -C "$project" config --bool ralph.pluginHooks 2>/dev/null || true)" = true ]; then
     shimmed=1
   fi
 }
@@ -245,6 +252,27 @@ plugin_owned() {
   else
     echo legacy
   fi
+}
+
+# Set hooks_dir to the absolute directory git runs this project's hooks from;
+# empty when the project has no .git (see the header).
+git_hooks_dir() {
+  local parent
+  hooks_dir=""
+  [ -e "$project/.git" ] || return 0
+  parent=$(cd "$project/.." && pwd)
+  # The ceiling keeps git from resolving a parent repository's hooks.
+  hooks_dir=$(cd "$project" && GIT_CEILING_DIRECTORIES=$parent git rev-parse --git-path hooks 2>/dev/null) ||
+    hooks_dir=.git/hooks
+  case $hooks_dir in (/*) ;; (*) hooks_dir=$project/$hooks_dir ;; esac
+}
+
+# Print the file managed path $1 is read from.
+file_of() {
+  case $1 in
+    (.git/hooks/*) echo "$hooks_dir/${1#.git/hooks/}" ;;
+    (*) echo "$project/$1" ;;
+  esac
 }
 
 # Print the template managed path $1 is compared with: the plugin shim for a
@@ -277,6 +305,7 @@ root=${CLAUDE_PLUGIN_ROOT:-$here/../../..}
   exit 2
 }
 
+git_hooks_dir
 plugin_state
 if [ "$1" = accept ]; then
   found=$(lookup "$3") || { echo "managed-file-drift: $3 is not a managed path" >&2; exit 2; }
@@ -298,7 +327,7 @@ accepted=$(load_accepted) || exit 2
 report=$(
   table | while IFS='|' read -r path tmpl rule gate; do
     case $gate in
-      (git) [ -d "$project/.git" ] || continue ;;
+      (git) [ -n "$hooks_dir" ] || continue ;;
       (devcontainer) [ -d "$project/.devcontainer" ] || continue ;;
     esac
     if [ "$rule" = hooks ]; then
