@@ -1,10 +1,10 @@
 ---
 id: TASK-336
 title: Make managed-file-drift.sh find git hooks where git does
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-07T21:35:00Z'
-updated_date: '2026-11-08T08:33:00Z'
+updated_date: '2026-11-08T08:34:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies: []
@@ -31,4 +31,10 @@ Fix: resolve the hooks directory with git -C <project> rev-parse --git-path hook
 
 <!-- SECTION:NOTES:BEGIN -->
 Commit: `4df7de2` - task-336: read git hooks from git's hooks directory in managed-file-drift.sh
+
+Review: APPROVED c29ef56fc3f422b5ab8464570a1b49fb807694ce
+
+Done: hooks_dir resolved via git rev-parse --git-path hooks (ceiling at project parent, fallback .git/hooks); git gate is .git existing; keys stay .git/hooks/<name>. pytest 1547 passed/4 skipped, bats 0 failures, ruff check clean, bash -n + bash32 guard ok. Reviewer minor (kept, documented): unresolvable .git file falls back to .git/hooks and reports hooks missing.
+
+Commit: `aa9c4e0` - task-336: bump plugin version to 0.25.7 (patch)
 <!-- SECTION:NOTES:END -->
