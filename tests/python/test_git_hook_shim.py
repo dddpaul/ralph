@@ -296,7 +296,7 @@ def test_dispatcher_warns_and_exits_0_after_local_for_a_name_without_body(world:
     write_hook(clone / ".git/hooks/post-rewrite.local", RECORD % ("%s", "local"))
     result = run_dispatcher(world, hooks, "post-rewrite", "amend", stdin="old new\n")
     assert result.returncode == 0
-    assert "ships no post-rewrite hook; ran only post-rewrite.local" in result.stderr
+    assert "ships no post-rewrite hook; skipped it" in result.stderr
     assert (clone / "local.log").read_text() == "amend\nold new\n"
 
 

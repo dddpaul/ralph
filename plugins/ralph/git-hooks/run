@@ -25,7 +25,7 @@ if [ -x "$local_hook" ]; then
   feed "$local_hook" "$@" || exit $?
 fi
 if [ ! -x "$body" ]; then
-  echo "ralph: warning: the ralph plugin ships no $name hook; ran only $name.local" >&2
+  echo "ralph: warning: the ralph plugin ships no $name hook; skipped it" >&2
   exit 0
 fi
 feed "$body" "$@"
