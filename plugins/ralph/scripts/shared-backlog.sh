@@ -76,7 +76,9 @@
 # disable (or the user), and never derived from the marker afterwards: a commit
 # that drops the marker does not turn it off, and the clone migration of
 # migrate-plugin-hooks.sh does not turn it back on. enable keeps an existing
-# pre-push hook as pre-push.local, which the shim runs first.
+# pre-push hook as pre-push.local, which the shim runs first, unless the hook
+# is an earlier version of the shim (a "shim" line in shipped-git-hooks.sha256):
+# that one it replaces in place.
 #
 # Exit codes: 0 ok, 1 refused / conflict / check failed, 2 origin unreachable,
 # 64 usage error. Bash 3.2 clean: no associative arrays, no mapfile.
@@ -1071,8 +1073,23 @@ enable_holder() {
   echo "$h"
 }
 
+# Succeed when file $1 is a version of the git hook shim ralph-init has
+# shipped: its sha256 is a "shim" line in shipped-git-hooks.sha256 ($2).
+shipped_shim() {
+  local sum
+  [ -f "$1" ] && [ -r "$2" ] || return 1
+  if command -v shasum >/dev/null 2>&1; then
+    sum=$(shasum -a 256 <"$1" | cut -d' ' -f1)
+  elif command -v sha256sum >/dev/null 2>&1; then
+    sum=$(sha256sum <"$1" | cut -d' ' -f1)
+  else
+    return 1
+  fi
+  grep -Fxq -- "shim $sum" "$2"
+}
+
 cmd_enable() {
-  local holder='' jq shim hooks
+  local holder='' jq shim shipped hooks old_shim=0
   while [ $# -gt 0 ]; do
     case "$1" in
       --holder) holder=${2:?--holder needs @name}; shift 2 ;;
@@ -1086,9 +1103,13 @@ cmd_enable() {
     die "not opted in: .claude/ralph.json does not set \"sharedBacklog\": true"
   shim="$(dirname "$SELF")/../skills/ralph-init/templates/shims/git-hook"
   [ -r "$shim" ] || die "cannot read the plugin shim $shim"
+  shipped="$(dirname "$SELF")/../skills/ralph-init/scripts/shipped-git-hooks.sha256"
   hooks=$(git rev-parse --git-path hooks)
   # Check everything before writing anything.
-  if [ -e "$hooks/pre-push" ] && ! cmp -s "$hooks/pre-push" "$shim" &&
+  if [ -e "$hooks/pre-push" ] && ! cmp -s "$hooks/pre-push" "$shim" && shipped_shim "$hooks/pre-push" "$shipped"; then
+    old_shim=1
+  fi
+  if [ "$old_shim" -eq 0 ] && [ -e "$hooks/pre-push" ] && ! cmp -s "$hooks/pre-push" "$shim" &&
     [ -e "$hooks/pre-push.local" ] && ! cmp -s "$hooks/pre-push" "$hooks/pre-push.local"; then
     die "$hooks/pre-push.local already exists and differs from $hooks/pre-push; merge the two into pre-push.local by hand, delete pre-push, and rerun"
   fi
@@ -1098,7 +1119,9 @@ cmd_enable() {
   }
   mkdir -p "$hooks"
   if ! cmp -s "$hooks/pre-push" "$shim" 2>/dev/null; then
-    if [ -e "$hooks/pre-push" ]; then
+    if [ "$old_shim" -eq 1 ]; then
+      echo "replacing an earlier plugin shim in pre-push"
+    elif [ -e "$hooks/pre-push" ]; then
       [ -e "$hooks/pre-push.local" ] || mv "$hooks/pre-push" "$hooks/pre-push.local"
       echo "kept the existing pre-push hook as pre-push.local; the shim runs it first"
     fi

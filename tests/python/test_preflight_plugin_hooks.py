@@ -7,6 +7,7 @@ says that plugin guards are best effort. It never changes the exit code.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shutil
@@ -143,6 +144,35 @@ def test_marker_without_the_clone_part_reports_shims_missing(tmp_path: Path, gap
     assert ("commit-msg not the plugin shim" in missing[0]) == (gap == "legacy-hook")
     assert ("ralph.pluginHooks is not true" in missing[0]) == (gap == "no-switch")
     assert any("best effort" in f for f in found)
+
+
+def test_an_earlier_shim_is_outdated_not_missing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = migrated_project(tmp_path / "p")
+    old = SHIM.read_bytes() + b"# an earlier shim version\n"
+    shipped = tmp_path / "shipped-git-hooks.sha256"
+    shipped.write_text(
+        (PLUGIN / "skills/ralph-init/scripts/shipped-git-hooks.sha256").read_text()
+        + f"shim {hashlib.sha256(old).hexdigest()}\n"
+    )
+    monkeypatch.setattr(preflight, "_SHIPPED", shipped)
+    for name in ("pre-commit", "post-commit"):
+        (root / ".git/hooks" / name).write_bytes(old)
+    found = state(root)
+    outdated = [f for f in found if f.startswith("shims outdated in this clone")]
+    expected = (
+        "shims outdated in this clone — an earlier plugin shim in pre-commit, post-commit "
+        f"(run bash {preflight._MIGRATE_SCRIPT} clone)"
+    )
+    assert outdated == [expected]
+    assert not any(f.startswith("shims missing") for f in found)
+
+
+def test_an_unlisted_shim_like_hook_is_still_missing(tmp_path: Path) -> None:
+    root = migrated_project(tmp_path / "p")
+    (root / ".git/hooks/commit-msg").write_bytes(SHIM.read_bytes() + b"# edited\n")
+    found = state(root)
+    assert not any(f.startswith("shims outdated") for f in found)
+    assert any(f.startswith("shims missing in this clone — commit-msg not the plugin shim") for f in found)
 
 
 def test_check_prints_warnings_and_reads_the_git_hooks_path(

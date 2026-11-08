@@ -1,9 +1,10 @@
-"""The list of every git hook body ralph-init has shipped (TASK-323).
+"""The list of every git hook body and shim ralph-init has shipped (TASK-323, TASK-335).
 
 ``migrate-plugin-hooks.sh clone`` replaces a hook whose sha256 is listed for
-its name in ``shipped-git-hooks.sha256``. The test regenerates the list from
-this repo's history of the hook bodies, in every place ralph-init has kept
-them, plus the bodies in the work tree, and fails when the shipped list drifts.
+its name in ``shipped-git-hooks.sha256``, or as a ``shim`` line. The test
+regenerates the list from this repo's history of the hook bodies, in every
+place ralph-init has kept them, and of the git hook shim, plus the bodies and
+the shim in the work tree, and fails when the shipped list drifts.
 """
 
 from __future__ import annotations
@@ -17,11 +18,13 @@ from devcontainer_config import REPO_ROOT
 
 LIST = REPO_ROOT / "plugins/ralph/skills/ralph-init/scripts/shipped-git-hooks.sha256"
 BODIES = REPO_ROOT / "plugins/ralph/git-hooks"
+SHIM_PATH = "plugins/ralph/skills/ralph-init/templates/shims/git-hook"
 HOOK_NAMES = ("pre-commit", "commit-msg", "post-commit")
 PATHSPECS = (
     "skills/ralph-init/templates",
     "plugins/ralph/skills/ralph-init/templates/git-hooks",
     "plugins/ralph/git-hooks",
+    SHIM_PATH,
 )
 HOOK_PATH = re.compile(
     r"\A(?:skills/ralph-init/templates/(?:git-hooks/)?|plugins/ralph/skills/ralph-init/templates/git-hooks/"
@@ -37,7 +40,7 @@ def git(*args: str) -> bytes:
 
 
 def expected_lines() -> list[str]:
-    """``<name> <sha256>`` for every hook body in history and in the work tree, sorted."""
+    """``<name> <sha256>`` per hook body and ``shim <sha256>`` per shim, in history and the work tree, sorted."""
     raw = git(
         "log",
         "--format=",
@@ -53,16 +56,17 @@ def expected_lines() -> list[str]:
     for line in raw.decode().splitlines():
         meta, _, path = line.partition("\t")
         match = HOOK_PATH.match(path)
-        blob = meta.split()[3] if match else ""
-        if match and blob.strip("0"):
+        name = match.group(1) if match else "shim" if path == SHIM_PATH else ""
+        blob = meta.split()[3] if name else ""
+        if name and blob.strip("0"):
             found.add(
-                (
-                    match.group(1),
-                    hashlib.sha256(git("cat-file", "blob", blob)).hexdigest(),
-                )
+                (name, hashlib.sha256(git("cat-file", "blob", blob)).hexdigest())
             )
     for name in HOOK_NAMES:
         found.add((name, hashlib.sha256((BODIES / name).read_bytes()).hexdigest()))
+    found.add(
+        ("shim", hashlib.sha256((REPO_ROOT / SHIM_PATH).read_bytes()).hexdigest())
+    )
     return [f"{name} {digest}" for name, digest in sorted(found)]
 
 
@@ -86,13 +90,18 @@ def test_shipped_list_matches_git_history() -> None:
     )
 
 
-def test_shipped_list_names_every_hook_and_holds_sha256_digests() -> None:
+def test_shipped_list_names_every_hook_and_the_shim_and_holds_sha256_digests() -> None:
     lines = shipped_lines()
-    assert {line.split(" ")[0] for line in lines} == set(HOOK_NAMES)
+    assert {line.split(" ")[0] for line in lines} == {*HOOK_NAMES, "shim"}
     assert all(
-        re.fullmatch(r"(pre-commit|commit-msg|post-commit) [0-9a-f]{64}", line)
+        re.fullmatch(r"(pre-commit|commit-msg|post-commit|shim) [0-9a-f]{64}", line)
         for line in lines
     )
+
+
+def test_the_current_shim_is_listed() -> None:
+    digest = hashlib.sha256((REPO_ROOT / SHIM_PATH).read_bytes()).hexdigest()
+    assert f"shim {digest}" in shipped_lines()
 
 
 def test_the_v0_14_14_pre_commit_and_v0_16_0_commit_msg_are_listed() -> None:
