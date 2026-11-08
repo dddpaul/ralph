@@ -1,10 +1,10 @@
 ---
 id: TASK-341
 title: Move git hook chaining into a plugin dispatcher and thin the shim
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-08T09:41:00Z'
-updated_date: '2026-11-08T10:21:00Z'
+updated_date: '2026-11-08T10:29:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -121,4 +121,12 @@ Commit: `9264c45` - task-341: move git hook chaining into the plugin dispatcher 
 Plan: add plugins/ralph/git-hooks/run (prototype from the description), thin the shim to resolver + exec run + fallback, record the new shim sha in shipped-git-hooks.sha256 with a fixture of the v0.25.10 shim for clone/preflight/enable tests, make install-clone-hooks.sh --check and the R11 parity bats accept any recorded shim, make migrate clone check git-hooks/run is resolvable, update README/RELEASING/SKILL.
 
 Deferred AC #9 (host): the devcontainer cannot run migrate-plugin-hooks.sh clone (it refuses with DEVCONTAINER=true), and the installed plugin (0.22.2) ships no git-hooks/run, so refreshing this clone's hooks now would fail closed under ralph.pluginHooks true. Follow-up: after merge and push, on each host run /plugin update, then migrate-plugin-hooks.sh clone (and .claude/hooks/install-clone-hooks.sh --check) in both clones, then record a live commit and push through the new shim in these notes and check AC #9.
+
+Commit: `d70334c` - task-341: say the dispatcher skipped a hook the plugin does not ship
+
+Review: APPROVED d70334cfac93a4ea2d2d561350a1a22448af1348
+
+Done: plugins/ralph/git-hooks/run chains <name>.local then the plugin body (pre-push stdin copied once into a variable); the shim is the unchanged resolver + exec git-hooks/run + per-switch fallback that execs <name>.local on warn. shipped-git-hooks.sha256 lists both shim versions (fixture git-hook-shim.v0.25.10); install-clone-hooks.sh --check and the R11 parity bats accept any recorded shim; migrate clone's resolvability warning checks git-hooks/run. Final: ruff clean, pytest 1583 passed / 4 skipped, bats 0 failures. AC #9 deferred to the host (see note).
+
+Commit: `f42977d` - task-341: bump plugin version to 0.25.11 (patch)
 <!-- SECTION:NOTES:END -->
