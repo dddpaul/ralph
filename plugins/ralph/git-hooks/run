@@ -3,7 +3,9 @@
 # finds the installed plugin and execs this file as: run <hook> [git's arguments].
 # It runs the clone's own <hook>.local first, then the plugin's <hook> body next
 # to this file. Both get git's arguments, and for pre-push the same ref list on
-# stdin. A failing <hook>.local stops the hook with its status.
+# stdin. A failing <hook>.local stops the hook with its status. When the plugin
+# ships no <hook> body, the shim's per-clone switches decide, as when the shim
+# cannot find the plugin: a true switch blocks the hook before <hook>.local runs.
 name="$1"
 shift
 body="$(dirname "$0")/$name"
@@ -20,6 +22,22 @@ fi
 feed() {
   if [ "$name" = pre-push ]; then printf '%s' "$input" | "$@"; else "$@"; fi
 }
+
+# Keep this table identical to the one in templates/shims/git-hook.
+if [ ! -x "$body" ]; then
+  case "$name" in
+    pre-commit | commit-msg) switches="ralph.pluginHooks" ;;
+    pre-push) switches="ralph.pluginHooks ralph.sharedBacklog" ;;
+    *) switches="" ;;
+  esac
+  for switch in $switches; do
+    if [ "$(git config --bool "$switch" 2>/dev/null)" = true ]; then
+      echo "ralph: $name hook blocked: the ralph plugin ships no $name hook ($body not found) and $switch is true." >&2
+      echo "ralph: install or update the ralph plugin, or bypass this once with --no-verify" >&2
+      exit 1
+    fi
+  done
+fi
 
 if [ -x "$local_hook" ]; then
   feed "$local_hook" "$@" || exit $?
