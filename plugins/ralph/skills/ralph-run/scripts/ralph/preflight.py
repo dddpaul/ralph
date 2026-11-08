@@ -20,8 +20,9 @@ plugin's ``user-settings.json`` fragment the user ``settings.json`` misses. It
 reads both files and changes neither.
 
 One more report-only check reads the project's migration to plugin hooks
-(``migrate-plugin-hooks.sh``): it prints "not migrated", "partially migrated"
-or "shims missing in this clone" when one applies, and in a project whose
+(``migrate-plugin-hooks.sh``): it prints "not migrated", "partially migrated",
+"shims outdated in this clone" (a git hook is an earlier shim version) or
+"shims missing in this clone" when one applies, and in a project whose
 marker sets ``pluginHooks`` it says that plugin guards are best effort. In a
 clone with ``ralph.sharedBacklog`` true it also says that the guard refusing
 task creation in autonomous runs is best effort.
@@ -38,6 +39,7 @@ Invariants the AC pins down explicitly:
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import json
 import os
 import re
@@ -66,6 +68,7 @@ _DRIFT_SCRIPT = _PLUGIN_ROOT / "skills/ralph-init/scripts/managed-file-drift.sh"
 _HOME_PREFIXES = ("$HOME/", "${HOME}/", "~/")
 _MIGRATE_SCRIPT = _PLUGIN_ROOT / "skills/ralph-init/scripts/migrate-plugin-hooks.sh"
 _SHIM = _PLUGIN_ROOT / "skills/ralph-init/templates/shims/git-hook"
+_SHIPPED = _PLUGIN_ROOT / "skills/ralph-init/scripts/shipped-git-hooks.sha256"
 _LENGTH_GUARD = "filename-length-guard"
 _MANAGED_GUARDS = (
     "commit-msg-guard",
@@ -575,6 +578,14 @@ def migration_state(root: Path, hooks_dir: Path, switch: bool) -> list[str]:
     except OSError:
         shim = b""
     stale = [n for n in _SHIMMED_HOOKS if not _same_bytes(hooks_dir / n, shim)]
+    past = _shipped_shims()
+    outdated = [n for n in stale if _sha256(hooks_dir / n) in past]
+    stale = [n for n in stale if n not in outdated]
+    if outdated:
+        found.append(
+            f"shims outdated in this clone — an earlier plugin shim in {', '.join(outdated)} "
+            f"(run bash {_MIGRATE_SCRIPT} clone)"
+        )
     if stale or not switch:
         detail = [f"{', '.join(stale)} not the plugin shim"] if stale else []
         detail += [] if switch else ["git config ralph.pluginHooks is not true"]
@@ -589,6 +600,22 @@ def migration_state(root: Path, hooks_dir: Path, switch: bool) -> list[str]:
         "the git hooks still block when ralph.pluginHooks is true"
     )
     return found
+
+
+def _shipped_shims() -> set[str]:
+    """Return the sha256 digests of every shim version ``shipped-git-hooks.sha256`` lists."""
+    try:
+        lines = _SHIPPED.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return set()
+    return {line[len("shim ") :] for line in lines if line.startswith("shim ")}
+
+
+def _sha256(path: Path) -> str | None:
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        return None
 
 
 def _same_bytes(path: Path, data: bytes) -> bool:

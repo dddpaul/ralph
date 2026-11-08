@@ -1,9 +1,10 @@
 ---
 id: TASK-335
 title: Recognize earlier git-hook shim versions after the shim changes
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-07T21:35:00Z'
+updated_date: '2026-11-08T08:19:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies: []
@@ -23,10 +24,24 @@ Fix: record every shipped shim version the way the bodies are recorded (for exam
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The hash list includes every shim version in git history, and test_shipped_git_hooks.py fails when that part drifts
-- [ ] #2 migrate-plugin-hooks.sh clone replaces a hook equal to a past shim with the current shim, with no acceptance needed (pytest)
-- [ ] #3 preflight reports a past shim as outdated and names the clone command, not as 'shims missing' (pytest)
-- [ ] #4 shared-backlog.sh enable replaces a past pre-push shim in place and leaves no pre-push.local (test)
-- [ ] #5 A hook that matches neither the current shim, a past shim nor a shipped body behaves as before (tests)
-- [ ] #6 bash -n, the bash 3.2 static guard, ruff, pytest and bats pass
+- [x] #1 The hash list includes every shim version in git history, and test_shipped_git_hooks.py fails when that part drifts
+- [x] #2 migrate-plugin-hooks.sh clone replaces a hook equal to a past shim with the current shim, with no acceptance needed (pytest)
+- [x] #3 preflight reports a past shim as outdated and names the clone command, not as 'shims missing' (pytest)
+- [x] #4 shared-backlog.sh enable replaces a past pre-push shim in place and leaves no pre-push.local (test)
+- [x] #5 A hook that matches neither the current shim, a past shim nor a shipped body behaves as before (tests)
+- [x] #6 bash -n, the bash 3.2 static guard, ruff, pytest and bats pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan: add 'shim <sha256>' lines for every blob of templates/shims/git-hook in history + work tree to shipped-git-hooks.sha256, generated/checked by test_shipped_git_hooks.py. migrate clone plan_hooks: a hook listed as a shim -> replace. preflight migration_state: split stale hooks into past shims ('shims outdated in this clone ... run clone') and the rest ('shims missing'). shared-backlog.sh enable: a pre-push listed as a shim is replaced in place, no pre-push.local, and the .local conflict check skips it. Tests use a copied plugin tree / monkeypatched list path with a fabricated old shim.
+
+Commit: `a40cc2e` - task-335: recognize earlier git hook shim versions in clone, enable and preflight
+
+Review: APPROVED a40cc2e05b69c9ab5bc545db48d1ef9eccf6b887
+
+Done: shipped-git-hooks.sha256 lists every shim version as 'shim <sha256>' (one so far, 79d1376a, from 777119a), regenerated/checked by test_shipped_git_hooks.py. clone replaces a listed past shim; preflight reports 'shims outdated in this clone — an earlier plugin shim in <hooks> (run bash ... clone)'; shared-backlog.sh enable replaces a past pre-push shim in place and keeps any existing pre-push.local. Tests fabricate an old shim via a copied plugin tree (bash) or a monkeypatched preflight._SHIPPED. ruff, full pytest (1544 passed), npm test bats and shared-backlog shell suites pass. Follow-up: repo-local .claude/hooks/install-clone-hooks.sh still calls an earlier shim 'not the plugin shim' (its message already points at clone).
+
+Commit: `d8062cb` - task-335: bump plugin version to 0.25.6 (patch)
+<!-- SECTION:NOTES:END -->

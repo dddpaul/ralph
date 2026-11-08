@@ -71,9 +71,10 @@
 #   2. shims    — installs the plugin shim (templates/shims/git-hook) as
 #                 pre-commit, commit-msg and post-commit in the directory
 #                 `git rev-parse --git-path hooks` returns. A hook that is
-#                 absent or an unedited copy of a <name> body ralph-init has
-#                 ever shipped (its sha256 is in shipped-git-hooks.sha256 beside
-#                 this script) is replaced. A hook that
+#                 absent, an unedited copy of a <name> body ralph-init has
+#                 ever shipped or an earlier version of the shim (its sha256
+#                 is in shipped-git-hooks.sha256 beside this script) is
+#                 replaced. A hook that
 #                 differs and that .claude/managed-file-drift.accept lists for
 #                 .git/hooks/<name> is kept as <name>.local, which the shim runs
 #                 first. Any other differing hook, or an existing <name>.local
@@ -185,7 +186,8 @@ copy_into() {
 }
 
 # Succeed when hook file $1 is an unedited copy of a $2 body ralph-init has
-# shipped: its sha256 is listed for $2 in shipped-git-hooks.sha256.
+# shipped: its sha256 is listed for $2 in shipped-git-hooks.sha256. With $2
+# "shim", succeed when $1 is a version of the shim ralph-init has shipped.
 shipped_hook() {
   grep -Fxq -- "$2 $(sha256 <"$1")" "$shipped"
 }
@@ -200,7 +202,7 @@ plan_hooks() {
       echo "$name:install"
     elif cmp -s "$hook" "$shim"; then
       echo "$name:keep"
-    elif { [ -r "$tmpl" ] && cmp -s "$hook" "$tmpl"; } || shipped_hook "$hook" "$name"; then
+    elif { [ -r "$tmpl" ] && cmp -s "$hook" "$tmpl"; } || shipped_hook "$hook" "$name" || shipped_hook "$hook" shim; then
       echo "$name:replace"
     elif accepted_hook "$hook" "$tmpl"; then
       if { [ -e "$loc" ] || [ -L "$loc" ]; } && ! cmp -s "$hook" "$loc"; then

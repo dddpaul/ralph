@@ -11,6 +11,7 @@ registry and execs its script.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import pty
@@ -230,6 +231,56 @@ def test_enable_refuses_when_pre_push_local_differs_and_writes_nothing(
     assert (
         config(repo, "ralph.holder") == "" and config(repo, "ralph.sharedBacklog") == ""
     )
+
+
+def plugin_with_old_shim(tmp_path: Path) -> tuple[Path, bytes]:
+    """A copy of the plugin whose hash list also lists a fabricated earlier shim; return it and that shim."""
+    plugin = tmp_path / "plugin"
+    shutil.copytree(PLUGIN, plugin, ignore=shutil.ignore_patterns("__pycache__"))
+    old = HOOK_SHIM.read_bytes() + b"# an earlier shim version\n"
+    with (plugin / "skills/ralph-init/scripts/shipped-git-hooks.sha256").open("a") as f:
+        f.write(f"shim {hashlib.sha256(old).hexdigest()}\n")
+    return plugin, old
+
+
+def test_enable_replaces_an_earlier_pre_push_shim_in_place(
+    tmp_path: Path, repo: Path, env: dict[str, str]
+) -> None:
+    plugin, old = plugin_with_old_shim(tmp_path)
+    pre_push(repo).write_bytes(old)
+    result = run(
+        repo, env, "enable", "--holder", "@host-a", script=plugin / "scripts/shared-backlog.sh"
+    )
+    assert result.returncode == 0, result.stderr
+    assert pre_push(repo).read_bytes() == HOOK_SHIM.read_bytes()
+    assert not (repo / ".git/hooks/pre-push.local").exists()
+    assert "pre-push.local" not in result.stdout
+
+
+def test_enable_replaces_an_earlier_shim_and_keeps_its_pre_push_local(
+    tmp_path: Path, repo: Path, env: dict[str, str]
+) -> None:
+    plugin, old = plugin_with_old_shim(tmp_path)
+    own = b"#!/bin/sh\necho own pre-push\n"
+    pre_push(repo).write_bytes(old)
+    (repo / ".git/hooks/pre-push.local").write_bytes(own)
+    result = run(
+        repo, env, "enable", "--holder", "@host-a", script=plugin / "scripts/shared-backlog.sh"
+    )
+    assert result.returncode == 0, result.stderr
+    assert pre_push(repo).read_bytes() == HOOK_SHIM.read_bytes()
+    assert (repo / ".git/hooks/pre-push.local").read_bytes() == own
+
+
+def test_enable_keeps_an_unlisted_shim_like_pre_push_as_pre_push_local(
+    repo: Path, env: dict[str, str]
+) -> None:
+    edited = HOOK_SHIM.read_bytes() + b"# edited\n"
+    pre_push(repo).write_bytes(edited)
+    result = run(repo, env, "enable", "--holder", "@host-a")
+    assert result.returncode == 0, result.stderr
+    assert (repo / ".git/hooks/pre-push.local").read_bytes() == edited
+    assert pre_push(repo).read_bytes() == HOOK_SHIM.read_bytes()
 
 
 # --------------------------------------------------------------------------

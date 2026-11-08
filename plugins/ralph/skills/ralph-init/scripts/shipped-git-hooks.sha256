@@ -1,4 +1,5 @@
-# <hook name> <sha256> of every git hook body ralph-init has shipped (TASK-323).
+# <hook name> <sha256> of every git hook body ralph-init has shipped (TASK-323), and
+# shim <sha256> of every version of the git hook shim, templates/shims/git-hook (TASK-335).
 # migrate-plugin-hooks.sh clone replaces a hook that matches a line; generated from git history
 # by tests/python/test_shipped_git_hooks.py, which fails when this list drifts.
 commit-msg 186275c50a88ae7032b931d56735f6be20b3beef2a60c11355e21b0c62eb2e54
@@ -14,3 +15,4 @@ pre-commit 4c261b32f47537062244d0905b10722f063d65e6f68ac72ceb8ede0cf8dbd67b
 pre-commit 7de2cebd77b46549a86d06d1f5e7b898188de41419574374577057821ea92373
 pre-commit ac7232a8a17111d419ec92206d4d59a93b5d418517efe6b56705c95da46a2d7c
 pre-commit cdf91401b04d8c0e480841f70e72c334be4c049513876627285117335e3b1773
+shim 79d1376ace2e09d17a62d8e4015eef9e9338859d218a3b28dc75f05bba54d1ca

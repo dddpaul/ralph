@@ -292,6 +292,41 @@ def test_old_shipped_hook_copies_are_replaced_by_the_shim(tmp_path: Path, home: 
         assert not (root / f".git/hooks/{name}.local").exists()
 
 
+def plugin_with_old_shim(tmp_path: Path, list_it: bool = True) -> tuple[Path, bytes]:
+    """A copy of the plugin and a fabricated earlier shim, which its hash list lists when ``list_it``."""
+    plugin = tmp_path / "plugin"
+    shutil.copytree(REPO_ROOT / "plugins/ralph", plugin, ignore=shutil.ignore_patterns("__pycache__"))
+    old = SHIM.read_bytes() + b"# an earlier shim version\n"
+    if list_it:
+        with (plugin / "skills/ralph-init/scripts/shipped-git-hooks.sha256").open("a") as f:
+            f.write(f"shim {hashlib.sha256(old).hexdigest()}\n")
+    return plugin, old
+
+
+def test_an_earlier_shim_is_replaced_by_the_current_shim(tmp_path: Path, home: Path) -> None:
+    root = make_clone(tmp_path / "proj")
+    plugin, old = plugin_with_old_shim(tmp_path)
+    for name in HOOK_NAMES:
+        (root / ".git/hooks" / name).write_bytes(old)
+    result = clone(root, home, extra_env={"CLAUDE_PLUGIN_ROOT": str(plugin)})
+    assert result.returncode == 0, result.stderr
+    for name in HOOK_NAMES:
+        assert (root / ".git/hooks" / name).read_bytes() == SHIM.read_bytes()
+        assert not (root / f".git/hooks/{name}.local").exists()
+    assert "installed the plugin shim as pre-commit" in result.stdout
+
+
+def test_an_unlisted_shim_like_hook_is_refused(tmp_path: Path, home: Path) -> None:
+    root = make_clone(tmp_path / "proj")
+    plugin, old = plugin_with_old_shim(tmp_path, list_it=False)
+    (root / ".git/hooks/pre-commit").write_bytes(old)
+    before = snapshot(root)
+    result = clone(root, home, extra_env={"CLAUDE_PLUGIN_ROOT": str(plugin)})
+    assert result.returncode == 1
+    assert "pre-commit differs from every pre-commit hook body ralph-init has shipped" in result.stderr
+    assert snapshot(root) == before
+
+
 def test_a_shipped_body_of_another_hook_name_is_refused(tmp_path: Path, home: Path) -> None:
     root = make_clone(tmp_path / "proj")
     shutil.copyfile(BODIES / "pre-commit", root / ".git/hooks/commit-msg")
