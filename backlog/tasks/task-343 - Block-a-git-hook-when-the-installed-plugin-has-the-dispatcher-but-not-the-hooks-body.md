@@ -3,10 +3,10 @@ id: TASK-343
 title: >-
   Block a git hook when the installed plugin has the dispatcher but not the
   hook's body
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-08T15:03:00Z'
-updated_date: '2026-11-08T18:21:00Z'
+updated_date: '2026-11-08T18:29:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies: []
@@ -45,4 +45,12 @@ If any listed switch is true (git config --bool), print a block line that names 
 
 <!-- SECTION:NOTES:BEGIN -->
 Plan: in git-hooks/run, when the body is missing check the shim's switch table before <name>.local and block (exit 1, block + hint lines) if a switch is true; else keep local-then-warn. Add pytest cases for AC1-3, a table-parity test comparing the case block in run and the shim, update README dispatcher paragraph.
+
+Commit: `4fec781` - task-343: block a hook in the dispatcher when its body is missing and a switch is true
+
+Review: APPROVED 4fec7815a1568cb899d6f44f858d9854f7dc4b8f
+
+Done: git-hooks/run now checks the shim's switch table when the hook body is missing, before <name>.local; a true switch blocks with exit 1 and the --no-verify hint. Parity test compares the case blocks. ruff clean, pytest 1592 passed, bats 282 ok.
+
+Commit: `c65ac1d` - task-343: bump plugin version to 0.25.12 (patch)
 <!-- SECTION:NOTES:END -->
