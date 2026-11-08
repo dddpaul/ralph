@@ -6,7 +6,7 @@ title: >-
 status: Done
 assignee: []
 created_date: '2026-11-04T14:53:00Z'
-updated_date: '2026-11-06T13:53:00Z'
+updated_date: '2026-11-08T15:02:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -52,4 +52,6 @@ Commit: `ef82389` - task-306: exit 2 when claim or release cannot reach origin
 Done: land_reapply replaces the rebase landing for claim, release and create; failures reset to origin/master (after one more fetch when the push was refused 3 times); claim/release exit 2 when origin is unreachable mid-retry. Release now undoes locally on failure instead of keeping the commit. Reviewer APPROVED (minor, open: the mid-retry exit-2 path has no test; a failed create commit can leave an untracked task file, left to TASK-307).
 
 Commit: `ea95c01` - task-306: bump plugin version to 0.20.4 (patch)
+
+Cross-reference (2026-11-08 feature review): the (host) /bin/bash 3.2 evidence for AC #5 is in TASK-320 AC #6, where the retry suite passed 38/0 under /bin/bash 3.2.
 <!-- SECTION:NOTES:END -->

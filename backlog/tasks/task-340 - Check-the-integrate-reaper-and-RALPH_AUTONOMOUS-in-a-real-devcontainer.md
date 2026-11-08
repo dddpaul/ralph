@@ -4,6 +4,7 @@ title: Check the integrate reaper and RALPH_AUTONOMOUS in a real devcontainer
 status: To Do
 assignee: []
 created_date: '2026-11-07T21:35:00Z'
+updated_date: '2026-11-08T15:02:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies: []
@@ -25,5 +26,5 @@ Guard: during an autonomous --devcontainer run in an enforcing test clone, confi
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 (host) After integrate times out in a real devcontainer, the grep finds no tagged process; the command and its output are recorded in the notes
-- [ ] #2 (host) Inside a real devcontainer run, RALPH_AUTONOMOUS=1 is set and backlog task create is refused in an enforcing clone; recorded in the notes
+- [ ] #2 (host) Inside a real devcontainer run, RALPH_AUTONOMOUS=1 is set, SHARED_BACKLOG_HOLDER and RALPH_RUN_LOCK_TOKEN carry the host run's values (the same --remote-env path, so far only tested against a fake devcontainer), and backlog task create is refused in an enforcing clone; recorded in the notes
 <!-- AC:END -->
