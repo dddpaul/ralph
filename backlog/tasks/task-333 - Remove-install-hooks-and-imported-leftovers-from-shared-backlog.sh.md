@@ -1,10 +1,10 @@
 ---
 id: TASK-333
 title: Remove install-hooks and imported leftovers from shared-backlog.sh
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-07T21:35:00Z'
-updated_date: '2026-11-08T07:43:00Z'
+updated_date: '2026-11-08T07:44:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies: []
@@ -48,4 +48,10 @@ Do not touch tests/shell/stage1/: it is the pinned import baseline, and test_sha
 Commit: `4a9b1b8` - task-333: remove install-hooks and imported leftovers from shared-backlog.sh
 
 Plan: drop install-hooks (header, HOOK_MARKER, cmd, dispatch, README row); repoint header to README 'Shared backlog across hosts'; reword the six owner-naming messages; anchor the prepush refusal check on 'shared-backlog: duplicate task IDs in'; add a claim-test check that install-hooks is a usage error.
+
+Review: APPROVED 1d0aead36a0861365c761993d1b8105c39527bae
+
+Done: install-hooks removed (header, HOOK_MARKER, cmd, dispatch, README row); header points to README 'Shared backlog across hosts'; six messages reworded to 'ask a person'/'only a person may decide'; prepush refusal check anchored on 'shared-backlog: duplicate task IDs in'; claim test asserts install-hooks is a usage error. ruff clean, pytest 1536 passed/4 skipped, all 7 shared-backlog shell suites 0 failures.
+
+Commit: `f1f5437` - task-333: bump plugin version to 0.25.4 (patch)
 <!-- SECTION:NOTES:END -->
