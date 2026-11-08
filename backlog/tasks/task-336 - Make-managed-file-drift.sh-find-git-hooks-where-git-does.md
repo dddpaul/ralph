@@ -4,7 +4,7 @@ title: Make managed-file-drift.sh find git hooks where git does
 status: In Progress
 assignee: []
 created_date: '2026-11-07T21:35:00Z'
-updated_date: '2026-11-08T08:19:00Z'
+updated_date: '2026-11-08T08:33:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies: []
@@ -21,8 +21,14 @@ Fix: resolve the hooks directory with git -C <project> rev-parse --git-path hook
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Under core.hooksPath, check compares the hooks in that directory (pytest)
-- [ ] #2 In a linked worktree, check compares the hooks of the git common dir instead of skipping them (pytest)
-- [ ] #3 Reports and the accept subcommand still use the .git/hooks/<name> key, and an existing accept line still suppresses its warning (pytest)
-- [ ] #4 bash -n, the bash 3.2 static guard, ruff, pytest and bats pass
+- [x] #1 Under core.hooksPath, check compares the hooks in that directory (pytest)
+- [x] #2 In a linked worktree, check compares the hooks of the git common dir instead of skipping them (pytest)
+- [x] #3 Reports and the accept subcommand still use the .git/hooks/<name> key, and an existing accept line still suppresses its warning (pytest)
+- [x] #4 bash -n, the bash 3.2 static guard, ruff, pytest and bats pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Commit: `4df7de2` - task-336: read git hooks from git's hooks directory in managed-file-drift.sh
+<!-- SECTION:NOTES:END -->
