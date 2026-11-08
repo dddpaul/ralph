@@ -4,7 +4,7 @@ title: Move git hook chaining into a plugin dispatcher and thin the shim
 status: Done
 assignee: []
 created_date: '2026-11-08T09:41:00Z'
-updated_date: '2026-11-08T10:29:00Z'
+updated_date: '2026-11-08T13:59:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -129,4 +129,6 @@ Review: APPROVED d70334cfac93a4ea2d2d561350a1a22448af1348
 Done: plugins/ralph/git-hooks/run chains <name>.local then the plugin body (pre-push stdin copied once into a variable); the shim is the unchanged resolver + exec git-hooks/run + per-switch fallback that execs <name>.local on warn. shipped-git-hooks.sha256 lists both shim versions (fixture git-hook-shim.v0.25.10); install-clone-hooks.sh --check and the R11 parity bats accept any recorded shim; migrate clone's resolvability warning checks git-hooks/run. Final: ruff clean, pytest 1583 passed / 4 skipped, bats 0 failures. AC #9 deferred to the host (see note).
 
 Commit: `f42977d` - task-341: bump plugin version to 0.25.11 (patch)
+
+Host check (macOS, installed plugin 0.25.11 at user scope, master 78c0e96, 2026-11-08): preflight first reported 'shims outdated in this clone' for pre-commit, commit-msg and post-commit. migrate-plugin-hooks.sh clone from the installed plugin replaced all three with shim v2 (sha256 1520d251...) with rc 0. It also removed 44 entries from .claude/settings.local.json that user settings already hold. clone does not manage pre-push, and this clone moved its pre-push by hand (TASK-328) with ralph.sharedBacklog unset, so shared-backlog.sh enable does not apply either. I replaced the v1 pre-push shim (79d1376a...) with the template by hand. Afterwards preflight shows no plugin-hooks shim warning and install-clone-hooks.sh --check exits 0. The commit that records this note is the live commit through the v2 pre-commit, commit-msg and post-commit.
 <!-- SECTION:NOTES:END -->
