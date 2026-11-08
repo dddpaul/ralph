@@ -10,7 +10,8 @@
 # it records follow-ups in its task notes instead. This guard refuses
 # `backlog task create`, `backlog draft create` and `backlog draft promote`
 # (anywhere in a compound command, so also after a cd into another repo),
-# `shared-backlog.sh create` and the ralph:ralph-handoff skill when
+# `shared-backlog.sh create`, the ralph:ralph-handoff skill and the skill's
+# `handoff-create.sh create` called directly when
 # RALPH_AUTONOMOUS=1 and the run's clone has ralph.sharedBacklog true.
 # hooks.json calls it directly, not through run.sh: it is not subject to the
 # pluginHooks marker or localGuards. The run's clone is the git root of
@@ -55,10 +56,13 @@ if [ -z "$what" ] && [ -n "$cmd" ]; then
   backlog_create="${backlog_cmd}tasks?[[:space:]]+create([[:space:]]|$)"
   draft_create="${backlog_cmd}draft[[:space:]]+create([[:space:]]|$)"
   draft_promote="${backlog_cmd}draft[[:space:]]+promote([[:space:]]|$)"
-  # The script name is distinctive enough to match anywhere, quoted or not.
+  # The script names are distinctive enough to match anywhere, quoted or not.
   shared_create="shared-backlog\\.sh[\"']?[[:space:]]+create([[:space:]]|$)"
+  handoff_create="handoff-create\\.sh[\"']?[[:space:]]+create([[:space:]]|$)"
   if printf '%s\n' "$cmd" | grep -Eq "$shared_create"; then
     what="shared-backlog.sh create"
+  elif printf '%s\n' "$cmd" | grep -Eq "$handoff_create"; then
+    what="handoff-create.sh create"
   elif printf '%s\n' "$cmd" | grep -Eq "$backlog_create"; then
     what="backlog task create"
   elif printf '%s\n' "$cmd" | grep -Eq "$draft_promote"; then
