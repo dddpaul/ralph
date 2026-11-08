@@ -1,9 +1,10 @@
 ---
 id: TASK-333
 title: Remove install-hooks and imported leftovers from shared-backlog.sh
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-07T21:35:00Z'
+updated_date: '2026-11-08T07:44:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies: []
@@ -32,11 +33,25 @@ Do not touch tests/shell/stage1/: it is the pinned import baseline, and test_sha
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 shared-backlog.sh has no install-hooks: no header lines, no cmd_install_hooks, no HOOK_MARKER and no dispatch entry; shared-backlog.sh install-hooks ends in the usage error like any unknown command (test)
-- [ ] #2 grep -rn install-hooks README.md plugins/ prints nothing
-- [ ] #3 The script header points to the README section 'Shared backlog across hosts'; grep -n -E 'Shared repo protocol|multi-host-parallel-work' plugins/ralph/scripts/shared-backlog.sh prints nothing
-- [ ] #4 No message names a person: grep -n -E 'say-so|stop and tell' plugins/ralph/scripts/shared-backlog.sh prints nothing, and the six messages read as given in the description
-- [ ] #5 The prepush suite's refusal check no longer matches the success line, and the suite still passes
-- [ ] #6 git diff --stat master..HEAD shows no path under tests/shell/stage1/
-- [ ] #7 bash -n, the bash 3.2 static guard, the shared-backlog shell suites, ruff and pytest pass
+- [x] #1 shared-backlog.sh has no install-hooks: no header lines, no cmd_install_hooks, no HOOK_MARKER and no dispatch entry; shared-backlog.sh install-hooks ends in the usage error like any unknown command (test)
+- [x] #2 grep -rn install-hooks README.md plugins/ prints nothing
+- [x] #3 The script header points to the README section 'Shared backlog across hosts'; grep -n -E 'Shared repo protocol|multi-host-parallel-work' plugins/ralph/scripts/shared-backlog.sh prints nothing
+- [x] #4 No message names a person: grep -n -E 'say-so|stop and tell' plugins/ralph/scripts/shared-backlog.sh prints nothing, and the six messages read as given in the description
+- [x] #5 The prepush suite's refusal check no longer matches the success line, and the suite still passes
+- [x] #6 git diff --stat master..HEAD shows no path under tests/shell/stage1/
+- [x] #7 bash -n, the bash 3.2 static guard, the shared-backlog shell suites, ruff and pytest pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Commit: `4a9b1b8` - task-333: remove install-hooks and imported leftovers from shared-backlog.sh
+
+Plan: drop install-hooks (header, HOOK_MARKER, cmd, dispatch, README row); repoint header to README 'Shared backlog across hosts'; reword the six owner-naming messages; anchor the prepush refusal check on 'shared-backlog: duplicate task IDs in'; add a claim-test check that install-hooks is a usage error.
+
+Review: APPROVED 1d0aead36a0861365c761993d1b8105c39527bae
+
+Done: install-hooks removed (header, HOOK_MARKER, cmd, dispatch, README row); header points to README 'Shared backlog across hosts'; six messages reworded to 'ask a person'/'only a person may decide'; prepush refusal check anchored on 'shared-backlog: duplicate task IDs in'; claim test asserts install-hooks is a usage error. ruff clean, pytest 1536 passed/4 skipped, all 7 shared-backlog shell suites 0 failures.
+
+Commit: `f1f5437` - task-333: bump plugin version to 0.25.4 (patch)
+<!-- SECTION:NOTES:END -->

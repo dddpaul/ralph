@@ -220,6 +220,9 @@ check "-h exits 0 and prints the help (rc=$rc)" sh -c 'test "$1" -eq 0 && case "
 out=$(sb no-such-command 2>&1 >/dev/null); rc=$?
 check "an unknown command is still a usage error (rc=$rc)" test "$rc" -eq 64
 check "the usage error prints the whole help on stderr" has "$out" "64 usage error"
+out=$(sb install-hooks 2>&1 >/dev/null); rc=$?
+check "install-hooks is an unknown command (rc=$rc)" test "$rc" -eq 64
+check "the help no longer lists install-hooks" sh -c 'case "$1" in *install-hooks*) exit 1 ;; esac' _ "$out"
 mkdir -p "$work/bin" && cp "$SB" "$work/bin/sb.sh"
 out=$( (cd "$work/a/backlog" && bash ../../bin/sb.sh no-such-command) 2>&1); rc=$?
 check "a usage error from a subdirectory still prints the help (rc=$rc)" sh -c 'test "$1" -eq 64 && case "$2" in *"64 usage error"*) ;; *) exit 1 ;; esac' _ "$rc" "$out"

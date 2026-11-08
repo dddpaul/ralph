@@ -223,7 +223,6 @@ The commands, each run as `bash scripts/shared-backlog.sh <command>` (`--help` p
 | `integrate [--task N]` | merge `origin/master` into local master (never rebase), stop on duplicate IDs, run the checks, push |
 | `check-dupes [REV]` | exit 1 when REV's tree has duplicate task or draft IDs; the pre-push hook runs it on every pushed tip |
 | `renumber [--base REF]` | renumber our copies of duplicate IDs; only a person runs it, after `integrate` stopped |
-| `install-hooks [--force]` | install the project's `scripts/hooks/pre-push` into `.git/hooks` |
 | `enable [--holder @who]` / `disable` | switch this clone on or off |
 | `run-lock` / `run-unlock` / `unlock` | the run lock a Ralph run holds, and removal of a dead owner's lock |
 
