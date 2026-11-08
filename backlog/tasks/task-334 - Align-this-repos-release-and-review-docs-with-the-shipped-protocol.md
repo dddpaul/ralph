@@ -4,7 +4,7 @@ title: Align this repo's release and review docs with the shipped protocol
 status: In Progress
 assignee: []
 created_date: '2026-11-07T21:35:00Z'
-updated_date: '2026-11-08T07:45:00Z'
+updated_date: '2026-11-08T08:02:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies: []
@@ -31,17 +31,19 @@ Why: the feature review of plugin-delivered-project-files and the task notes of 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 .claude/RELEASING.md step 2 says to merge origin/master and never rebase, with the R-INFRA-6 reason
-- [ ] #2 R11 no longer pairs .git/hooks/* with the plugin hook bodies; it says a migrated clone's git hooks are the plugin shim and are not tracked
-- [ ] #3 R11 counts the guards as in .claude/ralph.json localGuards and describes .claude/settings.json as it is now, with no 'until the repo migrates' wording
-- [ ] #4 tests/unit/template-parity.bats passes and matches the updated table
-- [ ] #5 R-INFRA-6 says a project without a remote-tracking branch should set master_provenance_since
-- [ ] #6 README.md 'Shared backlog across hosts' states that devcontainer checks need a project path without whitespace
-- [ ] #7 ruff, pytest and bats pass
+- [x] #1 .claude/RELEASING.md step 2 says to merge origin/master and never rebase, with the R-INFRA-6 reason
+- [x] #2 R11 no longer pairs .git/hooks/* with the plugin hook bodies; it says a migrated clone's git hooks are the plugin shim and are not tracked
+- [x] #3 R11 counts the guards as in .claude/ralph.json localGuards and describes .claude/settings.json as it is now, with no 'until the repo migrates' wording
+- [x] #4 tests/unit/template-parity.bats passes and matches the updated table
+- [x] #5 R-INFRA-6 says a project without a remote-tracking branch should set master_provenance_since
+- [x] #6 README.md 'Shared backlog across hosts' states that devcontainer checks need a project path without whitespace
+- [x] #7 ruff, pytest and bats pass
 <!-- AC:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 Plan: RELEASING.md step 2 merge-only with R-INFRA-6 reason; R11 table: one row pairing the four untracked .git/hooks/* with templates/shims/git-hook, six guards per localGuards, rewrite settings.json note; parity bats: registry rows for all four hooks against the shim, drop the legacy plugin-body/prefix path; R-INFRA-6 master_provenance_since advice; README whitespace limitation.
+
+Commit: `8613bbd` - task-334: align release, R11 and R-INFRA-6 docs with the shipped protocol
 <!-- SECTION:NOTES:END -->

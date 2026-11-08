@@ -37,7 +37,7 @@ TEMPLATES="$PLUGIN/skills/ralph-init/templates"
 #            differing line must be listed in claude_md_allowed_deviations.
 #   keys   — gitignored per-developer override: compare JSON shape, not bytes.
 #
-# The R11 table drives the rows. Two more are the same class but absent from
+# The R11 table drives the rows. One more is the same class but absent from
 # it — .claude/brainstorm-rules.md — and is in parity today, so it is
 # registered here to keep it that way.
 # --------------------------------------------------------------------------
