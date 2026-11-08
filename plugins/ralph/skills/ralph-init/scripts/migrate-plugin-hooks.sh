@@ -79,7 +79,10 @@
 #                 .git/hooks/<name> is kept as <name>.local, which the shim runs
 #                 first. Any other differing hook, or an existing <name>.local
 #                 with other content, stops the run before anything is written:
-#                 a <name>.local is never overwritten.
+#                 a <name>.local is never overwritten. An accepted hook that
+#                 holds every non-blank, non-comment line of the plugin body
+#                 git-hooks/<name>, in order, is still kept, with a warning: the
+#                 .local repeats the body, which then runs twice.
 #   3. switch   — sets git config ralph.pluginHooks true, so pre-commit and
 #                 commit-msg block when the plugin cannot be resolved.
 #   4. allow    — removes from .claude/settings.local.json each entry of the
@@ -190,6 +193,19 @@ copy_into() {
 # "shim", succeed when $1 is a version of the shim ralph-init has shipped.
 shipped_hook() {
   grep -Fxq -- "$2 $(sha256 <"$1")" "$shipped"
+}
+
+# Succeed when hook file $1 holds every non-blank, non-comment line of body
+# file $2, in order, compared without leading and trailing blanks.
+repeats_body() {
+  [ -r "$2" ] || return 1
+  awk -v body="$2" '
+    function trim(l) { sub(/^[ \t]+/, "", l); sub(/[ \t]+$/, "", l); return l }
+    function sig(l) { return l != "" && substr(l, 1, 1) != "#" }
+    BEGIN { while ((getline l < body) > 0) { l = trim(l); if (sig(l)) b[++n] = l } }
+    { l = trim($0); if (i < n && sig(l) && l == b[i + 1]) i++ }
+    END { exit !(n > 0 && i == n) }
+  ' "$1"
 }
 
 # Decide what clone does with each git hook; print "<name>:<action>" lines.
@@ -316,6 +332,9 @@ clone_main() {
   for line in $plan; do
     name=${line%%:*} action=${line#*:}
     [ "$action" != keep ] || continue
+    if [ "$action" = local ] && repeats_body "$hooks/$name" "$plugin_root/git-hooks/$name"; then
+      echo "migrate-plugin-hooks: warning: the accepted $name hook repeats the plugin body $plugin_root/git-hooks/$name, which the shim runs after $name.local, so that work runs twice; cut $name.local down to the project's own lines" >&2
+    fi
     if [ "$action" = local ] && ! [ -e "$hooks/$name.local" ]; then
       copy_into "$hooks/$name" "$hooks/$name.local"
       echo "kept the accepted $name hook as $name.local"
