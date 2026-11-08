@@ -25,6 +25,7 @@ set -u
 
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 SHIM="$script_dir/../../plugins/ralph/skills/ralph-init/templates/shims/git-hook"
+SHIPPED="$script_dir/../../plugins/ralph/skills/ralph-init/scripts/shipped-git-hooks.sha256"
 
 check=0
 case "${1:-}" in
@@ -85,8 +86,22 @@ problem() {
   failed=1
 }
 
+# SHA-256 of stdin, hex only: shasum on macOS, sha256sum on GNU systems.
+sha256() {
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 | cut -d' ' -f1
+  else
+    sha256sum | cut -d' ' -f1
+  fi
+}
+
+# Succeed when $1 is the checkout's shim or any shim version recorded in
+# shipped-git-hooks.sha256, so a clone not yet refreshed with
+# migrate-plugin-hooks.sh clone still passes (TASK-341).
 is_shim() {
-  [ -f "$1" ] && cmp -s "$1" "$SHIM"
+  [ -f "$1" ] || return 1
+  cmp -s "$1" "$SHIM" && return 0
+  [ -r "$SHIPPED" ] && grep -Fxq -- "shim $(sha256 <"$1")" "$SHIPPED"
 }
 
 # ensure <path> <content-function>: install <path> when absent, accept it when

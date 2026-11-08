@@ -377,7 +377,7 @@ clone_main() {
   fi
   # shellcheck source=../templates/shims/resolve-plugin.sh
   . "$templates/shims/resolve-plugin.sh"
-  if ! ralph_resolve_plugin "$root" git-hooks/pre-commit >/dev/null; then
+  if ! ralph_resolve_plugin "$root" git-hooks/run >/dev/null; then
     echo "migrate-plugin-hooks: warning: the plugin cannot be resolved from this clone (reason above); with ralph.pluginHooks true, commits block until it can (bypass once with git commit --no-verify)" >&2
   fi
   echo "note: the plugin's Claude guard hooks are best effort: a guard hook that cannot start does not block the command; the git hooks still block on ralph.pluginHooks"

@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Ralph git hook dispatcher (TASK-341). The per-clone shim (templates/shims/git-hook)
+# finds the installed plugin and execs this file as: run <hook> [git's arguments].
+# It runs the clone's own <hook>.local first, then the plugin's <hook> body next
+# to this file. Both get git's arguments, and for pre-push the same ref list on
+# stdin. A failing <hook>.local stops the hook with its status.
+name="$1"
+shift
+body="$(dirname "$0")/$name"
+local_hook="$(git rev-parse --git-path hooks)/$name.local" || exit 1
+
+# git writes pre-push's ref list to stdin once; keep a copy so that both hooks
+# read all of it. The trailing x keeps the final newline through $(...).
+if [ "$name" = pre-push ]; then
+  input="$(cat; echo x)"
+  input="${input%x}"
+fi
+
+# feed CMD ARGS... — run CMD with git's stdin, or with the copy for pre-push.
+feed() {
+  if [ "$name" = pre-push ]; then printf '%s' "$input" | "$@"; else "$@"; fi
+}
+
+if [ -x "$local_hook" ]; then
+  feed "$local_hook" "$@" || exit $?
+fi
+if [ ! -x "$body" ]; then
+  echo "ralph: warning: the ralph plugin ships no $name hook; ran only $name.local" >&2
+  exit 0
+fi
+feed "$body" "$@"

@@ -4,11 +4,12 @@
 bodies, which also still work as legacy copies installed straight into
 ``.git/hooks`` (ralph-init no longer ships template copies of them).
 ``templates/shims/git-hook`` is the one
-file installed under every hook name: it runs ``<name>.local`` first, then
-execs the plugin body found through the registry resolver, and when the plugin
-cannot be resolved it blocks or warns per the clone's switches (PRD US-003,
-FR-5). These tests drive real ``git commit`` / ``git push`` runs through the
-installed shim against fake ``installed_plugins.json`` registries.
+file installed under every hook name: it execs the plugin dispatcher
+``git-hooks/run`` found through the registry resolver, which runs
+``<name>.local`` first and then the plugin body (TASK-341). When the plugin
+cannot be resolved the shim blocks or warns per the clone's switches, and on a
+warning runs ``<name>.local`` alone (PRD US-003, FR-5). These tests drive real
+``git commit`` / ``git push`` runs through the installed shim against fake ``installed_plugins.json`` registries.
 """
 
 from __future__ import annotations
@@ -30,6 +31,7 @@ LEGACY_GUARD = PLUGIN / "hooks/filename-length-guard.sh"
 HOOK_NAMES = ("pre-commit", "commit-msg", "post-commit")
 # pre-push ships too, but only shared-backlog enable installs its shim (TASK-311).
 BODY_NAMES = (*HOOK_NAMES, "pre-push")
+DISPATCHER = BODIES / "run"
 GIT = shutil.which("git") or "/usr/bin/git"
 LONG_NAME = "x" * 130 + ".md"
 
@@ -109,16 +111,26 @@ def test_plugin_body_is_executable(name: str) -> None:
 
 
 def test_plugin_ships_exactly_the_shimmed_hooks_and_no_template_copies() -> None:
-    assert sorted(p.name for p in BODIES.iterdir()) == sorted(BODY_NAMES)
+    assert sorted(p.name for p in BODIES.iterdir()) == sorted((*BODY_NAMES, "run"))
     assert not (TEMPLATES / "git-hooks").exists()
 
 
 def test_shim_is_executable_and_names_no_hook() -> None:
     assert os.access(SHIM, os.X_OK)
+    assert os.access(DISPATCHER, os.X_OK)
     text = SHIM.read_text()
     assert 'name="${0##*/}"' in text
+    assert 'ralph_resolve_plugin "$PWD" git-hooks/run' in text
     for name in HOOK_NAMES:
         assert f"git-hooks/{name}" not in text
+
+
+def test_shim_copies_no_stdin_through_descriptors() -> None:
+    for path in (SHIM, DISPATCHER):
+        text = path.read_text()
+        assert "exec 3" not in text
+        assert "0<&3" not in text
+        assert "mktemp" not in text
 
 
 # ---------------------------------------------------------------- shim → plugin body
@@ -174,6 +186,8 @@ def test_legacy_install_into_git_hooks_still_works(world: dict[str, Path]) -> No
 def recording_install(base: Path, *names: str) -> Path:
     """A fake plugin install whose bodies record their arguments and stdin."""
     install = base / "install"
+    (install / "git-hooks").mkdir(parents=True, exist_ok=True)
+    shutil.copy2(DISPATCHER, install / "git-hooks/run")
     for name in names:
         write_hook(
             install / "git-hooks" / name,
@@ -218,14 +232,82 @@ def test_failing_local_hook_stops_the_hook(world: dict[str, Path]) -> None:
     assert (clone / ".git/commit-msg.body.log").read_text().startswith(".git/COMMIT_EDITMSG\n")
 
 
+# ---------------------------------------------------------------- dispatcher
+
+RECORD = '{ printf "%s\\n" "$@"; cat; } >"$PWD/%s.log"\n'
+
+
+def dispatcher_install(base: Path, *names: str) -> Path:
+    """A plugin ``git-hooks`` dir holding the real dispatcher and recording bodies."""
+    hooks = base / "plugin git-hooks"
+    hooks.mkdir(parents=True)
+    shutil.copy2(DISPATCHER, hooks / "run")
+    for name in names:
+        write_hook(hooks / name, RECORD % ("%s", "body"))
+    return hooks
+
+
+def run_dispatcher(
+    world: dict[str, Path], hooks: Path, *args: str, stdin: str = ""
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [str(hooks / "run"), *args],
+        cwd=world["clone"], env=env_for(world["cfg"]), input=stdin, capture_output=True, text=True, check=False,
+    )
+
+
+@pytest.mark.parametrize("stdin", ["a b c d\ne f g h\n", "no final newline", "\n\n"])
+def test_dispatcher_gives_local_and_body_the_same_args_and_pre_push_stdin(world: dict[str, Path], stdin: str) -> None:
+    clone = world["clone"]
+    hooks = dispatcher_install(world["base"], "pre-push")
+    write_hook(clone / ".git/hooks/pre-push.local", RECORD % ("%s", "local"))
+    result = run_dispatcher(world, hooks, "pre-push", "origin", "a b", stdin=stdin)
+    assert result.returncode == 0, result.stderr
+    expected = "origin\na b\n" + stdin
+    assert (clone / "local.log").read_text() == expected
+    assert (clone / "body.log").read_text() == expected
+
+
+def test_dispatcher_passes_git_stdin_straight_to_a_body_without_local(world: dict[str, Path]) -> None:
+    hooks = dispatcher_install(world["base"], "commit-msg")
+    result = run_dispatcher(world, hooks, "commit-msg", "msg", stdin="piped\n")
+    assert result.returncode == 0, result.stderr
+    assert (world["clone"] / "body.log").read_text() == "msg\npiped\n"
+
+
+def test_dispatcher_stops_with_the_status_of_a_failing_local(world: dict[str, Path]) -> None:
+    clone = world["clone"]
+    hooks = dispatcher_install(world["base"], "pre-push")
+    write_hook(clone / ".git/hooks/pre-push.local", "cat >/dev/null\nexit 7\n")
+    result = run_dispatcher(world, hooks, "pre-push", "origin", stdin="x\n")
+    assert result.returncode == 7
+    assert not (clone / "body.log").exists()
+
+
+def test_dispatcher_returns_the_body_status(world: dict[str, Path]) -> None:
+    hooks = dispatcher_install(world["base"])
+    write_hook(hooks / "pre-commit", "exit 5\n")
+    assert run_dispatcher(world, hooks, "pre-commit").returncode == 5
+
+
+def test_dispatcher_warns_and_exits_0_after_local_for_a_name_without_body(world: dict[str, Path]) -> None:
+    clone = world["clone"]
+    hooks = dispatcher_install(world["base"])
+    write_hook(clone / ".git/hooks/post-rewrite.local", RECORD % ("%s", "local"))
+    result = run_dispatcher(world, hooks, "post-rewrite", "amend", stdin="old new\n")
+    assert result.returncode == 0
+    assert "ships no post-rewrite hook; ran only post-rewrite.local" in result.stderr
+    assert (clone / "local.log").read_text() == "amend\nold new\n"
+
+
 # ---------------------------------------------------------------- unresolvable plugin
 
 BLOCKING = [
     # (hook, switches set true, expected exit, bypass named)
-    ("pre-commit", ("ralph.pluginHooks",), 1, "git commit --no-verify"),
-    ("commit-msg", ("ralph.pluginHooks",), 1, "git commit --no-verify"),
-    ("pre-push", ("ralph.pluginHooks",), 1, "git push --no-verify"),
-    ("pre-push", ("ralph.sharedBacklog",), 1, "git push --no-verify"),
+    ("pre-commit", ("ralph.pluginHooks",), 1, "--no-verify"),
+    ("commit-msg", ("ralph.pluginHooks",), 1, "--no-verify"),
+    ("pre-push", ("ralph.pluginHooks",), 1, "--no-verify"),
+    ("pre-push", ("ralph.sharedBacklog",), 1, "--no-verify"),
     ("pre-commit", ("ralph.sharedBacklog",), 0, None),
     ("commit-msg", ("ralph.sharedBacklog",), 0, None),
     ("post-commit", ("ralph.pluginHooks", "ralph.sharedBacklog"), 0, None),
@@ -259,6 +341,48 @@ def test_unresolved_plugin_blocks_only_per_switch(
         assert "warning" not in result.stderr
 
 
+@pytest.mark.parametrize("name", ["pre-push", "post-commit"])
+def test_unresolved_plugin_warns_then_execs_local_with_git_stdin(world: dict[str, Path], name: str) -> None:
+    clone, cfg = world["clone"], world["cfg"]
+    write_registry(cfg, None)
+    install_shim(clone / ".git/hooks", name)
+    write_hook(clone / ".git/hooks" / f"{name}.local", RECORD % ("%s", "local") + "exit 4\n")
+    result = subprocess.run(
+        [str(clone / ".git/hooks" / name), "origin", "a b"],
+        cwd=clone, env=env_for(cfg), input="refs\nmore", capture_output=True, text=True, check=False,
+    )
+    assert result.returncode == 4
+    assert f"ralph: warning: {name} hook ran without the ralph plugin" in result.stderr
+    assert (clone / "local.log").read_text() == "origin\na b\nrefs\nmore"
+
+
+def test_unresolved_plugin_blocks_without_running_local(world: dict[str, Path]) -> None:
+    clone, cfg = world["clone"], world["cfg"]
+    write_registry(cfg, None)
+    install_shim(clone / ".git/hooks", "pre-push")
+    git_ok(clone, cfg, "config", "ralph.sharedBacklog", "true")
+    write_hook(clone / ".git/hooks/pre-push.local", RECORD % ("%s", "local"))
+    result = subprocess.run(
+        [str(clone / ".git/hooks/pre-push"), "origin"],
+        cwd=clone, env=env_for(cfg), input="", capture_output=True, text=True, check=False,
+    )
+    assert result.returncode == 1
+    assert not (clone / "local.log").exists()
+
+
+@needs_jq
+def test_shim_names_a_plugin_without_the_dispatcher_and_falls_back(world: dict[str, Path]) -> None:
+    clone, cfg = world["clone"], world["cfg"]
+    old_plugin = world["base"] / "old plugin"
+    write_hook(old_plugin / "git-hooks/pre-commit", "exit 0\n")
+    write_registry(cfg, old_plugin)
+    install_shim(clone / ".git/hooks", "pre-commit")
+    git_ok(clone, cfg, "config", "ralph.pluginHooks", "true")
+    blocked = commit_file(world, "a.md")
+    assert blocked.returncode == 1
+    assert "git-hooks/run not found in the installed plugin" in blocked.stderr
+
+
 def test_unresolved_plugin_with_a_switch_false_only_warns(world: dict[str, Path]) -> None:
     clone, cfg = world["clone"], world["cfg"]
     install_shim(clone / ".git/hooks", "pre-commit")
@@ -272,7 +396,7 @@ def test_unresolved_plugin_blocks_a_real_commit_until_no_verify(world: dict[str,
     git_ok(clone, cfg, "config", "ralph.pluginHooks", "true")
     blocked = commit_file(world, "a.md")
     assert blocked.returncode == 1
-    assert "git commit --no-verify" in blocked.stderr
+    assert "bypass this once with --no-verify" in blocked.stderr
     assert run_git(clone, cfg, "commit", "-q", "--no-verify", "-m", "add").returncode == 0
 
 

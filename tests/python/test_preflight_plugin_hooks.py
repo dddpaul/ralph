@@ -167,6 +167,19 @@ def test_an_earlier_shim_is_outdated_not_missing(tmp_path: Path, monkeypatch: py
     assert not any(f.startswith("shims missing") for f in found)
 
 
+def test_the_real_pre_dispatcher_shim_is_outdated(tmp_path: Path) -> None:
+    root = migrated_project(tmp_path / "p")
+    old = (REPO_ROOT / "tests/python/fixtures/shipped-git-hooks/git-hook-shim.v0.25.10").read_bytes()
+    (root / ".git/hooks/commit-msg").write_bytes(old)
+    found = state(root)
+    expected = (
+        "shims outdated in this clone — an earlier plugin shim in commit-msg "
+        f"(run bash {preflight._MIGRATE_SCRIPT} clone)"
+    )
+    assert [f for f in found if f.startswith("shims outdated in this clone")] == [expected]
+    assert not any(f.startswith("shims missing") for f in found)
+
+
 def test_an_unlisted_shim_like_hook_is_still_missing(tmp_path: Path) -> None:
     root = migrated_project(tmp_path / "p")
     (root / ".git/hooks/commit-msg").write_bytes(SHIM.read_bytes() + b"# edited\n")

@@ -1,9 +1,10 @@
 ---
 id: TASK-341
 title: Move git hook chaining into a plugin dispatcher and thin the shim
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-08T09:41:00Z'
+updated_date: '2026-11-08T09:45:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:

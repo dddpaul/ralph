@@ -257,6 +257,16 @@ def test_enable_replaces_an_earlier_pre_push_shim_in_place(
     assert "pre-push.local" not in result.stdout
 
 
+def test_enable_replaces_the_real_pre_dispatcher_shim(repo: Path, env: dict[str, str]) -> None:
+    pre_push(repo).write_bytes(
+        (REPO_ROOT / "tests/python/fixtures/shipped-git-hooks/git-hook-shim.v0.25.10").read_bytes()
+    )
+    result = run(repo, env, "enable", "--holder", "@host-a")
+    assert result.returncode == 0, result.stderr
+    assert pre_push(repo).read_bytes() == HOOK_SHIM.read_bytes()
+    assert not (repo / ".git/hooks/pre-push.local").exists()
+
+
 def test_enable_replaces_an_earlier_shim_and_keeps_its_pre_push_local(
     tmp_path: Path, repo: Path, env: dict[str, str]
 ) -> None:
