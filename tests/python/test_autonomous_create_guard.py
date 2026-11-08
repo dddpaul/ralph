@@ -1,8 +1,8 @@
-"""The autonomous-create guard: no task IDs from an autonomous run in an opted-in clone (TASK-316, TASK-332).
+"""The autonomous-create guard: no task IDs from an autonomous run in an opted-in clone (TASK-316, TASK-332, TASK-338).
 
 ``plugins/ralph/hooks/autonomous-create-guard.sh`` refuses ``backlog task
 create``, ``backlog draft create``, ``backlog draft promote``, ``shared-backlog.sh
-create`` and the ``ralph:ralph-handoff`` skill when
+create``, the ``ralph:ralph-handoff`` skill and its ``handoff-create.sh create`` called directly when
 ``RALPH_AUTONOMOUS=1`` and the session's clone has ``ralph.sharedBacklog`` true.
 hooks.json calls it directly, so the tests run that exact command line with
 ``CLAUDE_PLUGIN_ROOT`` set: the ``pluginHooks`` marker, ``localGuards`` and the
@@ -55,6 +55,14 @@ DRAFT_REFUSED = [
     'bash -c "backlog draft {sub} {arg}"',
     "sh -c 'cd /tmp && backlog draft {sub} {arg}'",
 ]
+HANDOFF_SCRIPT = "plugins/ralph/skills/ralph-handoff/scripts/handoff-create.sh"
+HANDOFF_REFUSED = [
+    f'{HANDOFF_SCRIPT} create ../dest "Follow up" -d x',
+    '"${CLAUDE_PLUGIN_ROOT}"/skills/ralph-handoff/scripts/handoff-create.sh create ../dest "Follow up"',
+    f'"{HANDOFF_SCRIPT}" create ../dest "Follow up"',
+    f'bash {HANDOFF_SCRIPT} create ../dest "Follow up"',
+    f'cd /tmp && bash "{HANDOFF_SCRIPT}" create ../dest "Follow up"',
+]
 DRAFT_COMMANDS = {"create": "'Follow up'", "promote": "3"}
 ALLOWED = [
     "backlog task list -s 'To Do' --plain",
@@ -70,6 +78,8 @@ ALLOWED = [
     "cd ../other && backlog draft list",
     'grep -n "backlog draft promote" README.md',
     "echo backlog draft create x",
+    f"{HANDOFF_SCRIPT} mode ../dest",
+    f"bash {HANDOFF_SCRIPT} mode ../dest",
 ]
 
 
@@ -133,6 +143,11 @@ def test_autonomous_run_refuses_draft_id_allocation(opted_in: Path, template: st
     assert_refused(run_guard(opted_in, {"command": command}, RALPH_AUTONOMOUS="1"), f"backlog draft {sub}")
 
 
+@pytest.mark.parametrize("command", HANDOFF_REFUSED)
+def test_autonomous_run_refuses_direct_handoff_create(opted_in: Path, command: str) -> None:
+    assert_refused(run_guard(opted_in, {"command": command}, RALPH_AUTONOMOUS="1"), "handoff-create.sh create")
+
+
 @pytest.mark.parametrize("skill", ["ralph:ralph-handoff", "ralph-handoff"])
 def test_autonomous_run_refuses_the_handoff_skill(opted_in: Path, skill: str) -> None:
     result = run_guard(opted_in, {"skill": skill}, tool="Skill", RALPH_AUTONOMOUS="1")
@@ -186,6 +201,7 @@ def test_interactive_session_is_allowed(opted_in: Path, autonomous: str | None) 
         ({"command": 'scripts/shared-backlog.sh create "x"'}, "Bash"),
         ({"command": 'backlog draft create "x"'}, "Bash"),
         ({"command": "backlog draft promote 3"}, "Bash"),
+        ({"command": f'bash {HANDOFF_SCRIPT} create ../dest "x"'}, "Bash"),
         ({"skill": "ralph:ralph-handoff"}, "Skill"),
     ):
         result = run_guard(opted_in, tool_input, tool=tool, **env)
@@ -201,6 +217,7 @@ def test_clone_that_does_not_enforce_is_allowed(tmp_path: Path, shared: str | No
         ({"command": 'scripts/shared-backlog.sh create "x"'}, "Bash"),
         ({"command": 'backlog draft create "x"'}, "Bash"),
         ({"command": "backlog draft promote 3"}, "Bash"),
+        ({"command": f'bash {HANDOFF_SCRIPT} create ../dest "x"'}, "Bash"),
         ({"skill": "ralph:ralph-handoff"}, "Skill"),
     ):
         result = run_guard(clone, tool_input, tool=tool, RALPH_AUTONOMOUS="1")

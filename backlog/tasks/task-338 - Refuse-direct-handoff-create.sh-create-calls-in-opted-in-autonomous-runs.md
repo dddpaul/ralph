@@ -1,9 +1,10 @@
 ---
 id: TASK-338
 title: Refuse direct handoff-create.sh create calls in opted-in autonomous runs
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-07T21:35:00Z'
+updated_date: '2026-11-08T09:02:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies: []
@@ -18,8 +19,14 @@ Why: plugins/ralph/hooks/autonomous-create-guard.sh refuses backlog task create,
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 In an autonomous run in an enforcing clone, a Bash call of handoff-create.sh create is refused, with a plain, quoted and bash-prefixed path (pytest in tests/python/test_autonomous_create_guard.py)
-- [ ] #2 handoff-create.sh mode is not refused (pytest)
-- [ ] #3 Outside an autonomous run, or in a clone that does not enforce the protocol, handoff-create.sh create passes (pytest)
-- [ ] #4 bash -n, the bash 3.2 static guard, ruff and pytest pass
+- [x] #1 In an autonomous run in an enforcing clone, a Bash call of handoff-create.sh create is refused, with a plain, quoted and bash-prefixed path (pytest in tests/python/test_autonomous_create_guard.py)
+- [x] #2 handoff-create.sh mode is not refused (pytest)
+- [x] #3 Outside an autonomous run, or in a clone that does not enforce the protocol, handoff-create.sh create passes (pytest)
+- [x] #4 bash -n, the bash 3.2 static guard, ruff and pytest pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan: add a handoff-create.sh create pattern to autonomous-create-guard.sh matched anywhere (like shared-backlog.sh create, quoted or not); pytest for refused plain/quoted/bash-prefixed paths, allowed mode, and interactive/non-enforcing passes; update ralph-run SKILL.md guard list.
+<!-- SECTION:NOTES:END -->
