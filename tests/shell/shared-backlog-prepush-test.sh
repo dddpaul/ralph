@@ -132,7 +132,7 @@ commit_dup
 : >"$work/local.log"
 push master
 check "the push exits non-zero (rc=$rc)" test "$rc" -ne 0
-check "it names the duplicate task ID" has "$out" "duplicate task IDs in"
+check "it names the duplicate task ID" has "$out" "shared-backlog: duplicate task IDs in"
 check "it names the copy" has "$out" "task-1 - Copy.md"
 check "it names the refused ref" has "$out" "refusing to push refs/heads/master -> refs/heads/master"
 check "origin is unchanged" test "$(origin_sha)" = "$before"

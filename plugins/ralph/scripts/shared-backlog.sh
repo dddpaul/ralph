@@ -2,9 +2,8 @@
 # shared-backlog.sh — claim tasks, allocate task IDs and integrate finished work
 # when several hosts share one origin. The push to origin decides: the server
 # accepts only fast-forward pushes, so of two competing claims or task IDs only
-# one lands, and the loser finds out on its next pull. See the "Shared repo
-# protocol" section of CLAUDE.md for when each subcommand runs, and
-# design/multi-host-parallel-work-brainstorm.md for the reasoning.
+# one lands, and the loser finds out on its next pull. See the "Shared backlog
+# across hosts" section of the Ralph README for when each subcommand runs.
 #
 # Usage: scripts/shared-backlog.sh <command> [args]
 #
@@ -30,8 +29,6 @@
 #                        renumber our copies of duplicate IDs (those not in REF,
 #                        default origin/master) and commit; nothing runs it
 #                        but a person
-#   install-hooks [--force]
-#                        install scripts/hooks/pre-push into .git/hooks
 #   enable [--holder @who]
 #                        opt this clone in: needs "sharedBacklog": true in
 #                        .claude/ralph.json; saves the host's default holder
@@ -89,7 +86,6 @@ set -eu
 REMOTE=origin
 BRANCH=master
 MAX_TRIES=3
-HOOK_MARKER='shared-backlog pre-push hook'
 
 die() { echo "shared-backlog: $*" >&2; exit 1; }
 # help_text — the header comment from "Usage:" to its last line.
@@ -744,7 +740,7 @@ claim_apply() {
   st=$(fm_scalar "$f" status)
   [ "$st" = "To Do" ] || { say "TASK-$TASK_ID is '$st', not To Do"; return 4; }
   if [ -z "$FORCE" ] && ! deps_done "$TASK_ID"; then
-    say "claim refused; --force overrides on Paul's say-so"
+    say "claim refused; only a person may decide to override it with --force"
     return 4
   fi
   [ -z "$who" ] && held_by_holder "$TASK_ID" && return 5
@@ -785,7 +781,7 @@ release_apply() {
   who=${who% }
   [ -n "$who" ] || { say "TASK-$TASK_ID has no assignee"; return 5; }
   if [ "$who" != "$HOLDER" ] && [ -z "$FORCE" ]; then
-    say "TASK-$TASK_ID is held by $who, not $HOLDER; --force overrides on Paul's say-so"
+    say "TASK-$TASK_ID is held by $who, not $HOLDER; only a person may decide to override it with --force"
     return 4
   fi
   backlog task edit "$TASK_ID" -a "" >/dev/null &&
@@ -1038,39 +1034,22 @@ cmd_integrate() {
         git merge --abort
         say "merge conflict with $REMOTE/$BRANCH, not pushed; merge aborted. Conflicting files:"
         printf '%s\n' "$files" >&2
-        say "resolve only if mechanical: git merge $REMOTE/$BRANCH, fix, commit, rerun integrate; else stop and tell Paul"
+        say "resolve only if mechanical: git merge $REMOTE/$BRANCH, fix, commit, rerun integrate; else stop and ask a person"
         return 1
       fi
     fi
     stop_on_dupes || return 1
-    run_checks || { say "checks failed on the merged tree, not pushed; stop and tell Paul"; return 1; }
+    run_checks || { say "checks failed on the merged tree, not pushed; stop and ask a person"; return 1; }
     rc=0; push_master || rc=$?
     [ "$rc" -ne 0 ] || { echo "pushed $(git rev-parse --short HEAD)"; return 0; }
     case "$PUSH_FAILURE" in
       non-fast-forward) ;;
       unreachable) say "push failed: origin unreachable; done locally, not pushed, not retried"; return 2 ;;
-      *) say "push failed: $PUSH_FAILURE; not pushed, not retried; stop and tell Paul"; return 1 ;;
+      *) say "push failed: $PUSH_FAILURE; not pushed, not retried; stop and ask a person"; return 1 ;;
     esac
-    [ "$try" -ge "$MAX_TRIES" ] && { say "push refused $MAX_TRIES times, not pushed; stop and tell Paul"; return 1; }
+    [ "$try" -ge "$MAX_TRIES" ] && { say "push refused $MAX_TRIES times, not pushed; stop and ask a person"; return 1; }
     try=$((try + 1))
   done
-}
-
-# --- install-hooks ----------------------------------------------------------
-
-cmd_install_hooks() {
-  local force='' src dst
-  [ "${1:-}" = --force ] && force=1
-  src="scripts/hooks/pre-push"
-  [ -f "$src" ] || die "missing $src"
-  dst="$(git rev-parse --git-path hooks)/pre-push"
-  if [ -f "$dst" ] && ! grep -q "$HOOK_MARKER" "$dst" && [ -z "$force" ]; then
-    die "$dst exists and is not ours; chain it by hand or pass --force"
-  fi
-  mkdir -p "${dst%/*}"
-  cp "$src" "$dst"
-  chmod +x "$dst"
-  echo "installed $dst"
 }
 
 # --- enable / disable -------------------------------------------------------
@@ -1181,7 +1160,6 @@ case "$CMD" in
   integrate) protocol_cmd cmd_integrate "$@" ;;
   renumber) protocol_cmd cmd_renumber "$@" ;;
   check-dupes) with_deadline cmd_check_dupes "$@" ;;
-  install-hooks) cmd_install_hooks "$@" ;;
   enable) cmd_enable "$@" ;;
   disable) cmd_disable "$@" ;;
   run-lock)

@@ -1,9 +1,10 @@
 ---
 id: TASK-333
 title: Remove install-hooks and imported leftovers from shared-backlog.sh
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-07T21:35:00Z'
+updated_date: '2026-11-08T07:28:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies: []
