@@ -116,6 +116,7 @@ This feature does two things:
 - [ ] **The length guard.** pre-commit runs the length guard bundled in the plugin. When it runs from a legacy copy in `.git/hooks`, it falls back to `<repo>/.claude/hooks/filename-length-guard.sh`. Both layouts are tested.
 - [ ] **The shim template.** templates/shims/git-hook is the same file for every hook name. It embeds the US-001 resolver and execs `<installPath>/git-hooks/<name>` with the hook's arguments.
 - [ ] **Local hooks.** The local hook is `<name>.local`, in the directory `git rev-parse --git-path hooks` returns. It runs first and stops the hook if it fails, and arguments and pre-push stdin reach both hooks. A clone with `core.hooksPath` set is covered by a test.
+  *Superseded (TASK-341): the shim now execs the plugin's dispatcher `<installPath>/git-hooks/run` as `run <name> <arguments>`. The dispatcher runs `<name>.local` first and then the body `git-hooks/<name>`, both with the hook's arguments, and gives pre-push stdin to both, so the chaining ships with the plugin. The shim changed once for this, from v1 to v2, and `shipped-git-hooks.sha256` records both versions.*
 - [ ] **When the plugin can't be resolved:**
 
   | Hook | Fails when | Repair message names |

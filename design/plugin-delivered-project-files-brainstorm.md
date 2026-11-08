@@ -76,6 +76,7 @@ Template changes since 2026-08-01, by area:
      *Superseded (TASK-321): the host check on Claude Code 2.1.309 showed Claude Code takes the first applicable entry in registry order; the PRD's US-001 holds the rule now.*
   5. **Run the hook:** `exec` the file `<installPath>/git-hooks/<name>`.
   - **Before the plugin's hook:** if `.git/hooks/<name>.local` exists, the shim runs it first and stops if it fails. Arguments pass through to both, and pre-push stdin is read once and given to each.
+    *Superseded (TASK-341): the shim now execs the plugin's dispatcher `<installPath>/git-hooks/run` as `run <name> <arguments>`, and the dispatcher runs `<name>.local` and then the body, so the chaining ships with the plugin. The shim itself changed once for this, from v1 to v2; `shipped-git-hooks.sha256` records both versions and `migrate-plugin-hooks.sh clone` replaces the old one. The PRD's US-003 holds the rule now.*
   - **Independent of Claude:** git enforcement depends only on the marker and the installed package, not on `enabledPlugins` in Claude's settings.
 - **What happens when lookup fails:**
 
