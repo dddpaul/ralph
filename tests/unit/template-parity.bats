@@ -21,27 +21,25 @@ TEMPLATES="$PLUGIN/skills/ralph-init/templates"
 # --------------------------------------------------------------------------
 # Pair registry: "<mode>|<live path>|<template path>". The live path is
 # repo-relative; the template path is templates/-relative, or plugin-relative
-# when it starts with "plugin:". The Claude guards and the git hook bodies ship
-# in the plugin itself (plugins/ralph/hooks/, plugins/ralph/git-hooks/), not as
-# ralph-init templates, so this repo's live guard copies are compared with
-# those. This repo is migrated to the plugin hooks (TASK-302) but lists all six
-# managed guards in .claude/ralph.json localGuards, so .claude/settings.json
-# stays the wiring for its own copies; ralph-init no longer ships a
-# settings.json, so it has no pair. In a migrated clone the .git/hooks/* are
-# the fixed shim (templates/shims/git-hook), and post-commit.local carries the
-# repo-local part of post-commit; see migrated_clone below.
+# when it starts with "plugin:". The Claude guards ship in the plugin itself
+# (plugins/ralph/hooks/), not as ralph-init templates, so this repo's live
+# guard copies are compared with those. This repo is migrated to the plugin
+# hooks (TASK-302) but lists all six managed guards in .claude/ralph.json
+# localGuards, so .claude/settings.json wires its own copies; ralph-init no
+# longer ships a settings.json, so it has no pair. The .git/hooks/* are
+# untracked, and in this migrated clone each is the fixed shim
+# (templates/shims/git-hook); post-commit.local and pre-push.local carry the
+# repo-local parts.
 #
 # Modes:
 #   exact  — diff must be silent.
 #   region — only the region above "## Project-Specific" is compared, and every
 #            differing line must be listed in claude_md_allowed_deviations.
-#   prefix — live must open with the template verbatim; the trailing remainder
-#            must be the documented repo-local block only.
 #   keys   — gitignored per-developer override: compare JSON shape, not bytes.
 #
-# The R11 table drives the rows. Two more are the same class but absent from
-# it — .claude/brainstorm-rules.md and git-hooks/pre-commit — and are in parity
-# today, so they are registered here to keep them that way.
+# The R11 table drives the rows. One more is the same class but absent from
+# it — .claude/brainstorm-rules.md — and is in parity today, so it is
+# registered here to keep it that way.
 # --------------------------------------------------------------------------
 registry() {
   cat <<'ROWS'
@@ -56,9 +54,10 @@ exact|.claude/brainstorm-rules.md|claude/brainstorm-rules.md
 exact|ralph.sh|root/ralph.sh
 exact|refine.sh|root/refine.sh
 region|CLAUDE.md|root/CLAUDE.md
-prefix|.git/hooks/post-commit|plugin:git-hooks/post-commit
-exact|.git/hooks/commit-msg|plugin:git-hooks/commit-msg
-exact|.git/hooks/pre-commit|plugin:git-hooks/pre-commit
+exact|.git/hooks/pre-commit|shims/git-hook
+exact|.git/hooks/commit-msg|shims/git-hook
+exact|.git/hooks/post-commit|shims/git-hook
+exact|.git/hooks/pre-push|shims/git-hook
 exact|.devcontainer/devcontainer.json|devcontainer/devcontainer.json
 exact|.devcontainer/container-settings.local.json|devcontainer/container-settings.local.json
 exact|.devcontainer/init-firewall.sh|devcontainer/init-firewall.sh
@@ -116,17 +115,9 @@ generic_region() {
   sed -n '/^## Project-Specific/q;p' "$1"
 }
 
-# True when this clone was migrated to the plugin hooks (TASK-302): the
-# per-clone migration sets ralph.pluginHooks and installs the shim as each git
-# hook. A clone that has not run it yet keeps the legacy plugin-body copies.
-migrated_clone() {
-  [ "$(git -C "$PROJECT_ROOT" config --bool ralph.pluginHooks 2>/dev/null)" = true ]
-}
-
 # The lines the repo-local TASK-217 auto-bump nudge may consist of, as one ERE:
 # blank lines, comments, the helper lookup, the guarded --nudge call and an
-# optional trailing exit 0. Shared by the legacy post-commit tail check and the
-# migrated clone's post-commit.local check, so the two cannot drift apart.
+# optional trailing exit 0.
 NUDGE_LINES='^$|^#|^BUMP_HELPER=|^if \[ -x "\$BUMP_HELPER" \]; then$|^[[:space:]]*"\$BUMP_HELPER" --nudge [|][|] true$|^fi$|^exit 0$'
 
 # Print the absolute path of registry template column $1.
@@ -180,13 +171,6 @@ missing template for $live: $tmpl"
       continue
     fi
 
-    # A clone migrated to the plugin hooks (TASK-302) runs the fixed shim under
-    # every git hook name, so its .git/hooks/* mirror the shim template rather
-    # than the plugin bodies the shim executes.
-    case "$live" in
-      .git/hooks/*) migrated_clone && tmpl_path="$TEMPLATES/shims/git-hook" ;;
-    esac
-
     # .git/hooks/* live outside the work tree and are absent in a fresh
     # checkout (CI). The template side above is still asserted.
     if [ ! -f "$live_path" ]; then
@@ -214,7 +198,7 @@ EOF
     echo "$failures"
     return 1
   }
-  # Anti-vacuity: 15 exact rows, 2 of which (.git/hooks/*) may be absent in CI.
+  # Anti-vacuity: 17 exact rows, 4 of which (.git/hooks/*) may be absent in CI.
   [ "$checked" -ge 13 ]
 }
 
@@ -281,57 +265,10 @@ EOF
 }
 
 # --------------------------------------------------------------------------
-# prefix carve-out: .git/hooks/post-commit
+# repo-local hook part: .git/hooks/post-commit.local
 # --------------------------------------------------------------------------
 
-@test "R11: .git/hooks/post-commit is the shim (migrated) or opens with the plugin body (legacy)" {
-  live_path="$PROJECT_ROOT/.git/hooks/post-commit"
-  tmpl_path="$PLUGIN/git-hooks/post-commit"
-  [ -f "$tmpl_path" ]
-  [ -f "$live_path" ] || skip "git hooks are untracked and not installed here"
-
-  # A migrated clone runs the fixed shim as post-commit; its repo-local part
-  # lives in post-commit.local (checked by the next test).
-  if migrated_clone; then
-    run diff "$live_path" "$TEMPLATES/shims/git-hook"
-    [ "$status" -eq 0 ] || {
-      echo "R11 drift: .git/hooks/post-commit is not the shim in a migrated clone:"
-      echo "$output"
-      return 1
-    }
-    return 0
-  fi
-
-  tmpl_len="$(wc -l < "$tmpl_path" | tr -d '[:space:]')"
-  [ "$tmpl_len" -ge 20 ]
-
-  run diff <(head -n "$tmpl_len" "$live_path") "$tmpl_path"
-  [ "$status" -eq 0 ] || {
-    echo "R11 drift in the mirrored part of post-commit:"
-    echo "$output"
-    return 1
-  }
-
-  # The only permitted extra is the repo-local auto-bump nudge (TASK-217),
-  # which calls a helper that exists solely in this repo. Anything else in the
-  # tail is unmirrored logic and must fail.
-  tail_block="$(tail -n +"$((tmpl_len + 1))" "$live_path")"
-  if [ -n "$tail_block" ]; then
-    printf '%s\n' "$tail_block" | grep -Fq 'bump-version.sh'
-    [ "$(printf '%s\n' "$tail_block" | wc -l)" -le 12 ]
-    unexpected="$(printf '%s\n' "$tail_block" \
-      | grep -vE "$NUDGE_LINES" \
-      || true)"
-    [ -z "$unexpected" ] || {
-      echo "unmirrored trailing content in post-commit:"
-      echo "$unexpected"
-      return 1
-    }
-  fi
-}
-
-@test "R11: a migrated clone's post-commit.local holds only the repo-local nudge" {
-  migrated_clone || skip "clone not migrated to the plugin hooks"
+@test "R11: post-commit.local holds only the repo-local nudge" {
   local_path="$PROJECT_ROOT/.git/hooks/post-commit.local"
   [ -f "$local_path" ] || skip "no post-commit.local in this clone"
 

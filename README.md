@@ -228,6 +228,8 @@ The commands, each run as `bash scripts/shared-backlog.sh <command>` (`--help` p
 
 With the switch on, a Ralph run claims each task before it works on it (below), publishes each completed iteration through `integrate` instead of a plain `git push`, and an autonomous run may not create tasks: it records follow-ups in the task's notes. `/ralph-handoff` into such a project creates the task through `create`.
 
+A `--devcontainer` run has `integrate` run the checks in the devcontainer, which needs a project path without whitespace: the script splits `SHARED_BACKLOG_CHECKS_EXEC` on whitespace, so for a path that contains any the run refuses to publish (`integrate cannot reach the devcontainer`). Move such a clone to a path without spaces.
+
 ### Claiming tasks in shared-backlog clones
 
 In a clone with `git config ralph.sharedBacklog` true, a run works only on a task whose claim it has pushed:
