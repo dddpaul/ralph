@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
-# Ralph git hook shim (TASK-297). The same file is installed under every hook
-# name in the directory `git rev-parse --git-path hooks` returns. It runs the
-# clone's own <name>.local hook first, then execs the <name> body shipped in the
-# installed ralph plugin (plugins/ralph/git-hooks/), so hook changes arrive with
-# a plugin update (design/plugin-delivered-project-files-prd.md US-003, FR-5).
+# Ralph git hook shim (TASK-297, TASK-341). The same file is installed under
+# every hook name in the directory `git rev-parse --git-path hooks` returns. It
+# finds the installed ralph plugin and execs its dispatcher, git-hooks/run, which
+# runs the clone's own <name>.local hook and then the plugin's <name> body, so
+# hook changes arrive with a plugin update
+# (design/plugin-delivered-project-files-prd.md US-003, FR-5).
 #
 # When the plugin cannot be resolved, the per-clone switches decide:
 #   pre-commit, commit-msg  fail when ralph.pluginHooks is true;
 #   pre-push                fails when ralph.pluginHooks or ralph.sharedBacklog is true;
 #   anything else           only warns, as does every hook with neither switch set.
+# A hook that only warns still runs <name>.local, with git's stdin.
 # Replace this file only through ralph-init; put clone-specific logic in <name>.local.
 
 # >>> ralph-resolve-plugin >>>
@@ -95,44 +97,25 @@ ralph_resolve_plugin() {
 # <<< ralph-resolve-plugin <<<
 
 name="${0##*/}"
-hooks_dir="$(git rev-parse --git-path hooks)" || exit 1
-local_hook="$hooks_dir/$name.local"
-
-# Hooks git feeds on stdin: buffer it once so the local hook and the plugin body
-# both read all of it. The open descriptor keeps the unlinked file readable.
-stdin_file=""
-case "$name" in
-  pre-push | post-rewrite | reference-transaction)
-    stdin_file="$(mktemp "${TMPDIR:-/tmp}/ralph-$name.XXXXXX")" || exit 1
-    cat >"$stdin_file"
-    exec 3<"$stdin_file" 0<"$stdin_file"
-    rm -f "$stdin_file"
-    ;;
-esac
-
-if [ -x "$local_hook" ]; then
-  "$local_hook" "$@" 3<&- || exit $?
-  if [ -n "$stdin_file" ]; then
-    exec 0<&3
-  fi
-fi
-exec 3<&-
-
-if body="$(ralph_resolve_plugin "$PWD" "git-hooks/$name")"; then
-  exec "$body" "$@"
+if run="$(ralph_resolve_plugin "$PWD" git-hooks/run)"; then
+  exec "$run" "$name" "$@"
 fi
 
 case "$name" in
-  pre-commit | commit-msg) switches="ralph.pluginHooks" bypass="git commit --no-verify" ;;
-  pre-push) switches="ralph.pluginHooks ralph.sharedBacklog" bypass="git push --no-verify" ;;
-  *) switches="" bypass="" ;;
+  pre-commit | commit-msg) switches="ralph.pluginHooks" ;;
+  pre-push) switches="ralph.pluginHooks ralph.sharedBacklog" ;;
+  *) switches="" ;;
 esac
 for switch in $switches; do
   if [ "$(git config --bool "$switch" 2>/dev/null)" = true ]; then
-    echo "ralph: $name hook blocked: the ralph plugin hook cannot be resolved (reason above) and $switch is true." >&2
-    echo "ralph: install or update the ralph plugin, or bypass this once with $bypass" >&2
+    echo "ralph: $name hook blocked: the ralph plugin cannot be found (reason above) and $switch is true." >&2
+    echo "ralph: install or update the ralph plugin, or bypass this once with --no-verify" >&2
     exit 1
   fi
 done
-echo "ralph: warning: $name hook skipped the ralph plugin hook, which cannot be resolved (reason above)" >&2
+echo "ralph: warning: $name hook ran without the ralph plugin, which cannot be found (reason above)" >&2
+local_hook="$(git rev-parse --git-path hooks)/$name.local" || exit 1
+if [ -x "$local_hook" ]; then
+  exec "$local_hook" "$@"
+fi
 exit 0

@@ -199,6 +199,7 @@ else
   fresh
   plugin="$work/fake-plugin"
   mkdir -p "$plugin/git-hooks"
+  cp "$ROOT/plugins/ralph/git-hooks/run" "$plugin/git-hooks/run"
   for h in commit-msg post-commit; do
     printf '#!/bin/sh\necho "%s $(pwd -P) $(git log -1 --format=%%s 2>/dev/null)" >>"%s"\n' \
       "$h" "$work/hook.log" >"$plugin/git-hooks/$h"

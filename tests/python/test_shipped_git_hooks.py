@@ -104,11 +104,12 @@ def test_the_current_shim_is_listed() -> None:
     assert f"shim {digest}" in shipped_lines()
 
 
-def test_the_v0_14_14_pre_commit_and_v0_16_0_commit_msg_are_listed() -> None:
+def test_the_v0_14_14_pre_commit_v0_16_0_commit_msg_and_v0_25_10_shim_are_listed() -> None:
     lines = shipped_lines()
     for name, fixture in (
         ("pre-commit", "pre-commit.v0.14.14"),
         ("commit-msg", "commit-msg.v0.16.0"),
+        ("shim", "git-hook-shim.v0.25.10"),
     ):
         body = (
             REPO_ROOT / "tests/python/fixtures/shipped-git-hooks" / fixture

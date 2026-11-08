@@ -28,7 +28,8 @@ TEMPLATES="$PLUGIN/skills/ralph-init/templates"
 # localGuards, so .claude/settings.json wires its own copies; ralph-init no
 # longer ships a settings.json, so it has no pair. The .git/hooks/* are
 # untracked, and in this migrated clone each is the fixed shim
-# (templates/shims/git-hook); post-commit.local and pre-push.local carry the
+# (templates/shims/git-hook), or an earlier shim version listed in
+# shipped-git-hooks.sha256 until the clone is refreshed; post-commit.local and pre-push.local carry the
 # repo-local parts.
 #
 # Modes:
@@ -157,6 +158,23 @@ ROWS
 # exact pairs
 # --------------------------------------------------------------------------
 
+# earlier_shim <live> <path>: succeed when <live> is a .git/hooks/* row and
+# <path> holds a shim version listed in shipped-git-hooks.sha256.
+earlier_shim() {
+  case "$1" in
+    .git/hooks/*) ;;
+    *) return 1 ;;
+  esac
+  local sum
+  if command -v shasum >/dev/null 2>&1; then
+    sum="$(shasum -a 256 <"$2" | cut -d' ' -f1)"
+  else
+    sum="$(sha256sum <"$2" | cut -d' ' -f1)"
+  fi
+  grep -Fxq "shim $sum" \
+    "$PROJECT_ROOT/plugins/ralph/skills/ralph-init/scripts/shipped-git-hooks.sha256"
+}
+
 @test "R11: every exact pair is byte-identical to its template" {
   failures=""
   checked=0
@@ -184,7 +202,9 @@ missing live file for $tmpl: $live"
       esac
     fi
 
-    if ! diff -q "$live_path" "$tmpl_path" >/dev/null 2>&1; then
+    # A clone not yet refreshed after a shim change keeps an earlier shim
+    # version, which shipped-git-hooks.sha256 records (TASK-341).
+    if ! diff -q "$live_path" "$tmpl_path" >/dev/null 2>&1 && ! earlier_shim "$live" "$live_path"; then
       failures="$failures
 R11 drift: $live vs ${tmpl_path#"$PROJECT_ROOT"/}
 $(diff "$live_path" "$tmpl_path" || true)"

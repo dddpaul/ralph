@@ -348,6 +348,18 @@ def test_an_earlier_shim_is_replaced_by_the_current_shim(tmp_path: Path, home: P
     assert "installed the plugin shim as pre-commit" in result.stdout
 
 
+def test_the_real_pre_dispatcher_shim_is_replaced_in_place(tmp_path: Path, home: Path) -> None:
+    root = make_clone(tmp_path / "proj")
+    old = OLD_HOOKS / "git-hook-shim.v0.25.10"
+    for name in HOOK_NAMES:
+        shutil.copyfile(old, root / ".git/hooks" / name)
+    result = clone(root, home)
+    assert result.returncode == 0, result.stderr
+    for name in HOOK_NAMES:
+        assert (root / ".git/hooks" / name).read_bytes() == SHIM.read_bytes()
+        assert not (root / f".git/hooks/{name}.local").exists()
+
+
 def test_an_unlisted_shim_like_hook_is_refused(tmp_path: Path, home: Path) -> None:
     root = make_clone(tmp_path / "proj")
     plugin, old = plugin_with_old_shim(tmp_path, list_it=False)

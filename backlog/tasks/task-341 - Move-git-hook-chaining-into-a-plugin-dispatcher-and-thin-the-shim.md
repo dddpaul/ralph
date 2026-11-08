@@ -1,9 +1,10 @@
 ---
 id: TASK-341
 title: Move git hook chaining into a plugin dispatcher and thin the shim
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-08T09:41:00Z'
+updated_date: '2026-11-08T10:29:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies:
@@ -101,13 +102,31 @@ This repo: .claude/hooks/install-clone-hooks.sh --check compares pre-push byte f
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 plugins/ralph/git-hooks/run runs <name>.local, then the plugin's <name> body, with the same arguments and identical pre-push stdin; a failing .local stops the hook with its status; a name with no body warns and exits 0 after .local (pytest)
-- [ ] #2 The shim only resolves git-hooks/run and execs it, or falls back; grep -n -E 'exec 3|0<&3' on the shim finds nothing, and its resolver block still matches resolve-plugin.sh (test_resolve_plugin.py passes)
-- [ ] #3 When the plugin cannot be found, the shim blocks per switch as before, and otherwise warns and execs <name>.local with git's stdin (pytest)
-- [ ] #4 The existing test_git_hook_shim.py cases pass, adapted where needed (core.hooksPath, linked worktree, merge message); the shipped-bodies test allows run, and run gets no hook line in shipped-git-hooks.sha256
-- [ ] #5 shipped-git-hooks.sha256 lists both shim versions; clone replaces the old shim in place and preflight reports it as outdated, tested with the real old shim (pytest)
-- [ ] #6 .claude/hooks/install-clone-hooks.sh --check accepts a pre-push equal to any shim version recorded in shipped-git-hooks.sha256 (pytest)
-- [ ] #7 README.md and .claude/RELEASING.md say to run /plugin update first, then migrate-plugin-hooks.sh clone in each clone
-- [ ] #8 bash -n, the bash 3.2 static guard, ruff, pytest and bats pass
+- [x] #1 plugins/ralph/git-hooks/run runs <name>.local, then the plugin's <name> body, with the same arguments and identical pre-push stdin; a failing .local stops the hook with its status; a name with no body warns and exits 0 after .local (pytest)
+- [x] #2 The shim only resolves git-hooks/run and execs it, or falls back; grep -n -E 'exec 3|0<&3' on the shim finds nothing, and its resolver block still matches resolve-plugin.sh (test_resolve_plugin.py passes)
+- [x] #3 When the plugin cannot be found, the shim blocks per switch as before, and otherwise warns and execs <name>.local with git's stdin (pytest)
+- [x] #4 The existing test_git_hook_shim.py cases pass, adapted where needed (core.hooksPath, linked worktree, merge message); the shipped-bodies test allows run, and run gets no hook line in shipped-git-hooks.sha256
+- [x] #5 shipped-git-hooks.sha256 lists both shim versions; clone replaces the old shim in place and preflight reports it as outdated, tested with the real old shim (pytest)
+- [x] #6 .claude/hooks/install-clone-hooks.sh --check accepts a pre-push equal to any shim version recorded in shipped-git-hooks.sha256 (pytest)
+- [x] #7 README.md and .claude/RELEASING.md say to run /plugin update first, then migrate-plugin-hooks.sh clone in each clone
+- [x] #8 bash -n, the bash 3.2 static guard, ruff, pytest and bats pass
 - [ ] #9 (host) Both clones are refreshed with clone after /plugin update, and a live commit and push through the new shim are recorded in the notes
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Commit: `9264c45` - task-341: move git hook chaining into the plugin dispatcher git-hooks/run and thin the shim
+
+Plan: add plugins/ralph/git-hooks/run (prototype from the description), thin the shim to resolver + exec run + fallback, record the new shim sha in shipped-git-hooks.sha256 with a fixture of the v0.25.10 shim for clone/preflight/enable tests, make install-clone-hooks.sh --check and the R11 parity bats accept any recorded shim, make migrate clone check git-hooks/run is resolvable, update README/RELEASING/SKILL.
+
+Deferred AC #9 (host): the devcontainer cannot run migrate-plugin-hooks.sh clone (it refuses with DEVCONTAINER=true), and the installed plugin (0.22.2) ships no git-hooks/run, so refreshing this clone's hooks now would fail closed under ralph.pluginHooks true. Follow-up: after merge and push, on each host run /plugin update, then migrate-plugin-hooks.sh clone (and .claude/hooks/install-clone-hooks.sh --check) in both clones, then record a live commit and push through the new shim in these notes and check AC #9.
+
+Commit: `d70334c` - task-341: say the dispatcher skipped a hook the plugin does not ship
+
+Review: APPROVED d70334cfac93a4ea2d2d561350a1a22448af1348
+
+Done: plugins/ralph/git-hooks/run chains <name>.local then the plugin body (pre-push stdin copied once into a variable); the shim is the unchanged resolver + exec git-hooks/run + per-switch fallback that execs <name>.local on warn. shipped-git-hooks.sha256 lists both shim versions (fixture git-hook-shim.v0.25.10); install-clone-hooks.sh --check and the R11 parity bats accept any recorded shim; migrate clone's resolvability warning checks git-hooks/run. Final: ruff clean, pytest 1583 passed / 4 skipped, bats 0 failures. AC #9 deferred to the host (see note).
+
+Commit: `f42977d` - task-341: bump plugin version to 0.25.11 (patch)
+<!-- SECTION:NOTES:END -->

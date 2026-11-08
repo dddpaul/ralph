@@ -23,6 +23,7 @@ from devcontainer_config import REPO_ROOT
 INSTALLER = REPO_ROOT / ".claude/hooks/install-clone-hooks.sh"
 SESSION_CHECK = REPO_ROOT / ".claude/hooks/clone-hooks-session-check.sh"
 SHIM = REPO_ROOT / "plugins/ralph/skills/ralph-init/templates/shims/git-hook"
+OLD_SHIM = REPO_ROOT / "tests/python/fixtures/shipped-git-hooks/git-hook-shim.v0.25.10"
 WRAPPER = """#!/bin/bash
 # pre-push wrapper (TASK-214). Standard hook location, so any other pre-push
 # tooling keeps working. Delegates to the tracked, reviewable guard — nothing
@@ -181,6 +182,26 @@ def test_check_passes_when_in_place(tmp_path: Path) -> None:
     result = run(INSTALLER, root, "--check")
     assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
     assert snapshot(root / ".git/hooks") == before
+
+
+def test_check_accepts_an_earlier_recorded_shim(tmp_path: Path) -> None:
+    root = make_clone(tmp_path)
+    run(INSTALLER, root)
+    hooks = root / ".git/hooks"
+    for name in ("pre-push", "post-commit"):
+        (hooks / name).write_bytes(OLD_SHIM.read_bytes())
+    result = run(INSTALLER, root, "--check")
+    assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
+
+
+def test_check_refuses_an_unrecorded_shim_like_pre_push(tmp_path: Path) -> None:
+    root = make_clone(tmp_path)
+    run(INSTALLER, root)
+    hooks = root / ".git/hooks"
+    (hooks / "pre-push").write_bytes(SHIM.read_bytes() + b"# edited\n")
+    result = run(INSTALLER, root, "--check")
+    assert result.returncode != 0
+    assert "pre-push: differs" in result.stderr
 
 
 def test_check_names_each_missing_hook_and_changes_nothing(tmp_path: Path) -> None:
