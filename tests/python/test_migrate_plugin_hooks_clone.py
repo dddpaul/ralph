@@ -236,6 +236,38 @@ def test_accepted_differing_hook_becomes_local(tmp_path: Path, home: Path) -> No
     assert snapshot(root) == before
 
 
+def test_accepted_modified_copy_of_the_body_warns_and_still_becomes_local(tmp_path: Path, home: Path) -> None:
+    root = make_clone(tmp_path / "proj")
+    hook = root / ".git/hooks/pre-commit"
+    lines = hook.read_text().splitlines(keepends=True)
+    hook.write_text(lines[0] + "# project tweak\necho project-first\n" + "".join(lines[1:]) + "\n  echo project-own\n")
+    own = hook.read_bytes()
+    accept(root, "pre-commit")
+    result = clone(root, home)
+    assert result.returncode == 0, result.stderr
+    assert "the accepted pre-commit hook repeats the plugin body" in result.stderr
+    assert "git-hooks/pre-commit" in result.stderr
+    assert "commit-msg" not in result.stderr
+    assert (root / ".git/hooks/pre-commit.local").read_bytes() == own
+    assert (root / ".git/hooks/pre-commit").read_bytes() == SHIM.read_bytes()
+
+
+@pytest.mark.parametrize("own", ["#!/bin/sh\necho mine\n", "drop-one-line"])
+def test_accepted_hook_without_the_body_lines_gets_no_warning(tmp_path: Path, home: Path, own: str) -> None:
+    root = make_clone(tmp_path / "proj")
+    hook = root / ".git/hooks/post-commit"
+    if own == "drop-one-line":
+        body = hook.read_text().splitlines(keepends=True)
+        last = max(i for i, line in enumerate(body) if line.strip() and not line.lstrip().startswith("#"))
+        own = "".join(body[:last] + body[last + 1 :])
+    hook.write_text(own)
+    accept(root, "post-commit")
+    result = clone(root, home)
+    assert result.returncode == 0, result.stderr
+    assert "repeats the plugin body" not in result.stderr
+    assert (root / ".git/hooks/post-commit.local").read_text() == own
+
+
 def test_existing_local_is_never_overwritten(tmp_path: Path, home: Path) -> None:
     root = make_clone(tmp_path / "proj")
     customise(root, "post-commit")
