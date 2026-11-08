@@ -622,3 +622,60 @@ def test_clone_without_the_switch_compares_the_legacy_bodies(project: Path) -> N
     shim_clone(project)
     subprocess.run(["git", "-C", str(project), "config", "--unset", "ralph.pluginHooks"], check=True)
     assert run("check", str(project)).stdout.count(": outdated\n") == 3
+
+
+# TASK-336: git hooks are read where git runs them, under the .git/hooks/<name> key.
+def git(*args: str) -> None:
+    subprocess.run(["git", *args], check=True, capture_output=True)
+
+
+def legacy_clone(project: Path) -> None:
+    """Turn ``project`` into a git clone whose hooks are the current legacy bodies."""
+    shutil.rmtree(project / ".git")
+    git("init", "-q", str(project))
+    for name in ("pre-commit", "commit-msg", "post-commit"):
+        shutil.copyfile(MANAGED[f".git/hooks/{name}"], project / ".git/hooks" / name)
+
+
+def test_hooks_path_clone_compares_the_hooks_path_directory(project: Path) -> None:
+    legacy_clone(project)
+    git("-C", str(project), "config", "core.hooksPath", "githooks")
+    (project / "githooks").mkdir()
+    for name in ("pre-commit", "commit-msg"):
+        shutil.copyfile(MANAGED[f".git/hooks/{name}"], project / "githooks" / name)
+    (project / "githooks/post-commit").write_text("#!/bin/sh\n")
+    result = run("check", str(project))
+    assert (result.returncode, result.stdout) == (1, ".git/hooks/post-commit: outdated\n")
+    (project / "githooks/post-commit").unlink()
+    assert run("check", str(project)).stdout == ".git/hooks/post-commit: missing\n"
+
+
+def test_linked_worktree_compares_the_common_dir_hooks(project: Path, tmp_path: Path) -> None:
+    legacy_clone(project)
+    git("-C", str(project), "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "init")
+    worktree = tmp_path / "worktree"
+    git("-C", str(project), "worktree", "add", "-q", str(worktree))
+    for path, template in MANAGED.items():
+        if not path.startswith(".git/"):
+            (worktree / path).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(template, worktree / path)
+    assert (worktree / ".git").is_file()
+    assert run("check", str(worktree)).returncode == 0
+    with (project / ".git/hooks/commit-msg").open("a") as f:
+        f.write("# local nudge\n")
+    assert run("check", str(worktree)).stdout == ".git/hooks/commit-msg: outdated\n"
+
+
+def test_hooks_path_accept_keeps_the_git_hooks_key(project: Path) -> None:
+    legacy_clone(project)
+    with (project / ".git/hooks/post-commit").open("a") as f:
+        f.write("# local nudge\n")
+    (project / ACCEPT).write_text(accept(project, ".git/hooks/post-commit"))
+    git("-C", str(project), "config", "core.hooksPath", str(project / "githooks"))
+    shutil.copytree(project / ".git/hooks", project / "githooks")
+    (project / ".git/hooks/post-commit").unlink()
+    line = accept(project, ".git/hooks/post-commit")
+    assert line.startswith(".git/hooks/post-commit template=")
+    assert (project / ACCEPT).read_text() == line
+    result = run("check", str(project))
+    assert (result.returncode, result.stdout) == (0, "")
