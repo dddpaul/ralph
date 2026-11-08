@@ -1,9 +1,10 @@
 ---
 id: TASK-337
 title: Publish failed iterations that moved master in shared-backlog clones
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-07T21:35:00Z'
+updated_date: '2026-11-08T08:56:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies: []
@@ -22,10 +23,24 @@ Also from TASK-315: a run refused at startup in an enforcing clone writes no sta
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A timed-out iteration that advanced master is published before the next claim (pytest with a fake tool)
-- [ ] #2 A failed iteration under on-error=continue that advanced master is published before the next claim (pytest)
-- [ ] #3 An iteration that did not move master publishes nothing (pytest)
-- [ ] #4 A failed publish after such an iteration still ends the run, with no end-of-run retry (pytest)
-- [ ] #5 A run refused at startup in an enforcing clone writes a status file with state failed and the refusal message (pytest)
-- [ ] #6 ruff and pytest pass
+- [x] #1 A timed-out iteration that advanced master is published before the next claim (pytest with a fake tool)
+- [x] #2 A failed iteration under on-error=continue that advanced master is published before the next claim (pytest)
+- [x] #3 An iteration that did not move master publishes nothing (pytest)
+- [x] #4 A failed publish after such an iteration still ends the run, with no end-of-run retry (pytest)
+- [x] #5 A run refused at startup in an enforcing clone writes a status file with state failed and the refusal message (pytest)
+- [x] #6 ruff and pytest pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan: in loop._run_loop publish through _publish_iteration on the timeout and on-error=continue paths before the next claim; add write_refusal_status (loop.py) called on the prompt-file / RunSession refusals and the orchestrator no-push refusal, skipping when the status file shows a live run; tests in test_loop_shared_publish.py.
+
+Commit: `ecfba2a` - task-337: publish timed-out and continued iterations that moved master; record startup refusals in the status file
+
+Review: APPROVED ecfba2a0a8af7001d66c8d7a44b76d8098b81f4a
+
+Timed-out and on-error=continue iterations that moved master now publish through _publish_iteration before the next claim; a failed publish still stops the run with no end-of-run retry. write_refusal_status records startup refusals (prompt-file, holder/run lock, no-push) as a failed status, leaving a live run's status alone. Reviewer minor (redundant except PermissionError) not taken: without it PermissionError would escape os.kill. Full pytest: 1556 passed, 4 skipped.
+
+Commit: `3933f1b` - task-337: bump plugin version to 0.25.8 (patch)
+<!-- SECTION:NOTES:END -->

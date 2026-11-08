@@ -146,16 +146,18 @@ def run(args: ParsedArgs, project_root: Path) -> int:
         holder = tasks_module.resolve_holder(project_root)
         if push_module.shared_backlog_enforced(project_root):
             if args.prompt_file:
-                print(
-                    "Error: --prompt-file in a clone that enforces the shared-backlog protocol: "
-                    "each iteration's prompt names the task the run claimed",
-                    file=sys.stderr,
+                message = (
+                    "--prompt-file in a clone that enforces the shared-backlog protocol: "
+                    "each iteration's prompt names the task the run claimed"
                 )
+                print(f"Error: {message}", file=sys.stderr)
+                write_refusal_status(args, project_root, message, 1)
                 return 1
             try:
                 session = claims_module.RunSession.open(project_root, holder)
             except claims_module.ClaimError as exc:
                 print(f"Error: {exc}", file=sys.stderr)
+                write_refusal_status(args, project_root, str(exc), exc.exit_code)
                 return exc.exit_code
         return _run_armed(args, project_root, prompt_file_body, installer, holder, session)
     finally:
@@ -259,6 +261,42 @@ def _run_armed(
         f"exit_reason {state.exit_reason!r} not in closed set {EXIT_REASONS!r}"
     )
     return state.exit_code
+
+
+def write_refusal_status(args: ParsedArgs, project_root: Path, message: str, exit_code: int) -> None:
+    """Record a run refused at startup as a ``failed`` status carrying ``message`` (TASK-337).
+
+    The status of a live run is left alone: a run refused because another one
+    holds the run lock must not hide that run from ``/ralph-status``.
+    """
+    status_path = _status_file_path(project_root)
+    if _live_run_status(status_path):
+        return
+    status = _initial_status(args, timeout_to_seconds(args.timeout))
+    now = _now_iso()
+    status.state = "failed"
+    status.errors = [ErrorEntry(iteration=0, at=now, message=message)]
+    status.completed_at = now
+    status.exit_code = exit_code
+    with suppress(OSError):
+        status.write_atomic(status_path)
+
+
+def _live_run_status(status_path: Path) -> bool:
+    """True when ``status_path`` reports a running or paused run whose process is alive."""
+    try:
+        current = StatusFile.model_validate_json(status_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    if current.state not in ("running", "paused") or current.pid == os.getpid():
+        return False
+    try:
+        os.kill(current.pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
 
 
 def _initial_status(args: ParsedArgs, timeout_sec: int) -> StatusFile:
@@ -388,6 +426,11 @@ def _run_loop(
             _update_after_iteration(
                 status, status_path, started_epoch, state, iter_elapsed, whitelist
             )
+            # TASK-337: a timed-out iteration that merged is published before the next claim.
+            if state.shared_publish and not _publish_iteration(
+                project_root, next_task, rev_iter_before, i, state
+            ):
+                return
             installer.raise_if_pending()
             time.sleep(ITER_SLEEP_SEC)
             continue
@@ -420,6 +463,11 @@ def _run_loop(
                 )
                 state.exit_reason = "error"
                 state.exit_code = result.exit_code
+                return
+            # TASK-337: so is a failed one under --on-error=continue.
+            if state.shared_publish and not _publish_iteration(
+                project_root, next_task, rev_iter_before, i, state
+            ):
                 return
             installer.raise_if_pending()
             time.sleep(ITER_SLEEP_SEC)
