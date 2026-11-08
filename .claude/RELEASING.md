@@ -38,7 +38,7 @@ A tag on origin is never moved, deleted or force-pushed. Whatever origin tagged 
 When the guard reports `version conflict on vX.Y.Z`:
 
 1. Delete only your local, never-pushed tag: `git tag -d vX.Y.Z`. Then `git fetch origin --tags` to get origin's.
-2. Bring `master` up to date with `origin/master` (merge it in, or rebase your unpushed work onto it).
+2. Bring `master` up to date by merging `origin/master` into it. Never rebase: a rebase rewrites your reviewed commits, so they no longer match the SHAs in their `Review: APPROVED <sha>` notes and R-INFRA-6 flags them (the shared-backlog protocol never rebases either).
 3. Re-bump both manifests to a version above `X.Y.Z`, e.g. `.claude/hooks/bump-version.sh patch` on a task branch, then merge it into `master` as usual.
 4. On `master`, `.claude/hooks/bump-version.sh --tag` tags the new version; push again.
 

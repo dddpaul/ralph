@@ -1,9 +1,10 @@
 ---
 id: TASK-334
 title: Align this repo's release and review docs with the shipped protocol
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-07T21:35:00Z'
+updated_date: '2026-11-08T07:45:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies: []
@@ -38,3 +39,9 @@ Why: the feature review of plugin-delivered-project-files and the task notes of 
 - [ ] #6 README.md 'Shared backlog across hosts' states that devcontainer checks need a project path without whitespace
 - [ ] #7 ruff, pytest and bats pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan: RELEASING.md step 2 merge-only with R-INFRA-6 reason; R11 table: one row pairing the four untracked .git/hooks/* with templates/shims/git-hook, six guards per localGuards, rewrite settings.json note; parity bats: registry rows for all four hooks against the shim, drop the legacy plugin-body/prefix path; R-INFRA-6 master_provenance_since advice; README whitespace limitation.
+<!-- SECTION:NOTES:END -->
