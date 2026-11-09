@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import os
+import shutil
+import subprocess
+import sys
 import time
 from pathlib import Path
 
 import pytest
-from conftest import PreflightFixture, write_mock_bin
+from conftest import BASH_PREFLIGHT, PreflightFixture, write_mock_bin
 
 from ralph import preflight
 
@@ -56,6 +59,58 @@ def test_no_todo_tasks_fails(
     captured = capsys.readouterr()
     assert rc == 1
     assert captured.out == "ERROR: No To Do tasks in backlog\n"
+
+
+def test_caller_path_wins_over_uv_interpreter_bin(
+    preflight_fixture: PreflightFixture,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    write_mock_bin(preflight_fixture.bin_dir, "backlog", 'echo "  TASK-1 - Test"')
+    shadow_dir = preflight_fixture.project_dir / "interpreter-bin"
+    write_mock_bin(shadow_dir, "backlog", 'echo "No tasks found"')
+    rc = _run_preflight(
+        preflight_fixture,
+        [str(preflight_fixture.ralph_sh), "false"],
+        monkeypatch,
+        {
+            "PATH": f"{shadow_dir}:{preflight_fixture.path_value}",
+            "RALPH_CALLER_PATH": preflight_fixture.path_value,
+        },
+    )
+    captured = capsys.readouterr()
+    assert rc == 0
+    assert captured.out == f"OK RALPH_PATH={preflight_fixture.ralph_sh}\n"
+    assert os.environ["PATH"] == preflight_fixture.path_value
+    assert "RALPH_CALLER_PATH" not in os.environ
+
+
+@pytest.mark.skipif(shutil.which("uv") is None, reason="uv not on PATH")
+def test_shim_resolves_backlog_on_caller_path(preflight_fixture: PreflightFixture, tmp_path: Path) -> None:
+    """A ``backlog`` in the interpreter env's bin dir (Homebrew Python) must not shadow the caller's."""
+    venv = tmp_path / "venv"
+    subprocess.run(
+        ["uv", "venv", "--quiet", "--python", sys.executable, str(venv)],
+        check=True,
+    )
+    write_mock_bin(venv / "bin", "backlog", 'echo "No tasks found"')
+    write_mock_bin(preflight_fixture.bin_dir, "backlog", 'echo "  TASK-1 - Test"')
+    uv_dir = str(Path(shutil.which("uv") or "uv").parent)
+    caller_path = f"{preflight_fixture.path_value}:{uv_dir}"
+    env = preflight_fixture.env(PATH=caller_path, UV_PYTHON=str(venv / "bin" / "python"))
+    for key in ("UV_CACHE_DIR", "XDG_CACHE_HOME"):
+        if key in os.environ:
+            env[key] = os.environ[key]
+    proc = subprocess.run(
+        ["bash", str(BASH_PREFLIGHT), str(preflight_fixture.ralph_sh), "false"],
+        cwd=preflight_fixture.project_dir,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert f"OK RALPH_PATH={preflight_fixture.ralph_sh}" in proc.stdout
 
 
 def test_ralph_already_running_fails(

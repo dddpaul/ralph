@@ -32,6 +32,9 @@ the one the git hooks run, not with its own copy.
 Invariants the AC pins down explicitly:
 
 * Runs against the invoker's PWD — this module never calls ``os.chdir``.
+* Resolves tools on the invoker's PATH: ``preflight.sh`` passes it as
+  ``RALPH_CALLER_PATH``, undoing the interpreter bin directory ``uv run``
+  puts first.
 * Honors ``TMPDIR`` for the ``bash -n`` stderr capture; falls back to
   ``/tmp`` only when ``TMPDIR`` is unset (matching bash's ``${TMPDIR:-/tmp}``).
 * Anchors the backlog "not found" line on the canonical
@@ -700,7 +703,15 @@ def _check_plugin_hooks(verbose: bool) -> None:
         print(f"WARNING: plugin hooks: {_AUTONOMOUS_CREATE_NOTE}", file=sys.stderr)
 
 
+def _restore_caller_path() -> None:
+    """Put back the PATH ``preflight.sh`` saw before ``uv run`` prepended its interpreter's bin directory."""
+    caller_path = os.environ.pop("RALPH_CALLER_PATH", None)
+    if caller_path is not None:
+        os.environ["PATH"] = caller_path
+
+
 def main(argv: list[str] | None = None) -> int:
+    _restore_caller_path()
     real_argv = sys.argv[1:] if argv is None else argv
     args = _parse_args(real_argv)
     if args is None:
