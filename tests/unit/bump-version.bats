@@ -184,6 +184,50 @@ teardown() {
   [ "$(plugin_version)" = "1.0.0" ]  # 0.1.0 -> 1.0.0
 }
 
+@test "rebump: bumps with an empty master..HEAD (version-conflict re-bump)" {
+  git checkout -q -b task-8          # fresh branch, no commits past master
+
+  run bash "$HELPER" --rebump
+  [ "$status" -eq 0 ]
+  [ "$(plugin_version)" = "0.1.1" ]  # patch by default
+  [ "$(market_version)" = "0.1.1" ]
+  run git log -1 --format=%s
+  [ "$output" = "task-8: bump plugin version to 0.1.1 (patch)" ]   # same format as --auto
+}
+
+@test "rebump: combines with an explicit increment and --no-commit" {
+  git checkout -q -b task-9
+  before=$(git rev-parse HEAD)
+
+  run bash "$HELPER" --rebump minor --no-commit
+  [ "$status" -eq 0 ]
+  [ "$(plugin_version)" = "0.2.0" ]
+  [ "$(market_version)" = "0.2.0" ]
+  [ "$(git rev-parse HEAD)" = "$before" ]
+  run git diff --cached --name-only
+  [[ "$output" == *"$PLUGIN"* ]]
+  [[ "$output" == *"$MARKET"* ]]
+}
+
+@test "rebump: idempotent — no-op once already ahead of master" {
+  git checkout -q -b task-10
+  run bash "$HELPER" --rebump
+  [ "$status" -eq 0 ]
+  after_first=$(git rev-parse HEAD)
+
+  run bash "$HELPER" --rebump
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"already ahead"* ]]
+  [ "$(plugin_version)" = "0.1.1" ]
+  [ "$(git rev-parse HEAD)" = "$after_first" ]
+}
+
+@test "rebump: rejected with a non-bump mode" {
+  run bash "$HELPER" --rebump --tag
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"--rebump combines only"* ]]
+}
+
 @test "tag: creates an annotated vX.Y.Z once, then no-ops; sets push.followTags" {
   # HEAD is master at 0.1.0.
   run bash "$HELPER" --tag

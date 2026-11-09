@@ -20,13 +20,19 @@
 #                       already ahead of master (idempotent).
 #   patch|minor|major   Force the increment (overrides --auto inference). major
 #                       is never chosen automatically but may be requested here.
+#   --rebump            Like --auto, but skips the shipped-change check: bumps
+#                       both manifests above local master even when master..HEAD
+#                       is empty (re-bump after resolving a version conflict —
+#                       see .claude/RELEASING.md). Patch unless combined with
+#                       patch|minor|major. Same edit, commit message and
+#                       already-ahead no-op as --auto.
 #   --tag               Create an annotated tag vX.Y.Z on HEAD when absent
 #                       (no-op if present); also ensures push.followTags=true so
 #                       the tag rides the normal `git push origin master`.
 #   --nudge             Non-blocking: print one reminder line when HEAD touched
 #                       shipped files but the version is not yet ahead of
 #                       master. Always exits 0. Used by the post-commit hook.
-#   --no-commit         With --auto / patch|minor|major: edit + stage the two
+#   --no-commit         With --auto / --rebump / patch|minor|major: edit + stage the two
 #                       manifests but do not commit.
 #
 # Why compare against LOCAL master, not origin/master: the guard only needs one
@@ -62,11 +68,15 @@ Modes:
                       shipped plugins/ralph/** path changed in master..HEAD.
                       No-op otherwise / when already ahead of master.
   patch|minor|major   Force the increment (overrides --auto inference).
+  --rebump            Bump vs local master even with no shipped change in
+                      master..HEAD (version-conflict re-bump); patch unless
+                      combined with patch|minor|major.
   --tag               Create annotated tag vX.Y.Z on HEAD if absent; ensure
                       push.followTags=true.
   --nudge             Non-blocking reminder when HEAD touched shipped files but
                       the version is not yet ahead of master (always exit 0).
-  --no-commit         With --auto / patch|minor|major: edit + stage, no commit.
+  --no-commit         With --auto / --rebump / patch|minor|major: edit + stage,
+                      no commit.
 See TASK-217 for the design rationale.
 EOF
 }
@@ -163,10 +173,10 @@ already_ahead() {
 
 # --- modes -----------------------------------------------------------------
 
-do_auto() { # $1=forced increment ("" to infer)  $2=commit? (true/false)
-  forced="$1"; do_commit="$2"
+do_auto() { # $1=forced increment ("" to infer)  $2=commit? (true/false)  $3=require shipped change? (true/false)
+  forced="$1"; do_commit="$2"; require_shipped="$3"
 
-  if ! shipped_changed_in_range; then
+  if [ "$require_shipped" = true ] && ! shipped_changed_in_range; then
     echo "bump-version: no shipped-set file changed in $BASE_REF..HEAD; nothing to bump."
     return 0
   fi
@@ -180,7 +190,13 @@ do_auto() { # $1=forced increment ("" to infer)  $2=commit? (true/false)
     echo "bump-version: cannot read $BASE_REF version ($PLUGIN_MANIFEST)." >&2
     return 1
   fi
-  if [ -n "$forced" ]; then increment="$forced"; else increment=$(infer_increment); fi
+  if [ -n "$forced" ]; then
+    increment="$forced"
+  elif [ "$require_shipped" = true ]; then
+    increment=$(infer_increment)
+  else
+    increment=patch
+  fi
   target=$(bump_semver "$base_ver" "$increment")
 
   set_version_in "$PLUGIN_MANIFEST" "$target"
@@ -247,10 +263,12 @@ EOF
 mode=""
 forced=""
 do_commit=true
+rebump=false
 while [ $# -gt 0 ]; do
   case "$1" in
     --auto) mode="auto" ;;
     patch|minor|major) mode="auto"; forced="$1" ;;
+    --rebump) rebump=true ;;
     --tag) mode="tag" ;;
     --nudge) mode="nudge" ;;
     --no-commit) do_commit=false ;;
@@ -260,8 +278,15 @@ while [ $# -gt 0 ]; do
   shift
 done
 
+if $rebump; then
+  case "$mode" in
+    ""|auto) mode="rebump" ;;
+    *) echo "bump-version: --rebump combines only with patch|minor|major and --no-commit." >&2; usage >&2; exit 2 ;;
+  esac
+fi
+
 if [ -z "$mode" ]; then
-  echo "bump-version: no mode given (expected --auto, patch|minor|major, --tag, or --nudge)." >&2
+  echo "bump-version: no mode given (expected --auto, --rebump, patch|minor|major, --tag, or --nudge)." >&2
   usage >&2
   exit 2
 fi
@@ -270,7 +295,8 @@ fi
 cd "$(git rev-parse --show-toplevel)"
 
 case "$mode" in
-  auto) do_auto "$forced" "$do_commit" ;;
+  auto) do_auto "$forced" "$do_commit" true ;;
+  rebump) do_auto "$forced" "$do_commit" false ;;
   tag) do_tag ;;
   nudge) do_nudge ;;
 esac
