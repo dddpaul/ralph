@@ -3,9 +3,10 @@ id: TASK-342
 title: >-
   Refresh an outdated pre-push shim with clone and check shims against the
   installed plugin
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-08T15:03:00Z'
+updated_date: '2026-11-09T05:23:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies: []
@@ -32,10 +33,28 @@ The real v1 shim is in tests/python/fixtures/shipped-git-hooks/git-hook-shim.v0.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 migrate-plugin-hooks.sh clone replaces a pre-push equal to a recorded past shim (the git-hook-shim.v0.25.10 fixture) with the current template, leaves pre-push.local unchanged, and a second run changes nothing (pytest)
-- [ ] #2 clone leaves pre-push untouched when it is missing, is already the current shim, or is any other file, and never creates it (pytest)
-- [ ] #3 preflight reports 'shims outdated in this clone' naming pre-push when pre-push is a recorded past shim, and adds no warning for a missing pre-push or one that is not a recorded shim (pytest)
-- [ ] #4 preflight compares the hooks with the shim and hash list of the install the registry resolves for the project, and falls back to its own plugin root when resolution fails: with a fake registry whose install ships a newer shim, a hook equal to preflight's own copy is reported as outdated (pytest)
-- [ ] #5 README.md and .claude/RELEASING.md say that clone also refreshes an outdated pre-push shim
-- [ ] #6 bash -n and the bash 3.2 static guard pass on the changed scripts; ruff, pytest and bats pass
+- [x] #1 migrate-plugin-hooks.sh clone replaces a pre-push equal to a recorded past shim (the git-hook-shim.v0.25.10 fixture) with the current template, leaves pre-push.local unchanged, and a second run changes nothing (pytest)
+- [x] #2 clone leaves pre-push untouched when it is missing, is already the current shim, or is any other file, and never creates it (pytest)
+- [x] #3 preflight reports 'shims outdated in this clone' naming pre-push when pre-push is a recorded past shim, and adds no warning for a missing pre-push or one that is not a recorded shim (pytest)
+- [x] #4 preflight compares the hooks with the shim and hash list of the install the registry resolves for the project, and falls back to its own plugin root when resolution fails: with a fake registry whose install ships a newer shim, a hook equal to preflight's own copy is reported as outdated (pytest)
+- [x] #5 README.md and .claude/RELEASING.md say that clone also refreshes an outdated pre-push shim
+- [x] #6 bash -n and the bash 3.2 static guard pass on the changed scripts; ruff, pytest and bats pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan: clone's plan_hooks adds pre-push:replace only when pre-push is a regular file, differs from the current shim and is a recorded 'shim' hash; preflight adds pre-push to the outdated check and takes shim/hash list/migrate script from the registry-resolved install (sourcing its own resolve-plugin.sh in bash), falling back to its own root; tests in test_migrate_plugin_hooks_clone.py and test_preflight_plugin_hooks.py; README + .claude/RELEASING.md.
+
+Commit: `9972ab6` - task-342: refresh an earlier pre-push shim in clone and compare shims with the registry-resolved install in preflight
+
+Commit: `68744a8` - task-342: restore the executable bit on migrate-plugin-hooks.sh and describe pre-push and the resolved install in the ralph-run preflight docs
+
+Commit: `3c2dd4d` - task-342: list every preflight plugin-hooks state before the shim source sentence in ralph-run SKILL.md
+
+Review: APPROVED 3c2dd4d4881b5782c1dbfd8d2b4877792f3b4abb
+
+Done: clone refreshes a pre-push that is a recorded past shim (never creates it, never touches pre-push.local); preflight reports such a pre-push as outdated and takes shim, hash list and migrate script from the registry-resolved install (sourcing resolve-plugin.sh in bash), falling back to its own root. Docs: README, .claude/RELEASING.md, ralph-run SKILL.md. Final gate: ruff ok, pytest 1596 passed/4 skipped, bats 276 with 0 failures.
+
+Commit: `c6c0f4d` - task-342: bump plugin version to 0.25.12 (patch)
+<!-- SECTION:NOTES:END -->

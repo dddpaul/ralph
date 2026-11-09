@@ -2,7 +2,11 @@
 
 The report-only check names "not migrated", "partially migrated" and "shims
 missing in this clone", and in a project whose marker sets ``pluginHooks`` it
-says that plugin guards are best effort. It never changes the exit code.
+says that plugin guards are best effort. It never changes the exit code. It
+compares the hooks with the shim and hash list of the install the plugin
+registry names for the clone, falling back to its own plugin root (TASK-342);
+every test but the registry ones points ``CLAUDE_CONFIG_DIR`` at an empty dir,
+so resolution fails there.
 """
 
 from __future__ import annotations
@@ -32,6 +36,15 @@ GUARDS = (
 )
 HOOK_NAMES = ("pre-commit", "commit-msg", "post-commit")
 GUARD_COMMAND = '"$CLAUDE_PROJECT_DIR"/.claude/hooks/notes-guard.sh'
+
+
+@pytest.fixture(autouse=True)
+def no_registry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Point the resolver at an empty Claude config dir, so it finds no registry unless a test writes one."""
+    config = tmp_path / "claude-config"
+    config.mkdir()
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(config))
+    return config
 
 
 def git(cwd: Path, *args: str) -> None:
@@ -178,6 +191,102 @@ def test_the_real_pre_dispatcher_shim_is_outdated(tmp_path: Path) -> None:
     )
     assert [f for f in found if f.startswith("shims outdated in this clone")] == [expected]
     assert not any(f.startswith("shims missing") for f in found)
+
+
+def test_a_pre_push_that_is_a_past_shim_is_outdated(tmp_path: Path) -> None:
+    root = migrated_project(tmp_path / "p")
+    shutil.copyfile(
+        REPO_ROOT / "tests/python/fixtures/shipped-git-hooks/git-hook-shim.v0.25.10",
+        root / ".git/hooks/pre-push",
+    )
+    found = state(root)
+    expected = (
+        "shims outdated in this clone — an earlier plugin shim in pre-push "
+        f"(run bash {preflight._MIGRATE_SCRIPT} clone)"
+    )
+    assert [f for f in found if f.startswith("shims outdated in this clone")] == [
+        expected
+    ]
+    assert not any(f.startswith("shims missing") for f in found)
+
+
+@pytest.mark.parametrize("pre_push", ["missing", "current-shim", "own-hook", "body"])
+def test_a_pre_push_that_is_no_past_shim_adds_no_warning(
+    tmp_path: Path, pre_push: str
+) -> None:
+    root = migrated_project(tmp_path / "p")
+    hook = root / ".git/hooks/pre-push"
+    if pre_push == "current-shim":
+        shutil.copyfile(SHIM, hook)
+    elif pre_push == "own-hook":
+        hook.write_text("#!/bin/sh\nexit 0\n")
+    elif pre_push == "body":
+        shutil.copyfile(PLUGIN / "git-hooks/pre-push", hook)
+    found = state(root)
+    assert len(found) == 1
+    assert found[0].startswith("plugin guards are best effort")
+
+
+def fake_install(
+    tmp_path: Path, config: Path, *, newer: bool = True, install_exists: bool = True
+) -> Path:
+    """Register a copy of the plugin as the user-scope ralph install; with ``newer`` its shim is newer than ours."""
+    install = tmp_path / "install"
+    if install_exists:
+        shutil.copytree(PLUGIN, install, ignore=shutil.ignore_patterns("__pycache__"))
+        if newer:
+            shim = install / "skills/ralph-init/templates/shims/git-hook"
+            shim.write_bytes(SHIM.read_bytes() + b"# a newer shim version\n")
+            with (install / "skills/ralph-init/scripts/shipped-git-hooks.sha256").open(
+                "a"
+            ) as f:
+                f.write(f"shim {hashlib.sha256(shim.read_bytes()).hexdigest()}\n")
+    registry = {
+        "version": 2,
+        "plugins": {
+            "ralph@dddpaul-ralph": [{"scope": "user", "installPath": str(install)}]
+        },
+    }
+    (config / "plugins").mkdir()
+    (config / "plugins/installed_plugins.json").write_text(json.dumps(registry))
+    return install
+
+
+@pytest.mark.skipif(shutil.which("jq") is None, reason="jq is not installed")
+def test_hooks_are_compared_with_the_install_the_registry_resolves(
+    tmp_path: Path, no_registry: Path
+) -> None:
+    root = migrated_project(tmp_path / "p")
+    shutil.copyfile(SHIM, root / ".git/hooks/pre-push")
+    install = fake_install(tmp_path, no_registry)
+    found = state(root)
+    migrate = install / "skills/ralph-init/scripts/migrate-plugin-hooks.sh"
+    expected = (
+        "shims outdated in this clone — an earlier plugin shim in pre-commit, commit-msg, post-commit, pre-push "
+        f"(run bash {migrate} clone)"
+    )
+    assert [f for f in found if f.startswith("shims outdated in this clone")] == [
+        expected
+    ]
+    assert not any(f.startswith("shims missing") for f in found)
+
+
+@pytest.mark.skipif(shutil.which("jq") is None, reason="jq is not installed")
+@pytest.mark.parametrize("failure", ["no-install-dir", "no-registry"])
+def test_a_failed_resolution_falls_back_to_the_own_plugin_root(
+    tmp_path: Path, no_registry: Path, failure: str
+) -> None:
+    root = migrated_project(tmp_path / "p")
+    if failure == "no-install-dir":
+        fake_install(tmp_path, no_registry, install_exists=False)
+    assert preflight._plugin_files(root) == (
+        preflight._SHIM,
+        preflight._SHIPPED,
+        preflight._MIGRATE_SCRIPT,
+    )
+    found = state(root)
+    assert len(found) == 1
+    assert found[0].startswith("plugin guards are best effort")
 
 
 def test_an_unlisted_shim_like_hook_is_still_missing(tmp_path: Path) -> None:

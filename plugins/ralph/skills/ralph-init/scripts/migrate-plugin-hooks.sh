@@ -83,6 +83,10 @@
 #                 holds every non-blank, non-comment line of the plugin body
 #                 git-hooks/<name>, in order, is still kept, with a warning: the
 #                 .local repeats the body, which then runs twice.
+#                 A pre-push that is an earlier version of the shim is replaced
+#                 by the current shim too. Any other pre-push, and
+#                 pre-push.local, is left alone, and a missing pre-push is never
+#                 created: installing it is shared-backlog.sh enable's job.
 #   3. switch   — sets git config ralph.pluginHooks true, so pre-commit and
 #                 commit-msg block when the plugin cannot be resolved.
 #   4. allow    — removes from .claude/settings.local.json each entry of the
@@ -92,7 +96,7 @@
 #                 is deleted only when nothing is left in it.
 #
 # A second clone run changes nothing. RALPH_MIGRATE_STOP_AFTER also takes the
-# clone steps config, shim:<name> and switch.
+# clone steps config, shim:<name> (pre-push included) and switch.
 set -euo pipefail
 unset CDPATH
 
@@ -229,6 +233,10 @@ plan_hooks() {
       refuse "$hook differs from every $name hook body ralph-init has shipped and .claude/managed-file-drift.accept does not list it; to keep it as $name.local, accept it (managed-file-drift.sh accept . .git/hooks/$name) and rerun, else delete it and rerun"
     fi
   done
+  hook=$hooks/pre-push
+  if [ -f "$hook" ] && ! cmp -s "$hook" "$shim" && shipped_hook "$hook" shim; then
+    echo "pre-push:replace"
+  fi
 }
 
 # jq program for the allow step: reads .claude/settings.local.json, takes the

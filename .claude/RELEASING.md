@@ -12,7 +12,7 @@ The pre-push guard and the post-commit bump nudge live in `.git/hooks/`, which i
 
 It installs the version-bump wrapper (`pre-push.local` behind the plugin shim, or `pre-push` in a clone without one) and the nudge (`post-commit.local`). It never overwrites a differing hook: it names it and exits non-zero. `.claude/hooks/install-clone-hooks.sh --check` only reports, and the repo's SessionStart hook runs it to warn a session in a clone that lacks the hooks. Without them, pushes from that clone skip the guard below.
 
-When a release changes the git hook shim (`templates/shims/git-hook`), refresh each clone in this order: `/plugin update` first, then `migrate-plugin-hooks.sh clone` in each clone. `--check` accepts any shim version listed in `shipped-git-hooks.sha256`, so a clone not yet refreshed still passes.
+When a release changes the git hook shim (`templates/shims/git-hook`), refresh each clone in this order: `/plugin update` first, then `migrate-plugin-hooks.sh clone` in each clone. `clone` also refreshes a `pre-push` that is an earlier shim; it never creates `pre-push` and never touches `pre-push.local`. `--check` accepts any shim version listed in `shipped-git-hooks.sha256`, so a clone not yet refreshed still passes.
 
 ## Normal release
 

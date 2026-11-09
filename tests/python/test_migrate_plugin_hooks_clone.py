@@ -360,6 +360,52 @@ def test_the_real_pre_dispatcher_shim_is_replaced_in_place(tmp_path: Path, home:
         assert not (root / f".git/hooks/{name}.local").exists()
 
 
+def test_a_pre_push_that_is_a_past_shim_is_refreshed_and_its_local_kept(
+    tmp_path: Path, home: Path
+) -> None:
+    root = make_clone(tmp_path / "proj")
+    hook = root / ".git/hooks/pre-push"
+    shutil.copyfile(OLD_HOOKS / "git-hook-shim.v0.25.10", hook)
+    hook.chmod(0o755)
+    local = root / ".git/hooks/pre-push.local"
+    local.write_text("#!/bin/sh\necho own pre-push\n")
+    local.chmod(0o700)
+    local_before = (local.read_bytes(), local.stat().st_mode)
+    result = clone(root, home)
+    assert result.returncode == 0, result.stderr
+    assert hook.read_bytes() == SHIM.read_bytes()
+    assert os.access(hook, os.X_OK)
+    assert "installed the plugin shim as pre-push" in result.stdout
+    assert (local.read_bytes(), local.stat().st_mode) == local_before
+    before = snapshot(root)
+    second = clone(root, home)
+    assert second.returncode == 0, second.stderr
+    assert snapshot(root) == before
+    assert "clone: nothing to change" in second.stdout
+
+
+@pytest.mark.parametrize("pre_push", ["missing", "current-shim", "own-hook", "body"])
+def test_a_pre_push_that_is_no_past_shim_is_left_alone(
+    tmp_path: Path, home: Path, pre_push: str
+) -> None:
+    root = make_clone(tmp_path / "proj")
+    hook = root / ".git/hooks/pre-push"
+    if pre_push == "current-shim":
+        shutil.copyfile(SHIM, hook)
+    elif pre_push == "own-hook":
+        hook.write_text("#!/bin/sh\nexit 0\n")
+    elif pre_push == "body":
+        shutil.copyfile(BODIES / "pre-push", hook)
+    before = hook.read_bytes() if hook.exists() else None
+    result = clone(root, home)
+    assert result.returncode == 0, result.stderr
+    assert "as pre-push" not in result.stdout
+    if before is None:
+        assert not hook.exists()
+    else:
+        assert hook.read_bytes() == before
+
+
 def test_an_unlisted_shim_like_hook_is_refused(tmp_path: Path, home: Path) -> None:
     root = make_clone(tmp_path / "proj")
     plugin, old = plugin_with_old_shim(tmp_path, list_it=False)
