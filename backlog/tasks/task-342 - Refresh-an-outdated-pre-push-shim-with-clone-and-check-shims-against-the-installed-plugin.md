@@ -6,7 +6,7 @@ title: >-
 status: Done
 assignee: []
 created_date: '2026-11-08T15:03:00Z'
-updated_date: '2026-11-09T05:23:00Z'
+updated_date: '2026-11-09T05:54:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies: []
@@ -57,4 +57,10 @@ Review: APPROVED 3c2dd4d4881b5782c1dbfd8d2b4877792f3b4abb
 Done: clone refreshes a pre-push that is a recorded past shim (never creates it, never touches pre-push.local); preflight reports such a pre-push as outdated and takes shim, hash list and migrate script from the registry-resolved install (sourcing resolve-plugin.sh in bash), falling back to its own root. Docs: README, .claude/RELEASING.md, ralph-run SKILL.md. Final gate: ruff ok, pytest 1596 passed/4 skipped, bats 276 with 0 failures.
 
 Commit: `c6c0f4d` - task-342: bump plugin version to 0.25.12 (patch)
+
+Commit: `f97e38a` - task-342: bump plugin version to 0.25.13 (patch)
+
+Version re-bump: TASK-343 on the other host also released 0.25.12, and origin's v0.25.12 tag points at its merge (beda54c). Following .claude/RELEASING.md 'Resolving a version conflict': deleted the unpushed local v0.25.12 tag, merged origin/master into master (b2716cd, Integrated-Origin trailer, tree equal to git merge-tree), and moved both manifests to 0.25.13 on task-342-version. bump-version.sh patch refused there because master..HEAD changes no shipped file, so the two version lines were set by hand to what the script writes. Checks on the merged tree on macOS: ruff clean; pytest 1598 passed in the sandbox, and the 3 sandbox-bound tests passed outside it; the seven bash 3.2 shared-backlog suites pass; bats passes except 3 usage-pause preflight tests that already fail on 3e125d7.
+
+Review: APPROVED f97e38af39d4fad673dc98c89a64a582c6a6dbdc
 <!-- SECTION:NOTES:END -->
