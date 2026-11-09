@@ -21,11 +21,13 @@ reads both files and changes neither.
 
 One more report-only check reads the project's migration to plugin hooks
 (``migrate-plugin-hooks.sh``): it prints "not migrated", "partially migrated",
-"shims outdated in this clone" (a git hook is an earlier shim version) or
-"shims missing in this clone" when one applies, and in a project whose
-marker sets ``pluginHooks`` it says that plugin guards are best effort. In a
-clone with ``ralph.sharedBacklog`` true it also says that the guard refusing
-task creation in autonomous runs is best effort.
+"shims outdated in this clone" (a git hook, pre-push included, is an earlier
+shim version) or "shims missing in this clone" when one applies, and in a
+project whose marker sets ``pluginHooks`` it says that plugin guards are best
+effort. In a clone with ``ralph.sharedBacklog`` true it also says that the
+guard refusing task creation in autonomous runs is best effort. It compares the
+hooks with the shim of the install the plugin registry names for the clone,
+the one the git hooks run, not with its own copy.
 
 Invariants the AC pins down explicitly:
 
@@ -66,9 +68,13 @@ _PID_RE = re.compile(r'"pid":([0-9]+)')
 _PLUGIN_ROOT = Path(__file__).resolve().parents[4]
 _DRIFT_SCRIPT = _PLUGIN_ROOT / "skills/ralph-init/scripts/managed-file-drift.sh"
 _HOME_PREFIXES = ("$HOME/", "${HOME}/", "~/")
-_MIGRATE_SCRIPT = _PLUGIN_ROOT / "skills/ralph-init/scripts/migrate-plugin-hooks.sh"
-_SHIM = _PLUGIN_ROOT / "skills/ralph-init/templates/shims/git-hook"
-_SHIPPED = _PLUGIN_ROOT / "skills/ralph-init/scripts/shipped-git-hooks.sha256"
+_MIGRATE_REL = "skills/ralph-init/scripts/migrate-plugin-hooks.sh"
+_SHIM_REL = "skills/ralph-init/templates/shims/git-hook"
+_SHIPPED_REL = "skills/ralph-init/scripts/shipped-git-hooks.sha256"
+_MIGRATE_SCRIPT = _PLUGIN_ROOT / _MIGRATE_REL
+_SHIM = _PLUGIN_ROOT / _SHIM_REL
+_SHIPPED = _PLUGIN_ROOT / _SHIPPED_REL
+_RESOLVER = _PLUGIN_ROOT / "skills/ralph-init/templates/shims/resolve-plugin.sh"
 _LENGTH_GUARD = "filename-length-guard"
 _MANAGED_GUARDS = (
     "commit-msg-guard",
@@ -543,8 +549,11 @@ def migration_state(root: Path, hooks_dir: Path, switch: bool) -> list[str]:
     ``root`` is the work tree, ``hooks_dir`` what ``git rev-parse --git-path
     hooks`` returns and ``switch`` the clone's ``ralph.pluginHooks``. A fully
     migrated clone yields only the best-effort note, plus the leftover-copy note
-    while ``.claude/hooks/filename-length-guard.sh`` is still tracked.
+    while ``.claude/hooks/filename-length-guard.sh`` is still tracked. The shim,
+    the hash list and the migrate script named in the messages come from the
+    install the registry names for ``root`` (``_plugin_files``).
     """
+    shim_path, shipped, migrate = _plugin_files(root)
     try:
         marker: object = json.loads((root / ".claude/ralph.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -561,39 +570,41 @@ def migration_state(root: Path, hooks_dir: Path, switch: bool) -> list[str]:
             return [
                 (
                     "partially migrated — .claude/ralph.json does not set pluginHooks, but guard copies are missing "
-                    f"from .claude/hooks: {', '.join(missing)} (run bash {_MIGRATE_SCRIPT} tracked)"
+                    f"from .claude/hooks: {', '.join(missing)} (run bash {migrate} tracked)"
                 )
             ]
         return [
-            f"not migrated — the project runs its own guard copies (run bash {_MIGRATE_SCRIPT} tracked, then clone)"
+            f"not migrated — the project runs its own guard copies (run bash {migrate} tracked, then clone)"
         ]
     found: list[str] = []
     if legacy:
         found.append(
             f"partially migrated — .claude/ralph.json sets pluginHooks, but .claude/settings.json still runs "
-            f"{len(legacy)} legacy guard copies (rerun bash {_MIGRATE_SCRIPT} tracked)"
+            f"{len(legacy)} legacy guard copies (rerun bash {migrate} tracked)"
         )
     try:
-        shim = _SHIM.read_bytes()
+        shim = shim_path.read_bytes()
     except OSError:
         shim = b""
     stale = [n for n in _SHIMMED_HOOKS if not _same_bytes(hooks_dir / n, shim)]
-    past = _shipped_shims()
+    past = _shipped_shims(shipped)
     outdated = [n for n in stale if _sha256(hooks_dir / n) in past]
+    if not _same_bytes(hooks_dir / "pre-push", shim) and _sha256(hooks_dir / "pre-push") in past:
+        outdated.append("pre-push")
     stale = [n for n in stale if n not in outdated]
     if outdated:
         found.append(
             f"shims outdated in this clone — an earlier plugin shim in {', '.join(outdated)} "
-            f"(run bash {_MIGRATE_SCRIPT} clone)"
+            f"(run bash {migrate} clone)"
         )
     if stale or not switch:
         detail = [f"{', '.join(stale)} not the plugin shim"] if stale else []
         detail += [] if switch else ["git config ralph.pluginHooks is not true"]
-        found.append(f"shims missing in this clone — {'; '.join(detail)} (run bash {_MIGRATE_SCRIPT} clone)")
+        found.append(f"shims missing in this clone — {'; '.join(detail)} (run bash {migrate} clone)")
     if _same_bytes(hooks_dir / "pre-commit", shim) and (root / f".claude/hooks/{_LENGTH_GUARD}.sh").exists():
         found.append(
             f"leftover legacy copy — .claude/hooks/{_LENGTH_GUARD}.sh is removable: this clone's pre-commit is the "
-            f"plugin shim (once every clone has run clone, run bash {_MIGRATE_SCRIPT} tracked --retire-legacy)"
+            f"plugin shim (once every clone has run clone, run bash {migrate} tracked --retire-legacy)"
         )
     found.append(
         "plugin guards are best effort — a plugin guard hook that cannot start does not block the command; "
@@ -602,10 +613,43 @@ def migration_state(root: Path, hooks_dir: Path, switch: bool) -> list[str]:
     return found
 
 
-def _shipped_shims() -> set[str]:
-    """Return the sha256 digests of every shim version ``shipped-git-hooks.sha256`` lists."""
+def _plugin_files(root: Path) -> tuple[Path, Path, Path]:
+    """Return the shim, the shipped hash list and the migrate script to compare the clone at ``root`` with.
+
+    They come from the install the plugin registry names for the clone, resolved the way the git hooks resolve
+    it, so a session that has not reloaded after ``/plugin update`` still compares with the new plugin. When
+    resolution fails, or that install lacks the shim or the list, they come from this module's own plugin root.
+    """
+    installed = _resolved_plugin_root(root)
+    if installed is not None and (installed / _SHIM_REL).is_file() and (installed / _SHIPPED_REL).is_file():
+        return installed / _SHIM_REL, installed / _SHIPPED_REL, installed / _MIGRATE_REL
+    return _SHIM, _SHIPPED, _MIGRATE_SCRIPT
+
+
+def _resolved_plugin_root(root: Path) -> Path | None:
+    """Return the root of the install ``resolve-plugin.sh`` resolves for ``root``, or ``None`` when it fails."""
+    script = '. "$1" && ralph_resolve_plugin "$2" "$3"'
     try:
-        lines = _SHIPPED.read_text(encoding="utf-8").splitlines()
+        proc = subprocess.run(
+            ["bash", "-c", script, "bash", str(_RESOLVER), str(root), _SHIM_REL],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    path = proc.stdout.strip()
+    if proc.returncode != 0 or not path:
+        return None
+    # <install>/skills/ralph-init/templates/shims/git-hook → <install>
+    return Path(path).parents[4]
+
+
+def _shipped_shims(shipped: Path) -> set[str]:
+    """Return the sha256 digests of every shim version the hash list ``shipped`` names."""
+    try:
+        lines = shipped.read_text(encoding="utf-8").splitlines()
     except OSError:
         return set()
     return {line[len("shim ") :] for line in lines if line.startswith("shim ")}
