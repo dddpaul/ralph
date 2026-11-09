@@ -3,9 +3,10 @@ id: TASK-343
 title: >-
   Block a git hook when the installed plugin has the dispatcher but not the
   hook's body
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-08T15:03:00Z'
+updated_date: '2026-11-08T18:29:00Z'
 labels:
   - feature:plugin-delivered-project-files
 dependencies: []
@@ -32,10 +33,24 @@ If any listed switch is true (git config --bool), print a block line that names 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 With ralph.pluginHooks true and no pre-commit body beside run, the dispatcher exits 1, names the missing body and --no-verify on stderr, and does not run pre-commit.local (pytest)
-- [ ] #2 pre-push with no body is blocked when ralph.pluginHooks is true and, separately, when only ralph.sharedBacklog is true (pytest)
-- [ ] #3 With both switches off, and for post-commit or any name outside the table, the dispatcher runs <name>.local, then warns and exits 0 as before (pytest; adapt test_dispatcher_warns_and_exits_0_after_local_for_a_name_without_body)
-- [ ] #4 A test fails when the switch table in git-hooks/run differs from the one in templates/shims/git-hook (pytest)
-- [ ] #5 templates/shims/git-hook is unchanged (git diff master..HEAD --stat lists no change to it), and the README's dispatcher paragraph describes the block
-- [ ] #6 bash -n and the bash 3.2 static guard pass on git-hooks/run; ruff, pytest and bats pass
+- [x] #1 With ralph.pluginHooks true and no pre-commit body beside run, the dispatcher exits 1, names the missing body and --no-verify on stderr, and does not run pre-commit.local (pytest)
+- [x] #2 pre-push with no body is blocked when ralph.pluginHooks is true and, separately, when only ralph.sharedBacklog is true (pytest)
+- [x] #3 With both switches off, and for post-commit or any name outside the table, the dispatcher runs <name>.local, then warns and exits 0 as before (pytest; adapt test_dispatcher_warns_and_exits_0_after_local_for_a_name_without_body)
+- [x] #4 A test fails when the switch table in git-hooks/run differs from the one in templates/shims/git-hook (pytest)
+- [x] #5 templates/shims/git-hook is unchanged (git diff master..HEAD --stat lists no change to it), and the README's dispatcher paragraph describes the block
+- [x] #6 bash -n and the bash 3.2 static guard pass on git-hooks/run; ruff, pytest and bats pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan: in git-hooks/run, when the body is missing check the shim's switch table before <name>.local and block (exit 1, block + hint lines) if a switch is true; else keep local-then-warn. Add pytest cases for AC1-3, a table-parity test comparing the case block in run and the shim, update README dispatcher paragraph.
+
+Commit: `4fec781` - task-343: block a hook in the dispatcher when its body is missing and a switch is true
+
+Review: APPROVED 4fec7815a1568cb899d6f44f858d9854f7dc4b8f
+
+Done: git-hooks/run now checks the shim's switch table when the hook body is missing, before <name>.local; a true switch blocks with exit 1 and the --no-verify hint. Parity test compares the case blocks. ruff clean, pytest 1592 passed, bats 282 ok.
+
+Commit: `c65ac1d` - task-343: bump plugin version to 0.25.12 (patch)
+<!-- SECTION:NOTES:END -->

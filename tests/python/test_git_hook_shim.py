@@ -290,14 +290,69 @@ def test_dispatcher_returns_the_body_status(world: dict[str, Path]) -> None:
     assert run_dispatcher(world, hooks, "pre-commit").returncode == 5
 
 
-def test_dispatcher_warns_and_exits_0_after_local_for_a_name_without_body(world: dict[str, Path]) -> None:
-    clone = world["clone"]
+MISSING_BODY = [
+    # (hook, switches set true) for which a missing body only warns
+    ("post-rewrite", ("ralph.pluginHooks", "ralph.sharedBacklog")),
+    ("post-commit", ("ralph.pluginHooks", "ralph.sharedBacklog")),
+    ("pre-commit", ()),
+    ("pre-commit", ("ralph.sharedBacklog",)),
+    ("pre-push", ()),
+]
+
+
+@pytest.mark.parametrize(("name", "switches"), MISSING_BODY)
+def test_dispatcher_warns_and_exits_0_after_local_for_a_name_without_body(
+    world: dict[str, Path], name: str, switches: tuple[str, ...]
+) -> None:
+    clone, cfg = world["clone"], world["cfg"]
     hooks = dispatcher_install(world["base"])
-    write_hook(clone / ".git/hooks/post-rewrite.local", RECORD % ("%s", "local"))
-    result = run_dispatcher(world, hooks, "post-rewrite", "amend", stdin="old new\n")
+    for switch in switches:
+        git_ok(clone, cfg, "config", switch, "true")
+    write_hook(clone / ".git/hooks" / f"{name}.local", RECORD % ("%s", "local"))
+    result = run_dispatcher(world, hooks, name, "amend", stdin="old new\n")
     assert result.returncode == 0
-    assert "ships no post-rewrite hook; skipped it" in result.stderr
+    assert f"ships no {name} hook; skipped it" in result.stderr
+    assert "--no-verify" not in result.stderr
     assert (clone / "local.log").read_text() == "amend\nold new\n"
+
+
+@pytest.mark.parametrize(
+    ("name", "switch"),
+    [
+        ("pre-commit", "ralph.pluginHooks"),
+        ("commit-msg", "ralph.pluginHooks"),
+        ("pre-push", "ralph.pluginHooks"),
+        ("pre-push", "ralph.sharedBacklog"),
+    ],
+)
+def test_dispatcher_blocks_a_name_without_body_per_switch_without_running_local(
+    world: dict[str, Path], name: str, switch: str
+) -> None:
+    clone, cfg = world["clone"], world["cfg"]
+    hooks = dispatcher_install(world["base"])
+    git_ok(clone, cfg, "config", switch, "true")
+    write_hook(clone / ".git/hooks" / f"{name}.local", RECORD % ("%s", "local"))
+    result = run_dispatcher(world, hooks, name, "arg", stdin="refs\n")
+    assert result.returncode == 1
+    assert f"{name} hook blocked" in result.stderr
+    assert str(hooks / name) in result.stderr
+    assert switch in result.stderr
+    assert "--no-verify" in result.stderr
+    assert "warning" not in result.stderr
+    assert not (clone / "local.log").exists()
+
+
+def switch_table(path: Path) -> str:
+    """The ``case "$name" in ... esac`` block that maps hook names to switches."""
+    text = path.read_text()
+    start = text.index('case "$name" in\n')
+    end = text.index("esac", start)
+    return "\n".join(line.strip() for line in text[start:end].splitlines() if line.strip())
+
+
+def test_dispatcher_and_shim_share_the_switch_table() -> None:
+    assert "ralph.sharedBacklog" in switch_table(SHIM)
+    assert switch_table(DISPATCHER) == switch_table(SHIM)
 
 
 # ---------------------------------------------------------------- unresolvable plugin
