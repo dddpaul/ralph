@@ -6,6 +6,11 @@
 # allow rule on. It sets PYTHONPATH to its own directory (where the `ralph`
 # package lives) and execs the module. No orchestration logic lives here —
 # that stays in Python.
+#
+# `uv run` puts the interpreter environment's bin directory first on PATH (for
+# Homebrew Python that is /opt/homebrew/bin, which may hold its own backlog);
+# RALPH_CALLER_PATH carries the caller's PATH so the module restores it and
+# resolves backlog, devcontainer and ccusage the way the caller would.
 set -euo pipefail
 SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-PYTHONPATH="$SCRIPTS_DIR" exec uv run --no-project python -m ralph.preflight "$@"
+RALPH_CALLER_PATH="$PATH" PYTHONPATH="$SCRIPTS_DIR" exec uv run --no-project python -m ralph.preflight "$@"
